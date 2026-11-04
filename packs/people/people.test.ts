@@ -4,7 +4,8 @@
  *
  * WHAT IS HELD. People leans on two lists it does not own: Projects (`things`), which a person and an organisation are
  * met in and which an organisation's page draws, and Money's ledger (`transactions`), which that page draws too. Money
- * needs Projects, so the records BrainDog makes hold neither, Projects alone, or both, and each is made here. The file is
+ * only links to Projects since 4b137c806, so the records BrainDog makes hold neither, either alone, or both, and each is
+ * made here. The file is
  * read by `normalise`, planned on that record by `plan` (through the record's own `planPack`), and what the plan would
  * store is laid beside `firstPartyDocument('people', { holds })` after `normalise`: list by list, page by page, figure
  * by figure and rule by rule. Where they differ the failure says so in names, never in a path.
@@ -75,6 +76,8 @@ const OWN = ['people', 'organisations'] as const;
 const SUBSETS: readonly { name: string; holds: readonly string[] }[] = [
   { name: 'with Projects and Money', holds: [PROJECTS, MONEY] },
   { name: 'with Projects alone', holds: [PROJECTS] },
+  /* SINCE 4b137c806 (31 October) MONEY ONLY LINKS TO PROJECTS, so a record with Money alone can be made and is held too. */
+  { name: 'with Money alone', holds: [MONEY] },
   { name: 'with neither', holds: [] },
 ];
 
@@ -84,7 +87,7 @@ async function record(holds: readonly string[]): Promise<{ api: Api; close: () =
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   if (holds.includes(PROJECTS)) said(await put(api, firstPartyDocument('portfolio', { holds: [PROJECTS], seeds: [] })));
   /* MONEY BEFORE PEOPLE, with who a payment is with left out, since its own link waits for People as People's waits for it. */
-  if (holds.includes(MONEY)) said(await put(api, firstPartyDocument('money-core', { holds: [PROJECTS], seeds: [] })));
+  if (holds.includes(MONEY)) said(await put(api, firstPartyDocument('money-core', { holds: holds.filter((n) => n === PROJECTS), seeds: [] })));
   return { api, close: () => sql.close() };
 }
 
@@ -187,17 +190,18 @@ function waits(doc: File): { at: string; holds: unknown }[] {
 
 const kindOf = (d: Body): string => ['rule', 'script', 'ingest', 'register', 'page', 'metric'].find((k) => typeof d[k] === 'string') ?? 'something else';
 
-test('THE FILE IS ITS OWN: one script that reaches nowhere, two lists, three pages, eight figures over those lists, four rules', () => {
+test('THE FILE IS ITS OWN: one script that reaches nowhere, two lists, three pages, twelve figures over those lists, four rules', () => {
   const doc = file();
   assert.equal(doc.pack, 'people');
   const kinds = doc.declarations.map(kindOf);
   assert.deepEqual(
     Object.fromEntries(['register', 'page', 'metric', 'rule', 'script'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    /* EIGHT SINCE 4.2.0: organisations you work with apart from shops from card texts (`organisations-known`). FOUR RULES
-       AND ONE SCRIPT SINCE 4.7.0: `script.people_fields` offers the facts in a person's note as fields, and
-       `rule.people-fields` is its Run now. */
-    { register: 2, page: 3, metric: 8, rule: 4, script: 1 },
-    'two lists, three pages, eight figures, four rules and one script',
+    /* EIGHT SINCE 4.2.0: organisations you work with apart from shops from card texts (`organisations-known`). TWELVE
+       SINCE 4.3.0 (a4993e50f): clients and the rest, people and organisations apart. FOUR RULES AND ONE SCRIPT SINCE
+       4.7.0: `script.people_fields` offers the facts in a person's note as fields, and `rule.people-fields` is its Run
+       now. */
+    { register: 2, page: 3, metric: 12, rule: 4, script: 1 },
+    'two lists, three pages, twelve figures, four rules and one script',
   );
   assert.ok(!kinds.includes('something else'), 'the file declares something that is none of the five');
   /* THE SCRIPT READS AND WRITES PEOPLE ALONE AND REACHES NOWHERE. */
@@ -227,8 +231,10 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
      SINCE 27 October: one line a person, and shops from card texts apart. 4.0.0 SINCE 27 October: Health, Scripts,
      Calendar and Activity leave for core. 4.1.0 SINCE 29 October: organisations are one place and one count. 4.2.0
      SINCE 29 October: organisations you work with apart from shops. 4.2.1 SINCE 29 October: one organisations count.
-     4.2.2 SINCE 30 October: who may be listed twice, in plainer words. */
-  assert.equal(doc.version, '4.2.2');
+     4.2.2 SINCE 30 October: who may be listed twice, in plainer words. 4.3.0 SINCE 2 November: people and organisations
+     counted apart. 4.4.0, 4.5.0 and 4.6.0 SINCE 2 November: the roles a person may hold. 4.7.0 SINCE 3 November: a
+     person's facts are fields. 4.7.1 SINCE 3 November: a person's note stops repeating them. */
+  assert.equal(doc.version, '4.7.1');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -262,10 +268,11 @@ test('PROJECTS AND MONEY ARE ASKED FOR ONLY WHERE THEY ARE READ: six parts wait,
   }
 });
 
-test('THE RECORDS BRAINDOG MAKES ARE THE THREE HELD HERE: Money needs Projects, and People needs nothing', () => {
-  /* A RECORD WITH MONEY AND NO PROJECTS CANNOT BE MADE, so the fourth subset of what People leans on is not one to hold
-     it to. The day Money stops needing Projects, this goes red and says to add that record to SUBSETS. */
-  assert.ok(firstPartyManifest('money-core').requires.includes(`register.${PROJECTS}`), 'Money no longer needs Projects: hold People on a record with Money alone too');
+test('THE RECORDS BRAINDOG MAKES ARE THE FOUR HELD HERE: Money only links to Projects, and People needs nothing', () => {
+  /* SINCE 4b137c806 (31 October) A RECORD WITH MONEY AND NO PROJECTS CAN BE MADE, which is why it is in SUBSETS. The day
+     Money needs Projects again this goes red and says that record has stopped being one to hold it to. */
+  assert.ok(!firstPartyManifest('money-core').requires.includes(`register.${PROJECTS}`), 'Money needs Projects again: a record with Money alone cannot be made, so take it out of SUBSETS');
+  assert.ok(firstPartyManifest('money-core').links.includes(`register.${PROJECTS}`), 'Money no longer points at Projects at all');
   assert.deepEqual(firstPartyManifest('people').requires, []);
   assert.deepEqual(firstPartyManifest('people').links, [`register.${PROJECTS}`, `register.${MONEY}`], 'People leans on a list this test does not make a record for');
 });
@@ -323,6 +330,7 @@ test('THE TWO CUTS THE PLAN MAKES ITSELF: without Projects or Money the file goe
   const want: Readonly<Record<string, { requires: string[]; meets: boolean }>> = {
     'with Projects and Money': { requires: ['register.organisations', 'register.people', `register.${PROJECTS}`, `register.${MONEY}`], meets: true },
     'with Projects alone': { requires: ['register.organisations', 'register.people', `register.${PROJECTS}`], meets: true },
+    'with Money alone': { requires: ['register.organisations', 'register.people', `register.${MONEY}`], meets: false },
     'with neither': { requires: ['register.organisations', 'register.people'], meets: false },
   };
   for (const { name, holds } of SUBSETS) {
@@ -361,14 +369,14 @@ function project(api: Api, name: string): string {
 const PERSON = { name: 'Ines Varga', email: 'ines@kiln.example', note: 'Draws the plans.' };
 
 for (const { name, holds } of SUBSETS)
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same sixteen parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same twenty-two parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, theModule(holds)));
     said(await put(filed.api, file()));
     const [mine, theirs] = [stored(filed.api), stored(built.api)];
     const people = await ours();
-    assert.equal(people.length, 16);
+    assert.equal(people.length, 22);
     for (const id of people) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));

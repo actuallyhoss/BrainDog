@@ -1,9 +1,9 @@
 {
   "pack": "people",
-  "version": "4.2.2",
+  "version": "4.7.1",
   "title": "People",
   "summary": "Clients, contractors and accountants, the organisations they are with, and where each one was seen.",
-  "changes": "People says who may be listed twice in plainer words.",
+  "changes": "A person's note no longer repeats what their fields say: BrainDog offers to take out their name as a heading and a one-line deal the Deal field already holds, and to keep a short first line as their About. Lines it reads nothing from stay exactly as written.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -15,7 +15,7 @@
       "name": "People",
       "icon": "people",
       "one": "person",
-      "holds": "collaborators, contractors and accountants, and what each one is for",
+      "holds": "co-founders, staff, collaborators, contractors and accountants, and what each one is for",
       "title": "name",
       "mobile": [ "name", "role", "rate" ],
       "pack": "people",
@@ -38,12 +38,63 @@
         {
           "id": "role",
           "type": "enum",
-          "values": [ "client", "contractor", "accountant", "collaborator", "other" ],
+          "values": [ "client", "contractor", "accountant", "collaborator", "other", "cofounder", "partner", "staff" ],
+          "labels": { "cofounder": "Co-founder", "partner": "Business partner", "staff": "Staff" },
           "index": true
         },
         { "id": "rate", "type": "money" },
         { "id": "email", "type": "email", "unique": true, "index": true },
         { "id": "org", "label": "Organisation", "type": "ref", "to": "organisations", "index": true },
+        { "id": "legal_name", "label": "Legal name", "type": "text", "search": true },
+        { "id": "goes_by", "label": "Goes by", "type": "text" },
+        {
+          "id": "relation",
+          "label": "To you",
+          "type": "enum",
+          "values": [
+            "wife",
+            "husband",
+            "partner",
+            "parent",
+            "child",
+            "sibling",
+            "family",
+            "friend",
+            "mentor",
+            "other"
+          ],
+          "labels": {
+            "wife": "Wife",
+            "husband": "Husband",
+            "partner": "Partner",
+            "parent": "Parent",
+            "child": "Child",
+            "sibling": "Sibling",
+            "family": "Family",
+            "friend": "Friend",
+            "mentor": "Mentor",
+            "other": "Other"
+          }
+        },
+        { "id": "titles", "label": "Roles", "type": "list", "of": "text" },
+        { "id": "about", "label": "About", "type": "text" },
+        { "id": "nationality", "label": "Nationality", "type": "text" },
+        { "id": "country", "label": "Country", "type": "text" },
+        { "id": "city", "label": "City", "type": "text" },
+        { "id": "timezone", "label": "Time zone", "type": "text" },
+        { "id": "birthday", "label": "Birthday", "type": "day" },
+        { "id": "languages", "label": "Speaks", "type": "list", "of": "text" },
+        { "id": "phones", "label": "Phone", "type": "list", "of": "text" },
+        { "id": "discord", "label": "Discord", "type": "text", "index": true },
+        { "id": "discord_id", "label": "Discord id", "type": "text", "index": true },
+        { "id": "github", "label": "GitHub", "type": "text", "index": true },
+        { "id": "x", "label": "X", "type": "text" },
+        { "id": "instagram", "label": "Instagram", "type": "text" },
+        { "id": "linkedin", "label": "LinkedIn", "type": "text" },
+        { "id": "telegram", "label": "Telegram", "type": "text" },
+        { "id": "whatsapp", "label": "WhatsApp", "type": "text" },
+        { "id": "terms", "label": "Deal", "type": "text" },
+        { "id": "paperwork", "label": "Paperwork to do", "type": "list", "of": "text" },
         { "id": "note", "type": "text" },
         { "id": "keys", "label": "Known by", "type": "list", "of": "text" },
         { "id": "aliases", "label": "Also called", "type": "list", "of": "text" },
@@ -129,20 +180,6 @@
       "header": { "action": { "verb": "row.create", "label": "Add a person" } },
       "blocks": [
         {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "metric": "people-quiet", "is": 0 },
-          "body": "{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)"
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "metric": "people-quiet", "gt": 0 },
-          "body": "{{questions-open-in:people}} question(s) for you, {{people-quiet.first}} has been quiet since {{people-quiet.since}}, and {{people-quiet.more}} other(s) have too"
-        },
-        {
           "kind": "queue",
           "heading": "Waiting on you",
           "icon": "ask",
@@ -179,7 +216,7 @@
           "kind": "note",
           "span": 12,
           "when": { "metric": "organisations-count", "gt": 0 },
-          "body": "Organisations and shops you deal with: {{organisations-count}}. [See them](/r/organisations)."
+          "body": "[See the organisations and shops you deal with](/r/organisations)."
         },
         {
           "kind": "agents",
@@ -397,6 +434,50 @@
       "compare": "none"
     },
     {
+      "metric": "organisations-clients",
+      "name": "Client organisations",
+      "source": "register.organisations",
+      "where": "merged_into is empty, retired_on is empty, kind is client",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "organisations-not-clients",
+      "name": "Other organisations",
+      "source": "register.organisations",
+      "where": "merged_into is empty, retired_on is empty, kind is not client",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "people-clients",
+      "name": "Clients",
+      "source": "register.people",
+      "where": "merged_into is empty, self is not true, role is client",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "people-not-clients",
+      "name": "Other people",
+      "source": "register.people",
+      "where": "merged_into is empty, self is not true, role is not client",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
       "metric": "people-quiet",
       "name": "Quiet for three months",
       "source": "register.people",
@@ -550,35 +631,18 @@
       "rule": "people-fields",
       "name": "Offer the facts in each person's note as fields",
       "pack": "people",
-      "on": {
-        "manual": true
-      },
-      "steps": [
-        {
-          "script": {
-            "id": "people_fields",
-            "as": "reading",
-            "input": {}
-          }
-        }
-      ]
+      "on": { "manual": true },
+      "steps": [ { "script": { "id": "people_fields", "as": "reading", "input": {} } } ]
     },
     {
       "script": "people_fields",
       "title": "Keep the facts in each person's note as fields",
       "pack": "people",
-      "runs": {
-        "every": "1d",
-        "rule": true
-      },
+      "runs": { "every": "1d", "rule": true },
       "egress": [],
       "keys": [],
-      "reads": [
-        "people"
-      ],
-      "writes": [
-        "people"
-      ],
+      "reads": [ "people" ],
+      "writes": [ "people" ],
       "source": "function noteFacts(note, row, tidy) {\n  const NATIONS = {\n    afghan: 'Afghan', albanian: 'Albanian', algerian: 'Algerian', american: 'American', argentinian: 'Argentinian', australian: 'Australian',\n    austrian: 'Austrian', bahraini: 'Bahraini', bangladeshi: 'Bangladeshi', belgian: 'Belgian', brazilian: 'Brazilian', british: 'British',\n    bulgarian: 'Bulgarian', canadian: 'Canadian', chilean: 'Chilean', chinese: 'Chinese', colombian: 'Colombian', croatian: 'Croatian',\n    czech: 'Czech', danish: 'Danish', dutch: 'Dutch', egyptian: 'Egyptian', emirati: 'Emirati', english: 'English', estonian: 'Estonian',\n    filipino: 'Filipino', finnish: 'Finnish', french: 'French', german: 'German', ghanaian: 'Ghanaian', greek: 'Greek', hungarian: 'Hungarian',\n    indian: 'Indian', indonesian: 'Indonesian', iranian: 'Iranian', iraqi: 'Iraqi', irish: 'Irish', israeli: 'Israeli', italian: 'Italian',\n    japanese: 'Japanese', jordanian: 'Jordanian', kenyan: 'Kenyan', korean: 'Korean', kuwaiti: 'Kuwaiti', latvian: 'Latvian', lebanese: 'Lebanese',\n    libyan: 'Libyan', lithuanian: 'Lithuanian', malaysian: 'Malaysian', mexican: 'Mexican', moroccan: 'Moroccan', nigerian: 'Nigerian',\n    norwegian: 'Norwegian', omani: 'Omani', pakistani: 'Pakistani', palestinian: 'Palestinian', peruvian: 'Peruvian', polish: 'Polish',\n    portuguese: 'Portuguese', qatari: 'Qatari', romanian: 'Romanian', russian: 'Russian', saudi: 'Saudi', scottish: 'Scottish', serbian: 'Serbian',\n    singaporean: 'Singaporean', slovak: 'Slovak', 'south african': 'South African', spanish: 'Spanish', sudanese: 'Sudanese', swedish: 'Swedish',\n    swiss: 'Swiss', syrian: 'Syrian', thai: 'Thai', tunisian: 'Tunisian', turkish: 'Turkish', ukrainian: 'Ukrainian', vietnamese: 'Vietnamese',\n    welsh: 'Welsh', yemeni: 'Yemeni',\n  };\n  const KIN = { wife: 'wife', husband: 'husband', partner: 'partner', girlfriend: 'partner', boyfriend: 'partner', mother: 'parent', father: 'parent', mum: 'parent', mom: 'parent', dad: 'parent', sister: 'sibling', brother: 'sibling', son: 'child', daughter: 'child', cousin: 'family', aunt: 'family', uncle: 'family', friend: 'friend', mentor: 'mentor' };\n  const TITLE = '(?:CEO|CTO|CPO|COO|CFO|CMO|founder|co-?founder|owner|brand owner|director|head of [a-z]+|lead [a-z]+|engineer|designer|developer|artist|producer|manager|advisor|adviser|investor|partner|editor|writer|composer|animator|community manager|moderator)';\n  const ORG = \"([A-Z][\\\\w.&'-]*(?: [A-Z][\\\\w.&'-]*)*)\";\n  const titleOf = new RegExp(`^(?:the |an? )?(${TITLE}) (?:of|at|for) ${ORG}$`, 'i');\n\n  const fields = row && typeof row === 'object' ? row : {};\n  const empty = (v) => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);\n  const plain = (s) => s.replace(/\\*\\*|__|`/g, '').replace(/\\s+/g, ' ').trim();\n  const patch = {};\n  const found = [];\n  /* WHAT LEFT THE NOTE THAT NO FIELD TOOK, because a field already says it: their name as a heading, a one-line deal. */\n  const tidied = [];\n  /* THEIR OWN NAMES, as a heading would say one. */\n  const names = [fields.name, fields.goes_by, fields.legal_name, ...(Array.isArray(fields.aliases) ? fields.aliases : [])]\n    .filter((n) => typeof n === 'string' && n.trim() !== '')\n    .map((n) => n.replace(/\\*\\*|__|`/g, '').replace(/\\s+/g, ' ').trim().toLowerCase());\n  /** Sets one field when the row has none, and says whether the sentence it came from may leave the note. */\n  const put = (id, value, said) => {\n    if (value === '' || value === null || value === undefined) return false;\n    const held = fields[id];\n    if (empty(held) && patch[id] === undefined) {\n      patch[id] = value;\n      found.push(said);\n      return true;\n    }\n    const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();\n    return !empty(held) ? same(held, value) : same(patch[id], value);\n  };\n  /** Adds to a list field what it does not hold yet. A list always takes, so the sentence always leaves. */\n  const add = (id, values, said) => {\n    const held = Array.isArray(fields[id]) ? fields[id].map(String) : [];\n    const has = [...held, ...(patch[id] ?? [])].map((v) => v.toLowerCase());\n    const fresh = values.filter((v) => v !== '' && !has.includes(v.toLowerCase()));\n    if (fresh.length === 0) return true;\n    patch[id] = [...held, ...(patch[id] ?? []), ...fresh];\n    found.push(said);\n    return true;\n  };\n\n  /* ONE SENTENCE, READ WHOLE OR NOT AT ALL: true when every word of it went into a field. */\n  const sentence = (raw) => {\n    const s = plain(raw).replace(/[.;]+$/, '').trim();\n    if (s === '') return true;\n    let m;\n    /* A ONE-LINE DEAL, \"Deal: 10% of Otters gross, paid monthly\": said again when the Deal field holds one or the note's\n       `## Deal` part is setting it, so it leaves; the deal itself when nothing else says one. */\n    if (tidy && (m = /^(?:the )?(?:deal|terms|pay)(?: is)?:\\s*(.+)$/i.exec(s))) {\n      if (!empty(fields.terms) || patch.terms !== undefined) {\n        tidied.push('deal');\n        return true;\n      }\n      return put('terms', m[1].trim(), 'deal');\n    }\n    if ((m = /^(?:legal|full) name(?: is)?:?\\s+(.+)$/i.exec(s))) return put('legal_name', m[1].trim(), 'legal name');\n    if ((m = /^(?:goes by|called|nickname|preferred name)(?: is)?:?\\s+(.+)$/i.exec(s))) return put('goes_by', m[1].replace(/^[\"']|[\"']$/g, '').trim(), 'goes by');\n    if (Object.hasOwn(NATIONS, s.toLowerCase())) return put('nationality', NATIONS[s.toLowerCase()], 'nationality');\n    if ((m = /^(?:nationality|citizen(?:ship)?)(?: is)?:?\\s+(.+)$/i.exec(s))) return put('nationality', NATIONS[m[1].toLowerCase()] ?? m[1].trim(), 'nationality');\n    if ((m = /^(?:e-?mail|address)(?: is)?:?\\s+([\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+)$/i.exec(s)) || (m = /^([\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+)$/.exec(s))) {\n      return put('email', m[1].toLowerCase(), 'email');\n    }\n    if ((m = /^discord(?: user)? ?id(?: is)?:?\\s+(\\d{15,21})$/i.exec(s))) return put('discord_id', m[1], 'Discord id');\n    if ((m = /^discord(?: username| handle| name)?(?: is)?:?\\s+@?([a-z0-9_.]{2,32})$/i.exec(s))) return put('discord', m[1], 'Discord');\n    if ((m = /^github(?: username| handle)?(?: is)?:?\\s+@?([a-z0-9-]{1,39})$/i.exec(s))) return put('github', m[1], 'GitHub');\n    if ((m = /^(?:x|twitter)(?: handle)?(?: is)?:?\\s+@?(\\w{1,15})$/i.exec(s))) return put('x', m[1], 'X');\n    if ((m = /^instagram(?: handle)?(?: is)?:?\\s+@?([\\w.]{1,30})$/i.exec(s))) return put('instagram', m[1], 'Instagram');\n    if ((m = /^telegram(?: handle)?(?: is)?:?\\s+@?(\\w{3,32})$/i.exec(s))) return put('telegram', m[1], 'Telegram');\n    if ((m = /^linkedin(?: is)?:?\\s+(\\S+)$/i.exec(s))) return put('linkedin', m[1], 'LinkedIn');\n    if ((m = /^whats ?app(?: is)?:?\\s+(\\+?[\\d\\s().-]{7,20})$/i.exec(s))) return put('whatsapp', m[1].replace(/[^\\d+]/g, ''), 'WhatsApp');\n    if ((m = /^(?:phone|mobile|cell|tel)(?: is)?:?\\s+(\\+?[\\d\\s().-]{7,20})$/i.exec(s))) return add('phones', [m[1].trim()], 'phone');\n    if ((m = /^(?:born|birthday|date of birth|dob)(?: on| is)?:?\\s+(\\d{4}-\\d{2}-\\d{2})$/i.exec(s))) return put('birthday', m[1], 'birthday');\n    if ((m = /^(?:time ?zone|tz)(?: is)?:?\\s+([A-Za-z_]+\\/[A-Za-z_]+|UTC ?[+-] ?\\d{1,2}(?::\\d{2})?|GMT ?[+-] ?\\d{1,2})$/i.exec(s))) return put('timezone', m[1].replace(/\\s+/g, ''), 'time zone');\n    if ((m = /^(?:lives|based) in ([A-Z][\\w' -]+?)(?:, ([A-Z][\\w' -]+))?$/.exec(s))) {\n      /* \"Lives in Dublin, Ireland\" is a city and a country; \"Lives in Cork\" alone could be either, so it stays. */\n      if (!m[2]) return false;\n      const city = put('city', m[1].trim(), 'city');\n      const country = put('country', m[2].trim(), 'country');\n      return city && country;\n    }\n    if ((m = /^speaks (.+)$/i.exec(s))) return add('languages', m[1].split(/,\\s*|\\s+and\\s+/).map((x) => x.trim()).filter(Boolean), 'languages');\n    if ((m = /^(?:[A-Z][\\w-]*'s|his|her|my|your|our) (\\w+)$/i.exec(s)) && Object.hasOwn(KIN, m[1].toLowerCase())) return put('relation', KIN[m[1].toLowerCase()], 'relationship');\n    /* \"CPO of Quartz and brand owner of Tamsin\": every part a title at an organisation, or none is taken. */\n    const parts = s.split(/,\\s*(?:and\\s+)?|\\s+and\\s+/);\n    const titles = parts.map((p) => titleOf.exec(p.trim())).filter(Boolean);\n    if (titles.length > 0 && titles.length === parts.length) {\n      const said = titles.map((t) => `${t[1].length <= 3 ? t[1].toUpperCase() : t[1].charAt(0).toUpperCase() + t[1].slice(1)} at ${t[2]}`);\n      return add('titles', said, 'roles');\n    }\n    return false;\n  };\n\n  /* THE NOTE IN PARTS: what comes before the first `##`, then each part under its heading. A heading that is their own\n     name is no part of its own: with `tidy` it leaves, and what follows it is read as the opening is. */\n  const text = typeof note === 'string' ? note.replace(/\\r\\n/g, '\\n') : '';\n  const lines = text.split('\\n');\n  const parts = [{ head: null, lines: [] }];\n  for (const line of lines) {\n    const own = /^#{1,3}\\s+(.+?)\\s*#*\\s*$/.exec(line);\n    if (tidy && own && names.includes(plain(own[1]).toLowerCase())) {\n      tidied.push('name');\n      if (parts.at(-1).head !== null) parts.push({ head: null, lines: [] });\n      continue;\n    }\n    const h = /^#{2,3}\\s+(.+?)\\s*$/.exec(line);\n    if (h) parts.push({ head: h[1], lines: [] });\n    else parts.at(-1).lines.push(line);\n  }\n  const bullet = (l) => l.replace(/^\\s*(?:[-*•]|\\d+[.)])\\s+/, '').replace(/^\\[[ xX]\\]\\s*/, '').trim();\n  const kept = parts.map(() => null);\n  /* A PART UNDER A HEADING, kept whole unless it is the deal or the paperwork. */\n  const headed = (part, i) => {\n    const head = part.head.toLowerCase();\n    if (/^(?:deal|terms|pay|payment|the deal|pay terms)$/.test(head)) {\n      const said = part.lines.map(bullet).filter(Boolean).map((l) => plain(l)).join(' ');\n      if (said !== '' && put('terms', said, 'deal')) return;\n    }\n    if (/^(?:still to do|to do|todo|paperwork|open|outstanding)$/.test(head)) {\n      const items = part.lines.map(bullet).map(plain).filter(Boolean);\n      if (items.length > 0 && add('paperwork', items, 'paperwork')) return;\n    }\n    kept[i] = [`## ${part.head}`, ...part.lines].join('\\n').trim();\n  };\n  /* THE TEXT OUTSIDE THEM, PARAGRAPH BY PARAGRAPH AND LINE BY LINE: a sentence read whole leaves, the rest of its line\n     stays where it was, and a line nothing was read from stays exactly as written. A paragraph with a list in it, a\n     heading or a table row is kept whole. Lines are never joined, so a heading never runs into the line before it. */\n  let opening = null;\n  const open = (part, i) => {\n    const out = [];\n    for (const para of part.lines.join('\\n').split(/\\n[ \\t]*\\n/)) {\n      if (para.trim() === '') continue;\n      if (/^\\s*(?:[-*•]|\\d+[.)])\\s/m.test(para)) {\n        out.push(para.replace(/^\\n+|\\s+$/g, ''));\n        continue;\n      }\n      const left = [];\n      for (const line of para.split('\\n')) {\n        if (line.trim() === '' || /^\\s*(?:#|\\|)/.test(line)) {\n          if (line.trim() !== '') left.push(line.trimEnd());\n          continue;\n        }\n        const said = line.trim().split(/(?<=[.;!?])\\s+(?=[A-Z*_`\"'@+0-9])/);\n        const stay = said.filter((x) => !sentence(x));\n        if (stay.length === said.length) left.push(line.trimEnd());\n        else if (stay.join(' ').trim() !== '') left.push(stay.join(' ').trim());\n      }\n      if (left.length > 0) out.push(left.join('\\n'));\n    }\n    if (i === 0 && out.length > 0) opening = out;\n    if (out.length > 0) kept[i] = out.join('\\n\\n');\n  };\n  /* IN ORDER, AS 4.7.0 READ THEM; with `tidy`, the parts under a heading first, so the opening's one-line deal knows\n     whether `## Deal` is setting the field. */\n  const order = parts.map((part, i) => i);\n  if (tidy) order.sort((a, b) => Number(parts[a].head === null) - Number(parts[b].head === null) || a - b);\n  for (const i of order) (parts[i].head === null ? open : headed)(parts[i], i);\n\n  /* THE OPENING AS `about`, with `tidy`: the note opens on one short sentence, alone in its paragraph once the facts in\n     it left (\"Engineer on Otters.gg.\"), and more of the note follows it. A note that is only that sentence keeps it, since\n     it is then the note and not a line over it (\"Bank transfers to and from her are filed under Family.\"). */\n  if (tidy && opening !== null && empty(fields.about) && patch.about === undefined) {\n    const line = opening[0].trim();\n    const one = !line.includes('\\n') && !/^\\s*(?:#|\\||[-*•]\\s)/.test(line) && line.split(/(?<=[.;!?])\\s+(?=[A-Z*_`\"'@+0-9])/).length === 1;\n    const more = opening.length > 1 || kept.some((k, i) => i > 0 && k !== null);\n    if (one && /[.!]$/.test(line) && plain(line).split(' ').length <= 10 && plain(line).length <= 80 && more) {\n      patch.about = plain(line);\n      found.push('about');\n      kept[0] = opening.length > 1 ? opening.slice(1).join('\\n\\n') : null;\n    }\n  }\n\n  /* AND WHAT ITS HANDLES ALREADY SAY: `discord:<id>` is the Discord id, `github:<login>` the GitHub login. */\n  for (const list of [fields.handles, fields.keys])\n    for (const h of Array.isArray(list) ? list : []) {\n      const m = /^(discord|github|x|twitter|instagram|telegram|linkedin):(.+)$/i.exec(String(h).trim());\n      if (!m) continue;\n      const kind = m[1].toLowerCase();\n      const v = m[2].trim();\n      if (kind === 'discord') put(/^\\d{15,21}$/.test(v) ? 'discord_id' : 'discord', v, 'Discord');\n      else put(kind === 'twitter' ? 'x' : kind, v, kind);\n    }\n\n  const rest = kept.filter((k) => k !== null && k.trim() !== '').join('\\n\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\n  /* WITH `tidy`, A NOTE THAT ONLY LOST WHAT THE FIELDS ALREADY SAY IS STILL A CHANGE TO ASK ABOUT; without it, only a fact is. */\n  if (Object.keys(patch).length === 0 && !(tidy && tidied.length > 0 && rest !== text.trim())) return null;\n  if (rest !== text.trim()) patch.note = rest;\n  return { patch, found: [...new Set(found)], tidied: [...new Set(tidied)] };\n}\nfunction peopleFields(people) {\n  const out = [];\n  const listed = (l) => (l.length > 4 ? `${l.slice(0, 3).join(', ')} and ${l.length - 3} more` : l.length > 1 ? `${l.slice(0, -1).join(', ')} and ${l.at(-1)}` : l.join(''));\n  for (const p of people) {\n    const f = p.fields ?? {};\n    if (f.merged_into) continue;\n    const name = typeof f.name === 'string' && f.name.trim() !== '' ? f.name.trim() : 'this person';\n    const row = (patch) => [{ at: p.id, ...(typeof p.version === 'number' ? { version: p.version } : {}), patch }];\n    const read = noteFacts(f.note, f, false);\n    if (read !== null) {\n      out.push({\n        name,\n        cause: `people-fields:${p.id}`,\n        question: `Keep ${name}'s ${listed(read.found) || 'details'} as fields?`.slice(0, 280),\n        body_kind: 'rowset',\n        body: { register: 'people', rows: row(read.patch), why: 'Read from the note. What it could not read for sure stays in the note.' },\n      });\n      continue;\n    }\n    const tidy = noteFacts(f.note, f, true);\n    if (tidy === null) continue;\n    const said = [];\n    if (typeof tidy.patch.about === 'string') said.push(`keep \"${tidy.patch.about}\" as ${name}'s About`);\n    if (typeof tidy.patch.terms === 'string') said.push(`keep \"${tidy.patch.terms}\" as ${name}'s Deal`);\n    const other = tidy.found.filter((x) => x !== 'about' && x !== 'deal');\n    if (other.length > 0) said.push(`keep ${name}'s ${listed(other)} as fields`);\n    const whose = said.length > 0 ? 'their' : `${name}'s`;\n    const gone = [tidy.tidied.includes('name') ? `${whose} name as a heading` : '', tidy.tidied.includes('deal') ? 'the one-line deal the Deal field holds' : ''].filter(Boolean);\n    if (gone.length > 0) said.push(`take ${gone.join(' and ')} out of ${gone[0].startsWith(whose) || said.length > 0 ? 'their' : whose} note`);\n    const question = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said.at(-1)}` : said.join('');\n    out.push({\n      name,\n      cause: `people-notes:${p.id}`,\n      question: `${question.charAt(0).toUpperCase()}${question.slice(1)}?`.slice(0, 280),\n      body_kind: 'rowset',\n      body: {\n        register: 'people',\n        rows: row(tidy.patch),\n        why: 'Read from the note. What the fields already say leaves it, and the rest stays as it was written.',\n      },\n    });\n  }\n  return out;\n}\nexport default async function run(ctx) {\n  const people = [];\n  let after = 0;\n  for (;;) {\n    const page = await ctx.record.list('people', { field: 'seq', gt: after }, { order: 'seq' });\n    if (!Array.isArray(page) || page.length === 0) break;\n    for (const r of page) people.push({ id: r.id, version: r.version, fields: r.fields });\n    const last = page.at(-1).seq;\n    if (typeof last !== 'number' || last <= after) break;\n    after = last;\n  }\n  const asks = peopleFields(people);\n  if (asks.length === 0) {\n    ctx.log('No note holds anything the fields do not say.');\n    return null;\n  }\n  if (typeof ctx.propose !== 'function') {\n    ctx.log(`${asks.length === 1 ? 'One person has' : `${asks.length} people have`} something in their note to keep as a field, and a trial files no questions.`);\n    return null;\n  }\n  const asked = [];\n  const left = [];\n  for (const a of asks) {\n    const got = await ctx.propose({ question: a.question, body_kind: a.body_kind, body: a.body, cause: a.cause });\n    const filed = got && typeof got === 'object' && 'ok' in got ? (got.ok ? got.value : null) : got;\n    if (filed === null || filed === undefined || filed.answered !== undefined || filed.joined) left.push(a.name);\n    else asked.push(a.name);\n  }\n  const names = (l) => (l.length > 3 ? `${l.slice(0, 3).join(', ')} and ${l.length - 3} more` : l.length > 1 ? `${l.slice(0, -1).join(', ')} and ${l.at(-1)}` : l.join(''));\n  ctx.log([asked.length > 0 ? `Asked about what ${names(asked)}'s notes say.` : '', left.length > 0 ? `${names(left)} already asked or answered.` : ''].join(' ').trim());\n  return { asked: asked.length, left: left.length };\n}"
     }
   ],

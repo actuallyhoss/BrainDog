@@ -1,9 +1,9 @@
 {
   "pack": "work",
-  "version": "1.20.0",
+  "version": "1.26.1",
   "title": "Work",
   "summary": "Tasks, the threads of work they belong to, and how each thread is going.",
-  "changes": "The project chips, Yours and Agents count what Open counts, so the backlog is no longer in their numbers, and the first line says none of your tasks is late.",
+  "changes": "Work, the Board and the Timeline no longer open on a line of counts. What is late, waiting on you or due soon is in the lists under them, as before.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -59,7 +59,14 @@
           "when": { "holds": [ "things" ] }
         },
         { "id": "opened", "type": "day", "index": true },
-        { "id": "target", "label": "Aiming for", "type": "day", "index": true, "deadline": true, "remind": [ "0d" ] },
+        {
+          "id": "target",
+          "label": "Aiming for",
+          "type": "day",
+          "index": true,
+          "deadline": true,
+          "remind": [ "0d" ]
+        },
         { "id": "note", "type": "document" },
         { "id": "tags", "type": "list", "of": "text" }
       ]
@@ -104,7 +111,7 @@
       "hand": { "person": "owner", "agent": "agent", "taken": "doing" },
       "pack": "work",
       "fields": [
-        { "id": "what", "label": "Description", "type": "text", "required": true, "search": true },
+        { "id": "what", "label": "Task", "type": "text", "required": true, "search": true },
         {
           "id": "state",
           "label": "Status",
@@ -125,7 +132,7 @@
         { "id": "why", "label": "Why this tier", "type": "text" },
         {
           "id": "owner",
-          "label": "Owner",
+          "label": "Assigned to",
           "type": "ref",
           "to": "people",
           "index": true,
@@ -143,6 +150,14 @@
           "scope": {},
           "when": { "holds": [ "things" ] }
         },
+        {
+          "id": "client",
+          "label": "Client",
+          "type": "ref",
+          "to": "organisations",
+          "qualifies": "thing",
+          "when": { "holds": [ "organisations" ] }
+        },
         { "id": "by", "label": "Due", "type": "day", "index": true, "deadline": true, "remind": [ "0d" ] },
         { "id": "track", "label": "Thread", "type": "ref", "to": "tracks", "index": true },
         { "id": "effort", "type": "duration", "unit": "d" },
@@ -157,17 +172,22 @@
       "icon": "task",
       "requires": [ "register.tasks" ],
       "pack": "work",
-      "header": {
-        "count": { "metric": "open-tasks" },
-        "action": { "verb": "row.create", "label": "Add" }
-      },
+      "header": { "count": { "metric": "open-tasks" }, "action": { "verb": "row.create", "label": "Add" } },
       "filters": [
-        { "field": "thing", "control": "chips", "counts": "state is not backlog or done or dropped", "when": { "holds": [ "things" ] } },
+        {
+          "field": "thing",
+          "control": "chips",
+          "counts": "state is not backlog or done or dropped",
+          "when": { "holds": [ "things" ] }
+        },
         {
           "field": "whose",
           "control": "segmented",
           "counts": "state is not backlog or done or dropped",
-          "options": [ { "value": "yours", "label": "Yours", "where": "agent is empty" }, { "value": "agents", "label": "Agents", "where": "agent is set" } ]
+          "options": [
+            { "value": "yours", "label": "Yours", "where": "agent is empty, owner is not someone else" },
+            { "value": "agents", "label": "Agents", "where": "agent is set" }
+          ]
         }
       ],
       "blocks": [
@@ -177,20 +197,6 @@
           "span": 12,
           "when": { "metric": "open-tasks", "is": 0 },
           "body": "Nothing is open right now"
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "metric": "tasks-late-yours", "gt": 0 },
-          "body": "{{questions-open-in:tasks}} question(s) for you, {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you"
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "metric": "tasks-late-yours", "is": 0 },
-          "body": "None of your tasks is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you"
         },
         { "kind": "capture", "heading": "What needs doing?", "icon": "plus", "span": 12, "register": "tasks" },
         {
@@ -210,8 +216,13 @@
           "icon": "calendar-days",
           "span": 6,
           "source": "register.tasks",
-          "where": "state is open or doing, agent is empty, by before today",
-          "columns": [ { "field": "what" }, { "field": "by" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
+          "where": "state is open or doing, agent is empty, owner is not someone else, by before today",
+          "columns": [
+            { "field": "what" },
+            { "field": "by" },
+            { "field": "thing", "when": { "holds": [ "things" ] } },
+            { "field": "client", "when": { "holds": [ "organisations" ] } }
+          ],
           "order": [ { "field": "by", "dir": "asc" }, { "field": "priority", "dir": "asc" } ],
           "limit": 8,
           "when": { "metric": "tasks-late-yours", "gt": 0 }
@@ -223,19 +234,30 @@
           "span": 6,
           "source": "register.tasks",
           "where": "state is review or blocked",
-          "columns": [ { "field": "what" }, { "field": "note" }, { "field": "by" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
+          "columns": [
+            { "field": "what" },
+            { "field": "note" },
+            { "field": "by" },
+            { "field": "thing", "when": { "holds": [ "things" ] } }
+          ],
           "order": [ { "field": "by", "dir": "asc" } ],
           "limit": 8,
           "when": { "metric": "tasks-waiting", "gt": 0 }
         },
         {
           "kind": "todo",
-          "heading": "This week",
+          "key": "k1e53uhc",
+          "heading": "Your work this week",
           "icon": "calendar-days",
           "span": 6,
           "source": "register.tasks",
-          "where": "state is open or doing, agent is empty, by after yesterday, by before +8d",
-          "columns": [ { "field": "what" }, { "field": "by" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
+          "where": "state is open or doing, agent is empty, owner is not someone else, by after yesterday, by before +8d",
+          "columns": [
+            { "field": "what" },
+            { "field": "by" },
+            { "field": "thing", "when": { "holds": [ "things" ] } },
+            { "field": "client", "when": { "holds": [ "organisations" ] } }
+          ],
           "order": [ { "field": "by", "dir": "asc" }, { "field": "priority", "dir": "asc" } ],
           "limit": 8,
           "when": { "metric": "tasks-this-week-yours", "gt": 0 }
@@ -247,7 +269,12 @@
           "span": 6,
           "source": "register.tasks",
           "where": "state is open or doing, agent is set",
-          "columns": [ { "field": "what" }, { "field": "agent" }, { "field": "by" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
+          "columns": [
+            { "field": "what" },
+            { "field": "agent" },
+            { "field": "by" },
+            { "field": "thing", "when": { "holds": [ "things" ] } }
+          ],
           "order": [ { "field": "by", "dir": "asc" } ],
           "limit": 8,
           "working": true,
@@ -259,6 +286,19 @@
           "icon": "archive",
           "span": 12,
           "fold": true,
+          "source": "register.tasks",
+          "where": {
+            "any": [
+              {
+                "all": [
+                  { "field": "state", "in": [ "open", "doing" ] },
+                  { "field": "agent", "empty": true },
+                  { "any": [ { "field": "by", "after": "+7d" }, { "field": "by", "empty": true } ] }
+                ]
+              },
+              { "field": "state", "is": "backlog" }
+            ]
+          },
           "when": { "metric": "tasks-not-this-week", "gt": 0 }
         },
         {
@@ -267,8 +307,12 @@
           "icon": "calendar-days",
           "span": 12,
           "source": "register.tasks",
-          "where": "state is open or doing, agent is empty, by after +7d",
-          "columns": [ { "field": "what" }, { "field": "by" } ],
+          "where": "state is open or doing, agent is empty, owner is not someone else, by after +7d",
+          "columns": [
+            { "field": "what" },
+            { "field": "by" },
+            { "field": "client", "when": { "holds": [ "organisations" ] } }
+          ],
           "order": [ { "field": "by", "dir": "asc" } ],
           "limit": 8,
           "when": { "metric": "tasks-after-week-yours", "gt": 0 }
@@ -279,9 +323,13 @@
           "icon": "circle-dashed",
           "span": 12,
           "source": "register.tasks",
-          "where": "state is open or doing, agent is empty, by is empty",
-          "columns": [ { "field": "what" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
-          "order": [ { "field": "by", "dir": "asc" } ],
+          "where": "state is open or doing, agent is empty, owner is not someone else, by is empty",
+          "columns": [
+            { "field": "what" },
+            { "field": "thing", "when": { "holds": [ "things" ] } },
+            { "field": "client", "when": { "holds": [ "organisations" ] } }
+          ],
+          "order": [ { "field": "created_at", "dir": "desc" } ],
           "limit": 8,
           "when": { "metric": "tasks-undated-yours", "gt": 0 }
         },
@@ -292,8 +340,12 @@
           "span": 12,
           "source": "register.tasks",
           "where": "state is backlog",
-          "columns": [ { "field": "what" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
-          "order": [ { "field": "by", "dir": "asc" } ],
+          "columns": [
+            { "field": "what" },
+            { "field": "thing", "when": { "holds": [ "things" ] } },
+            { "field": "client", "when": { "holds": [ "organisations" ] } }
+          ],
+          "order": [ { "field": "by", "dir": "asc" }, { "field": "created_at", "dir": "desc" } ],
           "limit": 8,
           "when": { "metric": "tasks-later", "gt": 0 }
         },
@@ -303,6 +355,8 @@
           "icon": "inbox",
           "span": 12,
           "fold": true,
+          "source": "register.tasks",
+          "where": "state is not backlog or done or dropped, thing is empty, client is empty",
           "when": { "metric": "tasks-no-project", "gt": 0 }
         },
         {
@@ -311,8 +365,11 @@
           "icon": "folder",
           "span": 12,
           "source": "register.tasks",
-          "where": "state is not backlog or done or dropped, thing is empty",
-          "columns": [ { "field": "what", "width": "minmax(20ch,1fr)" }, { "field": "by", "label": "Due", "width": "13ch", "align": "end" } ],
+          "where": "state is not backlog or done or dropped, thing is empty, client is empty",
+          "columns": [
+            { "field": "what", "width": "minmax(20ch,1fr)" },
+            { "field": "by", "label": "Due", "width": "13ch", "align": "end" }
+          ],
           "order": [ { "field": "created_at", "dir": "desc" } ],
           "limit": 5,
           "when": { "holds": [ "things" ] }
@@ -322,7 +379,9 @@
           "heading": "Not moved in three months",
           "icon": "hourglass",
           "span": 12,
-          "fold": true
+          "fold": true,
+          "source": "register.tasks",
+          "where": "state is not backlog or done or dropped, updated_at before -90d"
         },
         {
           "kind": "table",
@@ -331,7 +390,10 @@
           "span": 12,
           "source": "register.tasks",
           "where": "state is not backlog or done or dropped, updated_at before -90d",
-          "columns": [ { "field": "what", "width": "minmax(20ch,1fr)" }, { "field": "by", "label": "Due", "width": "13ch", "align": "end" } ],
+          "columns": [
+            { "field": "what", "width": "minmax(20ch,1fr)" },
+            { "field": "by", "label": "Due", "width": "13ch", "align": "end" }
+          ],
           "order": [ { "field": "updated_at", "dir": "asc" } ],
           "limit": 8
         },
@@ -341,6 +403,8 @@
           "icon": "check",
           "span": 12,
           "fold": true,
+          "source": "register.tasks",
+          "where": "state is done, done_on after -8d",
           "when": { "metric": "tasks-done-7d", "gt": 0 }
         },
         {
@@ -372,12 +436,6 @@
           "when": { "metric": "open-tasks", "is": 0 },
           "body": "Nothing is open right now"
         },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "body": "{{open-tasks}} open task(s), {{tasks-later}} for later, {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent"
-        },
         { "kind": "capture", "heading": "What needs doing?", "icon": "plus", "span": 12, "register": "tasks" },
         {
           "kind": "board",
@@ -390,7 +448,11 @@
           ],
           "source": "register.tasks",
           "where": "state is not dropped",
-          "order": [ { "field": "state", "dir": "asc" }, { "field": "priority", "dir": "asc" }, { "field": "by", "dir": "asc" } ],
+          "order": [
+            { "field": "state", "dir": "asc" },
+            { "field": "priority", "dir": "asc" },
+            { "field": "by", "dir": "asc" }
+          ],
           "limit": 100,
           "working": true
         }
@@ -404,10 +466,17 @@
       "requires": [ "register.tasks" ],
       "pack": "work",
       "blocks": [
-        { "kind": "note", "lead": true, "span": 12, "body": "{{tasks-overdue}} past their date, {{tasks-due-7d}} due in 7 days" },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "tasks-dated", "is": 0 },
+          "body": "No task has a due day yet. Give one a day on [Work](/p/work)."
+        },
         {
           "kind": "roadmap",
-          "heading": "In play",
+          "key": "k0bndy4b",
+          "heading": "Tasks by due day",
           "span": 12,
           "source": "register.tasks",
           "where": "by is set, state is not done or dropped",
@@ -418,7 +487,7 @@
           ],
           "order": [ { "field": "by", "dir": "asc" } ],
           "limit": 200,
-          "empty": "No task in play has a due day yet."
+          "empty": "Each open task with a due day stands here on its day. Give a task a due day and it joins the line."
         }
       ]
     },
@@ -564,6 +633,17 @@
       "compare": "none"
     },
     {
+      "metric": "tasks-dated",
+      "name": "Open tasks with a due day",
+      "source": "register.tasks",
+      "where": "by is set, state is not done or dropped",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
       "metric": "tasks-overdue",
       "name": "Past their date",
       "source": "register.tasks",
@@ -578,67 +658,73 @@
       "metric": "tasks-late-yours",
       "name": "Yours, late",
       "source": "register.tasks",
-      "where": "state is open or doing, agent is empty, by before today",
+      "where": "state is open or doing, agent is empty, owner is not someone else, by before today",
       "value": { "count": "id" },
       "format": "int",
       "target": { "lte": 0 },
       "window": "30d",
-      "compare": "none"
+      "compare": "none",
+      "when": { "holds": [ "people" ] }
     },
     {
       "metric": "tasks-today-yours",
       "name": "Yours, due today",
       "source": "register.tasks",
-      "where": "state is open or doing, agent is empty, by is today",
+      "where": "state is open or doing, agent is empty, owner is not someone else, by is today",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none"
+      "compare": "none",
+      "when": { "holds": [ "people" ] }
     },
     {
       "metric": "tasks-week-yours",
       "name": "Yours, due this week",
       "source": "register.tasks",
-      "where": "state is open or doing, agent is empty, by after today, by before +8d",
+      "where": "state is open or doing, agent is empty, owner is not someone else, by after today, by before +8d",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none"
+      "compare": "none",
+      "when": { "holds": [ "people" ] }
     },
     {
       "metric": "tasks-this-week-yours",
       "name": "Yours, due today or this week",
       "source": "register.tasks",
-      "where": "state is open or doing, agent is empty, by after yesterday, by before +8d",
+      "where": "state is open or doing, agent is empty, owner is not someone else, by after yesterday, by before +8d",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none"
+      "compare": "none",
+      "when": { "holds": [ "people" ] }
     },
     {
       "metric": "tasks-after-week-yours",
       "name": "Yours, after this week",
       "source": "register.tasks",
-      "where": "state is open or doing, agent is empty, by after +7d",
+      "where": "state is open or doing, agent is empty, owner is not someone else, by after +7d",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none"
+      "compare": "none",
+      "when": { "holds": [ "people" ] }
     },
     {
       "metric": "tasks-undated-yours",
       "name": "Yours, with no due day",
       "source": "register.tasks",
-      "where": "state is open or doing, agent is empty, by is empty",
+      "where": "state is open or doing, agent is empty, owner is not someone else, by is empty",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none"
+      "compare": "none",
+      "when": { "holds": [ "people" ] }
     },
     {
       "metric": "tasks-not-this-week",
@@ -751,7 +837,7 @@
       "metric": "tasks-no-project",
       "name": "With no project",
       "source": "register.tasks",
-      "where": "state is not backlog or done or dropped, thing is empty",
+      "where": "state is not backlog or done or dropped, thing is empty, client is empty",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
@@ -795,7 +881,6 @@
       "writes": [ "tasks" ],
       "source": "export default async function run(ctx) {\n  const task = await ctx.record.get(ctx.input.id);\n  if (!task || !task.fields.parent) return;\n  const parent = await ctx.record.get(task.fields.parent);\n  if (!parent) return;\n  const patch = {};\n  for (const field of ['thing', 'track', 'owner'])\n    if (!task.fields[field] && parent.fields[field]) patch[field] = parent.fields[field];\n  const name = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');\n  const by = ctx.input.made_by;\n  const maker = by !== null && typeof by === 'object' ? name(by.agent) : '';\n  if (!task.fields.agent && maker !== '' && maker !== 'other' && maker === name(parent.fields.agent)) patch.agent = parent.fields.agent;\n  if (Object.keys(patch).length > 0) ctx.update('tasks#' + task.seq, patch, task.version);\n}"
     }
-
   ],
   "seeds": [
     {

@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.30.2",
+  "version": "1.31.2",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "A card's key number is ticked as \"Shown first\".",
+  "changes": "Projects opens on your projects. The bar of how they are going is gone; each project says it if it is at risk or off track.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -57,7 +57,13 @@
         { "id": "progress", "label": "How far along", "type": "decimal", "unit": "%", "min": 0, "max": 100 },
         { "id": "aim", "label": "Aiming for", "type": "day", "index": true },
         { "id": "agent", "label": "Agent", "type": "text", "index": true },
-        { "id": "draft", "label": "Not kept yet", "type": "bool", "default": false, "hidden_from_agents": true },
+        {
+          "id": "draft",
+          "label": "Not kept yet",
+          "type": "bool",
+          "default": false,
+          "hidden_from_agents": true
+        },
         { "id": "mark", "type": "text", "hidden_from_agents": true },
         { "id": "hue", "type": "int", "hidden_from_agents": true },
         { "id": "note", "type": "document" },
@@ -216,7 +222,13 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "when": { "all": [ { "metric": "projects-live", "is": 0 }, { "metric": "projects-parked", "is": 0 }, { "metric": "projects-retired", "is": 0 } ] },
+          "when": {
+            "all": [
+              { "metric": "projects-live", "is": 0 },
+              { "metric": "projects-parked", "is": 0 },
+              { "metric": "projects-retired", "is": 0 }
+            ]
+          },
           "body": "No project yet. Add the first one below."
         },
         {
@@ -235,16 +247,6 @@
           "when": { "metric": "projects-live", "is": 0 }
         },
         {
-          "kind": "split",
-          "heading": "How they are going",
-          "icon": "activity",
-          "span": 12,
-          "source": "metric.projects-by-health",
-          "unset": "Not said yet",
-          "tones": { "on_track": "good", "at_risk": "warn", "off_track": "bad" },
-          "when": { "all": [ { "metric": "projects-live", "gt": 4 }, { "metric": "projects-with-health", "gt": 0 } ] }
-        },
-        {
           "kind": "cards",
           "heading": "In play",
           "icon": "rocket",
@@ -261,12 +263,23 @@
             { "field": "revenue", "as": "fact" },
             { "field": "next", "label": "Next step", "as": "fact" },
             { "field": "agent", "label": "Agent", "as": "who" },
-            { "metric": "project-done-by-week:{{name}}", "kpi": "headline", "as": "trend", "when": { "holds": [ "tasks" ] } },
+            {
+              "metric": "project-done-by-week:{{name}}",
+              "kpi": "headline",
+              "as": "trend",
+              "when": { "holds": [ "tasks" ] }
+            },
             { "metric": "project-worked:{{name}}", "as": "when", "label": "Worked on" }
           ],
           "order": [ { "field": "name", "dir": "asc" } ],
           "limit": 100,
-          "when": { "any": [ { "metric": "projects-live", "gt": 0 }, { "metric": "projects-parked", "gt": 0 }, { "metric": "projects-retired", "gt": 0 } ] }
+          "when": {
+            "any": [
+              { "metric": "projects-live", "gt": 0 },
+              { "metric": "projects-parked", "gt": 0 },
+              { "metric": "projects-retired", "gt": 0 }
+            ]
+          }
         },
         {
           "kind": "queue",
@@ -295,7 +308,8 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "What your projects report, newest first."
+          "when": { "metric": "readings-held", "is": 0 },
+          "body": "No project has reported a number yet. [Add a key number](/r/kpis)."
         },
         {
           "key": "numbers-by-project",
@@ -304,7 +318,14 @@
           "icon": "chart-line",
           "span": 12,
           "source": "register.datapoints",
-          "columns": [ { "field": "at" }, { "field": "value" }, { "field": "name" }, { "field": "unit" }, { "field": "amount" }, { "field": "thing" } ],
+          "columns": [
+            { "field": "at" },
+            { "field": "value" },
+            { "field": "name" },
+            { "field": "unit" },
+            { "field": "amount" },
+            { "field": "thing" }
+          ],
           "where": "source is not example",
           "back": 366,
           "bucket": "week",
@@ -318,7 +339,16 @@
           "heading": "All readings",
           "icon": "rows",
           "span": 12,
-          "authored": [ { "cells": [ "Open every reading as a table", "/r/datapoints?rows=1", "Every reading on its own line, newest first" ] } ]
+          "authored": [
+            {
+              "cells": [
+                "Open every reading as a table",
+                "/r/datapoints?rows=1",
+                "Every reading on its own line, newest first"
+              ]
+            }
+          ],
+          "when": { "metric": "readings-held", "gt": 0 }
         }
       ]
     },
@@ -472,6 +502,17 @@
       "name": "Key numbers kept",
       "source": "register.kpis",
       "where": "state is live, draft is false",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "readings-held",
+      "name": "Readings",
+      "source": "register.datapoints",
+      "where": "source is not example",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
@@ -650,52 +691,25 @@
       "script": "kpi_backfill",
       "title": "Offer each project its key numbers from what Numbers holds",
       "pack": "portfolio",
-      "runs": {
-        "every": "1d",
-        "rule": true
-      },
+      "runs": { "every": "1d", "rule": true },
       "egress": [],
       "keys": [],
-      "reads": [
-        "things",
-        "kpis",
-        "datapoints"
-      ],
-      "writes": [
-        "kpis"
-      ],
+      "reads": [ "things", "kpis", "datapoints" ],
+      "writes": [ "kpis" ],
       "source": "function kpiBackfill(things, readings, kpis) {\n  const FEW = 3;\n  const MOST = 6;\n  const DAY = 86_400_000;\n  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];\n  /* ISO 4217'S MINOR DIGITS where they are not two, as Revenue bands holds them: the sandbox has no `Intl`. */\n  const DIGITS = { JPY: 0, KRW: 0, VND: 0, CLP: 0, ISK: 0, PYG: 0, UGX: 0, RWF: 0, XAF: 0, XOF: 0, BHD: 3, KWD: 3, OMR: 3, JOD: 3, TND: 3, IQD: 3, LYD: 3 };\n  const OUTLOOK = /^(.+?) a year out: (bear|base|bull)$/i;\n  const TRIVIA = /\\b(cpu|memory|disk|round trip|cdn temp|connections|loc|lines|tests?|tests green|docs?|gdd|uncommitted|commands|scopes|migrations|surfaces|entities|decisions|research agents|assets|card frames|rarity tiers|breeds|effort days|age days|prototype)\\b/i;\n  const SERVER_UNITS = /^(ms|s|kb|mb|gb|tb|conn|req\\/day|writes\\/day)$/i;\n  const KEY = /\\b(revenue|mrr|sales|orders|takings|billed|income|payers|subs|subscribers|customers|users|players|members|active|dau|wau|mau|servers|installs|sign-?ins|sign-?ups|waitlist|audience|followers|views|plays|sessions|accounts)\\b/i;\n  const REVENUE = /\\b(revenue|mrr|takings|billed|income|sales)\\b/i;\n  const PERIOD = /\\b(by|per|a|each) (day|week|month)\\b/i;\n  const DOWN = /\\b(churn|costs?|spend|fails?|failures?|cancels?|cancellations?|missed|skips?|wrong|errors?|late|bugs|refunds?)\\b/i;\n\n  const money = (v) => (v && typeof v === 'object' && Number.isSafeInteger(v.amount) && typeof v.currency === 'string' && /^[A-Z]{3}$/.test(v.currency) ? v : null);\n  const currencyOf = (unit) => (typeof unit === 'string' && /^[A-Z]{3}$/.test(unit.trim()) ? unit.trim() : null);\n  const minor = (value, currency) => Math.round(value * 10 ** (DIGITS[currency] ?? 2));\n  const dayOf = (at) => (typeof at === 'string' && /^\\d{4}-\\d{2}-\\d{2}/.test(at) ? at.slice(0, 10) : null);\n  const msOf = (day) => Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)));\n  const dayWords = (day) => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}`;\n  const yearOn = (day) => {\n    const next = new Date(msOf(day));\n    next.setUTCFullYear(next.getUTCFullYear() + 1);\n    return next.toISOString().slice(0, 10);\n  };\n  const moneyWords = (m) => {\n    const places = DIGITS[m.currency] ?? 2;\n    const whole = Math.trunc(Math.abs(m.amount) / 10 ** places);\n    const rest = Math.abs(m.amount) % 10 ** places;\n    const said = String(whole).replace(/\\B(?=(\\d{3})+$)/g, ',');\n    return `${m.currency} ${m.amount < 0 ? '-' : ''}${said}${rest === 0 ? '' : `.${String(rest).padStart(places, '0')}`}`;\n  };\n  const listed = (names) => (names.length > 2 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names.join(' and '));\n  const seqOf = (r) => Number(String(r.spoken ?? '').split('#')[1]) || 0;\n\n  /* A PROJECT BY ITS ROW ID OR ITS SPOKEN ONE, since a reading's link may arrive as either. */\n  const projectOf = new Map();\n  for (const t of things) {\n    projectOf.set(t.id, t);\n    if (typeof t.spoken === 'string') projectOf.set(t.spoken, t);\n  }\n  const keeps = new Set();\n  for (const k of kpis) {\n    const t = projectOf.get(k.fields.thing);\n    if (t) keeps.add(t.id);\n  }\n\n  /* EACH PROJECT'S READINGS BY MEASURE, oldest written first, so the same rows always answer the same question. */\n  const byProject = new Map();\n  for (const r of [...readings].sort((a, b) => seqOf(a) - seqOf(b))) {\n    const f = r.fields;\n    if (f.source === 'example') continue;\n    const t = projectOf.get(f.thing);\n    const day = dayOf(f.at);\n    const name = typeof f.name === 'string' ? f.name.trim() : '';\n    if (!t || day === null || name === '') continue;\n    const cash = money(f.amount);\n    const currency = cash?.currency ?? currencyOf(f.unit);\n    const value = cash ? cash.amount / 10 ** (DIGITS[cash.currency] ?? 2) : typeof f.value === 'number' && Number.isFinite(f.value) ? f.value : null;\n    if (value === null) continue;\n    const own = String(t.fields.name ?? '').trim();\n    const bare = own !== '' && name.endsWith(`, ${own}`) ? name.slice(0, -(own.length + 2)).trim() : name;\n    if (!byProject.has(t.id)) byProject.set(t.id, new Map());\n    const measures = byProject.get(t.id);\n    if (!measures.has(bare)) measures.set(bare, { name: bare, unit: currency ?? (typeof f.unit === 'string' && f.unit.trim() !== '' ? f.unit.trim() : null), currency, points: new Map(), first: measures.size });\n    /* ONE POINT A DAY, the last written: an import that said one day twice said it once. */\n    measures.get(bare).points.set(day, { day, value, minor: cash ? cash.amount : null });\n  }\n\n  const out = [];\n  for (const t of [...things].sort((a, b) => seqOf(a) - seqOf(b))) {\n    const lane = t.fields.lane;\n    if (lane === 'retired' || keeps.has(t.id)) continue;\n    const project = String(t.fields.name ?? '').trim() || 'This project';\n    const measures = [...(byProject.get(t.id)?.values() ?? [])];\n\n    /* THE OUTLOOK, by the measure it forecasts: the latest said of each case. */\n    const outlooks = new Map();\n    for (const m of measures) {\n      const said = OUTLOOK.exec(m.name);\n      if (!said) continue;\n      const of = said[1].trim();\n      const latest = [...m.points.values()].sort((a, b) => (a.day < b.day ? -1 : 1)).at(-1);\n      if (!outlooks.has(of.toLowerCase())) outlooks.set(of.toLowerCase(), { of, currency: m.currency, cases: {} });\n      const o = outlooks.get(of.toLowerCase());\n      o.currency ??= m.currency;\n      o.cases[said[2].toLowerCase()] = latest;\n    }\n\n    const isMoney = (m) => m.currency !== null;\n    const left = (m) => OUTLOOK.test(m.name) || TRIVIA.test(m.name) || (m.unit !== null && SERVER_UNITS.test(m.unit));\n    let series = measures.filter((m) => !left(m) && m.points.size >= FEW);\n\n    /* A SERIES THAT REPEATS ANOTHER: one unit, as many days give or take a tenth, and most days the same value. */\n    const repeats = (a, b) => {\n      if (a.unit !== b.unit) return false;\n      const [few, many] = a.points.size <= b.points.size ? [a, b] : [b, a];\n      if (many.points.size > few.points.size * 1.1) return false;\n      let same = 0;\n      for (const [day, p] of few.points) if (many.points.get(day)?.value === p.value) same++;\n      return same >= few.points.size * 0.8;\n    };\n    const kept = [];\n    for (const m of series) {\n      const twin = kept.findIndex((k) => repeats(k, m));\n      if (twin < 0) kept.push(m);\n      else {\n        const k = kept[twin];\n        const better = PERIOD.test(m.name) !== PERIOD.test(k.name) ? PERIOD.test(m.name) : m.points.size > k.points.size;\n        if (better) kept[twin] = m;\n      }\n    }\n    series = kept;\n\n    /* MONEY FIRST, THEN WHAT A PROJECT IS JUDGED BY, THEN THE MOST READ, then the order they were first read in. */\n    const score = (m) => (isMoney(m) ? 2 : 0) + (KEY.test(m.name) ? 1 : 0);\n    series.sort((a, b) => score(b) - score(a) || b.points.size - a.points.size || a.first - b.first);\n    const chosen = series.slice(0, MOST).map((m) => ({ m, source: 'numbers' }));\n\n    /* THE ONE-OFF REVENUE, when no series is money: the latest revenue reading said once or twice. */\n    if (!chosen.some((c) => isMoney(c.m))) {\n      const once = measures.filter((m) => isMoney(m) && !left(m) && REVENUE.test(m.name) && m.points.size < FEW).sort((a, b) => b.points.size - a.points.size || a.first - b.first)[0];\n      if (once) chosen.unshift({ m: once, source: 'numbers' });\n    }\n    if (chosen.length > MOST) chosen.length = MOST;\n\n    /* THE OUTLOOK'S BASE AS THE TARGET of the money number it forecasts, else of the project's first money number. */\n    const revenueOutlook = [...outlooks.values()].find((o) => REVENUE.test(o.of) && o.currency !== null) ?? null;\n    const baseOf = (o) => {\n      const base = o?.cases.base;\n      if (!base || !o.currency) return null;\n      const amount = base.minor ?? minor(base.value, o.currency);\n      return amount > 0 ? { amount: { amount, currency: o.currency }, by: yearOn(base.day) } : null;\n    };\n    let target = null;\n    let onlyOutlook = false;\n    if (revenueOutlook && baseOf(revenueOutlook)) {\n      const base = baseOf(revenueOutlook);\n      const exact = chosen.find((c) => isMoney(c.m) && c.m.currency === revenueOutlook.currency && c.m.name.toLowerCase() === revenueOutlook.of.toLowerCase());\n      const first = chosen.find((c) => isMoney(c.m) && c.m.currency === revenueOutlook.currency && REVENUE.test(c.m.name));\n      const to = exact ?? first ?? null;\n      if (to) target = { to, ...base };\n      else if (!chosen.some((c) => isMoney(c.m)) && (lane === 'earning' || lane === 'building')) {\n        /* NO REVENUE READ YET: the outlook's own measure, to be typed, so the outlook is put to him. */\n        const typed = { m: { name: revenueOutlook.of, unit: revenueOutlook.currency, currency: revenueOutlook.currency, points: new Map(), first: -1 }, source: 'typed' };\n        chosen.unshift(typed);\n        if (chosen.length > MOST) chosen.length = MOST;\n        target = { to: typed, ...base };\n        onlyOutlook = chosen.length === 1;\n      }\n    }\n    if (chosen.length === 0) continue;\n\n    /* THE HEADLINE: the money one read most, else the one read most, ties to the higher rank. */\n    const pool = chosen.some((c) => isMoney(c.m)) ? chosen.filter((c) => isMoney(c.m)) : chosen;\n    const headline = pool.reduce((best, c) => (c.m.points.size > best.m.points.size ? c : best), pool[0]);\n\n    const everyOf = (m) => {\n      const days = [...m.points.keys()].sort();\n      if (days.length < 2) return /\\b(monthly|a month|per month|by month|mrr)\\b/i.test(m.name) ? '1m' : null;\n      const gaps = days.slice(1).map((d, i) => msOf(d) - msOf(days[i])).sort((a, b) => a - b);\n      const middle = gaps[Math.floor(gaps.length / 2)];\n      return middle <= DAY * 1.5 ? '1d' : middle <= DAY * 10 ? '1w' : '1m';\n    };\n    const kindOf = (m) => {\n      if (m.unit === '%' || /\\b(rate|share|churn|conversion|ratio)\\b/i.test(m.name)) return 'share';\n      if (/\\b(monthly|recurring|mrr)\\b/i.test(m.name)) return 'level';\n      if (PERIOD.test(m.name) || /\\b(revenue|sales|orders|takings|billed|income|new|sign-?ins|sign-?ups|sessions|plays|views|votes)\\b/i.test(m.name)) return 'flow';\n      return 'level';\n    };\n    const oftenWords = { '1d': 'daily', '1w': 'weekly', '1m': 'monthly' };\n\n    const rows = chosen.map((c, i) => {\n      const m = c.m;\n      const every = c.source === 'typed' ? '1m' : everyOf(m);\n      const row = {\n        name: m.name,\n        thing: t.id,\n        measures:\n          c.source === 'typed'\n            ? `${m.name} as you type it, a value a month.`\n            : `Read from Numbers, where ${m.name} ${every ? `arrives ${oftenWords[every]}` : 'was read once'}.`,\n        source: c.source,\n        measure: m.name,\n        kind: kindOf(m),\n        good: DOWN.test(m.name) ? 'down' : 'up',\n        order: i + 1,\n        headline: c === headline,\n        draft: true,\n      };\n      if (m.unit !== null) row.unit = m.unit;\n      if (every) row.every = every;\n      if (target && target.to === c) {\n        row.target_amount = target.amount;\n        row.target_by = target.by;\n      }\n      return row;\n    });\n\n    /* THE QUESTION, IN NAMES AND ONE OR TWO SENTENCES, under the 280 a question is held to. */\n    const names = rows.map((r) => r.name);\n    const lead = headline.m.name;\n    const aim = target ? `${target.to.m.name} aims for ${moneyWords(target.amount)} by ${dayWords(target.by)}, the outlook's base.` : '';\n    let question;\n    if (onlyOutlook) {\n      const cases = revenueOutlook.cases;\n      const at = (c) => (cases[c] ? moneyWords({ amount: cases[c].minor ?? minor(cases[c].value, revenueOutlook.currency), currency: revenueOutlook.currency }) : null);\n      const range = [at('bear') ? `${at('bear')} at worst` : null, at('bull') ? `${at('bull')} at best` : null].filter(Boolean).join(', ');\n      question = `Track ${lead} for ${project}, aiming for ${moneyWords(target.amount)} by ${dayWords(target.by)}? That is its outlook's base${range ? ` (${range})` : ''}; say no to drop it.`;\n    } else {\n      const rest = names.filter((n) => n !== lead);\n      const shown = rest.length > 3 ? [...rest.slice(0, 2), `${rest.length - 2} more`] : rest;\n      const after = shown.length === 0 ? '' : `, then ${listed(shown)}`;\n      question = `Keep ${rows.length === 1 ? `${lead} as the key number` : `${rows.length} key numbers`} for ${project}? ${rows.length === 1 ? '' : `${lead} leads${after}. `}${aim}`.trim();\n    }\n    if (question.length > 280) question = `Keep ${rows.length === 1 ? 'one key number' : `${rows.length} key numbers`} for ${project}, led by ${lead}?`;\n\n    out.push({\n      project,\n      cause: `kpi-backfill:${t.id}`,\n      question,\n      body_kind: 'rowset',\n      body: {\n        register: 'kpis',\n        rows,\n        why: onlyOutlook\n          ? 'Its outlook is the only number it has, so the target is the outlook until a real value is typed.'\n          : 'Each one is already in Numbers. Numbers read once or twice, and engineering counts, are left out.',\n      },\n    });\n  }\n  return out;\n}\nexport default async function run(ctx) {\n  const PAGE = 50;\n  const every = async (list) => {\n    let bound = PAGE;\n    while ((await ctx.record.list(list, { field: 'seq', gte: bound })).length > 0) bound *= 2;\n    const rows = [];\n    for (let from = 1; from < bound; from += PAGE) {\n      const page = await ctx.record.list(list, { all: [{ field: 'seq', gte: from }, { field: 'seq', lt: from + PAGE }] });\n      for (const r of page) rows.push({ id: r.id, spoken: `${list}#${r.seq}`, version: r.version, fields: r.fields });\n    }\n    return rows;\n  };\n  const things = await every('things');\n  const kpis = await every('kpis');\n  const readings = await every('datapoints');\n  const asks = kpiBackfill(things, readings, kpis);\n  if (asks.length === 0) return null;\n  if (typeof ctx.propose !== 'function') {\n    ctx.log(`${asks.length === 1 ? 'One project has' : `${asks.length} projects have`} key numbers to offer, and this run files no questions (a trial files none), so nothing was asked.`);\n    return null;\n  }\n\n  const asked = [];\n  const waiting = [];\n  const answered = [];\n  const refused = [];\n  for (const a of asks) {\n    const got = await ctx.propose({ question: a.question, body_kind: a.body_kind, body: a.body, cause: a.cause });\n    /* THE GATE'S RESULT, or its value handed on bare by a host that unwraps it. */\n    const filed = got && typeof got === 'object' && 'ok' in got ? (got.ok ? got.value : null) : got;\n    if (filed === null || filed === undefined) refused.push(a.project);\n    else if (filed.answered !== undefined) answered.push(a.project);\n    else if (filed.joined && !filed.widened) waiting.push(a.project);\n    else asked.push(a.project);\n  }\n\n  /* SAID IN NAMES AND COUNTS: the first three projects asked about, and how many more. */\n  const names = (list) => (list.length > 3 ? `${list.slice(0, 3).join(', ')} and ${list.length - 3} more` : list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list.join(''));\n  const said = [];\n  if (asked.length > 0) said.push(`Offered key numbers for ${names(asked)}.`);\n  if (waiting.length > 0) said.push(`${names(waiting)} ${waiting.length === 1 ? 'is' : 'are'} already waiting for an answer.`);\n  if (answered.length > 0) said.push(`${names(answered)} ${answered.length === 1 ? 'was' : 'were'} answered before, so not asked again.`);\n  if (refused.length > 0) said.push(`The record would not take the question for ${names(refused)}.`);\n  ctx.log(said.join(' '));\n  return { asked: asked.length, waiting: waiting.length, answered: answered.length, refused: refused.length };\n}"
     },
     {
       "rule": "kind-offers-kpis",
       "name": "Offer a project the key numbers of its kind",
       "pack": "portfolio",
-      "on": {
-        "written": {
-          "register": "things",
-          "op": [ "create", "update" ],
-          "fields": [ "kind" ]
-        }
-      },
-      "steps": [
-        {
-          "script": {
-            "id": "kind_drafts",
-            "as": "offering",
-            "input": {
-              "project": "{{trigger.entry}}"
-            }
-          }
-        }
-      ]
+      "on": { "written": { "register": "things", "op": [ "create", "update" ], "fields": [ "kind" ] } },
+      "steps": [ { "script": { "id": "kind_drafts", "as": "offering", "input": { "project": "{{trigger.entry}}" } } } ]
     },
     {
       "script": "kind_drafts",
       "title": "Offer a project the key numbers of its kind",
       "pack": "portfolio",
-      "runs": {
-        "rule": true
-      },
+      "runs": { "rule": true },
       "egress": [],
       "keys": [],
       "reads": [ "things", "kpis" ],

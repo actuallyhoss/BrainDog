@@ -18,6 +18,6 @@ with it, and it is written here as a file anybody can read, the same as any othe
 
 The build still compiles the same lists, pages, figures and rules in as a module (`packages/seed/src/modules/people.ts`).
 `people.test.ts` holds this file equal to it, part for part, on a record with Projects and Money, with Projects alone,
-and with neither, and is deleted the day the module is. Two things the module leaves out on a smaller record, a part of
+with Money alone and with neither, and is deleted the day the module is. Two things the module leaves out on a smaller record, a part of
 how a person is met and a list a page asks for, have no `when:` of their own: the plan takes each out with the part
 that waits, and the test holds that.

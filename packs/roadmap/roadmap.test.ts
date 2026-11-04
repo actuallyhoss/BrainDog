@@ -145,7 +145,7 @@ test('THE OLD ID IS STILL INSTALLABLE, says it is part of Work, declares nothing
   assert.deepEqual(diff.approve, []);
   assert.deepEqual(diff.conflicts, []);
   said(await put(api, pack()));
-  assert.equal(((await roadmapOf(api)) as { heading: string }).heading, 'In play', 'installing the retired add-on took the page away');
+  assert.equal(((await roadmapOf(api)) as { heading: string }).heading, 'Tasks by due day', 'installing the retired add-on took the page away');
   close();
 });
 

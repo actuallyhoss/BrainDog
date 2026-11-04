@@ -39,7 +39,6 @@ import { readFileSync } from 'node:fs';
 import { settleWhen } from '../../packages/declare/src/catalogue.ts';
 import { normalise, type Pack } from '../../packages/declare/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
-import { rulesLine } from '../../packages/record/src/headlines.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import type { CtxHost, Json, ScriptAnswer, ScriptDecl, ScriptWrite } from '../../packages/script/src/index.ts';
 import { runInQuickJs } from '../../packages/script/src/quickjs.ts';
@@ -84,6 +83,7 @@ const file = (): File => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as never;
 const OWN = ['tracks', 'updates', 'tasks'] as const;
 const PROJECTS = 'things';
 const PEOPLE = 'people';
+const ORGANISATIONS = 'organisations';
 const SUBSETS: readonly { name: string; holds: readonly string[] }[] = [
   { name: 'with Projects and People', holds: [PROJECTS, PEOPLE] },
   { name: 'with Projects alone', holds: [PROJECTS] },
@@ -121,7 +121,7 @@ const read = async (doc: unknown): Promise<Pack> => said<Pack>(await normalise(d
 
 /** The module's Work for a record that holds `holds`, as `normalise` reads it. */
 const moduleDoc = (holds: readonly string[], seeds?: []): Record<string, unknown> =>
-  firstPartyDocument('work', { holds: [...holds, ...OWN], ...(seeds ? { seeds } : {}) })!;
+  firstPartyDocument('work', { holds: [...holds, ...(holds.includes(PEOPLE) ? peopleLists() : []), ...OWN], ...(seeds ? { seeds } : {}) })!;
 const moduleFor = (holds: readonly string[]): Promise<Pack> => read(moduleDoc(holds));
 
 /** The file as `plan` would store it on this record: the parts that wait taken out, and what waits. */
@@ -189,12 +189,20 @@ const KIND_ORDER = ['register', 'page', 'metric', 'rule', 'script'] as const;
 const of = (pack: Pack, kind: string): Pack => ({ ...pack, declarations: pack.declarations.filter((d) => d.kind === kind) });
 
 /** Every part of the file that waits on what a record holds, as where it is and what it waits for. */
-function waits(doc: File): { at: string; holds: unknown }[] {
+function waits(doc: File, have?: readonly string[]): { at: string; holds: unknown }[] {
   const out: { at: string; holds: unknown }[] = [];
+  /* A BLOCK DRAWN ON A FIGURE THAT WAITS WAITS WITH IT (`sifted` in `packages/declare/src/when.ts`), so Late is said here. */
+  const figures = new Map(doc.declarations.flatMap((d) => (typeof d.metric === 'string' && isBody(d.when) ? [[d.metric, d.when.holds] as const] : [])));
   const walk = (v: unknown, at: string): void => {
     if (Array.isArray(v)) return v.forEach((x, i) => walk(x, `${at}, ${partName(x, i)}`));
     if (!isBody(v)) return;
-    if (isBody(v.when) && Object.hasOwn(v.when, 'holds')) out.push({ at, holds: v.when.holds });
+    const held = isBody(v.when) ? (Object.hasOwn(v.when, 'holds') ? v.when.holds : figures.get(String(v.when.metric))) : undefined;
+    /* ASKED ABOUT ONE RECORD, ONLY WHAT IT DOES NOT HOLD, and a part taken out says nothing about what is inside it. */
+    if (held !== undefined) {
+      const isIn = have !== undefined && (held as string[]).every((h) => have.includes(h));
+      if (!isIn) out.push({ at, holds: held });
+      if (!isIn && have !== undefined) return;
+    }
     for (const [key, inner] of Object.entries(v)) if (key !== 'when') walk(inner, at);
   };
   doc.declarations.forEach((d, i) => walk(d, partName({ name: d.name ?? d.title }, i)));
@@ -250,13 +258,13 @@ function unplaced(pack: Pack, holds: readonly string[]): Pack {
 const SCRIPTS: Readonly<Record<string, string>> = { close_follow_ups: './close-follow-ups.js', start_with_parent: './start-with-parent.js' };
 const source = (script: string): string => readFileSync(new URL(SCRIPTS[script]!, import.meta.url), 'utf8');
 
-test('THE FILE IS WORK AND ONLY WORK: three lists, three pages, twenty-eight figures over its own lists, two rules, two scripts', () => {
+test('THE FILE IS WORK AND ONLY WORK: three lists, three pages, twenty-nine figures over its own lists, two rules, two scripts', () => {
   const doc = file();
   assert.equal(doc.pack, 'work');
   const kinds = doc.declarations.map((d) => ['rule', 'script', 'ingest', 'register', 'page', 'metric'].find((k) => typeof d[k] === 'string') ?? 'something else');
   assert.deepEqual(
     Object.fromEntries(['register', 'page', 'metric', 'rule', 'script'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    { register: 3, page: 3, metric: 28, rule: 2, script: 2 },
+    { register: 3, page: 3, metric: 29, rule: 2, script: 2 },
   );
   assert.ok(!kinds.includes('ingest') && !kinds.includes('something else'), 'the file declares something that is none of the five');
   assert.deepEqual(doc.declarations.flatMap((d) => (typeof d.register === 'string' && d.rule === undefined ? [d.register] : [])), [...OWN]);
@@ -294,14 +302,17 @@ test('THE TWO SCRIPTS ARE THE FILES BESIDE IT, byte for byte, and each reaches t
 const RELEASED = new URL('../../packages/seed/test/fixtures/released/work-1.18.0.json', import.meta.url);
 const released = (): Body & { version: string } => JSON.parse(readFileSync(RELEASED, 'utf8')) as never;
 
-test('ITS VERSION IS THE MODULE\'S, ONE MINOR STEP ABOVE THE RELEASED ONE, and it says what changed in one plain note', () => {
+test('ITS VERSION IS THE MODULE\'S, ABOVE THE RELEASED ONE, and it says what changed in one plain note', () => {
   const doc = file();
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.work, `the module is at ${FIRST_PARTY_VERSIONS.work}, and the file is the same step`);
-  /* 1.19.0 IS SERVED NOW (deployed 27 October, 51de57604), newer than the frozen 1.18.0 file, so the step is over it. */
+  /* 1.19.0 WAS SERVED ON 27 October (51de57604), newer than the frozen 1.18.0 file. THE FILE TAKES THE MODULE'S VERSION AND
+     NO STEP OF ITS OWN (the module's own notes are in `changelog.ts`): 1.26.1 SINCE 3 November (7438cc7e8), Work and the
+     Board drop their line of counts. */
   const live = '1.19.0';
   assert.ok(released().version < live, 'the frozen file is older than what is served');
-  const [major, minor] = live.split('.').map(Number) as [number, number];
-  assert.equal(doc.version, `${major}.${minor + 1}.0`, `${live} is released, so the file is the next minor step and not that one`);
+  const numbers = (v: string): number[] => v.split('.').map(Number);
+  assert.ok(numbers(doc.version)[1]! > numbers(live)[1]!, `${live} was released, so the file is past it and not that one`);
+  assert.equal(doc.version, '1.26.1');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -313,34 +324,52 @@ test('ITS VERSION IS THE MODULE\'S, ONE MINOR STEP ABOVE THE RELEASED ONE, and i
   assert.equal(firstPartyDocument('work')!.config, undefined);
 });
 
-test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-two parts wait, each on one of the two', () => {
+test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: thirty-eight parts wait, each on one neighbour', () => {
   const doc = file();
   assert.deepEqual(doc.requires, { format: 1, primitives: 1, packs: {} }, 'Work installs on a record with no other add-on');
   assert.deepEqual(firstPartyManifest('work').requires, [], 'and so does the module');
   assert.deepEqual(waits(doc), [
     { at: '"Threads", "Project"', holds: [PROJECTS] },
-    { at: '"Tasks", "Owner"', holds: [PEOPLE] },
+    { at: '"Tasks", "Assigned to"', holds: [PEOPLE] },
     { at: '"Tasks", "Project"', holds: [PROJECTS] },
+    /* WHO A TASK IS FOR, AN ORGANISATION OF PEOPLE'S (work 1.23.0). */
+    { at: '"Tasks", "Client"', holds: [ORGANISATIONS] },
     { at: '"Work", "thing"', holds: [PROJECTS] },
-    /* EVERY TASK SAYS ITS PROJECT UNDER IT (proj F10), and the column waits for Projects. */
+    /* EVERY TASK SAYS ITS PROJECT AND CLIENT UNDER IT (proj F10), and each column waits for its own. THE BANDS OF YOUR OWN
+       WORK ARE DRAWN ON A FIGURE THAT READS THE ASSIGNEE, so they wait for People with it (1.21.0, 4d5f2fe2e). */
+    { at: '"Work", "Late"', holds: [PEOPLE] },
     { at: '"Work", "Late", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "Late", "client"', holds: [ORGANISATIONS] },
     { at: '"Work", "Waiting on you", "thing"', holds: [PROJECTS] },
-    { at: '"Work", "This week", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "Your work this week"', holds: [PEOPLE] },
+    { at: '"Work", "Your work this week", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "Your work this week", "client"', holds: [ORGANISATIONS] },
     { at: '"Work", "With an agent", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "After this week"', holds: [PEOPLE] },
+    { at: '"Work", "After this week", "client"', holds: [ORGANISATIONS] },
+    { at: '"Work", "No due day"', holds: [PEOPLE] },
     { at: '"Work", "No due day", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "No due day", "client"', holds: [ORGANISATIONS] },
     { at: '"Work", "Later", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "Later", "client"', holds: [ORGANISATIONS] },
+    /* NEEDS A PROJECT IS DRAWN ON THE FIGURE THAT ASKS IT, WHICH WAITS FOR PROJECTS. */
+    { at: '"Work", "Needs a project"', holds: [PROJECTS] },
     /* OPEN WORK WITH NO PROJECT ASKS FOR PROJECTS WHOLE, SINCE work 1.19.0: its sentence is about the project. */
     { at: '"Work", "With no project"', holds: [PROJECTS] },
     { at: '"Board", "board", "owner"', holds: [PEOPLE] },
     /* NO EVERYTHING OPEN UNDER THE BOARD, so its Project and Owner wait no more. */
-    ...['Open', 'Due soon', 'In review', 'Handed back or blocked', 'Changed this week', 'Last worked', 'Done this week', 'Planned with a day', 'Done, by week'].map(
+    ...['Open', 'Due soon', 'In review', 'Handed back or blocked', 'Changed this week', 'Last worked', 'Done this week', 'Planned with a day'].map(
       (name) => ({ at: `"${name}"`, holds: [PROJECTS] }),
     ),
+    ...['Yours, late', 'Yours, due today', 'Yours, due this week', 'Yours, due today or this week', 'Yours, after this week', 'Yours, with no due day'].map(
+      (name) => ({ at: `"${name}"`, holds: [PEOPLE] }),
+    ),
+    { at: '"Done, by week"', holds: [PROJECTS] },
     { at: '"With no project"', holds: [PROJECTS] },
   ]);
   /* EVERY PART THAT NAMES THE PROJECT OR THE OWNER WAITS, and nothing else does: no column, field or figure over either
      is there unconditionally, so nothing the record lacks is ever drawn. */
-  const LINKED: Readonly<Record<string, string>> = { thing: PROJECTS, owner: PEOPLE };
+  const LINKED: Readonly<Record<string, string>> = { thing: PROJECTS, owner: PEOPLE, client: ORGANISATIONS };
   for (const d of doc.declarations) {
     for (const f of (d.fields as Body[] | undefined) ?? []) {
       if (LINKED[String(f.id)]) assert.deepEqual([f.type, f.to, f.required ?? false, f.when], ['ref', LINKED[String(f.id)], false, { holds: [LINKED[String(f.id)]] }]);
@@ -374,7 +403,8 @@ for (const { name, holds } of SUBSETS) {
     const built = apart(await moduleFor(holds), holds);
     const lines = parity(pack, built);
     assert.deepEqual(lines, [], `the file and the module disagree ${name}:\n  ${lines.join('\n  ')}`);
-    const unheld = waits(file()).filter((w) => !(w.holds as string[]).every((h) => holds.includes(h)));
+    const have = [...holds, ...(holds.includes(PEOPLE) ? peopleLists() : [])];
+    const unheld = waits(file(), have);
     assert.deepEqual(diff.waiting.map((w) => w.holds), unheld.map((w) => w.holds));
     assert.deepEqual(diff.conflicts, []);
     const mine = pack.manifest as unknown as Body;
@@ -422,7 +452,8 @@ test('HAND AND FILTER GO IN AS THE FILE SHIPS on all four records, and each wait
     control: 'segmented',
     counts: OPEN,
     options: [
-      { value: 'yours', label: 'Yours', where: 'agent is empty' },
+      /* NOT SOMEBODY ELSE'S, SINCE 1.21.0 (4d5f2fe2e): read for whoever is looking, and true of every task with no Owner field. */
+      { value: 'yours', label: 'Yours', where: 'agent is empty, owner is not someone else' },
       { value: 'agents', label: 'Agents', where: 'agent is set' },
     ],
   };
@@ -464,7 +495,7 @@ const TASK = { what: 'Proof the spring catalogue', state: 'open', by: '2026-03-1
 const THREAD = { name: 'Spring catalogue', state: 'open' };
 
 for (const holds of [[PROJECTS, PEOPLE], [PROJECTS]])
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record with ${holds.length === 2 ? 'both neighbours' : 'Projects alone'} stores the same thirty-eight parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record with ${holds.length === 2 ? 'both neighbours' : 'Projects alone'} stores the same thirty-nine parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, moduleDoc(holds, [])));
@@ -472,9 +503,11 @@ for (const holds of [[PROJECTS, PEOPLE], [PROJECTS]])
     const mine = stored(filed.api);
     const theirs = stored(built.api);
     const work = (await read(file())).declarations.map((d) => d.id);
-    assert.equal(work.length, 38);
+    assert.equal(work.length, 39);
     for (const id of work) {
-      assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
+      /* A FIGURE THAT WAITS FOR PEOPLE IS STORED BY NEITHER ON A RECORD WITHOUT THEM, and by both where it is held. */
+      assert.equal(mine.has(id), theirs.has(id), `${id}: the file stored it ${mine.has(id)}, the module ${theirs.has(id)}`);
+      if (!mine.has(id)) continue;
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));
       assert.deepEqual(lines, [], `stored differently:\n  ${lines.join('\n  ')}`);
       assert.equal(mine.get(id), theirs.get(id), `${id} is stored in another order`);
@@ -641,19 +674,17 @@ test('WORK ASKS ITS OWN QUESTIONS: a queue of the questions about tasks, three d
     { heading: queue.heading, where: queue.where, when: queue.when, limit: queue.limit, tiles: queue.tiles },
     { heading: 'Questions for you', where: 'list is tasks', when: { metric: 'questions-open-in:tasks', gt: 0 }, limit: 3, tiles: true },
   );
-  /* EVERY LINE OF THE PAGE BUT THE EMPTY ONE SAYS THE COUNT. */
-  const lines = workPage().filter((b) => b.lead && typeof b.body === 'string' && b.body.includes('{{'));
-  assert.equal(lines.length, 2);
-  for (const l of lines) assert.match(l.body!, /\{\{questions-open-in:tasks\}\} question\(s\) for you/u);
+  /* NO LINE OF COUNTS OVER THE PAGE SINCE 1.26.1 (7438cc7e8): the queue itself says the questions, and the bands the rest. */
+  assert.deepEqual(workPage().filter((b) => b.lead && typeof b.body === 'string' && b.body.includes('{{')), [], 'a line of counts over Work');
 });
 
 /* FIVE SINCE the screens scope of 24 October: the questions, then four bands in his order, Late, Waiting on you,
-   This week and With an agent, two to a row. */
+   Your work this week (called This week until 30 October, 4daeed99c) and With an agent, two to a row. */
 test('FIVE TILES BEFORE THE FOLD AT 1440, the questions over four bands in his order', () => {
-  assert.deepEqual(beforeTheFold(workPage()), ['Questions for you', 'Late', 'Waiting on you', 'This week', 'With an agent']);
+  assert.deepEqual(beforeTheFold(workPage()), ['Questions for you', 'Late', 'Waiting on you', 'Your work this week', 'With an agent']);
 });
 
-test('ON A RECORD, THE QUEUE AND THE LINE SAY THE QUESTIONS ABOUT TASKS: nothing at nought, two at two, and not the one about a person', async () => {
+test('ON A RECORD, THE QUEUE SAYS THE QUESTIONS ABOUT TASKS: nothing at nought, two at two, and not the one about a person', async () => {
   const { api, close } = await record([PROJECTS, PEOPLE]);
   said(await put(api, file()));
   const late = add(api, 'tasks', { what: 'Glaze the test tiles', state: 'open', by: '2026-03-02' });
@@ -666,21 +697,15 @@ test('ON A RECORD, THE QUEUE AND THE LINE SAY THE QUESTIONS ABOUT TASKS: nothing
   const OPTIONS = [{ id: 'yes', label: 'Yes', because: 'It is due' }, { id: 'no', label: 'No', because: 'Not yet' }];
   const ask = (question: string, about: string) => said(api.kernel.propose({ question, body_kind: 'options', body: { options: OPTIONS, about } } as never, 'slash'));
   const page = (): Drawn[] => said<{ blocks: Drawn[] }>(api.kernel.page('work')).blocks;
-  const line = (): string => {
-    const lead = page().find((b) => b.kind === 'note' && b.lead && b.drawn !== false && typeof b.body === 'string' && b.body.includes('questions-open-in'))!;
-    return rulesLine(lead.body!, lead.values ?? {});
-  };
   const questions = (): Drawn => page().find((b) => b.heading === 'Questions for you')!;
 
   assert.equal(questions().drawn, false, 'the queue drew with nothing asked');
-  assert.doesNotMatch(line(), /question/u, 'the line said nought');
-  assert.match(line(), /^1 late/u);
+  assert.equal(page().find((b) => b.heading === 'Late')!.matched, 1, 'Late does not hold the one task past its day');
 
   ask('Move the glazing to Friday?', spoken(late));
   ask('Book the small kiln?', spoken(later));
   ask('Is this the same potter?', spoken(ada));
   assert.notEqual(questions().drawn, false);
   assert.equal(questions().matched, 2, 'the queue kept a question about a person');
-  assert.match(line(), /^2 questions for you, 1 late/u);
   close();
 });

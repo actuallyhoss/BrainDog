@@ -1,9 +1,9 @@
 {
   "pack": "estate",
-  "version": "2.7.0",
+  "version": "2.9.0",
   "title": "Services",
   "summary": "Domains, hosting, subscriptions, memberships, insurance and bills, and when each one renews.",
-  "changes": "The Services page is called Services, as the menu calls it, and its Lapsing table says the day each service lapses and why, from its own note. A service that costs nothing is no longer asked about before it renews. Nothing you keep is moved or changed.",
+  "changes": "Services opens on what it costs a month, without counting the questions Waiting on you shows.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -33,7 +33,7 @@
       "icon": "service",
       "name": "Services",
       "one": "service",
-      "holds": "a renewal date, who it is with and a cost, so the record can tell you what is due in October",
+      "holds": "a renewal date, who it is with and a cost, so you are told what renews before it does",
       "title": "name",
       "mobile": [ "name", "cost", "renews" ],
       "state": "state",
@@ -122,7 +122,12 @@
       "requires": [ "register.services" ],
       "pack": "estate",
       "blocks": [
-        { "kind": "note", "lead": true, "span": 12, "body": "{{questions-open-in:services}} question(s) for you, {{estate-month}} a month to keep everything running." },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{estate-month}} a month to keep everything running."
+        },
         {
           "kind": "note",
           "heading": "Nothing kept yet",
@@ -132,12 +137,15 @@
           "when": { "metric": "services-held", "lt": 1 }
         },
         {
-          "kind": "note",
-          "tone": "warn",
+          "kind": "table",
           "heading": "Points at nothing",
           "icon": "circle-alert",
           "span": 12,
-          "body": "Something here renews and points at nothing. A domain that resolves nowhere still costs what it costs.",
+          "source": "register.services",
+          "where": "kind is domain, state is live, points_at is empty",
+          "columns": [ { "field": "name" }, { "field": "provider" }, { "field": "renews" }, { "field": "cost" } ],
+          "order": [ { "field": "renews", "dir": "asc" } ],
+          "limit": 6,
           "when": { "metric": "points-nowhere", "gt": 0 }
         },
         {
@@ -147,7 +155,12 @@
           "span": 12,
           "source": "register.services",
           "where": "state is lapsing",
-          "columns": [ { "field": "name" }, { "field": "provider" }, { "field": "renews", "label": "Lapses" }, { "field": "note", "label": "Why" } ],
+          "columns": [
+            { "field": "name" },
+            { "field": "provider" },
+            { "field": "renews", "label": "Lapses" },
+            { "field": "note", "label": "Why" }
+          ],
           "order": [ { "field": "renews", "dir": "asc" } ],
           "limit": 6,
           "when": { "metric": "lapsing", "gt": 0 }
@@ -178,7 +191,7 @@
           "icon": "calendar-clock",
           "span": 12,
           "where": "state is not cancelled, renews after yesterday, renews before +90d",
-          "columns": [ { "field": "renews" }, { "field": "name" }, { "field": "provider" } ],
+          "columns": [ { "field": "renews" }, { "field": "name" }, { "field": "cost" } ],
           "source": "register.services",
           "order": [ { "field": "renews", "dir": "asc" } ],
           "limit": 8,
@@ -248,17 +261,37 @@
           "lead": true,
           "span": 12,
           "source": "register.services",
-          "where": "seq is {{seq}}",
+          "where": "seq is {{seq}}, cost is set",
           "columns": [
             { "field": "name", "as": "title" },
-            { "field": "cost", "as": "figure" },
+            { "field": "cost", "label": "Next renewal", "as": "figure" },
             { "field": "provider", "label": "With", "as": "fact" },
             { "field": "points_at", "label": "Points at", "as": "fact" },
             { "field": "renews", "label": "Renews", "as": "when" }
           ],
           "limit": 1
         },
-        { "kind": "note", "heading": "Keys", "icon": "key", "span": 12, "body": "Keys for {{name}} are kept in the [Keychain](/keychain?q={{name}})." }
+        {
+          "kind": "cards",
+          "lead": true,
+          "span": 12,
+          "source": "register.services",
+          "where": "seq is {{seq}}, cost is empty",
+          "columns": [
+            { "field": "name", "as": "title" },
+            { "field": "provider", "label": "With", "as": "fact" },
+            { "field": "points_at", "label": "Points at", "as": "fact" },
+            { "field": "renews", "label": "Renews", "as": "when" }
+          ],
+          "limit": 1
+        },
+        {
+          "kind": "note",
+          "heading": "Keys",
+          "icon": "key",
+          "span": 12,
+          "body": "Keys for {{name}} are kept in the [Keychain](/keychain?q={{name}})."
+        }
       ]
     },
     {
@@ -312,7 +345,7 @@
       "metric": "points-nowhere",
       "name": "Points at nothing",
       "source": "register.services",
-      "where": "state is live, points_at is empty",
+      "where": "kind is domain, state is live, points_at is empty",
       "value": { "count": "id" },
       "format": "int",
       "target": { "lte": 0 },
@@ -384,7 +417,9 @@
       "when": "state is live, renews before today",
       "then": [
         { "move": "lapsing" },
-        { "notify": { "say": "{{name}} was due to renew {{ago:renews}} and nobody said it did, so it is lapsing." } }
+        {
+          "notify": { "say": "{{name}} was due to renew {{ago:renews}} and nobody said it did, so it is lapsing." }
+        }
       ],
       "once_per": [ "entry", "renews" ]
     },
@@ -409,14 +444,20 @@
       "name": "Keep a service live, and leave its next renewal day to you",
       "pack": "estate",
       "on": { "decided": { "about": "rule.renew-soon", "option": "Keep it" } },
-      "steps": [ { "move": "live" }, { "note": "You chose to keep this in Needs you. Set the day it renews next once it has." } ]
+      "steps": [
+        { "move": "live" },
+        { "note": "You chose to keep this in Needs you. Set the day it renews next once it has." }
+      ]
     },
     {
       "rule": "renewal-cancelled",
       "name": "Mark a service cancelled, and leave telling the provider to you",
       "pack": "estate",
       "on": { "decided": { "about": "rule.renew-soon", "option": "Cancel it" } },
-      "steps": [ { "move": "cancelled" }, { "note": "You chose to cancel this in Needs you. Cancel it with the provider too." } ]
+      "steps": [
+        { "move": "cancelled" },
+        { "note": "You chose to cancel this in Needs you. Cancel it with the provider too." }
+      ]
     }
   ],
   "seeds": [
