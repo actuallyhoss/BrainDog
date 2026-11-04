@@ -23,7 +23,7 @@
  *   - `pack`: the first add-on `packs` answers as switched on.
  *   - `page`: the first page `pages` answers.
  *   - `row`: the first row `list` answered, by its list and number.
- *   - `body`: a page body of one table over the list `list` would name, which `previewPage` draws and never installs.
+ *   - `body`: a page body of one table over the list `list` would name, which `today` and `previewPage` draw and never install.
  *   - `every`: every list the reader may read at once (`{ every: true }`), which `schemas` answers.
  */
 export type FirstAsk = 'bare' | 'list' | 'pack' | 'page' | 'row' | 'body' | 'every';
@@ -49,7 +49,8 @@ export const FIRST_DRAW: readonly FirstRead[] = [
   { method: 'packConfig', ask: 'pack', post: false, by: "the root layout, reading a plugin's currency" },
   { method: 'page', ask: 'page', post: false, by: "Home, drawing the record's own home page" },
   { method: 'get', ask: 'row', post: false, by: 'Home, naming the agent run a block shows' },
-  { method: 'previewPage', ask: 'body', post: true, by: 'Home, drawing Today where no home page is declared' },
+  { method: 'today', ask: 'body', post: true, by: 'Home, drawing Today where no home page is declared' },
+  { method: 'previewPage', ask: 'body', post: true, by: 'Home, drawing Today on a host older than `today`' },
   { method: 'whatsNew', ask: 'bare', post: false, by: 'Home, asking what is new before each read of its page' },
 ];
 
@@ -61,6 +62,7 @@ export const AFTER_DRAW: Readonly<Record<string, string>> = {
   previewChange: 'Needs you, when a proposed change is opened, never the front door',
   engineHealth: "Home's engine line, asked only where Slash has a model behind it, and a refusal or an older host draws nothing",
   slashStatus: "Home's engine line, the month's spend beside the model's health, asked only where Slash has a model behind it",
+  widgetSuggest: "Today's last cell, what Slash would add, asked apart once Today has drawn, and no offer draws nothing",
   sharedOut: "Today's one line about what is shared out, asked for an owner once Today has drawn, and nothing shared draws nothing",
 };
 
@@ -72,6 +74,7 @@ export const READERS: readonly string[] = [
   'lib/record/boot-live.ts',
   'lib/voice.svelte.ts',
   'lib/home/Home.svelte',
+  'lib/home/today-read.ts',
   'lib/record/page-live.ts',
   'routes/decide/[id]/proposed.ts',
 ];
