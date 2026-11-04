@@ -280,7 +280,7 @@ const CAPPED: readonly (readonly [route: string, what: string, capped: RegExp])[
      of rows exists to catch. */
   ['v/[view]/+page.svelte', 'the saved view’s grid', /(\w+) = \$derived\(entries\.slice\(0, DOM_CAP\)\)[\s\S]*toRows\(register, \1,/],
   ['v/[view]/+page.svelte', 'the saved view’s phone cards', /(\w+) = \$derived\(entries\.slice\(0, DOM_CAP\)\)[\s\S]*<RowCards[^>]*entries=\{\1\}/],
-  ['audit/+page.svelte', 'the log, which grows with writes', /lines = \$derived\(rolledRuns\(burstsOf\(matched[\s\S]*lines\.slice\(0, Math\.min\(wanted, DOM_CAP\)\)/],
+  ['audit/+page.svelte', 'the log, which grows with writes', /lines = \$derived\(sameMinute\(rolledRuns\(burstsOf\(matched[\s\S]*lines\.slice\(0, Math\.min\(wanted, DOM_CAP\)\)/],
   ['inbox/+page.svelte', 'arrivals that matched no rule', /INBOX\.slice\(0, DOM_CAP\)/],
 ];
 

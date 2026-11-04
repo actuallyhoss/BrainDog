@@ -94,9 +94,15 @@ function everyAsked(pathname: string): string[] {
 }
 
 test('and beside boot it asks every list the reader may read, at the same address, boot first', () => {
-  for (const path of ['/acme', '/acme/p/kiln', '/', '/decide']) {
+  /* AND TODAY ON TODAY (c52df9b85), A PAGE ON ITS OWN ADDRESS (`page` with `shape`), and on any other screen only those two. */
+  for (const [path, after] of [
+    ['/acme', ['/api/today']],
+    ['/acme/p/kiln', ['/api/page?slug=kiln&shape=1']],
+    ['/', ['/api/today']],
+    ['/decide', []],
+  ] as const) {
     const base = apiBase(new URL(`https://brain.dog${path}`));
-    assert.deepEqual(everyAsked(path), [`${base}/api/boot`, `${base}/api/schemas?every=true`], path);
+    assert.deepEqual(everyAsked(path), [`${base}/api/boot`, `${base}/api/schemas?every=true`, ...after.map((a) => `${base}${a}`)], path);
   }
 });
 

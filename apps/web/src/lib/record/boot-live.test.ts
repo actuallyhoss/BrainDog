@@ -262,7 +262,7 @@ test('a pack install names the list it brought, not the bare verb', () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ actor: 'system', target_kind: 'pack', ...over })] as never, null)[0]?.text;
   assert.equal(at({ kind: 'install', target: 'pack:estate' }), 'Added the Services list');
   assert.equal(at({ kind: 'uninstall', target: 'pack:estate' }), 'Removed the Services list');
-  assert.equal(at({ kind: 'install', target: 'pack:nobody-knows' }), 'Added the nobody-knows add-on');
+  assert.equal(at({ kind: 'install', target: 'pack:nobody-knows' }), 'Added the Nobody knows plugin');
   assert.equal(at({ kind: 'install', target: 'pack:usecase-student' }), 'Added the Student starter');
   assert.equal(at({ kind: 'install', target: 'pack:usecase-team' }), 'Added the Team board starter');
   assert.equal(at({ kind: 'uninstall', target: 'pack:usecase-book-club' }), 'Removed the Book club starter');
@@ -383,13 +383,19 @@ test('A SAVED VIEW ON A RECORD SITS UNDER ITS LIST in the rail and at its page, 
   );
 });
 
+/* THE RAIL IS WHAT `nav` DOES NOT MARK `cut`. A page that waits is still carried, cut and marked `waits`, so the sidebar can
+   hold it under its place's More and the palette can find it (9cc614088, audit 31 Oct f, AF7). */
+const railOf = (shell: ReturnType<typeof layoutOf>): string[] => shell.nav.filter((n) => !n.cut).map((n) => n.href);
+
 test('A PLACE OVER SEVERAL LISTS IS JUDGED BY THE LIST ITS SECTION IS NAMED AS: off the rail at no rows, on it at one', () => {
   /* Sam after sign-up: Renewals reads Services, its numbers and the open questions, so boot sends it no `list`. */
   const estate = { slug: 'estate', title: 'Renewals', nav: { section: 'Services', order: 10 }, icon: null, list: null };
   const money = { slug: 'ledger', title: 'Ledger', nav: { section: 'Money', order: 20 }, icon: null, list: null };
   const at = (count: number) =>
-    layoutOf({ ...BOOT, registers: [{ id: 'services', name: 'Services', count }], pages: [estate, money] } as never).nav.map((n) => n.href);
+    railOf(layoutOf({ ...BOOT, registers: [{ id: 'services', name: 'Services', count }], pages: [estate, money] } as never));
   assert.ok(!at(0).includes('/p/estate'), 'a place with nothing in it is in the rail');
+  const waited = layoutOf({ ...BOOT, registers: [{ id: 'services', name: 'Services', count: 0 }], pages: [estate] } as never).nav.find((n) => n.href === '/p/estate');
+  assert.ok(waited?.cut === true && waited.waits === true, 'a page that waits is no longer carried for the sidebar and the palette');
   assert.ok(at(1).includes('/p/estate'), 'the place did not come back with its first row');
   /* No list is named Money, so its page is never judged. */
   assert.ok(at(0).includes('/p/ledger'));
@@ -409,7 +415,7 @@ test('A PAGE THAT NAMES ITS PLACE ON THE RAIL NEVER WAITS: Money and Projects st
       { id: 'tasks', name: 'Tasks', count: 0 },
     ],
     pages: [money, projects, board],
-  } as never).nav.map((n) => n.href);
+  } as never).nav.filter((n) => !n.cut).map((n) => n.href);
   assert.deepEqual(nav, ['/p/money', '/p/projects']);
 });
 
@@ -430,16 +436,16 @@ test('A PLACE THAT SAYS ITS LISTS IS JUDGED BY ALL OF THEM: off the rail while e
       ],
       pages: [work, people, view, loose],
       ...over,
-    } as never).nav.map((n) => n.href);
+    } as never).nav.filter((n) => !n.cut).map((n) => n.href);
   assert.deepEqual(at(0, 0), ['/p/team', '/p/tasks-mine', '/p/notes'], 'a place whose lists all hold nothing is in the rail');
   assert.ok(at(0, 1).includes('/p/work'), 'the place did not come with the first row in its second list');
   assert.ok(at(1, 0).includes('/p/work'));
 
   /* `lists` WINS OVER `list` AND OVER THE SECTION'S NAME: one list is empty and the page reads a second that is not. */
   const one = { ...work, list: 'tasks', nav: { section: 'Tasks', order: 10 } };
-  assert.ok(layoutOf({ ...BOOT, registers: [{ id: 'tasks', name: 'Tasks', count: 0 }, { id: 'milestones', name: 'Milestones', count: 2 }], pages: [one] } as never).nav.some((n) => n.href === '/p/work'));
+  assert.ok(railOf(layoutOf({ ...BOOT, registers: [{ id: 'tasks', name: 'Tasks', count: 0 }, { id: 'milestones', name: 'Milestones', count: 2 }], pages: [one] } as never)).includes('/p/work'));
   /* A list the caller was not sent is not counted against the page: nothing says it is empty. */
-  assert.ok(layoutOf({ ...BOOT, registers: [{ id: 'tasks', name: 'Tasks', count: 0 }], pages: [{ ...work, lists: ['tasks', 'hidden'] }] } as never).nav.some((n) => n.href === '/p/work'));
+  assert.ok(railOf(layoutOf({ ...BOOT, registers: [{ id: 'tasks', name: 'Tasks', count: 0 }], pages: [{ ...work, lists: ['tasks', 'hidden'] }] } as never)).includes('/p/work'));
 
   /* A COLLEAGUE'S OWN LIST KEEPS ITS PAGE AT NO ROWS, as it keeps the list (`theirs`). */
   const theirs = layoutOf({
@@ -448,12 +454,12 @@ test('A PLACE THAT SAYS ITS LISTS IS JUDGED BY ALL OF THEM: off the rail while e
     pages: [work],
     now: '2026-09-22T09:00:00.000Z',
   } as never);
-  assert.deepEqual(theirs.nav.map((n) => n.href), ['/p/work']);
+  assert.deepEqual(railOf(theirs), ['/p/work']);
 
   /* A HOST THAT SENDS NO `lists` READS AS BEFORE: the one list, else the list its section is named as. */
   const old = [{ slug: 'work', title: 'Work', nav: { section: 'Tasks', order: 10 }, icon: null, list: null }, { slug: 'ms', title: 'Milestones', nav: { section: 'Plan', order: 20 }, icon: null, list: 'milestones' }];
   const before = (tasks: number, milestones: number) =>
-    layoutOf({ ...BOOT, registers: [{ id: 'tasks', name: 'Tasks', count: tasks }, { id: 'milestones', name: 'Milestones', count: milestones }], pages: old } as never).nav.map((n) => n.href);
+    railOf(layoutOf({ ...BOOT, registers: [{ id: 'tasks', name: 'Tasks', count: tasks }, { id: 'milestones', name: 'Milestones', count: milestones }], pages: old } as never));
   assert.deepEqual(before(0, 0), []);
   assert.deepEqual(before(1, 0), ['/p/work']);
   assert.deepEqual(before(0, 1), ['/p/ms']);
@@ -467,7 +473,7 @@ test('A PLACE WHOSE LISTS ARE ALL A STARTER SET (`lists: null`) IS OUT OF THE RA
   /* Reads no list and says so: `[]` is still never judged. */
   const none = { slug: 'about', title: 'About', nav: { section: 'Money', order: 30 }, icon: null, list: null, lists: [] };
   const registers = [{ id: 'categories', name: 'Categories', count: 8 }];
-  const first = layoutOf({ ...BOOT, registers, pages: [planted, several, none] } as never).nav.map((n) => n.href);
+  const first = railOf(layoutOf({ ...BOOT, registers, pages: [planted, several, none] } as never));
   assert.deepEqual(first, ['/p/about'], 'a place over nothing but a starter set is in the rail, though its list counts eight');
 
   /* THE FIRST ROW OF THEIR OWN: the record says the list by name again, and the place comes. */
@@ -475,16 +481,16 @@ test('A PLACE WHOSE LISTS ARE ALL A STARTER SET (`lists: null`) IS OUT OF THE RA
     ...BOOT,
     registers: [{ id: 'categories', name: 'Categories', count: 9 }],
     pages: [{ ...planted, lists: ['categories'] }, { ...several, lists: ['categories'] }, none],
-  } as never).nav.map((n) => n.href);
+  } as never).nav.filter((n) => !n.cut).map((n) => n.href);
   assert.deepEqual(own, ['/p/categories', '/p/budget', '/p/about']);
 
   /* A list named as the page's section is not asked either: `null` is the record's word, and no name is guessed at. */
   const guessed = { ...several, nav: { section: 'Categories', order: 20 } };
-  assert.deepEqual(layoutOf({ ...BOOT, registers, pages: [guessed] } as never).nav, []);
+  assert.deepEqual(railOf(layoutOf({ ...BOOT, registers, pages: [guessed] } as never)), []);
 
   /* A saved view over the list is somebody's own page and stays. */
   const view = { slug: 'categories-mine', title: 'Mine', nav: { section: 'Views', order: 900 }, icon: null, list: 'categories', lists: null };
-  assert.ok(layoutOf({ ...BOOT, registers, pages: [view] } as never).nav.some((n) => n.href === '/p/categories-mine'));
+  assert.ok(railOf(layoutOf({ ...BOOT, registers, pages: [view] } as never)).includes('/p/categories-mine'));
 });
 
 test('A COLLEAGUE\'S OWN LIST KEEPS ITS PLACE WHEN ALL IT HOLDS IS A STARTER SET, and a place over no list of theirs still waits', () => {
@@ -496,7 +502,7 @@ test('A COLLEAGUE\'S OWN LIST KEEPS ITS PLACE WHEN ALL IT HOLDS IS A STARTER SET
     pages: [planted, several],
     now: '2026-09-22T09:00:00.000Z',
   } as never);
-  assert.deepEqual(theirs.nav.map((n) => n.href), ['/p/categories']);
+  assert.deepEqual(railOf(theirs), ['/p/categories']);
 });
 
 test('AN IMPORT IS ONE LINE OF THE FEED with its counts and a link to that day in the log, and a few writes by hand keep their own lines', () => {

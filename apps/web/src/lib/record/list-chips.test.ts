@@ -147,23 +147,23 @@ test('an element carrying a comma is refused by name, in both languages, rather 
    *
    * `compile` splits a predicate on the comma, and `chipsOf` splits a chip's values on it, so an
    * element holding one is cut in half by both. `skills.because` points at `learnings`, whose
-   * titles are sentences: `Attach the rows a proposal read, or the record refuses it.` is held by
+   * titles are sentences: `Attach what a proposal read to it, or it is refused.` is held by
    * two rows and cannot be asked for from either side.
    *
    * IT LANDS IN `bad`, WHICH IS THE WHOLE DIFFERENCE. `where.ts` promises the halves fail to
    * resolve rather than filtering on half a name, and that promise had never been driven through
    * an operator whose value is a title. Measured: the chip and the typed sentence both answer
-   * *"there is no learnings called Attach the rows a proposal read"* and NO rows, which is the
+   * *"there is no learnings called Attach what a proposal read to it"* and NO rows, which is the
    * refusal `matches` turns into an empty answer rather than a wrong one.
    */
-  const title = 'Attach the rows a proposal read, or the record refuses it.';
+  const title = 'Attach what a proposal read to it, or it is refused.';
   assert.equal(holding('skills', 'because', (ROWS.learnings ?? []).find((e) => e.fields[REGISTERS.learnings?.title ?? ''] === title)?.seq).length, 2);
 
   const chips = chipsOf(new URL(`/r/skills?f=because:has:${encodeURIComponent(title)}`, 'http://x').searchParams);
   const said = compile('skills', whereOf(chips));
   assert.equal(said.bad.length, 1);
   /* THE RECORD'S OWN SENTENCE, full stop and all, since `compile` is the record's parser. */
-  assert.match(said.bad[0] ?? '', /there is no learnings called Attach the rows a proposal read\.$/);
+  assert.match(said.bad[0] ?? '', /there is no learnings called Attach what a proposal read to it\.$/);
   assert.deepEqual(list('skills', { filters: chips }).entries, []);
 });
 

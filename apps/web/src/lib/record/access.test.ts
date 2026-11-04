@@ -277,6 +277,8 @@ test('EVERY SETTINGS AREA HAS SOMETHING TO SAY, and it is not the same something
     ['x', ['y', 'z'], 1],
     [1, 'x', ['y']],
     [{ name: 'x' }, 'y', 2],
+    /* Three strings: `cashLowest` reads its amount and its day as text, and threw on every shape above. */
+    ['x', 'y', 'z'],
   ];
 
   const said = (v: unknown, at: string): string[] => {
@@ -361,7 +363,7 @@ test('and the two areas that report rather than offer say which deployment this 
      which sentence carries it. */
   const key = `${copy.theKeyIs} ${copy.theKeyWhere}`;
   /* SAID PLAINLY (agents F27): where the key is, and to keep a copy elsewhere. */
-  assert.match(key, /keep a copy somewhere else/i);
+  assert.match(key, /keep a copy of the key somewhere else/i);
   assert.match(key, /cannot show it to you/i);
   /* AND THE FILE BY ITS NAME, ON A SELF-HOST: "If you run BrainDog yourself" was said to the one
      person who does. */
@@ -529,7 +531,7 @@ test('and the *Suggest new pages* switch that `19 §2` says the area exists for'
      is that this call carries `suggestPages`; which other preferences travel beside it is the
      screen's business and will change again. */
   assert.match(src, /pref\.write\(\{[^}]*\bsuggestPages\b[^}]*\}\)/u, 'the switch does not write the store');
-  assert.match(copy.suggestPagesHint, /Nothing is ever placed for you/iu);
+  assert.match(copy.suggestPagesHint, /Nothing is placed for you/iu);
   assert.match(copy.suggestOffWhy, /untouched/iu, 'turning it off does not say that placed pages are safe');
   /* `19 §3` and `29 §4` both say it belongs to the record; `50 §10` owns the deviation. The screen
      says which it is rather than letting somebody assume the durable one. */

@@ -231,7 +231,8 @@ test('NUMBERS THAT STOPPED A WEEK AGO OR MORE ARE TILES THAT SAY THEIR AGE, neve
     ['Players | 52 | 25 days ago', 'Servers | 9 | 25 days ago'],
   );
   const many = measuresOf(
-    Array.from({ length: 8 }, (_, i) => point(`Measure ${i + 1}`, i, day(3))),
+    /* From one up: a measure that has only ever said nought is left off (daad6def5). */
+    Array.from({ length: 8 }, (_, i) => point(`Measure ${i + 1}`, i + 1, day(3))),
     FIELDS,
     late,
     30,

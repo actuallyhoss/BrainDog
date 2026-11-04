@@ -41,7 +41,8 @@ test('a line with no payee draws the bank’s own words between the day and the 
   );
   const fence = toSegments(block).find((s) => s.type === 'block');
   assert.ok(fence && fence.type === 'block', 'the tile draws no fence');
-  assert.ok(JSON.stringify(fence.rows[0]).includes('GRANGEMOOR EVENTS'), `the line with no payee drew ${JSON.stringify(fence.rows[0])}`);
+  /* THE BANK'S CAPITALS READ AS WORDS on the Ledger's lines (57a8634c9), and they are still the bank's words. */
+  assert.ok(JSON.stringify(fence.rows[0]).includes('Grangemoor Events'), `the line with no payee drew ${JSON.stringify(fence.rows[0])}`);
   assert.ok(JSON.stringify(fence.rows[1]).includes('Chillout'));
-  assert.ok(!JSON.stringify(fence.rows[1]).includes('POS 9'), 'the description is said only where no payee is');
+  assert.ok(!/pos 9/iu.test(JSON.stringify(fence.rows[1])), 'the description is said only where no payee is');
 });

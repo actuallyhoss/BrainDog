@@ -7,6 +7,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+/* WHAT EACH FIGURE IS: the page path no longer loads the build's tables (9e03fe8e7), a record says them with each block. */
+import './declared.ts';
 import { noteOf } from './metrics.ts';
 import { tileOf } from './page-live.ts';
 

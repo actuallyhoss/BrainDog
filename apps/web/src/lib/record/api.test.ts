@@ -23,7 +23,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { installSeed } from '@braindog/seed';
 
-import { columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, learnHome, seqWidth, readableFields, spokenRow, toRows, unnamed } from './api.ts';
+import { columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, learnHome, seqWidth, readableFields, spokenRow, tableOf, toRows, unnamed } from './api.ts';
 import { applyFilters, backlinks, boot, metric, page, pages, readBlock, search } from './fixtures/readers.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
@@ -32,7 +32,7 @@ import { seedBlock } from './seed.ts';
 import { hrefFor } from './metrics.ts';
 import { AUDIT, JOB, NEWS, NOW, KEYCHAIN } from './fixtures/sample.ts';
 import { PAGES, REGISTERS, ROWS } from './held.ts';
-import { blockOf as liveBlockOf } from './page-live.ts';
+import { blockOf as liveBlockOf, wholeMoneyIn } from './page-live.ts';
 import { layoutOf } from './boot-live.ts';
 import type { BlockResult } from './api.ts';
 import type { Entry } from './schema.ts';
@@ -98,10 +98,11 @@ test('a day is spelled, so no reader has to know the local order', () => {
 });
 
 test('an enum reads as words, not as an identifier', () => {
-  assert.equal(display('tasks', 'state', 'done'), 'done');
+  /* WITH A CAPITAL, as any label reads (`enumWords`, 6cffdb14f). */
+  assert.equal(display('tasks', 'state', 'done'), 'Done');
   /* A VALUE WITH NO LABEL LOSES ITS UNDERSCORES. This was `obligations.state`'s `written_off` until money-core 3.0.0
      labelled that list's values, which the next line holds. */
-  assert.equal(display('services', 'cycle', 'two_yearly'), 'two yearly');
+  assert.equal(display('services', 'cycle', 'two_yearly'), 'Two yearly');
   /* `updates.health` WAS THE CASE HERE until the redesign labelled it, as its chips and composer said it. */
   assert.equal(display('updates', 'health', 'at_risk'), 'At risk');
   assert.equal(display('obligations', 'state', 'written_off'), 'Written off');
@@ -135,6 +136,15 @@ test('A LIST OPENS ON WHAT ANSWERS ITS QUESTION, and it used to open on every `i
    */
   for (const [id, decl] of Object.entries(REGISTERS)) {
     const shown = new Set(columnsFor(id).map((c) => c.field));
+    /* A LIST THAT DECLARES ITS TABLE OPENS ON THAT TABLE (7909ef166, the Ledger's Date, Payee, Account, Category, Amount):
+       what it says wins, and its title still reads, as a column or as what a column falls back to. */
+    if (Array.isArray(decl.table)) {
+      const declared = tableOf(decl);
+      assert.deepEqual([...shown], declared.map((c) => c.field), `${id} declares its table and opens on something else`);
+      assert.ok(declared.some((c) => c.field === decl.title || [c.or ?? []].flat().includes(decl.title)), `${id}'s title is in no column of the table it declares`);
+      assert.ok(shown.size <= 7, `${id} opens on ${shown.size} columns, which is a database rather than an answer`);
+      continue;
+    }
     const must = [decl.title, ...decl.mobile, ...(decl.state ? [decl.state] : []), ...decl.fields.filter((f) => f.deadline).map((f) => f.id)];
     for (const f of must) assert.ok(shown.has(f), `${id}.${f} answers this list's question and is not a column`);
     assert.ok(shown.size <= 7, `${id} opens on ${shown.size} columns, which is a database rather than an answer`);
@@ -321,8 +331,9 @@ test('Overdue is one direction, because two directions do not add up', () => {
   assert.ok(owe > 0 && owed > 0, 'the seed needs late rows in both directions for this to mean anything');
 
   const tile = metric('overdue');
-  assert.equal(tile.value, display('obligations', 'amount', gbp(owe)));
-  assert.notEqual(tile.value, display('obligations', 'amount', gbp(owe + owed)));
+  /* A TILE SAYS MONEY IN WHOLE UNITS (dd6b3b9bf), so the sum it is held to is whole too. */
+  assert.equal(tile.value, wholeMoneyIn(display('obligations', 'amount', gbp(owe))));
+  assert.notEqual(tile.value, wholeMoneyIn(display('obligations', 'amount', gbp(owe + owed))));
   assert.match(tile.href ?? '', /direction/, 'the link must carry the same direction the figure does');
 });
 
@@ -1022,10 +1033,10 @@ test('THE FORECAST PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety 
   assert.equal(marks[0], 'opening');
   assert.ok(marks.filter((m) => m === 'past').length >= 80, 'the sample remembers ninety days of cash');
   assert.equal(marks.filter((m) => m === 'step').length, forecast.walk!.steps.length, 'every movement, not a slice of them');
-  /* THIRTEEN WEEKS FIRST ON THE FORECAST PAGE SINCE money-core 3.29.0 (twelve on the home from 3.27.0, ten from 3.17.0),
+  /* TWELVE WEEKS FIRST ON THE FORECAST PAGE, as on Money's home (9ff2b380a; thirteen from money-core 3.29.0, ten from 3.17.0),
      AND A YEAR WALKED, the longest length the page offers (`horizons`, and the kernel's WALK_UNASKED), so every length is
      still on the control without walking further than it shows. */
-  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '91']);
+  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '84']);
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'reach')?.cells.slice(0, 2), ['reach', '365']);
   /* `leave` IS FOLDED INTO `count` AND `sell` IS OFFERED, since money-core 3.0.0: one control over the streams, not two
      with opposite meanings, and what a pack declares sellable. */
@@ -1386,7 +1397,7 @@ test('two templates over one list are two capped headings, not one heading and n
 
 test('A WHOLE NUMBER DECLARED BETWEEN 1000 AND 9999 IS PRINTED AS A YEAR, NOT WITH A THOUSANDS SEPARATOR', () => {
   const src = readFileSync(new URL('./api.ts', import.meta.url), 'utf8');
-  assert.match(src, /f\.min >= 1000 && f\.max <= 9999 \? String\(Math\.trunc\(Number\(value\)\)\)/u);
+  assert.match(src, /f\.min >= 1000 && f\.max <= 9999\) return String\(Math\.trunc\(Number\(value\)\)\)/u);
 });
 
 test('a payee and the words a filing rule matches are said as words, the bank\'s own words stay (audit 2 B4)', () => {

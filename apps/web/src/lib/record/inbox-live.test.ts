@@ -74,7 +74,8 @@ test('no record here is a refusal: nothing answering, a sign-in wall, and a 404 
 });
 
 test('the Inbox screen draws the record or its refusal, and no control that cannot write', () => {
-  const page = readFileSync(new URL('../../routes/inbox/+page.svelte', import.meta.url), 'utf8');
+  /* The code, not its comments: "A GLASS CIRCLE NOW" over a button's style (178922ed2) is not the sample's clock. */
+  const page = readFileSync(new URL('../../routes/inbox/+page.svelte', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->/gu, '');
   /* THE SAMPLE'S ARRIVALS, ITS CLOCK AND ITS SOURCES were the screen's fallback. */
   assert.doesNotMatch(page, /INBOX as SAMPLE|\bSOURCES\b|\bNOW\b|from === 'sample'/u, 'the Inbox reads the sample again');
   /* A RULE OFFER HAS NO WRITE ON THE RECORD, so it is not drawn rather than drawn to toast that nothing was saved. */

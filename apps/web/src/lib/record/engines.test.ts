@@ -19,6 +19,7 @@ import { costOf, fill, openRecord, readBlock as kernelBlock, type Kernel, type P
 import { NOW, installSeed } from '@braindog/seed';
 
 import { page, readBlock as webBlock } from './fixtures/readers.ts';
+import { rowNameSaid } from './names.ts';
 import { tileOf } from './news-live.ts';
 import { tileOf as pageTile } from './page-live.ts';
 import type { PageBlock } from './schema.ts';
@@ -156,6 +157,8 @@ async function both(register: string, project: string) {
   return {
     kernel: {
       rows: kernel.rows.map((r, i) => `${String(r.fields[TITLES[register]!])} @ ${kernel.scopes?.[i] ?? 'Everywhere'}`).sort(),
+      /* THE SAME ROWS AS THE PAGE SAYS THEM: a tool or a skill by its name, not the handle it is filed under (8a47e508a). */
+      said: kernel.rows.map((r, i) => `${rowNameSaid(register, String(r.fields[TITLES[register]!]))} @ ${kernel.scopes?.[i] ?? 'Everywhere'}`).sort(),
       inherited: kernel.inherited,
       matched: kernel.matched,
       revs: kernel.rows.map((r) => `${String(r.fields[TITLES[register]!])}:${String(r.fields.rev)}`),
@@ -169,14 +172,14 @@ test('KILN’S PAGE SHOWS KILN’S review-pr AND HIDES THE GLOBAL ONE, and draws
   assert.ok(kernel.rows.includes('review-pr @ Kiln'), kernel.rows.join(', '));
   assert.ok(!kernel.rows.includes('review-pr @ Everywhere'), kernel.rows.join(', '));
   assert.ok(kernel.revs.includes('review-pr:2') && !kernel.revs.includes('review-pr:3'), 'Kiln reads its own version 2, not the global 3');
-  assert.deepEqual(web, { rows: kernel.rows, inherited: kernel.inherited, matched: kernel.matched });
+  assert.deepEqual(web, { rows: kernel.said, inherited: kernel.inherited, matched: kernel.matched });
 });
 
 test('PORTAGE’S PAGE SHOWS THE GLOBAL review-pr, and draws what the record answered', async () => {
   const { kernel, web } = await both('skills', 'Portage');
   assert.ok(kernel.rows.includes('review-pr @ Everywhere'), kernel.rows.join(', '));
   assert.ok(kernel.rows.includes('reconcile-invoice @ Portage'), kernel.rows.join(', '));
-  assert.deepEqual(web, { rows: kernel.rows, inherited: kernel.inherited, matched: kernel.matched });
+  assert.deepEqual(web, { rows: kernel.said, inherited: kernel.inherited, matched: kernel.matched });
 });
 
 test('Kiln’s fenwick tool hides the global one, and keys and learnings add up, drawn as the record answered', async () => {
@@ -185,7 +188,7 @@ test('Kiln’s fenwick tool hides the global one, and keys and learnings add up,
   for (const register of ['tools', 'credentials', 'learnings'])
     for (const project of ['Kiln', 'Portage']) {
       const { kernel, web } = await both(register, project);
-      assert.deepEqual(web, { rows: kernel.rows, inherited: kernel.inherited, matched: kernel.matched }, `${register} on ${project}`);
+      assert.deepEqual(web, { rows: kernel.said, inherited: kernel.inherited, matched: kernel.matched }, `${register} on ${project}`);
     }
   const keys = await both('credentials', 'Kiln');
   assert.ok(keys.kernel.rows.includes('Nordhaven API @ Everywhere') && keys.kernel.rows.includes('Fenwick deploy key @ Kiln'), keys.kernel.rows.join(', '));
@@ -230,7 +233,7 @@ test('A CARD SAYS "Everywhere" FOR A ROW OF NO PROJECT: a scope column on a card
   assert.equal((web.columns as { as?: string }[])[1]?.as, 'fact');
   const global = kernel.rows.findIndex((r) => r.fields.name === 'review-pr' && !r.fields.project);
   assert.ok(global >= 0 && kernel.scopes?.[global] === null, 'the seed has no global review-pr');
-  assert.ok(web.rows.some((r) => r.cells[0] === 'review-pr' && r.cells[1] === 'Everywhere'), JSON.stringify(web.rows.map((r) => r.cells)));
+  assert.ok(web.rows.some((r) => r.cells[0] === 'Review PR' && r.cells[1] === 'Everywhere'), JSON.stringify(web.rows.map((r) => r.cells)));
 });
 
 test('THE LIVE HOME TILE KEYS ITS VERDICT OFF WHAT THE LIST HOLDS, because the record answers that beside what the predicate matched', async () => {
