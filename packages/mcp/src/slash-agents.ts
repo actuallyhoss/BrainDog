@@ -213,6 +213,8 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
     return stamps.length === 0 ? 0 : Math.max(...stamps);
   };
   const callHeardOf = (f: Fields): number => (typeof f['last_seen'] === 'string' ? Date.parse(f['last_seen']) : heardOf(f));
+  /* A QUIET RUN'S WINDOW STILL SAYS IT IS OPEN, so how long it has been quiet is since its last call and not its last pulse. */
+  const lastHeard = (r: RunRow): number => (wordOf(liveStateOf(r as never, now())) === 'quiet' ? callHeardOf(r.fields) : heardOf(r.fields));
 
   /** The runs open now, each with its word, helpers left to the run they work for, newest heard first. */
   const roster = async (): Promise<Live[] | string> => {
@@ -356,7 +358,7 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
     if (r === undefined) return null;
     const doing = text(r.fields['doing']);
     const ref = refOf(r);
-    return `${ref === null ? spokenOf(r) : `{{ref:${ref}}}`}, ${agoSaid(now() - heardOf(r.fields))}${doing === '' ? '' : `: ${theirs(doing, 110)}`}`;
+    return `${ref === null ? spokenOf(r) : `{{ref:${ref}}}`}, ${agoSaid(now() - lastHeard(r))}${doing === '' ? '' : `: ${theirs(doing, 110)}`}`;
   };
 
   /** What is stuck: runs gone quiet or gone, and what waits on the person from them. */
@@ -400,15 +402,15 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
     if (asRun !== undefined) {
       const r = rows.find((x) => spokenOf(x) === asRun);
       if (r === undefined) return { text: `I can't find ${said} among the recent runs.`, step };
-      return { text: runStory(r, `${refSaid({ ref: refOf(r), run: spokenOf(r) })}, ${stateSaid(r)}, last heard ${agoSaid(now() - heardOf(r.fields))}.`).join('\n'), outside, step };
+      return { text: runStory(r, `${refSaid({ ref: refOf(r), run: spokenOf(r) })}, ${stateSaid(r)}, last heard ${agoSaid(now() - lastHeard(r))}.`).join('\n'), outside, step };
     }
     const project = await projectNamed(said);
     if (project === null) return { text: `No agent has worked on anything called ${clip(said, 40)} lately.`, step };
     const here = rows.filter((r) => text(r.fields['project']) === project.ref && text(r.fields['parent']) === '').sort((a, z) => heardOf(z.fields) - heardOf(a.fields));
     if (here.length === 0) return { text: `No agent has worked on ${project.title} lately.`, step };
     const [first, second] = here;
-    const out = runStory(first!, `Last on ${project.title}: ${refSaid({ ref: refOf(first!), run: spokenOf(first!) })}, ${stateSaid(first!)}, last heard ${agoSaid(now() - heardOf(first!.fields))}.`);
-    if (second !== undefined) out.push(`Before it: ${refSaid({ ref: refOf(second), run: spokenOf(second) })}, ${stateSaid(second)} ${agoSaid(now() - heardOf(second.fields))}${text(second.fields['doing']) === '' ? '' : `: ${theirs(text(second.fields['doing']), 120)}`}${lines(second.fields['notes']) === '' ? '' : ` ${theirs(lines(second.fields['notes']), 160)}`}`);
+    const out = runStory(first!, `Last on ${project.title}: ${refSaid({ ref: refOf(first!), run: spokenOf(first!) })}, ${stateSaid(first!)}, last heard ${agoSaid(now() - lastHeard(first!))}.`);
+    if (second !== undefined) out.push(`Before it: ${refSaid({ ref: refOf(second), run: spokenOf(second) })}, ${stateSaid(second)} ${agoSaid(now() - lastHeard(second))}${text(second.fields['doing']) === '' ? '' : `: ${theirs(text(second.fields['doing']), 120).replace(/[.]$/u, '')}.`}${lines(second.fields['notes']) === '' ? '' : ` ${theirs(lines(second.fields['notes']), 160)}`}`);
     const decided = await decidedOn(project.ref);
     if (decided.length > 0) out.push(...decided.map((d) => `- ${d}`));
     return { text: out.join('\n'), outside, step };
@@ -590,7 +592,7 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
     if (byRun && typeof rows !== 'string') {
       const r = rows.find((x) => spokenOf(x) === `S${byRun[1]}`);
       const project = r === undefined ? '' : text(r.fields['project']);
-      const left = r === undefined ? `I can't find S${byRun[1]}.` : `S${byRun[1]} can't hear this: it ${stateSaid(r) === 'gone' ? 'has gone' : stateSaid(r) === 'finished' ? 'finished' : 'stopped'}, last heard ${agoSaid(now() - heardOf(r.fields))}.`;
+      const left = r === undefined ? `I can't find S${byRun[1]}.` : `S${byRun[1]} can't hear this: it ${stateSaid(r) === 'gone' ? 'has gone' : stateSaid(r) === 'finished' ? 'finished' : 'stopped'}, last heard ${agoSaid(now() - lastHeard(r))}.`;
       const next = project === '' ? null : await nextOn(project, note, attach);
       return { text: `${left}${next === null ? '' : ' You can leave it for whoever starts next.'}`, ...(next === null ? {} : { action: next }), step };
     }
@@ -702,12 +704,12 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
   };
 
   /** The runs heard from since a moment, as lines: what the record's own activity folds away. */
-  const ranSince = async (at: number): Promise<string> => {
+  const ranSince = async (at: number, head = 'What agents were on since then:'): Promise<string> => {
     const rows = await runsNow();
     if (typeof rows === 'string') return '';
     const did = rows.filter((r) => text(r.fields['parent']) === '' && heardOf(r.fields) >= at && text(r.fields['doing']) !== '').slice(0, 6);
     if (did.length === 0) return '';
-    return ['What agents were on since then:', ...did.map((r) => `- ${refSaid({ ref: refOf(r), run: spokenOf(r) })}, ${stateSaid(r)}: ${theirs(text(r.fields['doing']), 110)}`)].join('\n');
+    return [head, ...did.map((r) => `- ${refSaid({ ref: refOf(r), run: spokenOf(r) })}, ${stateSaid(r)}: ${theirs(text(r.fields['doing']), 110)}`)].join('\n');
   };
 
   /** A run's ref as a link names it: its agent and computer. */

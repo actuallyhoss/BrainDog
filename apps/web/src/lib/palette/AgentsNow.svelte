@@ -9,11 +9,13 @@
   import { at } from '../at.ts';
   import { live } from '../data/live.svelte.ts';
   import { agentsNow, isQuietNow, ordered, readAgents, sinceSaid } from './agents-now.svelte.ts';
+  import { palette } from './open.svelte.ts';
 
-  let { base, onleave }: { base: string; onleave?: (() => void) | undefined } = $props();
-
-  /** Three rows, then the Agents page, which holds the rest and everything else about them. */
-  const MOST = 3;
+  /**
+   * `most`: three rows, then the Agents page, which holds the rest and everything else about them. In a conversation one,
+   * since the answer is what is being read.
+   */
+  let { base, onleave, most = 3 }: { base: string; onleave?: (() => void) | undefined; most?: number } = $props();
   const words = {
     label: 'Agents running now',
     between: 'Between steps',
@@ -23,16 +25,19 @@
   } as const;
 
   let now = $state(Date.now());
+  /* ASKED WHILE THE PANEL IS OPEN AND NEVER ELSE: it stays mounted, closed, for the whole visit. */
   $effect(() => {
     void live.version;
-    void readAgents(base);
+    if (palette.open) void readAgents(base);
   });
   $effect(() => {
+    if (!palette.open) return;
+    now = Date.now();
     const t = setInterval(() => (now = Date.now()), 30_000);
     return () => clearInterval(t);
   });
   const all = $derived(ordered(agentsNow.rows, now));
-  const shown = $derived(all.slice(0, MOST));
+  const shown = $derived(all.slice(0, most));
 </script>
 
 {#if shown.length > 0}
@@ -48,7 +53,7 @@
         </a>
       </li>
     {/each}
-    {#if all.length > MOST}
+    {#if all.length > most}
       <li><a class="an-more tap" href={at('/p/agents')} onclick={() => onleave?.()}>{words.more}</a></li>
     {/if}
   </ul>

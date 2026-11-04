@@ -200,7 +200,7 @@
                     {a.receipt ?? a.title}
                   {/if}
                 </p>
-                {#if !(a.state === 'done' && /^(Changed|Added|Drafted)$/u.test(said.verb))}<span class="pill-badge act-state" data-tone={st.tone}>{st.word}</span>{/if}
+                {#if !(a.state === 'done' && (a.sent || /^(Changed|Added|Drafted)$/u.test(said.verb)))}<span class="pill-badge act-state" data-tone={st.tone}>{st.word}</span>{/if}
               </div>
               {#if said.name}
                 {#if a.href}

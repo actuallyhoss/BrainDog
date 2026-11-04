@@ -72,6 +72,7 @@ const MONEY_WORDS = /\b(spen[dt]|spending|cash|runway|money|owed?|owes|owing|pai
 const LATE_WORDS = /\b(late|overdue|due|today|this week|urgent|behind|missed)\b/iu;
 const WAIT_WORDS = /\b(wait\w*|decide|decisions?|approve|on my plate)\b/iu;
 const AGENT_WORDS = /\b(agents?|sessions?|who(?:'s| is) (?:working|running|on)|any(?:one|body)\b[^?]*\b(?:busy|working|on)|stuck|at work)\b/iu;
+const AGENTS_TODAY = /^what did (?:my |the )?agents do(?: today)?[\s?.!]*$/iu;
 const SINCE_WORDS = /\b(?:since|changed?)\b.*\b(this morning|today|yesterday|last night|this week|last week|\d+\s*(?:hours?|h|days?|d)(?:\s+ago)?)\b/iu;
 /* A MESSAGE THAT ASKS FOR SOMETHING DONE, by its first word: "add", "mark", "draft", "take me". */
 const DOING_WORDS =
@@ -799,5 +800,14 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
     };
   };
 
-  return { list: TOOLS, call, apply, ref, now, context, prefetch: slashPrefetch, attached, direct: reach.direct };
+  /* "WHAT DID MY AGENTS DO TODAY" IS ONE OF THE PANEL'S OWN STARTERS, and is the runs heard from today. */
+  const direct = async (message: string, sent: DirectWith): Promise<SlashToolRan | null> => {
+    if (!AGENTS_TODAY.test(message.trim())) return reach.direct(message, sent);
+    const edge = await edgeOf('today');
+    if (edge === null) return reach.direct(message, sent);
+    const did = await reach.ranSince(edge.at, 'What agents were on today:');
+    return did === '' ? { text: 'No agent has been heard from today.', step: 'Reading what agents did' } : { text: did, outside: 'what agents wrote about their own work', step: 'Reading what agents did' };
+  };
+
+  return { list: TOOLS, call, apply, ref, now, context, prefetch: slashPrefetch, attached, direct };
 }

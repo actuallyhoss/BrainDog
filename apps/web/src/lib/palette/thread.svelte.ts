@@ -463,7 +463,9 @@ export async function answer(a: LiveAction, accept: boolean, base = apiBase()): 
     a.state = 'dismissed';
     return;
   }
-  Object.assign(a, landed({ ...a, ...(out.undo ? { undo: out.undo } : {}), ...(out.sent ? { sent: out.sent, href: undefined } : {}) }, out.receipt ?? a.title));
+  /* WHAT WENT TO AN AGENT IS FOLLOWED BY `SentLine`, which has the way to its run. */
+  if (out.sent) delete a.href;
+  Object.assign(a, landed({ ...a, ...(out.undo ? { undo: out.undo } : {}), ...(out.sent ? { sent: out.sent } : {}) }, out.receipt ?? a.title));
   /* A CHOICE OF WHO TAKES IT WAS ANSWERED: it went to this one, so the others are put away (the record has declined them). */
   if (a.group !== undefined)
     for (const t of convo.turns) if (t.role === 'slash') for (const other of t.actions) if (other !== a && other.group === a.group && other.state === 'open') other.state = 'dismissed';

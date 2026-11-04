@@ -3,7 +3,7 @@
   came back, and the way to its run.
 
   READ AGAIN WHEN THE RECORD'S VERSION MOVES (`live.version`), which an agent seeing it, taking it or replying does, and
-  never after it has ended. No timer of its own.
+  never after it has ended or while the panel holding it is closed (`resting`). No timer of its own.
 
   WHAT COMES BACK IS DRAWN AS TEXT AND GOES NOWHERE ELSE. It is the agent's words: this reads them to the person, and
   Slash's model reads them only if asked, marked as an agent's (`told`).
@@ -15,7 +15,7 @@
   import { agentsNow, isQuietNow, readAgents, sinceSaid } from './agents-now.svelte.ts';
   import type { ChatSent } from './slash-chat.ts';
 
-  let { sent, base }: { sent: ChatSent; base: string } = $props();
+  let { sent, base, resting = false }: { sent: ChatSent; base: string; resting?: boolean } = $props();
 
   const words = {
     label: 'What happened to it',
@@ -33,18 +33,28 @@
   const runId = $derived(now?.run ?? sent.run ?? null);
   const href = $derived(runId !== null && /^S[1-9][0-9]*$/u.test(runId) ? `/r/session/${runId.slice(1)}` : null);
 
+  /* AT MOST ONE READ IN THIS LONG, whatever the version does, and the last move is read a beat late. */
+  const EVERY_MS = 4000;
+  let lastRead = 0;
   $effect(() => {
     void live.version;
-    if (ended) return;
-    void one(base, sent.id).then((got) => {
-      if (got) now = got;
-    });
-    if (sent.run) void readAgents(base);
+    if (ended || resting) return;
+    const read = (): void => {
+      lastRead = Date.now();
+      void one(base, sent.id).then((got) => {
+        if (got) now = got;
+      });
+      if (sent.run) void readAgents(base);
+    };
+    const wait = EVERY_MS - (Date.now() - lastRead);
+    if (wait <= 0) return read();
+    const t = setTimeout(read, wait);
+    return () => clearTimeout(t);
   });
 
   /* NOT SEEN YET: where the run stands now, read from who is running, so a run gone quiet mid-question says so. */
   const hint = $derived.by((): string | null => {
-    if (stands !== 'sent') return null;
+    if (stands !== 'sent' || now?.progress) return null;
     if (!sent.run) return words.waiting;
     if (!agentsNow.read) return words.notSeen;
     const r = agentsNow.rows.find((x) => x.run === sent.run);

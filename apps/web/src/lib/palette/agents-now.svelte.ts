@@ -30,15 +30,25 @@ const QUIET_AFTER_MS = 15 * 60_000;
 export const agentsNow = $state<{ rows: RunNow[]; read: boolean }>({ rows: [], read: false });
 
 let asking: { base: string; at: number; out: Promise<RunNow[]> } | null = null;
-/** Two asks this close are one: a version that moves twice in a second is read once. */
-const FRESH_MS = 1500;
+let later: ReturnType<typeof setTimeout> | null = null;
+/**
+ * ONE READ THIS OFTEN AT MOST. A version that moves all the time, with agents writing, is still one read in this long,
+ * and the last move is always read, a beat late, so what is drawn ends up true.
+ */
+const FRESH_MS = 4000;
 
 const WHO: Readonly<Record<string, string>> = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor', gemini: 'Gemini', copilot: 'Copilot', windsurf: 'Windsurf' };
 
 const titleOf = (p: unknown): string | null => (typeof p === 'string' ? p : typeof p === 'object' && p !== null && typeof (p as { title?: unknown }).title === 'string' ? (p as { title: string }).title : typeof p === 'object' && p !== null && typeof (p as { name?: unknown }).name === 'string' ? (p as { name: string }).name : null);
 
 export function readAgents(base: string): Promise<RunNow[]> {
-  if (asking && asking.base === base && Date.now() - asking.at < FRESH_MS) return asking.out;
+  if (asking && asking.base === base && Date.now() - asking.at < FRESH_MS) {
+    later ??= setTimeout(() => {
+      later = null;
+      void readAgents(base);
+    }, FRESH_MS);
+    return asking.out;
+  }
   const out = (async (): Promise<RunNow[]> => {
     try {
       const { control } = await import('../record/instruct.ts');

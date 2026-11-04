@@ -367,7 +367,7 @@
       /* WHAT WENT TO AN AGENT IS FOLLOWED HERE (`SentLine`): whether it arrived, what it is at, what came back. */
       text: out.ok ? (out.convo.id === null ? sendWords.sentInPalette(out.label) : '') : '',
       figures: {},
-      actions: out.ok && out.convo.id !== null ? [{ id: out.convo.id, kind: 'done', title: sendWords.sentTo(out.label), state: 'done', sent: { id: out.convo.id, to: out.label, said } }] : [],
+      actions: out.ok && out.convo.id !== null ? [{ id: out.convo.id, kind: 'done', title: sendWords.sentTo(out.label), state: 'done', sent: { id: out.convo.id, to: out.label, said, ...(t.kind === 'session' ? { run: t.id.slice('session:'.length) } : {}) } }] : [],
       go: out.ok && row ? [{ href: `/r/${row.replace('#', '/')}`, label: sendWords.open }] : [],
       error: out.ok ? null : out.text,
       spent: false,
@@ -2166,7 +2166,7 @@
     </div>
   {:else}
   <div class="p-body">
-    {#if q.trim() === '' && isLive}<div class="p-agents"><AgentsNow base={apiBase()} onleave={() => (open = false)} /></div>{/if}
+    {#if open && q.trim() === '' && isLive}<div class="p-agents"><AgentsNow base={apiBase()} onleave={() => (open = false)} /></div>{/if}
     <!-- WAITING HAS A SHAPE, NOT A WORD (slash1104): what was kept is drawn at once, and only when nothing kept answers
          does the place of the first rows show, as rows, after 150 ms. The word is for a screen reader alone. -->
     {#if pending}<span class="p-sr" role="status">{copy.looking}</span>{/if}
@@ -2583,6 +2583,10 @@
    * input names in `aria-controls`. So the scroll belongs on that element rather than on a plain
    * `div` wrapped around it, which is also the truer description: what a person scrolls is the list.
    */
+  .p-agents {
+    padding: var(--sp-2) var(--sp-2) 0;
+  }
+
   .p-body {
     display: flex;
     flex: 1;

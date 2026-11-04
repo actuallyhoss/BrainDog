@@ -44,7 +44,7 @@ export function runOffers(rows: readonly { run: string; who: string; project: st
       return words.every((w) => has(hay, w) || w === 'agent' || w === 'run');
     })
     .slice(0, RUNS_MOST)
-    .map((r) => ({ ref: `run:${r.run}`, label: `${r.who}${r.project ? ` on ${r.project}` : ''}`, list: 'Running now', icon: 'agent', ...(r.doing ? { told: r.doing } : {}) }));
+    .map((r) => ({ ref: `run:${r.run}`, label: `${r.who}${r.project ? ` on ${r.project}` : ''}`, list: 'Running now', icon: 'session', ...(r.doing ? { told: r.doing } : {}) }));
 }
 
 /** Rows of runs at the head of what an @ offers, with room left for what the record has. */
