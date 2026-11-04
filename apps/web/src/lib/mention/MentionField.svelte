@@ -98,8 +98,9 @@
   const full = $derived(new Set(mentions.map((m) => m.ref)).size >= ATTACH_MOST);
   /* A NAME WITH A SPACE IN IT THAT NOTHING ANSWERS IS JUST THE SENTENCE GOING ON, and the list goes away unasked. */
   const drawn = $derived(wanting && (offers.length > 0 || full || (answered && !spaced)));
-  /* ENTER NEVER SENDS WHILE THE LIST IS OPEN OR ON ITS WAY: "@ba" and a fast Enter did not mean send "@ba". */
-  const holdsEnter = $derived(wanting && (drawn || !spaced));
+  /* ENTER NEVER SENDS WHILE THERE IS A ROW TO PICK OR ONE MAY BE COMING: "@ba" and a fast Enter did not mean send "@ba". With
+     nothing to pick ("Nothing called x", or the most rows already) it sends, as Slack and Discord do. */
+  const holdsEnter = $derived(wanting && !full && (offers.length > 0 || (!spaced && (stale || !answered))));
   const at = $derived(drawn && trigger ? trigger.start : null);
   const pieces = $derived(piecesOf(value, mentions, at));
 
@@ -270,10 +271,9 @@
         e.preventDefault();
         e.stopPropagation();
         /* THE ROWS ON SCREEN ARE FOR EARLIER LETTERS: Enter waits for the answer rather than pick one of them. */
-        if (stale && !full) return;
+        if (stale) return;
         const o = offers[cursor];
-        if (o && !full) pick(o);
-        else if (answered || full) shut = trigger?.start ?? null;
+        if (o) pick(o);
         return;
       }
       if (e.key === 'Escape' && drawn) {
