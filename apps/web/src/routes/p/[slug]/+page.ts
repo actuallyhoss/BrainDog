@@ -14,6 +14,7 @@ import { createClient } from '@braindog/client';
 import { apiBase, at } from '$lib/at.ts';
 import { agentsPlace } from '$lib/nav/rail.ts';
 import { REGISTERS } from '$lib/record/held.ts';
+import { namedOutright, shellPlaces } from '$lib/record/nearest.ts';
 import { learn } from '$lib/record/remote.ts';
 import { spokenOf } from '$lib/record/row-href.ts';
 
@@ -48,5 +49,15 @@ export async function load({ params, url, parent, fetch }: Pick<LoadEvent, 'para
   if (params.slug === 'agents' && parent) {
     const shell = (await parent()) as { pages?: readonly string[] };
     if (Array.isArray(shell.pages) && !shell.pages.includes('agents')) redirect(307, at(agentsPlace(shell.pages), url.pathname));
+  }
+  /* A PAGE ASKED FOR BY THE NAME THE RAIL GIVES IT (`/p/projects`, where Projects is `/p/portfolio`) OPENS IT, as a list's
+     name does (`r/[register]/+page.ts`). Only where no page answers at that address. */
+  if (parent && !row) {
+    const shell = (await parent()) as { pages?: readonly string[]; nav?: readonly { title: string; href: string }[]; lists?: readonly { id: string; name: string }[] };
+    const slug = params.slug ?? '';
+    if (Array.isArray(shell.pages) && shell.pages.length > 0 && !shell.pages.includes(slug) && !shell.pages.includes(decodeURIComponent(slug))) {
+      const named = namedOutright(slug, shellPlaces(shell.nav ?? [], shell.lists ?? []));
+      if (named && named.href !== `/p/${slug}`) redirect(307, at(`${named.href}${url.search}`, url.pathname));
+    }
   }
 }

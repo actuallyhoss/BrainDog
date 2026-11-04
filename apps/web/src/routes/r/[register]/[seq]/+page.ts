@@ -16,6 +16,7 @@ import { createClient } from '@braindog/client';
 
 import { apiBase, at } from '../../../../lib/at.ts';
 import { REGISTERS } from '../../../../lib/record/held.ts';
+import { namedOutright } from '../../../../lib/record/nearest.ts';
 import { opensOnPage } from '../../../../lib/record/project.ts';
 import { learn } from '../../../../lib/record/remote.ts';
 import { ownPage } from '../../../../lib/record/row-href.ts';
@@ -36,7 +37,13 @@ export async function load({
   parent: () => Promise<unknown>;
   fetch?: typeof globalThis.fetch;
 }): Promise<void> {
-  await parent();
+  const shell = (await parent()) as { lists?: readonly { id: string; name: string }[] } | undefined;
+  /* A ROW'S ADDRESS KEPT WITH ITS LIST'S NAME IN IT (`/r/projects/4`) IS THAT LIST'S ROW, as `/r/projects` is the list. */
+  const lists = shell?.lists ?? [];
+  if (lists.length > 0 && !lists.some((l) => l.id === params.register)) {
+    const named = namedOutright(params.register, lists.map((l) => ({ title: l.name, href: `/r/${l.id}`, address: l.id })));
+    if (named) redirect(307, at(`${named.href}/${params.seq}${url.search}`, url.pathname));
+  }
   const to = ownPage(params.register, Number(params.seq), url.searchParams);
   if (to === null) return;
   if (REGISTERS[params.register] === undefined) await learn(createClient({ base: apiBase(url), ...(fetch ? { fetch } : {}) }).schema, params.register, asked).catch(() => undefined);

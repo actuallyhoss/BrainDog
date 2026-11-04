@@ -60,6 +60,17 @@ export function shellPlaces(nav: readonly { title: string; href: string }[], lis
 }
 
 /**
+ * THE PLACE THE ADDRESS NAMES OUTRIGHT, differing only in case or punctuation, or null. `/r/projects` on a record whose
+ * list is `things`, named Projects, said "No list called Projects", offered Projects as the closest list, and offered to
+ * make one more of that name, which the record then refuses. Such an address is that place and needs no screen of its own.
+ */
+export function namedOutright(asked: string, places: readonly Place[]): Place | null {
+  const said = fold(asked);
+  if (said === '') return null;
+  return places.find((p) => fold(p.title) === said) ?? places.find((p) => p.address !== undefined && fold(p.address) === said) ?? null;
+}
+
+/**
  * The `most` places nearest to what was typed, each once by where it opens and once by its name, the nearest first. A
  * page and the list it shows share a name (People's page and its list), and the screen said "People, People" (first-hour
  * audit E20): the first of them, the rail's page, stands for both.

@@ -10,10 +10,15 @@
  *
  * AFTER THE SHELL: `boot` says which page is which list's (`learnRowPages`), learnt in the root layout's load, which
  * `parent()` waits for. A list with no page, and a record that sent none, stay on the list's screen.
+ *
+ * AND AN ADDRESS THAT NAMES A LIST BY ITS NAME OPENS IT (`namedOutright`): `/r/Projects`, `/r/projects`, on a record whose
+ * list's id is `things`. `/r/_new` is the new-list sheet's own address (`MAKE_ID`), never a name.
  */
 import { redirect } from '@sveltejs/kit';
 
 import { at } from '../../../lib/at.ts';
+import { MAKE_ID } from '../../../lib/record/list-write.ts';
+import { namedOutright } from '../../../lib/record/nearest.ts';
 import { listPage } from '../../../lib/record/row-href.ts';
 
 /** Whether the tab is on this list's screen already, and moving within it (the address it is leaving is the list's too). */
@@ -32,7 +37,12 @@ export async function load({
   parent: () => Promise<unknown>;
   from?: { pathname: string; search: string } | null;
 }): Promise<void> {
-  await parent();
+  const shell = (await parent()) as { lists?: readonly { id: string; name: string }[] } | undefined;
+  const lists = shell?.lists ?? [];
+  if (params.register !== MAKE_ID && lists.length > 0 && !lists.some((l) => l.id === params.register)) {
+    const named = namedOutright(params.register, lists.map((l) => ({ title: l.name, href: `/r/${l.id}`, address: l.id })));
+    if (named) redirect(307, at(`${named.href}${url.search}`, url.pathname));
+  }
   if (within(url, from)) return;
   const to = listPage(params.register, url.searchParams);
   if (to !== null) redirect(307, at(to, url.pathname));
