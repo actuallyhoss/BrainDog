@@ -11,11 +11,15 @@
  * everybody's passes each of those tests, and the first person to find it would be the person whose projects they are.
  *
  * WHAT IT WALKS: on the seeded record with six more projects, five in play over Building and Earning and one parked, one of them
- * saying how it is going, and three tools that apply everywhere and one of the first project's own. Open Projects: it opens
- * on a headline that is a fact, with the Earning, a month tile, the This week strip of four counts, the one list of the
- * projects in play under an Earning group and a Building group, and the parked one as a chip. Open the first project: Tools
- * and servers names its own tool. Open the second: no Tools and servers, since nothing there is its own. At the phone's
- * width and the desk's (`WIDTHS` says why the desk is 1512 and not the 1440 the scope names).
+ * saying how it is going, and three tools that apply everywhere and one of the first project's own. Open Projects: a headline
+ * that is a fact for a screen reader, with the Earning, a month tile, every project in play under a section by what a person
+ * does about it, none of them parked, and the parked one a press away on the switch. Open the first project: Tools and
+ * servers names its own tool. Open the second: no Tools and servers, since nothing there is its own. At the phone's width and
+ * the desk's (`WIDTHS` says why the desk is 1512 and not the 1440 the scope names).
+ *
+ * THE PAGE MOVED ON PURPOSE ON 4 NOV (d34c58021, "projects page looks poor"): no headline over the projects, no This week
+ * strip, sections by what needs you in place of lanes, and Parked behind the switch. What falls due draws only when something
+ * does, and these six have nothing due, so that side is `projects-board.test.ts`'s to hold.
  *
  * TWO HALVES, as `row-drawer.walk.mjs` has. `judge` is a pure function of what was read, so each promise taken away is
  * red in the words of what was missing; the drive below it only presses and reads.
@@ -42,10 +46,11 @@ export const WIDTHS = budget('a11y').widths;
 
 /** The headings and words the pages declare, read off the screen by their words. */
 export const EARNING = 'Earning, a month';
-export const WEEK = 'This week';
-export const WEEK_CELLS = ['Late', 'Due in 7 days', 'Quiet numbers', 'Renewals'];
-/** The list's groups: the earning ones first, then the building ones; the group names open the heading's words. */
-export const GROUPS = ['Earning', 'Building'];
+/** The sections a project in play can stand in (`sectionsOf`); the name opens the heading's words. */
+export const SECTIONS = ['Needs you', 'Moving', 'Quiet'];
+/** The switch's name and its second word. */
+export const VIEWS = 'Which projects';
+export const PARKED = 'Parked';
 export const TOOLS = 'Tools and servers';
 
 /** Six invented projects: five in play over two lanes and one parked, so three lanes; the fourth says how it is going. */
@@ -63,8 +68,8 @@ export const FIRST = PROJECTS[0].name;
 export const SECOND = PROJECTS[1].name;
 export const EVERYWHERE = ['ripgrep', 'jq', 'httpie'];
 export const OWN_TOOL = 'bindery-cli';
-/** HOW THE PAGE SAYS IT: a name typed as a slug is said in words (`wordsOf`), so the tool is read as "Bindery cli". */
-export const OWN_TOOL_SAID = 'Bindery cli';
+/** HOW THE PAGE SAYS IT: a name typed as a slug is said in words (`wordsOf`, capitals since 57a8634c9), so the tool is read as "Bindery CLI". */
+export const OWN_TOOL_SAID = 'Bindery CLI';
 
 /** A project's page address, from its name as the record makes a slug of a title. */
 const slugOf = (name) => name.toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-|-$/gu, '');
@@ -72,23 +77,21 @@ const slugOf = (name) => name.toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace
 /**
  * What one walk fell short of, each as a sentence that starts with its width. An empty list is a pass.
  *
- * `seen` is `{ width, headline, earning, week, cells: { [label]: visible }, groups: string[] | null, listed: { [name]: visible },
- * parked, first: { tools, own }, second: { tools } }`: the headline's words, the group headings' words, and booleans the
- * drive read, or `null` where it could not read it. `null` is never a pass.
+ * `seen` is `{ width, headline, earning, groups: string[] | null, listed: { [name]: visible }, parked, first: { tools, own },
+ * second: { tools } }`: the headline's words, the section headings' words, and booleans the drive read, or `null` where it
+ * could not read it. `null` is never a pass.
  */
 export function judge(seen) {
   const out = [];
   const say = (line) => out.push(`${seen.width}: ${line}`);
   if (typeof seen.headline !== 'string' || !/[a-z].*\.$/u.test(seen.headline.trim())) say(`Projects opens on no headline sentence (read ${JSON.stringify(seen.headline)}).`);
   if (seen.earning !== true) say(`Projects draws no "${EARNING}" tile with two projects earning.`);
-  if (seen.week !== true) say(`Projects draws no "${WEEK}" strip with projects in play.`);
-  else for (const c of WEEK_CELLS) if (seen.cells?.[c] !== true) say(`"${WEEK}" does not say "${c}".`);
-  if (!Array.isArray(seen.groups)) say('Projects draws no list of the projects in play.');
+  if (!Array.isArray(seen.groups) || seen.groups.length === 0) say('Projects draws no section of the projects in play.');
   else {
-    for (const g of GROUPS) if (!seen.groups.some((h) => h.startsWith(g))) say(`the list of projects in play has no "${g}" group with five projects in play over two lanes (read ${JSON.stringify(seen.groups)}).`);
-    for (const p of PROJECTS.filter((x) => x.lane !== 'parked')) if (seen.listed?.[p.name] !== true) say(`the list of projects in play does not name ${p.name}.`);
+    for (const h of seen.groups) if (!SECTIONS.some((g) => h.startsWith(g))) say(`Projects draws a section it has no name for: "${h}".`);
+    for (const p of PROJECTS.filter((x) => x.lane !== 'parked')) if (seen.listed?.[p.name] !== true) say(`no section of the projects in play names ${p.name}.`);
   }
-  if (seen.parked !== true) say(`Projects does not show ${PROJECTS.find((x) => x.lane === 'parked').name} among the parked.`);
+  if (seen.parked !== true) say(`Projects does not keep ${PROJECTS.find((x) => x.lane === 'parked').name} out of play and a press away under ${PARKED}.`);
   if (seen.first?.tools !== true) say(`${FIRST}'s page draws no "${TOOLS}" though ${OWN_TOOL} is its own.`);
   else if (seen.first?.own !== true) say(`${FIRST}'s "${TOOLS}" does not name ${OWN_TOOL} (drawn "${OWN_TOOL_SAID}"), its own tool.`);
   if (seen.second?.tools !== false) say(`${SECOND}'s page draws "${TOOLS}" though no tool is its own: it lists what applies everywhere as its own.`);
@@ -146,21 +149,21 @@ const visible = (page, words) => page.getByText(words, { exact: true }).first().
 /** Whether `words` comes into sight within `timeout`. */
 const arrives = (page, words, timeout) => page.getByText(words, { exact: true }).first().waitFor({ state: 'visible', timeout }).then(() => true, () => false);
 
-/** Projects at one width: the headline, the earning tile, the week's four tiles, the list's groups and the parked. Nothing here decides. */
+/** Projects at one width: the headline a screen reader has, the earning tile, the sections, and the parked behind the switch. Nothing here decides. */
 async function readProjects(page, seen, timeout) {
   seen.earning = await arrives(page, EARNING, timeout);
-  const head = page.locator('.b-head').first();
-  seen.headline = (await head.isVisible().catch(() => false)) ? ((await head.textContent().catch(() => '')) ?? '') : null;
-  seen.week = await page.locator('.b-week').first().isVisible().catch(() => false);
-  seen.cells = Object.fromEntries(await Promise.all(WEEK_CELLS.map(async (c) => [c, await visible(page, c)])));
-  const list = page.locator('section[aria-label="Projects in play"]');
-  const drawn = await list.first().isVisible().catch(() => false);
-  seen.groups = drawn ? (await list.locator('h3').allTextContents()).map((t) => t.trim()) : null;
-  seen.listed = Object.fromEntries(
-    await Promise.all(PROJECTS.map(async (p) => [p.name, drawn && (await list.getByText(p.name, { exact: true }).first().isVisible().catch(() => false))])),
-  );
+  seen.headline = (await page.locator('h2.sr-only').first().textContent({ timeout: 1000 }).catch(() => null)) ?? null;
+  const heads = page.locator('.b-main .b-sec-head');
+  seen.groups = (await heads.first().isVisible().catch(() => false)) ? (await heads.allTextContents()).map((t) => t.trim()) : null;
+  const main = page.locator('.b-main');
+  seen.listed = Object.fromEntries(await Promise.all(PROJECTS.map(async (p) => [p.name, await main.getByText(p.name, { exact: true }).first().isVisible().catch(() => false)])));
   const parked = PROJECTS.find((x) => x.lane === 'parked').name;
-  seen.parked = await page.locator('section[aria-label="Parked and finished"]').getByText(parked, { exact: true }).first().isVisible().catch(() => false);
+  /* PARKED IS NOT IN PLAY, so it is read only after the press: in sight before it is a project in the wrong place. */
+  seen.parked = false;
+  if (seen.listed[parked] === true) return;
+  const press = page.getByRole('group', { name: VIEWS }).getByRole('button', { name: new RegExp(`^${PARKED}`, 'u') });
+  await press.click({ timeout: 2000 }).catch(() => {});
+  seen.parked = await main.getByText(parked, { exact: true }).first().waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false);
 }
 
 /** A project's page at one width: whether Tools and servers is drawn, and whether it names the project's own tool. */
@@ -194,7 +197,7 @@ export default async function projects(root = join(import.meta.dirname, '..', '.
     const ready = readiness('projects', settle, ROOT);
     browser = await chromium.launch();
     for (const width of WIDTHS) {
-      const seen = { width, headline: null, earning: null, week: null, cells: {}, groups: null, listed: {}, parked: null, first: null, second: null };
+      const seen = { width, headline: null, earning: null, groups: null, listed: {}, parked: null, first: null, second: null };
       /* THREE PAGES A WIDTH, each in a context of its own and each given back however its read ends. */
       const visit = async (path, read) => {
         let opened = null;
@@ -218,7 +221,7 @@ export default async function projects(root = join(import.meta.dirname, '..', '.
     const blind = ready.nothingDrawn();
     if (blind) findings.push(blind);
     if (findings.length === 0) {
-      console.log(`projects: at ${WIDTHS.join(' and ')}, Projects drew a headline, ${EARNING}, ${WEEK}, the list and the parked, ${FIRST} named its own tool and ${SECOND} drew no ${TOOLS}.`);
+      console.log(`projects: at ${WIDTHS.join(' and ')}, Projects drew a headline, ${EARNING}, the sections and the parked a press away, ${FIRST} named its own tool and ${SECOND} drew no ${TOOLS}.`);
     } else {
       console.error('\n  Projects and a project page, walked in a real browser:');
       for (const f of findings) console.error(`      ${f}`);
