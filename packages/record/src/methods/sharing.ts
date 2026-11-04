@@ -341,12 +341,18 @@ export function methods(deps: RecordDeps) {
   /**
    * A person's id from their id or their People row (`people#16`): the person on this BrainDog whose address that row
    * holds, else, when nobody here has it, that address itself, so the share waits for them there.
+   *
+   * A CALLER WHO HOLDS ONLY HER OWN SHARE (`asked`, `shareOnward`) TURNS A ROW INTO A PERSON ONLY WHERE SHE READS THE ROW.
+   * The refusals below say the row's name and how many addresses it holds, so a manager of Tasks who reads no People
+   * walked `people#1`, `people#2` and was told each name that had no address. A row she does not read is answered as
+   * one that is not there.
    */
-  const personId = (said: string, _catalog: LensCatalog): string | Refusal | { kind: 'email'; id: string } => {
+  const personId = (said: string, _catalog: LensCatalog, asked?: CallContext): string | Refusal | { kind: 'email'; id: string } => {
     const text = said.trim();
     if (sql.one('SELECT 1 AS y FROM person WHERE id = ?', text) !== undefined) return text;
     const row = kernel.get(text);
     if (row === null) return said;
+    if (asked !== undefined && (deps.readable(asked, row.register) !== null || !deps.sight.admits(asked, row))) return said;
     if (row.register !== kernel.meetsList()?.register) return { code: 'REF_REGISTER_MISMATCH', fix: `${text} is not somebody in People. Name a person by their People row.`, at: 'who' };
     const keys = sql.all<{ key: string }>("SELECT key FROM entity_key WHERE row_id = ? AND key LIKE 'email:%'", row.id).map((k) => k.key);
     const emails = keys.map((k) => k.slice('email:'.length));
@@ -1003,7 +1009,7 @@ export function methods(deps: RecordDeps) {
       if ((parent.when?.until !== undefined && Date.parse(parent.when.until) <= now) || (parent.when?.from !== undefined && Date.parse(parent.when.from) > now))
         return refuse('FORBIDDEN', 'Your share is not on right now, so you cannot share it on.', 'from');
 
-      const whoSaid = typeof args?.who === 'string' ? personId(args.who, kernel.catalog()) : '';
+      const whoSaid = typeof args?.who === 'string' ? personId(args.who, kernel.catalog(), ctx) : '';
       if (typeof whoSaid !== 'string' && 'code' in whoSaid) return { ok: false, refusal: whoSaid };
       const who = typeof whoSaid === 'string' ? whoSaid : '';
       if (who === '' || who === me) return refuse('REQUIRED_MISSING', 'Share it on with somebody else on this BrainDog, by id.', 'who');
@@ -1016,6 +1022,9 @@ export function methods(deps: RecordDeps) {
       let target: ShareTarget | undefined = isObj(args?.what) ? (args.what as ShareTarget) : undefined;
       if (target !== undefined) {
         const named = resolved({ effect: 'allow', who: { kind: 'person', id: who }, what: target, can }, catalog);
+        /* ONE ANSWER FOR A NAME THAT IS NOT THERE AND ONE THAT IS OUT OF HER REACH: she may not read the rest of the record,
+           and "No project is called X" against "reaches past" told her which projects exist, a guess at a time. */
+        if ('code' in named && ['REF_UNKNOWN', 'REF_REGISTER_MISMATCH', 'NAME_AMBIGUOUS'].includes(named.code)) return refuse('OUT_OF_BOUNDS', 'That reaches past what you manage. Pick something inside it.', 'what');
         if ('code' in named) return { ok: false, refusal: named };
         target = named.what;
       }
