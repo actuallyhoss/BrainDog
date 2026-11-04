@@ -92,7 +92,9 @@ test('one widget per thing: no two titles alike, the folded ones gone, and the s
   const out = await api.widgetGallery!({}, owner);
   const titles = (out.value as { widgets: { title: string }[] }).widgets.map((w) => w.title);
   assert.equal(new Set(titles).size, titles.length);
-  assert.ok(titles.length <= 30, `${titles.length} widgets`);
+  /* 40, THE OWNER'S CALL OF 4 NOV: the sheet holds 34, 17 core and 17 from add-ons not held (Calendar, Gmail, Sentry, Weather
+     and others), so it grows with the add-ons and not with core. Past 40 it wants folding, not a bigger number. */
+  assert.ok(titles.length <= 40, `${titles.length} widgets`);
   for (const gone of ['Bills coming up', 'Cash today', 'Runway', 'Days in a row', 'Next trip']) assert.ok(!titles.includes(gone), gone);
   assert.ok(titles.includes('Cash ahead') && titles.includes('Coming up'));
   assert.equal(exampleMoney('¤fx', 'GBP'), '£1 = $1.27');
