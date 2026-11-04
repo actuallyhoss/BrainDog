@@ -107,7 +107,9 @@ async function money(now = TENTH) {
     for (const w of writes) value(k.update('recurring', k.get(w.spoken)!.id, w.patch, OWNER));
     return { out, writes };
   };
-  const queued = (): string[] => sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'script.run' ORDER BY rowid").map((r) => (JSON.parse(r.payload) as { script: string }).script);
+  /* THE RUNS AFTER SET-UP: an outbox row stays, done, and the account made in its book above ran one (3.35.0, 24fd3a8d4). */
+  let settledUp = 0;
+  const queued = (): string[] => sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'script.run' ORDER BY rowid").slice(settledUp).map((r) => (JSON.parse(r.payload) as { script: string }).script);
   const asked = (): string[] => sql.all<{ opened_by: string }>("SELECT opened_by FROM suggestion WHERE status = 'open' ORDER BY rowid").map((r) => r.opened_by);
   /** `repeating-overdue` as Money declares it: how many matched lines are past their day, or no value. */
   const late = (): number | null => {
@@ -117,6 +119,7 @@ async function money(now = TENTH) {
   };
   /* THE ACCOUNT MADE IN ITS BOOK ABOVE RUNS `book_from_account` (3.35.0, 24fd3a8d4): done before a test reads what a payment starts. */
   await turn();
+  settledUp = sql.all<{ n: number }>("SELECT rowid AS n FROM outbox WHERE kind = 'script.run'").length;
   log.length = 0;
   return { k, clock, made, paid, turn, mark, queued, asked, late, log };
 }

@@ -109,6 +109,8 @@ function write(k: Kernel, side: Side, kiln: { book: string; thing: string; categ
      (money-core 3.17.0, spend-figures-63). Thirty-three days back, so no thirty-day figure reads it. */
   make('transactions', { what: `Software last month in ${side.word}`, on: day(-33), direction: 'out', amount: at(600), account: cash.id, state: 'cleared', category: kiln.category });
   make('transactions', { what: `Received in ${side.word}`, on: day(-1), direction: 'in', amount: at(2_500), account: cash.id, state: 'cleared', thing: kiln.thing });
+  /* AND MONEY IN LAST MONTH, for what Reports says of it (`received-last`, 8d6620ac1). */
+  make('transactions', { what: `Received last month in ${side.word}`, on: day(-33), direction: 'in', amount: at(1_100), account: cash.id, state: 'cleared' });
   /* AND MONEY IN THREE MONTHS BACK, 15 June, for what comes in a month (`received-a-month`, `received-three-months-back`,
      money-core 3.32.0), and a payment still waiting to clear this month (`pending-out-month`, money-core 3.31.0). */
   make('transactions', { what: `Received in June in ${side.word}`, on: day(-80), direction: 'in', amount: at(1_800), account: cash.id, state: 'cleared' });
@@ -119,6 +121,8 @@ function write(k: Kernel, side: Side, kiln: { book: string; thing: string; categ
   make('obligations', { what: `Late invoice in ${side.word}`, direction: 'owed_to_me', amount: at(1_500), due: day(-4), state: 'open', chased: day(-1), thing: kiln.thing });
   make('obligations', { what: `Paid invoice in ${side.word}`, direction: 'owed_to_me', amount: at(900), due: day(-40), settled: day(-30), state: 'paid' });
   make('obligations', { what: `Invoice paid this week in ${side.word}`, direction: 'owed_to_me', amount: at(700), due: day(-3), settled: day(-2), state: 'paid' });
+  /* AND A BILL PAID THIS WEEK, for what Today's told money says went out (`settled-out-7d`, edbe8c9de). */
+  make('obligations', { what: `Bill paid this week in ${side.word}`, direction: 'owed_by_me', amount: at(650), due: day(-3), settled: day(-2), state: 'paid' });
   make('recurring', { what: `Rent in ${side.word}`, direction: 'out', amount: at(40_000), every: 'monthly', next_due: day(6), state: 'live', category: kiln.category });
   make('recurring', { what: `Retainer in ${side.word}`, direction: 'in', amount: at(7_000), every: 'monthly', next_due: day(12), state: 'live' });
   /* THE LAPTOP HAS A PART AFTER THIS ONE, so what is left once this is paid is not nought (`installments-after-next-by-plan`,

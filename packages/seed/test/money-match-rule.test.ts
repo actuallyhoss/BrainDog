@@ -89,10 +89,13 @@ async function money() {
       await k.runActions(execute, { script: sandbox, limit: 50 });
     }
   };
-  const queued = (): Queued[] => sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'script.run' ORDER BY rowid").map((r) => JSON.parse(r.payload) as Queued);
+  /* THE RUNS AFTER SET-UP: an outbox row stays, done, and the account made in its book above ran one (3.35.0, 24fd3a8d4). */
+  let settledUp = 0;
+  const queued = (): Queued[] => sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'script.run' ORDER BY rowid").slice(settledUp).map((r) => JSON.parse(r.payload) as Queued);
   const asked = (): Asked[] => sql.all<Asked>("SELECT id, cause, opened_by, body FROM suggestion WHERE status = 'open' ORDER BY rowid");
   /* THE ACCOUNT MADE IN ITS BOOK ABOVE RUNS `book_from_account` (3.35.0, 24fd3a8d4): done before a test reads what a payment starts. */
   await turn();
+  settledUp = sql.all<{ n: number }>("SELECT rowid AS n FROM outbox WHERE kind = 'script.run'").length;
   log.length = 0;
   return { k, made, paid, bill, turn, queued, asked, log };
 }

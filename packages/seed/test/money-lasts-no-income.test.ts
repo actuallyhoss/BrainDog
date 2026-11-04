@@ -114,7 +114,7 @@ test('THREE FULL MONTHS OF CLEARED SPENDING SHORTEN IT: the everyday leg is in t
 
 /* THE LASTS TILE SAYS IT (money F3), beside the day on what is due, and the lead says
    what there is: the two answers to how long it lasts stood a screen apart, one in the line and one in the tile. */
-test('MONEY\'S HERO SAYS IT, and the one line drawn says where the money is kept and that it lasts the year', async () => {
+test('FORECAST SAYS IT, and the one line drawn on Money says where the money is kept and that it lasts the year', async () => {
   const { k } = await lived();
   type Drawn = { kind: string; heading?: string; lead?: boolean; drawn?: boolean; body?: string; values?: Record<string, unknown>; cells?: { metric: string }[] };
   const blocks = value<{ blocks: Drawn[] }>(k.page('money')).blocks;
@@ -123,9 +123,10 @@ test('MONEY\'S HERO SAYS IT, and the one line drawn says where the money is kept
   /* NOTHING IS LATE HERE, SO SINCE money-core 3.33.0 (AF4) THE LINE IS THE YEAR AND THE CARD: what is late leads only while it is. */
   assert.equal(leads[0]!.body, 'Lasts the year on what is due.');
   assert.equal(leads[0]!.values?.['lasts-no-income'], undefined, 'the line says it again');
-  /* THE HERO SAYS IT SINCE money-core 3.29.0, as the cell after the day it runs out on what is due, with the day it ends
-     on in the sentence under it; the line says it lasts the year on what is due, so no cell says "Lasts past" beside it. */
   const hero = blocks.find((b) => b.kind === 'stat' && b.lead === true);
-  assert.ok(hero?.cells?.some((c) => c.metric === 'lasts-no-income'), 'the hero does not say how long it lasts with nothing coming in');
+  /* NOT THE HERO SINCE 3.33.0 (41fc3ea51): the hero is Cash now and the thirty days, and Forecast opens on how long it lasts with nothing coming in. */
+  assert.ok(!hero?.cells?.some((c) => c.metric === 'lasts-no-income'), 'the hero says how long it lasts with nothing coming in again');
+  const forecast = value<{ blocks: Drawn[] }>(k.page('money-forecast')).blocks;
+  assert.ok(forecast.some((b) => String(b.body).includes('{{lasts-no-income.on}}')), 'Forecast does not say how long it lasts with nothing coming in');
   assert.equal(reading(k, 'lasts-no-income').value, 68);
 });

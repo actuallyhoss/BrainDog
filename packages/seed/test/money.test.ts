@@ -989,7 +989,7 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   /* THE LINE IS ONLY WHAT NEEDS DOING SINCE money-core 3.29.1: the part that is late, then the card to pay. */
   /* WHAT HURTS MOST FIRST SINCE money-core 3.33.0 (AF4): the bills that are late, or the low point, then the card. */
   const said = lead.body?.split(/(?<=\.)\s+/u) ?? [];
-  assert.equal(said.at(-1), 'Cash falls to {{runway-days.low}} by {{runway-days.low_on}}.');
+  assert.match(said.at(-1) ?? '', /^Invoices \{\{bad:late\}\}: \[\{\{late-in\}\}\]\(\/r\/obligations\?/u);
   assert.equal(reading(k, 'installments-late'), 0, 'the sample has no part late');
   assert.match(
       said[0]!,
