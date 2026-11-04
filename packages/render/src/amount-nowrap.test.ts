@@ -75,13 +75,14 @@ test('A TABLE CELL HOLDING "EGP 1,350.00" IS ONE AMOUNT, the same span in the ap
 
 test('A STAT TILE\'S CODED FIGURE IS ONE AMOUNT in both renderers, and a count is not one', () => {
   const { svelte, html } = both('```stat\nRent | EGP 1,350.50\nUsers | 36\n```');
-  assert.deepEqual(html, ['EGP 1,350.50']);
+  /* SAID AS A TOTAL, whole from a thousand up (d9bab2403). */
+  assert.deepEqual(html, ['EGP 1,351']);
   assert.deepEqual(svelte, html);
 });
 
 test('A CARD\'S CODED FIGURE IS ONE AMOUNT in both renderers, and a figure in a symbol needs none', () => {
   const { svelte, html } = both('```cards\ntitle | figure: Owed to you\nRent | EGP 1,350.50\nPrinter | £190.00\n```');
-  assert.deepEqual(html, ['EGP 1,350.50']);
+  assert.deepEqual(html, ['EGP 1,351']);
   assert.deepEqual(svelte, html);
 });
 

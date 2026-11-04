@@ -19,6 +19,7 @@ import type { Component } from 'svelte';
 
 import { parse, type Block as BlockSegment } from './parse.ts';
 import { toHTML, type RenderOptions } from './html.ts';
+import { totalSaid, wholeFigure } from './format.ts';
 import { readAmount, writeAmount } from './money.ts';
 
 registerHooks({
@@ -86,10 +87,11 @@ const HOME = { home: 'EGP' } as const;
 
 /* ---- One way to write an amount (jobs 3 and 4) --------------------------------------------------- */
 
-const AMOUNTS: Record<string, { src: string; cls: string; at: number[] }> = {
+/* A BAR ROW AND A LEGEND ARE A SET OF TOTALS, every figure said whole (aa560291b, polish5); a stat and a card's figure are one amount each. */
+const AMOUNTS: Record<string, { src: string; cls: string; at: number[]; totals?: true }> = {
   'a stat': { src: `\`\`\`stat\nIn Cairo | ${EGP} | \nHarbour | ${USD} | \n\`\`\``, cls: 'cell-figure num', at: [0, 1] },
-  'a bar row': { src: `\`\`\`bar\nCairo | ${EGP}\nHarbour | ${USD}\n\`\`\``, cls: 'prop-value num', at: [0, 1] },
-  'a legend': { src: `\`\`\`split\nCairo | ${EGP}\nHarbour | ${USD}\n\`\`\``, cls: 'split-value num', at: [0, 1] },
+  'a bar row': { src: `\`\`\`bar\nCairo | ${EGP}\nHarbour | ${USD}\n\`\`\``, cls: 'prop-value num', at: [0, 1], totals: true },
+  'a legend': { src: `\`\`\`split\nCairo | ${EGP}\nHarbour | ${USD}\n\`\`\``, cls: 'split-value num', at: [0, 1], totals: true },
   'a cards figure': { src: `\`\`\`cards\ntitle | figure: Owed\nCairo | ${EGP}\nHarbour | ${USD}\n\`\`\``, cls: 'cards-value num', at: [0, 1] },
 };
 
@@ -98,7 +100,7 @@ for (const [name, shape] of Object.entries(AMOUNTS)) {
     const html = mirror(shape.src, HOME);
     const texts = said(html, shape.cls);
     assert.equal(texts[shape.at[0]!], writer(EGP, 'EGP'), 'the home currency');
-    assert.equal(texts[shape.at[1]!], writer(USD, 'EGP'), 'another currency, by its own sign');
+    assert.equal(texts[shape.at[1]!], shape.totals ? wholeFigure(writer(USD, 'EGP')) : writer(USD, 'EGP'), 'another currency, by its own sign');
     assert.doesNotMatch(html, /E£/u, 'the Egyptian pound is written by its code');
     assert.doesNotMatch(html, /US\$/u, 'a dollar is said once, by the writer');
     assert.equal(drawer(shape.src, HOME), html, 'the Svelte drawer draws the same tree');
@@ -106,7 +108,8 @@ for (const [name, shape] of Object.entries(AMOUNTS)) {
 
   test(`NOT TOLD THE HOME, ${name} draws what it drew before, the same in both drawers`, () => {
     assert.equal(drawer(shape.src), mirror(shape.src));
-    assert.notEqual(mirror(shape.src), mirror(shape.src, HOME), 'the home changes what is written');
+    /* A DOLLAR IS `$` TOLD OR NOT SINCE AM15, so what tells the two paths apart is a home where `$` is the home's own sign. */
+    assert.notEqual(mirror(shape.src), mirror(shape.src, { home: 'CAD' }), 'the home changes what is written');
   });
 }
 
@@ -114,7 +117,8 @@ test('A RING SAYS ITS VALUE AND ITS TARGET AS THE WRITER DOES, in both drawers',
   const src = `\`\`\`ring\nSaved | ${USD} | ${EGP}\n\`\`\``;
   const html = mirror(src, HOME);
   assert.deepEqual(said(html, 'ring-target'), [writer(EGP, 'EGP')]);
-  assert.deepEqual(said(html, 'ring-value'), [writer(USD, 'EGP')]);
+  /* A RING'S VALUE IS A HEADLINE, the writer's and then said as a total (d9bab2403). */
+  assert.deepEqual(said(html, 'ring-value'), [totalSaid(writer(USD, 'EGP'))]);
   assert.equal(drawer(src, HOME), html);
 });
 

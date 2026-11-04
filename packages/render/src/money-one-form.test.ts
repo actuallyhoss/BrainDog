@@ -34,7 +34,7 @@ test('A DOLLAR ON A RECORD THAT IS NOT IN DOLLARS IS `$3.63`: in a table, on a t
     }
     for (const text of LARGE) {
       assert.equal(exact(text, home), '$4,012.46', `exact, ${text}, home ${home}`);
-      assert.equal(read(text, home), '$4,012.46', `read, ${text}, home ${home}`);
+      assert.equal(read(text, home), '$4,012', `read, whole from a thousand up (d9bab2403), ${text}, home ${home}`);
       assert.equal(bar(text, home), '$4,012.46', `bar, ${text}, home ${home}`);
       assert.equal(axisFigure(text, home), '$4k', `axis, ${text}, home ${home}`);
     }
@@ -75,9 +75,9 @@ test('A CELL, A TILE AND A SENTENCE OF ONE RECORD AGREE, the two currencies side
   const home = 'EGP';
   const cell = leadingCode('USD 2,947.95', home);
   assert.deepEqual(cell, { currency: '', rest: '$2,947.95', sign: '', place: null, text: '$2,947.95' });
-  assert.equal(read(`$2,947.95${S}USD`, home), cell.text, 'a tile handed the drawn figure');
+  assert.equal(read(`$2,947.95${S}USD`, home), '$2,948', 'a tile handed the drawn figure, said as a total');
   assert.equal(symbolText('Harbour holds USD 2,947.95 today', false, home), `Harbour holds ${cell.text} today`);
-  assert.equal(read(`EGP 702,318.00 · $2,947.95${S}USD`, home), `EGP${S}702,318 · $2,947.95`, 'two figures on one tile');
+  assert.equal(read(`EGP 702,318.00 · $2,947.95${S}USD`, home), `EGP${S}702,318 · $2,948`, 'two figures on one tile');
 });
 
 test('MONEY COMING IN KEEPS ITS PLUS, in front of everything, and nought has no sign', () => {
@@ -109,8 +109,8 @@ test('NOT TOLD THE HOME, A DRAWER KEEPS THE PATH IT HAD, which is why every host
   assert.equal(symbolFigure('USD 3.63'), '$3.63');
   /* The older path reads the writer's own code-first figure too, so a figure drawn once is not mangled by it. */
   assert.equal(barFigure(`EGP${S}700`), `EGP${S}700`);
-  assert.equal(headlineFigure(`−EGP${S}73,615.27`), `−EGP${S}73,615.27`);
+  assert.equal(headlineFigure(`−EGP${S}73,615.27`), `−EGP${S}73,615`);
   assert.equal(headlineFigure(`EGP${S}58,185.00`), `EGP${S}58,185`);
-  assert.equal(headlineFigure('EGP −73,615.27'), 'EGP −73,615.27', 'the stored form keeps this path, as before');
+  assert.equal(headlineFigure('EGP −73,615.27'), 'EGP −73,615', 'the stored form keeps this path, as before');
   assert.deepEqual(leadingCode(`−EGP${S}73,615.27`), { currency: 'EGP', rest: '73,615.27', sign: '−' });
 });

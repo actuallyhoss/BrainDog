@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { axisFigure, barFigure, money, symbolFigure } from './format.ts';
+import { axisFigure, barFigure, money, symbolFigure, wholeFigure } from './format.ts';
 import { linesPlan } from './lines.ts';
 import { writeAmount } from './money.ts';
 import { progressLeft, progressOver, progressPlan, progressToGo, rangePlan } from './progress.ts';
@@ -73,8 +73,8 @@ test('WITH A HOME CURRENCY, AN AXIS IS COMPACT IN THE HOME SIGN: £8m, and what 
   const plan = seriesPlan(series('GBP'), true, 'GBP');
   assert.equal(plan.top, '£8m');
   assert.equal(plan.bottom, '−£4m');
-  assert.deepEqual(plan.ticks.map((t) => t.label), ['£8m', '0', '−£4m'], 'zero is 0 in any currency');
-  assert.equal(plan.buckets[0]!.net, '£6,800,000.00', 'a net is an amount, so every minor unit');
+  assert.deepEqual(plan.ticks.map((t) => t.label), ['£8m', '£0', '−£4m'], 'a money axis names its nought with the currency');
+  assert.equal(plan.buckets[0]!.net, '£6,800,000', 'a table of months is totals, so a net is whole');
   assert.deepEqual(plan.totals.map((t) => t.value), ['£21,600,000', '£9,100,000']);
   /* The same figures on a record whose home is another currency, or none, say which currency they are in by its own sign. */
   assert.equal(seriesPlan(series('GBP'), true, 'EGP').top, '£8m');
@@ -88,7 +88,7 @@ test('A HOME OF EGYPTIAN POUNDS READS AS THE WRITER WRITES IT, compact on the ax
   assert.equal(plan.bottom, said(-400_000_000, 'EGP', 'EGP', 'axis'));
   assert.equal(plan.bottom.codePointAt(0), 0x2212, 'a true minus in front, never a hyphen');
   assert.deepEqual(plan.ticks.map((t) => t.label), [800_000_000, 0, -400_000_000].map((m) => said(m, 'EGP', 'EGP', 'axis')));
-  assert.equal(plan.buckets[1]!.net, said(250_000_000, 'EGP', 'EGP', 'exact'));
+  assert.equal(plan.buckets[1]!.net, wholeFigure(said(250_000_000, 'EGP', 'EGP', 'exact')));
 });
 
 test('A LINE CHART\'S AXIS THE SAME, and a currency with no sign keeps its code in front', () => {
@@ -162,7 +162,13 @@ test('A CELL THAT IS NOT STORED MONEY IS LEFT ALONE, and so is every caller that
   assert.deepEqual(seriesPlan(hours, false, 'EGP'), seriesPlan(hours));
   const drawn = [SERIES_HEAD, ['Apr', '£300.00', '£100.00'], ['May', '£100.00', '£300.00']];
   assert.equal(seriesPlan(drawn).top, '£300');
-  assert.deepEqual(seriesPlan(drawn, false, 'GBP'), seriesPlan(drawn), 'a figure a page drew itself is not read back');
+  /* A FIGURE DRAWN BY ITS SIGN ALONE IS READ BY ITS CURRENCY SINCE f0cee160e, so told the home its total is a total, said
+     as one. Nothing else of the plan moves. */
+  const told = seriesPlan(drawn, false, 'GBP');
+  const untold = seriesPlan(drawn);
+  assert.deepEqual(told.totals.map((t) => t.value), ['£400', '£400']);
+  assert.deepEqual(untold.totals.map((t) => t.value), ['£400.00', '£400.00']);
+  assert.deepEqual({ ...told, totals: [] }, { ...untold, totals: [] }, 'nothing else of the plan moves');
   const count = [{ label: 'Bike', value: '3', third: '7' }];
   assert.deepEqual(ringPlan(count, 'GBP'), ringPlan(count));
 });

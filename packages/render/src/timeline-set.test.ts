@@ -17,7 +17,9 @@ test('whole amounts stay whole, and a cell that is no figure is left as it is sa
   assert.deepEqual(timelineDetails(rows(['Kiln', '−£4.50'])), ['Kiln', '−£4.50']);
 });
 
-test('A TIMELINE WITH NO MONEY ROW SAYS ITS AMOUNTS AS TOTALS, whole (polish5, 2 Nov)', () => {
+test('A TIMELINE WITH NO MONEY ROW SAYS ITS AMOUNTS AS ITS TABLE DOES: to the penny, whole from a thousand up (shared fix, 2 Nov)', () => {
   const plain = ['−£2,500', '−£964', '−£39.61'].map((a) => ({ cells: ['2 Sep', 'Payee', a] }));
-  assert.deepEqual(timelineDetails(plain), ['−£2,500', '−£964', '−£40']);
+  assert.deepEqual(timelineDetails(plain), ['−£2,500', '−£964.00', '−£39.61']);
+  const large = ['−£2,500.50', '−£39.61'].map((a) => ({ cells: ['2 Sep', 'Payee', a] }));
+  assert.deepEqual(timelineDetails(large), ['−£2,501', '−£39.61']);
 });

@@ -12,7 +12,7 @@ test('a gap is a gap and never a zero', () => {
   assert.equal(seriesValue('£0.00'), 0);
   assert.equal(seriesValue('−£1,600.00'), 1600);
   const plan = seriesPlan([HEAD, ['Apr 2026', '£100.00', '', ''], ['May 2026', '', '', '']], true);
-  assert.deepEqual(plan.buckets.map((b) => b.values), [['£100.00', '—'], ['—', '—']]);
+  assert.deepEqual(plan.buckets.map((b) => b.values), [['£100', '—'], ['—', '—']]);
   assert.equal(plan.buckets[1]!.net, '—');
   assert.equal(plan.bars.length, 1, 'no bar for a gap');
   assert.doesNotMatch(plan.netLine, /L/u, 'the net line breaks at the gap rather than reading zero');
@@ -29,7 +29,7 @@ test('in stands above the zero rule and out hangs under it, on one scale that en
   assert.equal(downB!.height, '50');
   assert.equal(plan.top, '£300');
   assert.equal(plan.bottom, '−£300');
-  assert.deepEqual(plan.ticks.map((t) => [t.y, t.label, t.zero]), [['0', '£300', false], ['50', '0', true], ['100', '−£300', false]]);
+  assert.deepEqual(plan.ticks.map((t) => [t.y, t.label, t.zero]), [['0', '£300', false], ['50', '£0', true], ['100', '−£300', false]]);
   assert.equal(plan.series[1]!.dir, 'out');
 });
 
@@ -76,10 +76,10 @@ test('A TOTAL IS IN ONE UNIT: each series in its own cells, in whole minor units
 
 test('the net is in minus out, written like the cells, and the states are said', () => {
   const plan = seriesPlan([HEAD, ['Sep 2026', '£1,000.00', '£1,900.00', 'partial'], ['Oct 2026', '£2,000.00', '', 'ahead']], true);
-  assert.deepEqual(plan.buckets.map((b) => b.net), ['−£900.00', '£2,000.00']);
+  assert.deepEqual(plan.buckets.map((b) => b.net), ['−£900', '£2,000']);
   assert.deepEqual(plan.buckets.map((b) => b.said), [SERIES_PARTIAL, SERIES_AHEAD]);
   assert.equal(plan.buckets[0]!.short, 'Sep');
-  assert.match(plan.sentence, /Sep 2026 so far, Money in £1,000.00, Money out £1,900.00, Net −£900.00/u);
+  assert.match(plan.sentence, /Sep 2026 so far, Money in £1,000, Money out £1,900, Net −£900/u);
   assert.equal((plan.netDots.match(/h0/gu) ?? []).length, 2);
 });
 
@@ -88,7 +88,7 @@ test('the current bucket with money still due in it is marked due, on its bars a
   assert.equal(plan.buckets[0]!.state, 'due');
   assert.equal(plan.buckets[0]!.said, SERIES_DUE);
   assert.ok(plan.bars.every((b) => b.state === 'due'));
-  assert.match(plan.sentence, /Sep 2026 so far, and due, Money in £1,500.00/u);
+  assert.match(plan.sentence, /Sep 2026 so far, and due, Money in £1,500/u);
 });
 
 test('nothing but gaps and zeroes is a sentence, not a chart', () => {
@@ -123,9 +123,12 @@ test('ONE TABLE SAYS ITS MONEY ONE WAY: a table of months is totals, so every am
 
 test('A CELL DRAWN BY ITS SIGN ALONE IS READ BY ITS CURRENCY, never copied as a shape', () => {
   /* "$1,950" on a record kept in pounds is the US dollar, as the writer draws another currency. */
-  assert.equal(amountLike('$1,950', 2400.5, 'GBP', 'exact'), '$2,400.50');
+  /* WHOLE WHERE THE PAGE WROTE IT WHOLE (AO11), and to the cent where it wrote the cents. */
+  assert.equal(amountLike('$1,950', 2400.5, 'GBP', 'exact'), '$2,401');
+  assert.equal(amountLike('$1,950.00', 2400.5, 'GBP', 'exact'), '$2,400.50');
   assert.equal(amountLike('$1,950', 2400, 'GBP', 'read'), '$2,400');
-  assert.equal(amountLike('£1,000', -250, 'GBP', 'exact'), '−£250.00');
+  assert.equal(amountLike('£1,000', -250, 'GBP', 'exact'), '−£250');
+  assert.equal(amountLike('£1,000.00', -250, 'GBP', 'exact'), '−£250.00');
   assert.equal(figureLike('$1,950', 2400, 'EGP', 'read'), '$2,400');
   /* A sign nobody owns keeps the shape it came in. */
   assert.equal(amountLike('E£400', 500, 'GBP', 'read'), 'E£500');
