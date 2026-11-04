@@ -339,12 +339,12 @@
     --red-fill: rgb(207, 65, 58);
     --red-fill-hover: #B3322C;
     --red-fill-press: #A12A25;
-    --red-ink: #C2362F;
-    --red-press: #A12A25;
+    --red-ink: var(--red);
+    --red-press: var(--red-fill-press);
     --red-rule: rgba(255, 255, 255, .26);
     --red-tint: #FBEBE9;
     --red-tint-2: #F5D9D8;
-    --redcard: #CF413A;
+    --redcard: var(--red-fill);
     --row-wash: color-mix(in oklab, rgb(16, 17, 20) 5%, transparent);
     --rule: rgb(227, 229, 233);
     --rule-strong: rgb(213, 217, 223);
