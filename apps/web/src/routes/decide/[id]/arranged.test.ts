@@ -59,7 +59,7 @@ test('an arrangement reads as one story, in the order a person asks it', () => {
 
 test('a pack this same proposal installs is not on yet, so the sentence starts from the house word, and a word it already reads is no sentence', () => {
   const said = (word: string) =>
-    arrangedOf('settings', { pack: 'usecase-student', values: { voice_home: word }, before: { voice_home: 'Dashboard' } }, {})?.parts.flatMap((p) => ('lines' in p ? p.lines : []));
+    arrangedOf('settings', { pack: 'usecase-student', values: { voice_home: word }, before: { voice_home: 'Dashboard' } }, {})?.parts.flatMap((p) => ('lines' in p ? p.lines.map((l) => (typeof l === 'string' ? l : l.text)) : []));
   assert.deepEqual(arrangedOf('arrange', { ...STUDENT, settings: [{ pack: 'usecase-student', values: { voice_home: 'Studies' }, before: { voice_home: 'Dashboard' } }] }, {})?.parts.find((p) => p.part === 'words'), { part: 'words', lines: ['Today will be called “Studies”'] });
   assert.deepEqual(said('Dashboard'), [], 'the word it already reads is said as a change');
   assert.deepEqual(said('Studies'), ['Dashboard will be called “Studies”']);

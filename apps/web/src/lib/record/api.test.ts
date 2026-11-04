@@ -332,8 +332,8 @@ test('Overdue is one direction, because two directions do not add up', () => {
 
   const tile = metric('overdue');
   /* A TILE SAYS MONEY IN WHOLE UNITS (dd6b3b9bf), so the sum it is held to is whole too. */
-  assert.equal(tile.value, wholeMoneyIn(display('obligations', 'amount', gbp(owe))));
-  assert.notEqual(tile.value, wholeMoneyIn(display('obligations', 'amount', gbp(owe + owed))));
+  assert.equal(tile.value, wholeMoneyIn(display('obligations', 'amount', gbp(owe)) ?? ''));
+  assert.notEqual(tile.value, wholeMoneyIn(display('obligations', 'amount', gbp(owe + owed)) ?? ''));
   assert.match(tile.href ?? '', /direction/, 'the link must carry the same direction the figure does');
 });
 
