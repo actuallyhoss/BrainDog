@@ -462,6 +462,13 @@
     display: none;
   }
 
+  /* A VERY SHORT WINDOW (a phone on its side, 400% zoom) KEEPS ITS ROOM FOR THE WORK: the bar scrolls away with the page. */
+  @media (height < 360px) {
+    .head-bar.head-bar {
+      position: static;
+    }
+  }
+
   /* The section or the parent over the name, in meta: 13 in the quiet ink, sentence case. */
   .kicker {
     display: block;

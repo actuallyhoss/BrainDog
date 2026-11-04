@@ -19,6 +19,7 @@
   import { arrive } from '$lib/motion/index.ts';
   import Button from '$lib/ui/Button.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
 
@@ -66,7 +67,7 @@
     };
   }
   $effect(() => {
-    if (base) void readHeld();
+    if (base) untrack(() => void readHeld());
   });
 
   /* ── the file ── */
