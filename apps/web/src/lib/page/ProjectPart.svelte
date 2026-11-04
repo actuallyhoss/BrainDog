@@ -35,6 +35,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
+  import { numberMenus } from '$lib/kpis/cell-menu.svelte.ts';
   import type { ShapeHold } from './shape-hold.svelte.ts';
   import { LEFT_COLUMN, RIGHT_COLUMN, rowLaid } from './project-parts.ts';
   import { happenedSaid } from './project-facts.ts';
@@ -309,9 +311,10 @@
           {#if hold.facts}<Button size="sm" href={hold.facts.hrefs.feed}>Fix the feed</Button>{/if}
         </div>
       {/if}
-      <ul class="n-cells">
+      <ul class="n-cells" {@attach numberMenus.open ? ownMenu((p) => numberMenus.open?.(null, p)) : null}>
         {#each nums.cells as c (c.label)}
-          <li class="n-cell" data-stale={c.stale ? '' : undefined}>
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <li class="n-cell" data-stale={c.stale ? '' : undefined} tabindex={numberMenus.open ? 0 : undefined} {@attach numberMenus.open ? ownMenu((p) => numberMenus.open?.(c.label, p)) : null}>
             <span class="n-label own-dir">{c.label}</span>
             <span class="n-fig num">{c.figure}</span>
             {#if c.trail}

@@ -193,9 +193,17 @@
      runs off the screen. */
   $effect(() => {
     if (!open || !list || !floating || sheet) return;
-    const seen = new ResizeObserver(() => untrack(fit));
+    let frame = 0;
+    /* On the next frame: a fit changes the size it is watching, and a change inside the callback is a loop the browser complains of. */
+    const seen = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => untrack(fit));
+    });
     seen.observe(list);
-    return () => seen.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      seen.disconnect();
+    };
   });
 
   /** The gap the panel keeps from the edge of the screen. Eight, so a clamped menu reads as near the edge, not welded. */

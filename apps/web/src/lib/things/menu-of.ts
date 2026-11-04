@@ -407,8 +407,10 @@ export async function itemsOf(address: string, shell: Shell, from: ThingFrom, na
       break;
     case 'automation': {
       const opened = await openAutomations((url, init) => fetch(url, init), apiBase(), {});
-      const rule = opened.first.ok ? opened.first.value.find((r) => r.id === t.id) : null;
-      if (!rule) throw new Error('no rule');
+      if (!opened.first.ok) throw new Error('not read');
+      /* A RULE THAT IS GONE IS NOT A READ THAT FAILED: its link has the link's verbs and nothing more. */
+      const rule = opened.first.value.find((r) => r.id === t.id);
+      if (!rule) return [];
       const owns = shell.me?.owner === true;
       out = [
         item('rename', 'rename', editWords.rename, G.change, { run: () => askPage(t.href, 'rename') }),

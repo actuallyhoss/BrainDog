@@ -42,6 +42,7 @@ export function thingOf(address: string): Thing {
   if (m[0] === 'r' && m.length === 2) return { kind: 'list', href, list: m[1]! };
   if (m[0] === 'r' && m.length === 3 && /^[1-9]\d*$/u.test(m[2]!)) return { kind: 'row', href, list: m[1]!, seq: Number(m[2]) };
   if (m[0] === 'jobs' && m.length === 2) return { kind: 'run', href, id: piece(m[1]!) };
-  if (m[0] === 'automations' && m.length === 2) return { kind: 'automation', href, id: piece(m[1]!) };
+  /* `/automations/runs` and `/automations/new` are pages of the hub, not rules. */
+  if (m[0] === 'automations' && m.length === 2 && m[1] !== 'runs' && m[1] !== 'new') return { kind: 'automation', href, id: piece(m[1]!) };
   return { kind: 'place', href };
 }

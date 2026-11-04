@@ -49,6 +49,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import { MENU_AT, type MenuAt } from '$lib/ui/context-menu.ts';
+  import { numberMenus } from './cell-menu.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { draftsOf, findKpiList, findReadingList, keptOf, projectsOf, readKpis, rowOf, type Reads } from './kpi-rows.ts';
   import { staleFixOf, type ReadingFor, type StaleFix } from './stale-fix.ts';
@@ -175,14 +176,14 @@
   /* ── a number's menu ── */
 
   /** What the menu offers: from its row once read, and from what the block answered until then. */
-  function actionsOf(k: KpiView): KpiAction[] {
+  function actionsOf(k: Pick<KpiView, 'input'>): KpiAction[] {
     const row = rowOf(rows ?? [], k.input.kpi);
     const held = rawOf(k.input.kpi);
     const fields: Fields = row?.fields ?? { today: typeof held?.today === 'string' ? held.today : 'auto', headline: form === 'today' ? held?.headline === true : false };
     return kpiActionsFor({ fields }, writable);
   }
 
-  async function press(a: KpiAction, k: KpiView): Promise<void> {
+  async function press(a: KpiAction, k: Pick<KpiView, 'input' | 'name'>): Promise<void> {
     if (busy) return;
     busy = true;
     try {
@@ -299,6 +300,30 @@
     return () => node.removeEventListener(MENU_AT, on);
   };
 
+  /* A FIGURE ON THE PROJECT'S NUMBERS TILE ASKS HERE (`cell-menu.svelte.ts`). One the tile drew from readings alone is no key
+     number yet, so it has only what the tile has. */
+  let cellAt = $state.raw<{ x: number; y: number; height: number } | null>(null);
+  let cellKpi = $state.raw<KpiAnswered | null>(null);
+  $effect(() => {
+    if (form !== 'project' || !writable) return;
+    numberMenus.open = (name, at) => {
+      const k = name === null ? undefined : kpis.find((x) => x.name === name);
+      if (k) {
+        cellKpi = k;
+        cellAt = at;
+      } else tileAt = at;
+    };
+    return () => {
+      numberMenus.open = null;
+    };
+  });
+
+  /* THE BLOCK MAY BE HELD UNSEEN, AND A SHEET INSIDE IT WOULD BE TOO, so its sheets are drawn at the end of the page. */
+  const toBody = (node: HTMLElement) => {
+    document.body.appendChild(node);
+    return () => node.remove();
+  };
+
   /* ── what shows on Today, chosen (`KpiChooser.svelte`) ── */
 
   let chooserOn = $state(false);
@@ -338,13 +363,8 @@
   });
 </script>
 
-{#snippet menu(k: KpiView)}
-  {@const acts = actionsOf(k)}
-  {#if acts.length || (writes !== null && (writable || href?.(k.input as KpiAnswered)))}
-    <span class="kb-menu" data-open={menus[k.key] ? '' : undefined}>
-      <Menu label={copy.kpiMenu(k.name)} align="end" bind:open={() => menus[k.key] === true, (v) => (menus[k.key] = v)}>
-        {#snippet trigger()}<span class="kb-mark"><Icon name="more" size="s" /><span class="kb-hidden">{copy.kpiMenu(k.name)}</span></span>{/snippet}
-        <!-- OPEN: the number's sheet for who may change it, its project's page for who may only read. -->
+{#snippet numberItems(k: Pick<KpiView, 'input' | 'name'>, acts: readonly KpiAction[])}
+  <!-- OPEN: the number's sheet for who may change it, its project's page for who may only read. -->
         {#if writable}
           <button type="button" class="kb-item" role="menuitem" onclick={() => void openKpi(k.input)}><Icon name="arrow" size="s" />{copy.kpiMenuOpen}</button>
         {:else if href?.(k.input as KpiAnswered)}
@@ -357,6 +377,15 @@
           <hr />
           <button type="button" class="kb-item" role="menuitem" onclick={() => void openChooser()}><Icon name="grid" size="s" />{copy.kpiMenuChoose}</button>
         {/if}
+{/snippet}
+
+{#snippet menu(k: KpiView)}
+  {@const acts = actionsOf(k)}
+  {#if acts.length || (writes !== null && (writable || href?.(k.input as KpiAnswered)))}
+    <span class="kb-menu" data-open={menus[k.key] ? '' : undefined}>
+      <Menu label={copy.kpiMenu(k.name)} align="end" bind:open={() => menus[k.key] === true, (v) => (menus[k.key] = v)}>
+        {#snippet trigger()}<span class="kb-mark"><Icon name="more" size="s" /><span class="kb-hidden">{copy.kpiMenu(k.name)}</span></span>{/snippet}
+        {@render numberItems(k, acts)}
       </Menu>
     </span>
   {/if}
@@ -370,6 +399,13 @@
 {#snippet foot()}
   <Button size="sm" onclick={() => void addKpi()}><Icon name="plus" size="s" />{copy.kpiAddNumber}</Button>
 {/snippet}
+
+{#if cellKpi}
+  {@const k = { input: cellKpi as KpiInput, name: cellKpi.name }}
+  <Menu label={copy.kpiMenu(k.name)} open={cellAt !== null} at={cellAt} onclose={() => (cellAt = null)}>
+    {@render numberItems(k, actionsOf(k))}
+  </Menu>
+{/if}
 
 <!-- THE TILE AROUND ITS NUMBERS: what shows on Today, a right-click away from anywhere in it. -->
 {#if writable}
@@ -410,6 +446,7 @@
   {/if}
 </div>
 
+<div class="kb-sheets" {@attach toBody}>
 {#if chooserOn && list}
   {#await import('./KpiChooser.svelte') then { default: KpiChooser }}
     <KpiChooser bind:open={chooserOpen} rows={rows ?? []} names={projectNames} showing={form === 'today' ? kpis.map((k) => k.kpi) : []} onsave={chosen} />
@@ -427,8 +464,12 @@
     <KpiSheet bind:open={sheetOpen} {list} project={sheetProject} kpi={sheetKpi} onsaved={() => void after()} />
   {/await}
 {/if}
+</div>
 
 <style>
+  .kb-sheets {
+    display: contents;
+  }
   .kb {
     display: grid;
     gap: var(--sp-5);
