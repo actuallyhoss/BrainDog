@@ -100,7 +100,7 @@
   >
     <Field {id} label={words.label} help={words.help} {error}>
       {#snippet children({ describedBy, invalid })}
-        <input {id} class="input extra-input num" inputmode="decimal" autocomplete="off" bind:value={typed} aria-describedby={describedBy} aria-invalid={invalid} disabled={busy} />
+        <div class="field extra-input"><input {id} class="field-input num" inputmode="decimal" autocomplete="off" bind:value={typed} aria-describedby={describedBy} aria-invalid={invalid} disabled={busy} /></div>
       {/snippet}
     </Field>
     <div class="extra-buttons">

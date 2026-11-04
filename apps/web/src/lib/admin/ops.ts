@@ -59,6 +59,68 @@ export type Funnel = { weeks: Week[]; asked?: number; more?: boolean; missed?: n
 
 export const REVIEW = '/api/kennel/v1/review';
 
+/** The six steps of the way in, in the order a person takes them. */
+export const STEPS = [
+  { key: 'seen', label: 'Visits' },
+  { key: 'applied', label: 'Applied' },
+  { key: 'invites_used', label: 'Invites used' },
+  { key: 'signed_up', label: 'Signed up' },
+  { key: 'agent', label: 'First agent' },
+  { key: 'brief', label: 'First brief' },
+] as const;
+
+/** One step as the funnel draws it: its total, its share of the widest step, what it kept of the step before, and its weeks. */
+export type Step = { key: string; label: string; total: number; share: number; next: number; rate: string | null; of: string | null; weeks: { week: string; n: number }[]; peak: number };
+
+const count = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) ? n : 0);
+
+/** The shape drawn while there is nothing to count: a funnel with no figures in it, so an empty page still reads as this one. */
+const GHOST = [1, 0.66, 0.54, 0.44, 0.34, 0.26];
+
+/** Whether any week counted anything, so there is a table worth opening. */
+export const counted = (funnel: Funnel): boolean => funnel.weeks.some((w) => STEPS.some((s) => count(w[s.key]) > 0));
+
+const percent = (part: number): string => {
+  const at = part * 100;
+  if (at < 1) return 'Under 1%';
+  return `${at < 10 ? String(Math.round(at * 10) / 10) : String(Math.round(at))}%`;
+};
+
+/**
+ * The funnel's steps, from a door's answer or from none yet.
+ *
+ * THE WIDTHS ARE ON A CUBE ROOT. Visits run to thousands and sign-ups to tens, and on a straight scale every step after
+ * the first is a hair. The figure and the percent beside each step are the facts; the shape only says where it narrows.
+ * A step larger than the one before (an invite sent by hand has no application behind it) says no percent, since over
+ * 100% of a step nobody took is not a rate.
+ */
+export function stepsOf(funnel: Funnel | null): Step[] {
+  const weeks = funnel?.weeks ?? [];
+  const totals = STEPS.map((s) => weeks.reduce((t, w) => t + count(w[s.key]), 0));
+  const top = Math.max(0, ...totals);
+  /* A FUNNEL ONLY ONCE VISITS LEAD IT. On a young record one sign-up and no counted visits is no shape to join up, so each
+     step then stands as its own bar, at half the height, since one sign-up is not a wall. */
+  const joined = top === 0 || totals[0] === top;
+  const shares = totals.map((t, i) => (top === 0 ? (GHOST[i] ?? 0) : Math.max(0.05, Math.cbrt(t / top) * (joined ? 1 : 0.5))));
+  return STEPS.map((s, i) => {
+    const before = i > 0 ? (totals[i - 1] ?? 0) : 0;
+    const total = totals[i] ?? 0;
+    const kept = before > 0 && total > 0 && total <= before;
+    const line = weeks.map((w) => ({ week: w.week, n: count(w[s.key]) }));
+    return {
+      key: s.key,
+      label: s.label,
+      total,
+      share: shares[i] ?? 0,
+      next: joined ? (shares[i + 1] ?? shares[i] ?? 0) : (shares[i] ?? 0),
+      rate: kept ? percent(total / before) : null,
+      of: kept ? (STEPS[i - 1]?.label ?? null) : null,
+      weeks: line,
+      peak: Math.max(0, ...line.map((w) => w.n)),
+    };
+  });
+}
+
 export const readApplications = async (): Promise<Answer<Application[]>> => {
   const out = await door<{ applications?: Application[] }>('/account/ops/applications');
   return out.ok ? { ok: true, value: Array.isArray(out.value.applications) ? out.value.applications : [] } : out;
