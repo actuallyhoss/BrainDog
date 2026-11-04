@@ -656,6 +656,7 @@ export const SCENES = new Map([
 
   /* ── not driven, and why ── */
 
+  ['human-only.yaml', "the caller it refuses is an agent's token, and this driver is the owner, who adds a deleted person back by hand, or a bearer nobody issued. `packages/record/test/human-only.test.ts` drives it."],
   [
     'declaration-unknown.yaml',
     'the fixture claims `at: ids`, and no raiser under packages/kernel/src or packages/record/src answers DECLARATION_UNKNOWN at that address: the one sentence that names several ids (`None of ... is installed.`, packages/kernel/src/declare.ts) carries none. The fixture or the raiser has to move first.',

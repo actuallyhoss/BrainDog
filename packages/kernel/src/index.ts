@@ -18,7 +18,7 @@
 
 import { scriptRows } from './script-rows.ts';
 import type { Clock, Param, Refusal, Result, Row, Scheduler, Sql } from '@braindog/ports';
-import { clash, fixOf, no, ok, refused } from '@braindog/ports';
+import { clash, codeOf, fixOf, no, ok, refused } from '@braindog/ports';
 
 import { nameSpokenIn } from './spoken-names.ts';
 import { coerce, currencyFixed, isAbsent, instant, measure, parseSpoken, range, rowOverCap, type FieldDecl, type Json } from './coerce.ts';
@@ -9600,7 +9600,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        answered VERSION_STALE for ever: its rows were deleted, merged, or already hold what it asked (`staleWhy`). */
     if (!out.ok && !('defer' in verdict)) {
       const why = transaction(() => settleOne(governDeps(), id, clock.now()));
-      if (why !== null) return no<Decided>('refusal' in out ? out.refusal.code : 'VERSION_STALE', `${why} It is off Needs you now.`, { at: 'id' });
+      if (why !== null) return no<Decided>(codeOf(out), `${why} It is off Needs you now.`, { at: 'id' });
     }
     /* AND AN ANSWER THAT DELETED OR MERGED ROWS TAKES BACK THE OTHER OPEN QUESTIONS ABOUT THEM THAT NO LONGER APPLY: a
        second "same person?" card about two people one card already merged. */

@@ -1,0 +1,8 @@
+code:    HUMAN_ONLY
+via:     rpc
+raises:  packages/kernel/src/people.ts
+at:      email
+fix:     The owner deleted that person, so only he brings them back.
+
+# NO INPUT YET, AND `SCENES` IN `tools/refusals/rpc.mjs` SAYS WHY. The caller it refuses is an agent's token, and that
+# driver is the owner or a bearer nobody issued. Driven in `packages/record/test/human-only.test.ts`.
