@@ -193,7 +193,7 @@ enum Links {
                     Shots.other(titled: "Quick panel", name: String(s.dropFirst(10)))
 
                 case let s where s.hasPrefix("dropshot:"):
-                    Shots.view(TellWindow().overlay { DropRing() }.frame(width: 520, height: 420).environment(\.font, Typeface.body), name: String(s.dropFirst(9)))
+                    Shots.view(DropRing().frame(width: 520, height: 420).environment(\.font, Typeface.body), name: String(s.dropFirst(9)))
                 case "menubar": model.openWindow?("menubar-shot")
                 case "search": model.desk.emit("search")
                 case let s where s.hasPrefix("shot:"): await Shots.window(String(s.dropFirst(5)))

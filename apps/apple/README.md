@@ -34,15 +34,16 @@ person on the seed, on 8787, printing each sign-in letter's link and code) and `
 
 **One iOS simulator booted at a time, ever.** `build.mjs sim` refuses when more than one is.
 
-The screenshot walk: `node apps/apple/tools/shots.mjs m2` (or `m3`, `m5`) relaunches the signed-in app on the booted
+The screenshot walk: `node apps/apple/tools/shots.mjs all --out <folder>` (or `m2`, `m3`, `m5`) relaunches the signed-in app on the booted
 simulator once per screen, light and dark, and saves each to `~/Developer/braindog/.notes/shots/apps/<milestone>/`.
-Each screen is reached by a Debug launch press (`-braindogPress go:…`, `BrainDogApp.swift`), which calls what the
+`node apps/apple/tools/launch.mjs --server <url>` measures a cold launch from the Debug marks. Each screen is reached by a Debug launch press (`-braindogPress go:…`, `BrainDogApp.swift`), which calls what the
 screen's own control calls; a Release build has none of it.
 
 ## The iPhone app
 
 - **Tabs**: the web's first four places (`places`, from `tabsOf`), kept for the next launch, and Search or go to as the
   search tab. Needs you is native with its count; every other tab is a native stack of web screens.
+- **The page runs under the bars**, top and foot. The web view's scroll view has no inset: the page pays for the bars with `env(safe-area-inset-*)` (`.body` in `AppFrame.svelte`), because with an inset the page's own `scrollTo(0, 0)` landed under the nav bar. Dynamic Type is the page's zoom, with the root box set to the window's width (`ShellScript.js`). A web sheet takes the tab bar and Tell away while it is open (`modal` in the bridge).
 - **Stacks**: a link pressed in a page becomes a native push (`shell.visit`, from `AppFrame.svelte`), taken from a warm
   web view (`WebPool`). At most four live per stack; deeper screens sleep with their picture and reload on the way back.
   A pushed screen's back and name are drawn by the app (no glass); the system's edge swipe back is kept (`SwipeBack`).
@@ -59,7 +60,7 @@ screen's own control calls; a Release build has none of it.
   background, keeps it in the App Group and asks the widgets to draw again; each widget also reads it itself every 15
   minutes with the session from the shared Keychain group.
 - **Widgets**: Needs you (small, medium, Lock Screen circular and rectangular), Key numbers (small, medium), Tell
-  (small, Lock Screen circular). Plain: the tile, a Lexend figure, red only for the count and a figure under its target.
+  (small, Lock Screen circular). Plain: the tile, a Plus Jakarta Sans figure, red only for the count and a figure under its target. Due next is what Today's Coming up reads (dates on the money in two weeks), after any reminder.
   `braindog://open?path=` and `braindog://tell` are what they open.
 - **Siri and Shortcuts** (`Shared/Intents.swift`): "Tell BrainDog" reads the words with the same `tell-core.js` and adds
   what is placed whole in one `capture`; anything it cannot place opens the app in Tell with the words in it. "What
@@ -150,11 +151,8 @@ Each takes `--check` and fails when its output is not what its source makes now.
 `Resources/Fonts` holds the OFL TTFs (the web's woff2 files cannot be registered on iOS), each with its licence beside
 it, as the SIL Open Font License 1.1 asks:
 
-- `Lexend-SemiBold.ttf`: Lexend, © 2018 The Lexend Project Authors (googlefonts/lexend), OFL 1.1 (`OFL-Lexend.txt`).
-- `Geist[wght].ttf`: Geist, variable weight, © 2024 The Geist Project Authors (vercel/geist-font), OFL 1.1 (`OFL-Geist.txt`).
+- `PlusJakartaSans[wght].ttf`: Plus Jakarta Sans, variable weight, OFL 1.1 (`OFL-PlusJakartaSans.txt`), built by `tools/fonts/jakarta.py`: upstream's, with its capitals centred in the line and a wider word space, the same as the web's.
 - `GeistMono.ttf`: Geist Mono, variable weight, © 2024 The Geist Project Authors, OFL 1.1 (`OFL-GeistMono.txt`).
-
-Fetched once on 2 November 2026 from `github.com/google/fonts` (Geist, Geist Mono) and `github.com/googlefonts/lexend`.
 
 ## Signing
 

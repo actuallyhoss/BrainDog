@@ -166,10 +166,7 @@ public struct SignInView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
-        #if os(macOS)
-        /* A MAC'S WINDOW IS TALLER THAN THE FORM: it stands in the middle, not hung from the traffic lights. */
-        .defaultScrollAnchor(.center, for: .alignment)
-        #endif
+        .modifier(MiddleOfWindow())
         .background(Ground())
         .animation(.easeOut(duration: 0.18), value: flow.step)
         .task { await flow.offerAutofill() }
@@ -291,6 +288,22 @@ public struct SignInView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.updatesFrequently)
         }
+    }
+}
+
+/// A Mac's window is taller than the form: it stands in the middle, not hung from the traffic lights (macOS 15, and on an
+/// older Mac from the top as before).
+private struct MiddleOfWindow: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        if #available(macOS 15, *) {
+            content.defaultScrollAnchor(.center, for: .alignment)
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 }
 

@@ -711,4 +711,10 @@
     scrollbar-width: thin;
     scrollbar-color: color-mix(in oklab, var(--ink) 24%, transparent) transparent;
   }
+
+  /* IN THE MAC APP THE SYSTEM DRAWS THEM: a custom colour turns a Mac's overlay scrollbars off for an always-on web one. */
+  html[data-shell='mac'],
+  html[data-shell='mac'] * {
+    scrollbar-color: auto;
+  }
 }

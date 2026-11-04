@@ -4,6 +4,7 @@
  *
  *   node apps/apple/tools/launch.mjs --server http://localhost:5183 [--times 6]
  *
+ * A press that does nothing goes on the launch line, so the system's notification ask stays away.
  * "shell" is the app's own first view; "drawn" the first web screen on screen, with its kept picture if it has one;
  * "ready" the page saying it has drawn. Each run relaunches the app; the first is dropped, since it fills the caches.
  */
@@ -30,7 +31,7 @@ for (let i = 0; i <= times; i++) {
   rmSync(marks, { force: true });
   await sleep(1500);
   const t0 = Date.now() / 1000;
-  sim('launch', 'booted', 'dog.brain.app', '-braindogServer', server);
+  sim('launch', 'booted', 'dog.brain.app', '-braindogServer', server, '-braindogPress', 'none');
   await sleep(8000);
   /* LEAVING THE APP SAVES ITS PICTURE, as a person leaving does, so the next launch has one. */
   sim('launch', 'booted', 'com.apple.Preferences');

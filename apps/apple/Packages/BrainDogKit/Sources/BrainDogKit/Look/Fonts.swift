@@ -43,8 +43,8 @@ public enum Typeface {
     public static let figure = face(22, .semibold, .title2)
     /// A sheet's title and a section's heading, 17 semibold.
     public static let heading = face(17, .semibold, .headline)
-    /// A card's heading, 15 semibold.
-    public static let tileHeading = face(15, .semibold, .subheadline)
+    /// A card's heading, 14 semibold (RHYTHM, section 5).
+    public static let tileHeading = face(14, .semibold, .subheadline)
     /// Reading text, 14.
     public static let body = face(14, .regular, .body)
     /// A row's subject, 15.

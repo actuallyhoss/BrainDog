@@ -13,6 +13,7 @@ public enum Glyph: String, CaseIterable, Sendable {
     case settings = "glyph.settings"
     case search = "glyph.search"
     case slash = "glyph.slash"
+    case pin = "glyph.pin"
     case star = "glyph.star"
     case inbox = "glyph.inbox"
     case mail = "glyph.mail"

@@ -55,13 +55,15 @@ const WALK = [
   ['window-search', 'size:1512x945;;/;;/;;search;;shot:window-search', 16],
   ['window-small', 'size:900x600;;/;;/;;shot:window-small', 16],
   ['tell', 'size:1200x760;;tell:Paid £120 for the domain renewal yesterday|New project: autumn fair|Call Nadia tomorrow;;window:Tell BrainDog=tell', 12],
-  ['menubar', 'size:1200x760;;/;;panel:menubar', 10],
+  ['menubar', 'size:1200x760;;/;;menubar;;window:Menu bar=menubar', 14],
   ['settings', 'size:1200x760;;/;;settings;;window:General=settings', 14],
   ['settings-shortcut', 'size:1200x760;;/;;settings:shortcut;;window:Shortcut=settings-shortcut', 14],
   ['settings-signing-in', 'size:1200x760;;/;;settings:signing-in;;window:Signing in=settings-signing-in', 14],
   ['quick-tell', 'size:1200x760;;/;;quick:tell:Paid £120 for the domain renewal yesterday|Call Nadia tomorrow about the autumn fair;;quickshot:quick-tell', 14],
   ['quick-search', 'size:1200x760;;/;;quick:search:brand;;quickshot:quick-search', 14],
   ['quick-added', 'size:1200x760;;/;;quick:tell:Paid £120 for the domain renewal yesterday;;quick:add;;quickshot:quick-added', 17],
+  ['drop', 'size:1200x760;;/;;dropshot:drop', 10],
+  /* SIGNED OUT, `window:BrainDog=signin` draws Sign in as the window holds it (`build.mjs mac --press signout` first). */
   /* NOTHING ANSWERS ON THIS PORT, so the first load reaches nothing and the window says so. */
   ['offline', 'size:1512x945;;/;;offlineshot:offline', 14, 'http://localhost:9'],
 ];

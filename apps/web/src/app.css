@@ -80,15 +80,11 @@
   }
 
   /* ON THE MAC THE CHROME IS CHROME: a label in the rail or a button does not select when dragged across, and takes the
-     arrow as a native control does, and the system draws its own scrollbars (a custom colour turns the overlay ones off). */
+     arrow as a native control does. (Its scrollbars are the system's: `style.css`, beside the web's thin ones.) */
   html[data-shell='mac'] :is(nav, aside, button, summary, label, [role='button'], [role='tab'], [role='menuitem'], [role='switch']) {
     -webkit-user-select: none;
     user-select: none;
     cursor: default;
-  }
-
-  html[data-shell='mac'] * {
-    scrollbar-color: auto;
   }
 
   /* A TAP IS A TAP AT ONCE: no wait to see whether it was the first half of a double-tap zoom, which a phone browser
