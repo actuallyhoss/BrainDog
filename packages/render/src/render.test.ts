@@ -344,9 +344,17 @@ test('and it is a div where no host can act on it, still marked and no longer pr
 });
 
 test('a bar row whose value is not a number keeps its words and loses its bar', () => {
-  const html = toHTML(parse('```bar | X\nKnown | 10 | \nUnknown | tbc | \n```'));
-  assert.equal(html.match(/--magnitude/g)?.length, 1);
+  /* A BAR OF ONE COMPARES NOTHING SINCE 8a2ad40fc, so two rows have a number here and the third does not. */
+  const html = toHTML(parse('```bar | X\nKnown | 10 | \nAlso | 5 | \nUnknown | tbc | \n```'));
+  assert.equal(html.match(/--magnitude/g)?.length, 2);
   assert.match(html, /tbc/);
+});
+
+test('a bar of one compares nothing: its words and its figure, and no track of 100%', () => {
+  const html = toHTML(parse('```bar | X\nOnly | 10 | \nUnknown | tbc | \n```'));
+  assert.doesNotMatch(html, /--magnitude|prop-track/u);
+  assert.match(html, /Only/u);
+  assert.match(html, /tbc/u);
 });
 
 test('a chips row without both a number and a word is dropped', () => {
@@ -862,18 +870,18 @@ test('and the bar drawn off it put a credit at the top of the chart, full length
      label reaches the measurement. Measured: the −1,299 row set the scale at 3 and drew at 1.00,
      and the only row that was actually owed anything was shrunk to two thirds of a credit. A
      negative value draws no bar at all, because the scale has one side. */
-  const html = toHTML(parse(['```bar | Owed', 'Ada | Q3 −1,299.00 | ', 'Bo | GBP 2.00 | ', '```'].join(NEWLINE)));
+  const html = toHTML(parse(['```bar | Owed', 'Ada | Q3 −1,299.00 | ', 'Bo | GBP 2.00 | ', 'Cy | GBP 1.00 | ', '```'].join(NEWLINE)));
   const tracks = html.match(/--magnitude:[\d.]+/g) ?? [];
-  assert.deepEqual(tracks, ['--magnitude:1.00'], 'the credit was given a bar and the debt was scaled against it');
-  assert.ok(html.indexOf('--magnitude') > html.indexOf('Q3'), 'the one bar drawn belongs to the row that is owed');
+  assert.deepEqual(tracks, ['--magnitude:1.00', '--magnitude:0.50'], 'the credit was given a bar and the debt was scaled against it');
+  assert.ok(html.indexOf('--magnitude') > html.indexOf('Q3'), 'the first bar drawn belongs to the row that is owed');
 });
 
 test('a negative row draws no bar, and still shows its number', () => {
   // A proportional chart has one side. Drawing |v| would put money owed to you and money owed by
   // you at the same length, on the same side, which is the reading the sign exists to prevent.
-  const html = toHTML(parse(['```bar | Owed', `Ada | ${money(50_000, 'GBP')} | `, `Bo | ${money(-129_900, 'GBP')} | `, '```'].join(NEWLINE)));
+  const html = toHTML(parse(['```bar | Owed', `Ada | ${money(50_000, 'GBP')} | `, `Bo | ${money(-129_900, 'GBP')} | `, `Cy | ${money(25_000, 'GBP')} | `, '```'].join(NEWLINE)));
   const tracks = html.match(/--magnitude:[\d.]+/g) ?? [];
-  assert.equal(tracks.length, 1, 'the negative row was given a bar');
+  assert.deepEqual(tracks, ['--magnitude:1.00', '--magnitude:0.50'], 'the negative row was given a bar');
   assert.ok(html.includes('−'), 'the minus sign did not reach the screen');
 });
 
@@ -1058,7 +1066,7 @@ test('a card leads with its mark, is named by a heading, and wears its tone besi
   const first = /<li class="cards-item" data-intent="warn">.*?<\/li>/u.exec(html)?.[0] ?? '';
   assert.doesNotMatch(first, /cards-facts|<dd>—<\/dd>/u, 'a fact nobody wrote is not drawn, and a card with none has no list');
   assert.match(html, /<dt>Next<\/dt><dd>Ship it<\/dd>/u, 'a fact that is written still is');
-  assert.match(html, /<span class="cards-when">3m ago<\/span>/u);
+  assert.match(html, /<span class="cards-when">Seen\u00a03m ago<\/span>/u, 'its column says what the day is');
 });
 
 test('a card with no title is the person, so the face takes the mark’s place and is not drawn twice', () => {
@@ -1109,8 +1117,8 @@ test('the figure is drawn with its currency symbol, and a missing figure is the 
   assert.match(html, /<span class="cards-value num">£4,800<\/span><span class="cards-label">Owed<\/span>/u, 'a card\'s figure is a tile\'s, said short');
   assert.match(
     toHTML(onPage('```cards\ntitle | figure: Earned\nKiln | £18,400.00\u00a0GBP\nSite | £4,200.50\n```')),
-    /cards-value num">£18,400<\/span>.*cards-value num">£4,200\.50<\/span>/u,
-    'one mark of currency, and a fraction that is part of the amount stays',
+    /cards-value num">£18,400<\/span>.*cards-value num">£4,201<\/span>/u,
+    'one mark of currency, and whole from a thousand up',
   );
   assert.match(html, /<span class="cards-value num">—<\/span>/u);
   assert.match(html, /role="img" aria-label="Weekly: 18, 20, no value, 24"/u);

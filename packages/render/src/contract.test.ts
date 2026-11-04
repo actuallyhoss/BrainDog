@@ -49,7 +49,8 @@ const SPECIMEN = [
   '```note | Heads up\nPlain words.\n```',
   '```stat\nCash | GBP 12.00 | in 2 accounts | | good\nCash now | EGP 43,700.00 · £24,800.00\n```',
   '```chips\nLate | 2 | late\n```',
-  '```bar\nA | 3\nB | many\n```',
+  /* TWO ROWS THAT HAVE A BAR: a bar of one compares nothing and draws no track (8a2ad40fc). */
+  '```bar\nA | 3\nB | many\nC | 2\n```',
   '```ring\nA | 3\nB | 2\n```',
   '```heat who\nAmara | 2026-10-01\n```',
   '```stat\n' + Array.from({ length: 7 }, (_, i) => `Row ${i + 1} | ${i}`).join('\n') + '\n```',
