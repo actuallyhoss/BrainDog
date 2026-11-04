@@ -24,7 +24,8 @@ const withWhere = (d: Body, where: unknown): Body => {
 const LATER_RULES = new Set(['meet-sender-organisations', 'meet-payees']);
 
 /** The figures over the organisations, and the lines drawn on them: `organisations-known` since People 4.2.0. */
-const ORG_FIGURES = new Set(['organisations-count', 'organisations-from-card-texts', 'organisations-known']);
+/* AND THE TWO BY WHETHER AN ORGANISATION IS A CLIENT, SINCE People 4.3.0 (a4993e50f). */
+const ORG_FIGURES = new Set(['organisations-count', 'organisations-from-card-texts', 'organisations-known', 'organisations-clients', 'organisations-not-clients']);
 
 /** A `where` without the clause about who is you, which a People with no `self` cannot read (People 3.6.0 added it). */
 const unselfed = (where: unknown): unknown =>

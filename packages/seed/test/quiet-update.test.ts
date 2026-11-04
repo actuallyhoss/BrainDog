@@ -23,7 +23,8 @@ import { AGENTS_PACK, CORE_PAGES, FIRST_PARTY_VERSIONS, NOW, agentsPackDocument,
 import { keptLists, modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 import { peopleBefore3 } from './people-before-3.ts';
-import { thingsUndone, useCaseThingsUndone } from './things-before.ts';
+import { useCaseThingsUndone } from './things-before.ts';
+
 import { CHASING } from '../src/modules/money/pages/parts/chasing.ts';
 import { NEXT_30 } from '../src/modules/money/pages/parts/next30.ts';
 import { ADDON_LEG_LISTS, withoutLegs } from '../src/modules/held-legs.ts';
@@ -274,10 +275,11 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
      the money lasts with nothing coming in since 3.27.0, where it was a figure of its own, and since 3.29.0 a cell of the
      hero, beside the day it runs out on. Since 3.29.1 the day is that cell's alone, and the sentence under how long it
      lasts with nothing coming in says only the day that ends on. */
+  /* SINCE 3.33.0 (41fc3ea51) IT IS ONE LINE UNDER CASH NOW, and the cells are the two thirty days. */
   const hero = (page.blocks as { lead?: boolean; cells?: { metric: string; note?: string }[] }[]).find((b) => b.lead === true && Array.isArray(b.cells));
-  const lasts = hero?.cells?.find((c) => c.metric === 'lasts-no-income');
-  assert.ok(hero?.cells?.some((c) => c.metric === 'runs-out-on'), 'the hero says no day the money runs out on');
-  assert.doesNotMatch(lasts?.note ?? '', /\{\{runs-out-on\}\}/u, 'the day the money runs out is said twice on one tile');
+  const cash = hero?.cells?.find((c) => c.metric === 'cash-now');
+  assert.match(cash?.note ?? '', /\{\{runs-out-on\}\}/u, 'the hero says no day the money runs out on');
+  assert.equal((cash?.note ?? '').match(/\{\{runs-out-on\}\}/gu)?.length, 1, 'the day the money runs out is said twice on one tile');
   assert.ok(k.packClaims('money-core').includes('metric.runs-out-on'), 'the day the money runs out did not reach the record');
   sql.close();
 });
@@ -343,106 +345,8 @@ const withPage = (doc: Body, page: string, blocks: (now: Body[]) => Body[], keep
 /** A block with a heading and a glyph put back straight after its kind, where every block here writes them. */
 const headed = ({ kind, ...rest }: Body, heading: string, icon: string): Body => ({ kind, heading, icon, ...rest });
 
-/** A person, who they are with and the day: the columns of the two lists People 3.1.0 drew over its cards. */
-const LAST_IN_TOUCH: Body[] = [
-  { field: 'name', label: 'Name', width: 'minmax(12ch,1fr)' },
-  { field: 'org', label: 'Organisation', width: 'minmax(10ch,1fr)' },
-  { field: 'in_touch', label: 'Last in touch', width: '14ch', align: 'end' },
-];
-const QUIETEST_FIRST: Body[] = [
-  { field: 'in_touch', dir: 'asc' },
-  { field: 'seq', dir: 'asc' },
-];
-
-/**
- * MONEY-CORE 3.13.0, WORK 1.16.0 AND PEOPLE 3.1.0, THE VERSIONS BEFORE THIS BUILD'S, made from this build's document by
- * undoing the one change each new version makes (money-core 3.14.0, work 1.17.0, people 3.2.0), and held below to the
- * fingerprint released under each. Money-core 3.15.0's one figure, `ledger-rows-7d`, and 3.16.0's three signs are taken
- * off as well.
- */
-/** And the two halves of Today's money this week (uc6-money-47), folded into the same unreleased 3.16.0. */
-const WEEK_IN = new Set(['received-7d', 'settled-in-7d']);
 const SIGNS_ADDED = new Set(['ledger-rows-7d', 'ledger-newest-days', 'currencies-held', 'uncategorised-share-30d', 'statement-oldest-days', 'nights-missed-30d', 'repeating-overdue']);
 
-/**
- * AND 3.16.0'S PAYDAYS, folded into the same unreleased step: Repeating's `day_of_month` and `weekend` and
- * the sentence its `holds` gained, the leg's `days` and `weekend` that name them (on the figures and on the pages' blocks),
- * and Money's `rest_days` setting.
- */
-const PAYDAYS_FIELDS = new Set(['day_of_month', 'weekend']);
-const withoutPaydays = (doc: Body): Body => {
-  const { rest_days: _rest, ...config } = (doc.config ?? {}) as Body;
-  const legless = (leg: Body): Body => {
-    const { days: _days, weekend: _weekend, ...rest } = leg;
-    return rest;
-  };
-  return {
-    ...doc,
-    ...(doc.config === undefined ? {} : { config }),
-    declarations: (doc.declarations as Body[]).map((d) => {
-      if (d.register === 'recurring' && Array.isArray(d.fields))
-        return {
-          ...d,
-          holds: 'the money that comes in and goes out on a cadence, weekly to yearly, without anybody deciding again',
-          fields: (d.fields as Body[]).filter((f) => !PAYDAYS_FIELDS.has(String(f.id))),
-        };
-      if (Array.isArray(d.legs)) return { ...d, legs: (d.legs as Body[]).map(legless) };
-      /* A PAGE'S BLOCKS WALK THE SAME LEGS (`from`), so they lose the two keys there too. */
-      if (Array.isArray(d.blocks))
-        return { ...d, blocks: (d.blocks as Body[]).map((b) => (Array.isArray(b.from) ? { ...b, from: (b.from as Body[]).map(legless) } : b)) };
-      return d;
-    }),
-  };
-};
-/**
- * AND 3.16.0'S AGES AND CURRENCIES, folded into the same unreleased step: `account-ages` goes,
- * `cash-as-of` and `balances-stale` read the typed day again, the money fields lose `currency_from` and
- * `currency_fixed`, Money loses Last confirmed and its box, a book's account cards read the typed day, and
- * `rule.cash-stale` comes back after `invoice-late`.
- */
-const CASH_STALE: Body = {
-  rule: 'cash-stale',
-  pack: 'money-core',
-  register: 'accounts',
-  when: 'as_of before -7d',
-  then: [{ notify: { say: 'The balance of {{name}} was last set {{ago:as_of}}.' } }],
-  once_per: ['entry', 'as_of'],
-};
-const CURRENCY_KEYS = new Set(['currency_from', 'currency_fixed']);
-const withoutAges = (doc: Body): Body => {
-  const out: Body[] = [];
-  for (const d of doc.declarations as Body[]) {
-    if (d.metric === 'account-ages') continue;
-    if (d.metric === 'cash-as-of') out.push({ ...d, value: { min: 'as_of' } });
-    else if (d.metric === 'balances-stale') out.push({ ...d, where: 'liquid is true, as_of before -7d', value: { count: 'id' } });
-    else if (Array.isArray(d.fields) && ['transactions', 'balances', 'installments', 'recurring'].includes(String(d.register)))
-      out.push({ ...d, fields: (d.fields as Body[]).map((f) => Object.fromEntries(Object.entries(f).filter(([k]) => !CURRENCY_KEYS.has(k)))) });
-    else if (d.page === 'money')
-      out.push({
-        ...d,
-        requires: (d.requires as string[]).filter((r) => r !== 'register.balances'),
-        blocks: (d.blocks as Body[])
-          .filter((b) => b.heading !== 'Last confirmed' && b.heading !== 'What it holds today')
-          .map((b) =>
-            b.when && (b.when as Body).metric === 'balances-stale' && b.kind === 'note'
-              ? { ...b, body: "The oldest balance in Cash now is from {{cash-as-of}}. Update it so this page starts from today's money." }
-              : b,
-          ),
-      });
-    else if (d.page === 'money-book')
-      out.push({
-        ...d,
-        blocks: (d.blocks as Body[]).map((b) =>
-          b.heading === 'Accounts'
-            ? { ...b, columns: (b.columns as Body[]).map((c) => (c.field === 'as_of' ? { field: 'as_of', label: 'As of', as: 'when' } : c)), stale: { field: 'as_of', after: '7d' } }
-            : b,
-        ),
-      });
-    else out.push(d);
-    if (d.rule === 'invoice-late') out.push(CASH_STALE);
-  }
-  return { ...doc, declarations: out };
-};
 /**
  * A VERSION BEFORE 3.16.0 WITHOUT `cash-stale`, for the tests below that measure page fixes going in on their own: 3.16.0
  * takes the rule away, which is a loss a record is asked about once (`TAKING CASH STALE AWAY IS ASKED`), and those tests
@@ -463,19 +367,6 @@ const withoutDirection = (doc: Body): Body => ({
       return d;
     }),
 });
-/** AND 3.17.0'S CROSS-CHECK (cash-check-52): `cash-cross-check`, the one figure it adds, goes. */
-const withoutCrossCheck = (doc: Body): Body => ({
-  ...doc,
-  declarations: (doc.declarations as Body[])
-    .filter((d) => d.metric !== 'cash-cross-check')
-    /* AND THE BLOCK THE MONEY PAGE DRAWS IT WITH (cash-page-54): the tile. The line for no balance it also drew went
-       before release, and in the same unreleased step the page gained its lead for two books or more, which goes too. */
-    .map((d) =>
-      d.page !== 'money' || !Array.isArray(d.blocks)
-        ? d
-        : { ...d, blocks: (d.blocks as Body[]).filter((b) => b.heading !== 'Cash now does not add up' && !(b.kind === 'note' && b.lead === true && (b.when as Body | undefined)?.gte === 2)) },
-    ),
-});
 /**
  * AND 3.17.0'S FILING RULES AND CLOSED ACCOUNTS (filing-list-56, account-state-56), folded into the same unreleased step:
  * the list Filing rules and the Ledger's `filed_by` go, a category's How it matches loses `pattern`, `txn-categorise`
@@ -483,81 +374,6 @@ const withoutCrossCheck = (doc: Body): Body => ({
  */
 const NOT_CLOSED = ', state is not closed';
 const open = (b: Body): Body => (typeof b.where === 'string' && b.where.includes(NOT_CLOSED) ? { ...b, where: b.where.replace(NOT_CLOSED, '') } : b);
-const RULE_FILED_91: ReadonlySet<string> = new Set(['rule-filed', 'filed-by-rule-30d', 'rules-filing-30d', 'rules-filing']);
-const withoutFiling = (doc: Body): Body => ({
-  ...doc,
-  declarations: (doc.declarations as Body[])
-    .filter((d) => d.register !== 'filing_rules' && d.page !== 'money-rules' && !RULE_FILED_91.has(String(d.metric)))
-    .map((d) => {
-      if (d.register === 'transactions' && Array.isArray(d.fields)) return { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'filed_by') };
-      if (d.register === 'categories' && Array.isArray(d.fields))
-        return {
-          ...d,
-          fields: (d.fields as Body[]).map((f) =>
-            f.id === 'match_by'
-              ? { ...f, values: (f.values as string[]).filter((v) => v !== 'pattern'), labels: Object.fromEntries(Object.entries(f.labels as Body).filter(([v]) => v !== 'pattern')) }
-              : f,
-          ),
-        };
-      if (d.register === 'accounts' && Array.isArray(d.fields))
-        return (({ state: _state, done: _done, ...rest }) => ({ ...rest, fields: (d.fields as Body[]).filter((f) => f.id !== 'state') }))(d);
-      if (d.rule === 'txn-categorise') return { ...d, then: [{ link: { field: 'category', to: { register: 'categories', by: 'match', value: '{{what}}' } } }] };
-      if (Array.isArray(d.blocks)) return { ...d, blocks: (d.blocks as Body[]).map(open) };
-      return open(d);
-    }),
-});
-/**
- * AND 3.17.0'S PAYMENT LINKS (pay-links-57), folded into the same unreleased step: a bill loses Paid so far,
- * an instalment Paid by, a repeating line Last paid and Last amount, and the Ledger its delete rule, which is there
- * for Paid by alone.
- */
-const PAID_FIELDS: Record<string, ReadonlySet<string>> = {
-  obligations: new Set(['paid_so_far']),
-  installments: new Set(['paid_by']),
-  recurring: new Set(['last_paid', 'last_amount']),
-};
-const withoutPaid = (doc: Body): Body => ({
-  ...doc,
-  declarations: (doc.declarations as Body[]).map((d) => {
-    if (d.register === 'transactions' && d.delete !== undefined) return (({ delete: _delete, ...rest }) => rest)(d);
-    const gone = typeof d.register === 'string' ? PAID_FIELDS[d.register] : undefined;
-    return gone && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !gone.has(String(f.id))) } : d;
-  }),
-});
-/**
- * AND 3.17.0'S LEDGER TILE AND ITS BAD PHRASE (ledger-tile-59, bad-phrase-59), folded into the same unreleased step: the
- * tile leaves the Money page and History takes back What moved, twelve lines and the last block, and the two late
- * lines on Heads up say "past their due date" as plain words again.
- */
-const WHAT_MOVED: Body = {
-  kind: 'timeline',
-  heading: 'What moved',
-  icon: 'receipt',
-  span: 12,
-  source: 'register.transactions',
-  where: 'state is not void',
-  columns: [{ field: 'on' }, { field: 'what' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
-  order: [{ field: 'on', dir: 'desc' }],
-  limit: 12,
-  when: { metric: 'cash-accounts', gt: 0 },
-  empty: 'Nothing has moved yet. Add what left the bank and this page starts from it.',
-};
-const withoutLedgerTile = (doc: Body): Body => ({
-  ...doc,
-  declarations: (doc.declarations as Body[]).map((d) =>
-    d.page !== 'money' || !Array.isArray(d.blocks)
-      ? d
-      : {
-          ...d,
-          blocks: [
-            ...(d.blocks as Body[])
-              .filter((b) => b.heading !== 'Ledger')
-              .map((b) => (typeof b.body === 'string' && b.body.includes('{{bad:past their due date}}') ? { ...b, body: b.body.replace('{{bad:past their due date}}', 'past their due date') } : b)),
-            WHAT_MOVED,
-          ],
-        },
-  ),
-});
 /**
  * AND 3.17.0'S PLANS (plans-list-66), folded into the same unreleased step: the list Plans goes,
  * an instalment loses Part of and Left after, and the script that makes and counts plans goes with the rule that starts it.
@@ -566,25 +382,6 @@ const withoutLedgerTile = (doc: Body): Body => ({
  */
 const PLAN_FIELDS: ReadonlySet<string> = new Set(['plan_row', 'left_after']);
 const PLAN_FIGURES_68: ReadonlySet<string> = new Set(['plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-next-due', 'plan-last-due', 'installments-paid-by-plan', 'installments-total-by-plan', 'budget-passed-on']);
-/** AND 3.17.0'S PAYEE (payee-field-68), folded into the same unreleased step: the Ledger loses `payee`, and `counterparty_text` is labelled Paid to or from again. */
-const withoutPayee = (doc: Body): Body => ({
-  ...doc,
-  declarations: (doc.declarations as Body[]).map((d) =>
-    d.register === 'transactions' && Array.isArray(d.fields)
-      ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'payee').map((f) => (f.id === 'counterparty_text' ? { ...f, label: 'Paid to or from' } : f)) }
-      : d,
-  ),
-});
-/** AND BATCH 70'S (everyday-leg-69-70), folded into the same unreleased step: 3.17.0's leg of everyday spending comes off the cash walk, on the figures over it and on Money's Cash ahead and bridge. */
-const withoutEveryday = (doc: Body): Body => {
-  const dated = (legs: unknown): Body[] => (legs as Body[]).filter((leg) => leg.everyday === undefined);
-  return {
-    ...doc,
-    declarations: (doc.declarations as Body[]).map((d) =>
-      Array.isArray(d.legs) ? { ...d, legs: dated(d.legs) } : Array.isArray(d.blocks) ? { ...d, blocks: (d.blocks as Body[]).map((b) => (Array.isArray(b.from) ? { ...b, from: dated(b.from) } : b)) } : d,
-    ),
-  };
-};
 /** AND BATCH 70'S (instalments-tile-70): Money's Instalments tile counts the list's own parts again, as it did before it read the two figures by plan. */
 const INSTALMENTS_BY_PARTS: Body = {
   kind: 'progress',
@@ -607,94 +404,7 @@ const moneyBeforeSpending = (blocks: Body[]): Body[] =>
   blocks
     .filter((b) => b.heading !== "This month's spending" && b.heading !== 'Budgets')
     .flatMap((b) => (b.heading === 'Instalments' ? [b, CHASING[0] as Body] : b.heading === 'In and out, by month' ? [HISTORY_FOLD, b] : [b]));
-const withoutPlans = (doc: Body): Body => ({
-  ...doc,
-  declarations: (doc.declarations as Body[])
-    .filter((d) => d.register !== 'plans' && d.rule !== 'part-counts-plan' && d.rule !== 'plan-links-parts' && d.script !== 'plans_from_names' && d.page !== 'money-plan' && !PLAN_FIGURES_68.has(String(d.metric)))
-    .map((d) => (d.register === 'installments' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !PLAN_FIELDS.has(String(f.id))) } : d))
-    .map((d) => (d.page === 'money' && Array.isArray(d.blocks) ? { ...d, blocks: moneyBeforeSpending((d.blocks as Body[]).map((b) => (b.kind === 'progress' && b.heading === 'Instalments' ? INSTALMENTS_BY_PARTS : b))) } : d)),
-});
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
-/** Work as 1.18.0 released it, the frozen document (`fixtures/released/`), which holds the follow-up script as it was. */
-const WORK_1_18 = JSON.parse(readFileSync(new URL('./fixtures/released/work-1.18.0.json', import.meta.url), 'utf8')) as Body;
-
-/**
- * PROJECTS' AND WORK'S PAGES AS THEY WERE THE MORNING OF 20 OCTOBER, before the UI pass changed them inside the unreleased
- * portfolio 1.18.0 and work 1.19.0 (proj F5): the Overview with its open and folded headings, Work with Late,
- * At a glance, This week and its search word, and a thread's health with no labels. Frozen from that morning's build, so
- * the steps below undo the pass first and then the ones before it, as each version was released.
- */
-const BEFORE_UI_PASS = JSON.parse(readFileSync(new URL('./fixtures/before-ui-pass-20-oct.json', import.meta.url), 'utf8')) as {
-  portfolio: { page: Body };
-  work: { page: Body; updatesHealth: Body };
-};
-
-/**
- * A document with the redesign taken off its pages, as the morning's build declared them. AND THE SCREENS
- * SCOPE OF 24 OCTOBER WITH IT, in the same unreleased 1.19.0: the page is the morning's whole, and the figure its
- * head counts now, `tasks-in-play`, goes.
- */
-const beforeUiPass = (doc: Body, id: 'portfolio' | 'work'): Body => ({
-  ...doc,
-  declarations: (doc.declarations as Body[]).filter((d) => !(id === 'work' && d.metric === 'tasks-in-play')).map((d) => {
-    /* ITS PLACE ON THE RAIL AS THE DOCUMENT SAYS IT, which an older step may have taken off. */
-    if (id === 'portfolio' && d.page === 'portfolio') return { ...BEFORE_UI_PASS.portfolio.page, nav: d.nav };
-    if (id === 'work' && d.page === 'work') {
-      /* A RECORD WITHOUT PROJECTS DRAWS NO PROJECT COLUMN, as the document it was made with says. */
-      const linked = (doc.declarations as Body[]).some((x) => x.register === 'tasks' && (x.fields as Body[]).some((f) => f.id === 'thing'));
-      const page: Body = { ...BEFORE_UI_PASS.work.page, nav: d.nav };
-      return linked ? page : { ...page, filters: undefined, blocks: (page.blocks as Body[]).map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter((c) => c.field !== 'thing') } : b)) };
-    }
-    if (id === 'work' && d.register === 'updates' && Array.isArray(d.fields))
-      return { ...d, fields: (d.fields as Body[]).map((f) => (f.id === 'health' ? BEFORE_UI_PASS.work.updatesHealth : f)) };
-    return d;
-  }),
-});
-/**
- * AND BATCH 71'S BOOKS (book-fill-71, book-figures-71, book-page-71), folded into the same
- * unreleased step: the three rules that file a thing in its account's book go with the script they start, the seven
- * figures of a book's month and of what no book holds go, and a book's page loses This month.
- */
-const BOOK_FIGURES_71: ReadonlySet<string> = new Set(['book-in-month', 'book-out-month', 'book-net-month', 'ledger-in-no-book', 'repeating-in-no-book', 'instalments-in-no-book', 'bills-in-no-book']);
-const BOOK_RULES_71: ReadonlySet<string> = new Set(['entry-takes-book', 'repeat-takes-book', 'part-takes-book']);
-const withoutBookFill = (doc: Body): Body =>
-  withPage(doc, 'money-book', (now) => now.filter((b) => b.heading !== 'This month'), (d) => !BOOK_FIGURES_71.has(String(d.metric)) && !BOOK_RULES_71.has(String(d.rule)) && d.script !== 'book_from_account');
-/**
- * AND BATCH 72'S (plan-lead-all-paid-72), folded into the same unreleased step: the one figure the plan page's lead
- * sentences wait on goes (batch 74 took the second, `plan-share-left`, out again: plan-lead-one-figure-74). The page
- * itself, with its second lead sentence, goes with every plan (`withoutPlans`), since 3.13.0 held no plan at all, so
- * no lead is put back by hand.
- */
-const PLAN_LEAD_72: ReadonlySet<string> = new Set(['plan-parts-open']);
-const withoutPlanLeads = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => !PLAN_LEAD_72.has(String(d.metric))) });
-/**
- * AND BATCH 73'S, folded into the same unreleased step: the count of budgets set, which Money declares itself now
- * (budgets-set-73); the two figures of what is due to and from one book (book-owed-figures-73) and the three of a book's
- * months (book-page-months-73), with the row What is due and the chart In and out, by month they draw on a book's page;
- * and the rule that files a bill in its account's book, with the account a bill names (bill-takes-book-73). The script
- * the rule starts went whole with `withoutBookFill`, and the Ledger tile's name column with the tile
- * (`withoutLedgerTile`, ledger-payee-73).
- */
-const MONEY_FIGURES_73: ReadonlySet<string> = new Set(['budgets-set', 'book-owed-to', 'book-owed-by', 'book-in-by-month', 'book-out-by-month', 'book-net-by-month']);
-const BOOK_BLOCKS_73: ReadonlySet<string> = new Set(['What is due', 'In and out, by month']);
-const withoutBatch73 = (doc: Body): Body => {
-  const cut = withPage(doc, 'money-book', (now) => now.filter((b) => !BOOK_BLOCKS_73.has(String(b.heading))), (d) => !MONEY_FIGURES_73.has(String(d.metric)) && d.rule !== 'bill-takes-book');
-  return {
-    ...cut,
-    declarations: (cut.declarations as Body[]).map((d) => (d.register === 'obligations' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'account') } : d)),
-  };
-};
-/**
- * AND BATCH 74'S, folded into the same unreleased step and undone first: a project's money on its way is named Owed to
- * you again, where it is Still to come in (owed-words-74). The plan page's leads on two counts go with every plan
- * (`withoutPlans`), the share figure batch 74 took out was never in a released version, and `repeating-overdue`,
- * whose value batch 74 changed, is dropped whole with the other signs (`SIGNS_ADDED`), so none of the three is put
- * back by hand.
- */
-const withoutBatch74 = (doc: Body): Body => ({
-  ...doc,
-  declarations: (doc.declarations as Body[]).map((d) => (d.metric === 'project-owed' ? { ...d, name: 'Owed to you' } : d)),
-});
 /**
  * AND BATCH 75'S, folded into the same unreleased step and undone first: an invoice's Draft to send goes from Bills and
  * invoices, and the step that writes it goes from the rule that answers Chase it (money-chase-draft-75).
@@ -1223,7 +933,7 @@ const peopleBefore6 = (b: Body): Body => (b.heading === 'Everyone' ? EVERYONE_CA
 /* AND portfolio 1.22.0'S SCRIPT THAT OFFERS THE KEY NUMBERS (`kpi_backfill`) goes with them.
    AND WITH PORTFOLIO 1.23.0'S STAGES, THEIR FIGURE AND THE PLAN'S KEPT SHAPE off first, newer still. */
 const KPI_LISTS: ReadonlySet<string> = new Set(['datapoints', 'kpis', 'stages']);
-const KPI_FIGURES: ReadonlySet<string> = new Set(['kpis-held', 'kpi-stale', 'project-staged', 'project-plan-path', 'project-plan-roadmap']);
+const KPI_FIGURES: ReadonlySet<string> = new Set(['kpis-held', 'readings-held', 'kpi-stale', 'project-staged', 'project-plan-path', 'project-plan-roadmap']);
 const beforeKpis = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[])
@@ -1234,291 +944,35 @@ const beforeKpis = (doc: Body): Body => ({
     .map((d) => (d.register === 'things' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'kind' && f.id !== 'drawn_as') } : d)),
 });
 
-const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
-  /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
-  'money-core': {
-    version: '3.13.0',
-    released: '2e09983b40aba73e',
-    undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(withoutLasts23(withoutLimit24(withoutAhead27(withoutSection29(withoutWords291(withoutStays330(raw)))))))))))))))))))))))))))))))));
-      return {
-      ...doc,
-      /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
-      /* AND BATCH 61'S THREE, folded into the same unreleased 3.17.0: the two figures over who filed the Ledger go
-         (filing-figures-61), and the Ledger pairs within one currency alone again (pairs-fx-61). The Ledger tile's own
-         gate went with the tile (`withoutLedgerTile`). */
-      /* AND BATCH 63'S, folded into the same unreleased 3.17.0: the four figures of this month's spending against last go
-         (spend-figures-63). The Ledger tile's written line went with the tile, the narrowed `filed-for-you-30d` with the
-         figure, and the guard on a typed Paid so far with `settle`, each dropped whole above. */
-      declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day' && d.script !== 'settle' && d.rule !== 'payment-settles' && d.metric !== 'filed-for-you-30d' && d.metric !== 'filed-today' && !SPEND_VS_LAST.has(String(d.metric))).map((d) =>
-        d.register === 'accounts' && Array.isArray(d.fields)
-          ? { ...d, fields: (d.fields as Body[]).map((f) => (f.id === 'last4' ? { ...f, label: 'Last four digits' } : f)) }
-          : d.register === 'transactions' && d.pairs !== undefined
-            ? { ...d, pairs: (({ across_currency: _fx, ...rest }) => rest)(d.pairs as Body) }
-            : d,
-      ),
-      };
-    },
-  },
-  /* A PROJECT OTHERS POINT AT COULD BE DELETED, PROJECTS DID NOT COUNT WHO SAYS WHAT THEY EARNED, AND NOTHING COUNTED
-     WHETHER A PROJECT WAS DESCRIBED (portfolio 1.16.0 comes off first). */
-  portfolio: {
-    version: '1.15.0',
-    released: '982f163d9d8ab76f',
-    undo: (fresh) => {
-      /* THE UI PASS OF 20 OCTOBER COMES OFF FIRST, inside the unreleased 1.18.0, after 1.19.0's key numbers. */
-      const raw = beforeUiPass(beforeKpis(fresh), 'portfolio');
-      return withPage(
-        {
-          ...raw,
-          /* AND THE `draft` FIELD comes off with it, added in portfolio 1.18.0: a project the record formed from a first session. */
-          declarations: (raw.declarations as Body[]).map((d) =>
-            /* AND WHERE THEY ARE COUNTS FINISHED AGAIN, as it did until portfolio 1.28.0 (the look of 25 October, P11). */
-            d.metric === 'projects-by-lane' ? { ...d, where: 'lane is set' } :
-            d.register === 'things' ? (({ delete: _rule, ...rest }) => (Array.isArray(rest.fields) ? { ...rest, fields: (rest.fields as Body[]).filter((f) => f.id !== 'draft').map(({ hidden_from_agents: _h, ...f }) => f) } : rest))(d) : d,
-          ),
-        },
-        'portfolio',
-        /* AND THE ONE LINE TYPED ON AN IN PLAY CARD comes off with it, added inside the unreleased 1.17.0
-           (card-edit-wire-93): `about` was text alone. AND ITS WHEN, how long since anybody worked on the
-           project, added inside the same unreleased 1.17.0 (projects-last-worked-96). */
-        (now) =>
-          now
-            .filter((b) => b.key !== 'open-earns-said' && b.key !== 'earns-said' && !(b.kind === 'queue' && b.where === 'list is things') && b.key !== 'in-play-earning' && b.key !== 'where-they-are')
-            /* AND BATCH 101'S STRIP AND LANES (projects-lanes-lines-101), inside the same unreleased 1.17.0: the
-               strip In play and earning and the split Where they are go, and How they are going draws past four again. */
-            .map((b) => (b.kind === 'split' && b.heading === 'How they are going' ? { ...b, when: { metric: 'projects-live', gt: 4 } } : b))
-            /* AND THE QUESTIONS ABOUT ITS LIST, a queue and a clause in the line, added inside the same unreleased 1.17.0
-               (waiting-work-projects-99). */
-            .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body === QUIET_PROJECTS ? 'Nothing needs you across {{projects-live}} project(s) in play' : b.body.replace('{{questions-open-in:things}} question(s) for you, ', '') } : b))
-            .map((b) =>
-              b.kind === 'cards' && Array.isArray(b.columns)
-                ? { ...b, columns: (b.columns as Body[]).filter((c) => c.as !== 'when').map(({ edit: _edit, ...c }) => c) }
-                : b,
-            ),
-        (d) => d.metric !== 'project-said' && d.metric !== 'projects-with-health' && d.metric !== 'projects-lane-earning',
-      );
-    },
-  },
-  /* A CARD NAMED ITS PROJECT, where it says its day and who holds it. A record without Projects had no third column. */
-  /* AND WORK 1.18.0'S COUNT OF WHAT WAS WORKED ON A PROJECT THIS WEEK comes off first. */
-  work: {
-    version: '1.16.0',
-    released: 'b27c59050f32684d',
-    undo: (fresh) => {
-      /* THE UI PASS OF 20 OCTOBER COMES OFF FIRST, inside the unreleased 1.19.0. */
-      const raw = beforeUiPass(fresh, 'work');
-      /* WORK 1.19.0'S THREADS AND FOLLOW-UPS COME OFF BEFORE THAT: a thread's Status back to its four
-         values with no labels and no declared moves, the day it aims for gone, and the script that starts a follow-up
-         back to the title and source 1.18.0 released, read from its frozen document. */
-      const was = (WORK_1_18.declarations as Body[]).find((d) => d.script === 'start_with_parent')!;
-      const threads = (raw.declarations as Body[]).map((d) =>
-        d.register === 'tracks' && Array.isArray(d.fields)
-          ? {
-              ...d,
-              fields: (d.fields as Body[])
-                .filter((f) => f.id !== 'target')
-                .map((f) => (f.id === 'state' ? (({ labels: _labels, transitions: _moves, ...rest }) => ({ ...rest, values: ['open', 'holding', 'done', 'dropped'] }))(f) : f)),
-            }
-          : d.script === 'start_with_parent'
-            ? { ...d, title: was.title, source: was.source }
-            : d,
-      );
-      const doc = { ...raw, declarations: threads.filter((d) => d.metric !== 'project-moved-7d' && d.metric !== 'project-last-worked') };
-      const linked = (doc.declarations as Body[]).some((d) => d.register === 'tasks' && (d.fields as Body[]).some((f) => f.id === 'thing'));
-      /* AND THE BOARD'S CAPTURE LINE comes off too, added inside the unreleased 1.19.0 (board-capture-line-83). */
-      /* AND THE QUESTIONS ABOUT ITS LIST, a queue and a clause in the line, added inside the unreleased 1.19.0
-         (waiting-work-projects-99). */
-      /* AND WORK'S HEAD AND ITS OPEN WORK WITH NO PROJECT, a fold, a list and the figure both are gated on, added inside
-         the unreleased 1.19.0 (work-head-and-no-project-101). */
-      const headless = {
-        ...doc,
-        declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'tasks-no-project').map((d) => (d.page === 'work' ? (({ header: _head, ...rest }) => rest)(d) : d)),
-      };
-      const asked = withPage(headless, 'work', (now) =>
-        now
-          .filter((b) => !(b.kind === 'queue' && b.where === 'list is tasks') && b.heading !== 'Needs a project' && b.heading !== 'With no project')
-          .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:tasks}} question(s) for you, ', '') } : b)),
-      );
-      /* AND THE BOARD'S READ, ITS LINE AND ITS LIST, inside the unreleased 1.19.0: the board
-         read by tier and day, fifty at most, the line said nothing of Later, and Everything open stood under it. */
-      const boardBefore = (b: Body): Body => {
-        const { limit: _limit, ...rest } = b;
-        return { ...rest, order: [{ field: 'priority', dir: 'asc' }, { field: 'by', dir: 'asc' }] };
-      };
-      const EVERYTHING_OPEN: Body = {
-        kind: 'table',
-        heading: 'Everything open',
-        icon: 'rows',
-        span: 12,
-        source: 'register.tasks',
-        where: 'state is not backlog or done or dropped',
-        columns: [
-          { field: 'what', width: 'minmax(20ch,1fr)' },
-          { field: 'thing', label: 'Project', width: 'minmax(10ch,16ch)' },
-          { field: 'owner', label: 'Owner', width: 'minmax(8ch,14ch)' },
-          { field: 'agent', label: 'Agent', width: '10ch' },
-          { field: 'state', label: 'Status', width: '12ch' },
-          { field: 'by', label: 'Due', width: '13ch', align: 'end' },
-        ],
-        order: [{ field: 'by', dir: 'asc' }],
-        when: { metric: 'open-tasks', gt: 0 },
-        limit: 50,
-      };
-      return withPage(asked, 'work-board', (now) =>
-        [...now, EVERYTHING_OPEN]
-          .filter((b) => b.kind !== 'capture')
-          .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{tasks-later}} for later, ', '') } : b))
-          .map((b) => (b.kind === 'board' ? { ...boardBefore(b), columns: [{ field: 'state' }, { field: 'what' }, ...(linked ? [{ field: 'thing' }] : [])] } : b)),
-      );
-    },
-  },
-  /* GONE QUIET AND LAST IN TOUCH STOOD OVER EVERYONE, two lists of the people on the cards under them. */
-  /* AND PEOPLE 3.3.0'S HEALTH PAGE, the record's vital signs, comes off first. */
-  /* AND PEOPLE 3.4.0'S NOTE OF WHO MAY BE HELD TWICE comes off the People page with it (people-held-twice-69). */
-  /* AND PEOPLE 3.4.0'S CALENDAR PAGE, added while it is unreleased (calendar-page-82). */
-  /* AND PEOPLE 3.4.0'S ACTIVITY PAGE, added while it is still unreleased (activity-page-88). */
-  /* AND PEOPLE 3.6.0'S SCRIPTS PAGE. */
-  people: {
-    version: '3.1.0',
-    released: '36328d2fcaeb58f3',
-    undo: (raw) =>
-      withPage({ ...raw, declarations: (withoutRetired38(raw).declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar' && d.page !== 'activity' && d.page !== 'scripts').map((d) => (d.metric === 'people-in-touch-30d' ? (({ snapshot: _save, ...rest }) => rest)(d) : d)) }, 'people', (now) =>
-        /* AND PEOPLE 3.4.0'S QUESTIONS ABOUT SOMEBODY, a queue and a clause in each line (waiting-people-services-99). */
-        /* AND PEOPLE 3.4.0'S IN TOUCH AND WHAT AGENTS DID, with the night's save of the figure and the line's clause that
-           In touch took over (services-people-five-parts-101). */
-        now
-          .filter((b) => !(b.kind === 'queue' && b.where === 'list is people') && b.heading !== 'In touch' && b.heading !== 'What agents did')
-          /* AND PEOPLE 4.2.2'S "besides you" (AM17) off first, newer still. */
-          .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace(/ contact\(s\) besides you$/u, ' contact(s)') } : b))
-          .map((b) => (b.kind === 'note' && b.body === '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)' ? { ...b, body: `${b.body}, {{people-in-touch-30d}} in touch in the last 30 days` } : b))
-          .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:people}} question(s) for you, ', '') } : b))
-          .map(peopleBefore6)
-          .flatMap((b) =>
-            (b.when as Body | undefined)?.metric === 'held-twice'
-              ? []
-              : b.heading !== 'Everyone'
-              ? [b]
-              : [
-                  {
-                    kind: 'table',
-                    heading: 'Gone quiet',
-                    icon: 'hourglass',
-                    tone: 'bad',
-                    span: 6,
-                    source: 'register.people',
-                    where: 'merged_into is empty, in_touch before -90d',
-                    columns: LAST_IN_TOUCH,
-                    order: QUIETEST_FIRST,
-                    limit: 6,
-                    when: { metric: 'people-quiet', gt: 0 },
-                  },
-                  {
-                    kind: 'table',
-                    heading: 'Last in touch',
-                    icon: 'handshake',
-                    span: 6,
-                    source: 'register.people',
-                    where: 'merged_into is empty, in_touch after -91d',
-                    columns: LAST_IN_TOUCH,
-                    order: QUIETEST_FIRST,
-                    limit: 6,
-                    when: { metric: 'people-in-touch-90d', gt: 0 },
-                  },
-                  b,
-                ],
-          ),
-      ),
-  },
+/**
+ * THE VERSIONS OF THE SECOND DESIGN REVIEW, FROZEN FROM THE COMMITS THAT HELD THEM, each with what a record on them holds (`onRecord`, cut to the lists
+ * held when it went in, in the order below). `BEFORE` is d3e7ca033 (work 1.15.0, portfolio 1.14.0, people 3.0.0, money-core 3.12.0) and `LATEST` 72ec5ab1d
+ * (work 1.16.0, portfolio 1.15.0, people 3.1.0, money-core 3.13.0). THEY WERE REBUILT HERE BY UNDOING EVERY LATER CHANGE BY HAND, which took a function a release
+ * and went red on the first release nobody undid. Written by reading those commits through `git archive`, and held to the fingerprints each version shipped with.
+ */
+type Frozen = { version: string; whole: Body; onRecord: Body };
+type FrozenFile = { modules: Record<string, Frozen>; usecases: Record<string, Body> };
+const frozenFile = (name: string): FrozenFile => JSON.parse(readFileSync(new URL(`./fixtures/released/${name}`, import.meta.url), 'utf8')) as FrozenFile;
+const FROZEN_LATEST = frozenFile('review-2-after-2026-10-07.json');
+const FROZEN_BEFORE = frozenFile('review-2-before-2026-10-07.json');
+const LATEST: Record<string, Frozen & { released: string }> = {
+  'money-core': { ...FROZEN_LATEST.modules['money-core']!, released: '2e09983b40aba73e' },
+  portfolio: { ...FROZEN_LATEST.modules.portfolio!, released: '982f163d9d8ab76f' },
+  work: { ...FROZEN_LATEST.modules.work!, released: 'b27c59050f32684d' },
+  people: { ...FROZEN_LATEST.modules.people!, released: '36328d2fcaeb58f3' },
+};
+const BEFORE: Record<string, Frozen & { released: string }> = {
+  work: { ...FROZEN_BEFORE.modules.work!, released: '285a35e7197ac5cb' },
+  'money-core': { ...FROZEN_BEFORE.modules['money-core']!, released: 'f7558a5590d4ee11' },
+  people: { ...FROZEN_BEFORE.modules.people!, released: 'd6246046a52dcc45' },
+  portfolio: { ...FROZEN_BEFORE.modules.portfolio!, released: '51a2d8569a7b35e3' },
 };
 
-/**
- * A LEAD PAGE'S PLACE ON THE RAIL, `nav.place`, taken off every page: batch 101 put it inside each module's unreleased
- * step (places-and-computed-101), and no released version said one.
- */
-const unplaced = (doc: Body): Body => ({
-  ...doc,
-  declarations: (doc.declarations as Body[]).map((d) => (d.nav !== null && typeof d.nav === 'object' && 'place' in (d.nav as Body) ? { ...d, nav: (({ place: _place, ...nav }) => nav)(d.nav as Body) } : d)),
-});
-
-/** A document as the version before this build's declared it, for a module this build moved on, else as it is. */
-const latestUndone = (id: string, doc: Body): Body => LATEST[id]?.undo(thingsUndone(id, doc)) ?? thingsUndone(id, doc);
-
-/**
- * EACH MODULE AS THE VERSION BEFORE DECLARED IT, made from this build's document by undoing the one change its new
- * version makes (work 1.16.0, portfolio 1.15.0, people 3.1.0, money-core 3.13.0). NOT A GUESS AT WHAT SHIPPED: each is
- * held below to the fingerprint `pack-versions.test.ts` records for the version it rebuilds, so the update is planned
- * over what a record really holds, to the letter. WORK AND PEOPLE HAVE MOVED ON ONCE MORE SINCE (`LATEST`), so theirs
- * undo that step first and a record two versions back is rebuilt as it was.
- */
-const BEFORE: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
-  /* THE BOARD SAID BY STATUS, with its glyph. */
-  work: {
-    version: '1.15.0',
-    released: '285a35e7197ac5cb',
-    undo: (doc) => withPage(latestUndone('work', doc), 'work-board', (now) => now.map((b) => (b.kind === 'board' ? headed(b, 'By status', 'board') : b))),
-  },
-  /* THE WALK OF THE NEXT THIRTY DAYS HAD A HEADING OF ITS OWN under Coming and going's. */
-  'money-core': {
-    version: '3.12.0',
-    released: 'f7558a5590d4ee11',
-    undo: (doc) => withPage(latestUndone('money-core', doc), 'money', (now) => now.map((b) => (b.kind === 'bridge' ? headed(b, 'The next 30 days', 'scale') : b))),
-  },
-  /* TWELVE WEEKS OF DOTS where the two lists are, and no figure for the second of them. */
-  people: {
-    version: '3.0.0',
-    released: 'd6246046a52dcc45',
-    undo: (doc) =>
-      withPage(
-        latestUndone('people', doc),
-        'people',
-        (now) =>
-          now.flatMap((b) =>
-            b.heading === 'Last in touch'
-              ? []
-              : b.heading === 'Gone quiet'
-                ? [
-                    {
-                      kind: 'heat',
-                      heading: 'In touch, 12 weeks',
-                      icon: 'handshake',
-                      span: 12,
-                      who: true,
-                      source: 'register.people',
-                      where: 'in_touch after -84d',
-                      columns: [{ field: 'in_touch' }, { field: 'name' }],
-                      when: { metric: 'people-in-touch-12w', gt: 0 },
-                      empty: 'Nobody was in touch in the last twelve weeks.',
-                    },
-                  ]
-                : [b],
-          ),
-        (d) => d.metric !== 'people-in-touch-90d',
-      ),
-  },
-  /* BOTH HEADINGS FOLDED WHATEVER WAS UNDER THEM: no open tile, and each fold drawn on more than nought. */
-  portfolio: {
-    version: '1.14.0',
-    released: '51a2d8569a7b35e3',
-    undo: (doc) =>
-      withPage(latestUndone('portfolio', doc), 'portfolio', (now) => {
-        const out: Body[] = [];
-        let open = false;
-        for (const b of now) {
-          if (b.kind === 'section') open = b.box === true;
-          if (open) continue;
-          out.push(b.kind === 'section' && b.fold === true ? { ...b, when: { ...(b.when as Body), gt: 0 } } : b);
-        }
-        return out;
-      }),
-  },
-};
-
-test('THE VERSIONS BEFORE THE SECOND DESIGN REVIEW, REBUILT, ARE THE ONES RELEASED, to the letter', () => {
+test('THE VERSIONS BEFORE THE SECOND DESIGN REVIEW, FROZEN, ARE THE ONES RELEASED, to the letter', () => {
   for (const [id, was] of [...Object.entries(BEFORE), ...Object.entries(LATEST)]) {
     const now = firstPartyDocument(id as never, { seeds: [] }) as unknown as Body;
     assert.notEqual(FIRST_PARTY_VERSIONS[id as 'work'], was.version, `${id} has not moved on from ${was.version}`);
-    assert.equal(fingerprintOf(was.undo(unplaced(thingsUndone(id, now)))), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
+    assert.equal(fingerprintOf(was.whole), was.released, `${id}: the frozen file is not ${was.version} as it was released`);
     assert.notEqual(fingerprintOf(now), was.released, `${id}: this build declares what ${was.version} did under a new version`);
   }
 });
@@ -1533,8 +987,7 @@ test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versio
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
-    const doc = documentFor(k, m)!;
-    await put(k, sql, { ...withoutCashStale(BEFORE[m]!.undo(doc)), version: BEFORE[m]!.version });
+    await put(k, sql, withoutCashStale(BEFORE[m]!.onRecord));
     assert.equal(k.packs().find((p) => p.id === m)?.version, BEFORE[m]!.version);
   }
   assert.ok(!k.packClaims('people').includes('metric.people-in-touch-90d'), 'the record starts without the figure the update brings');
@@ -1860,7 +1313,9 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
     const u = useCase(id)!;
     const was = USECASE_BEFORE[id]!;
     assert.notEqual(u.version, was.version);
-    assert.equal(fingerprintOf(oneBefore(projectBefore(useCaseThingsUndone(useCaseDocument(id, TODAY) as Body), id))), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
+    /* TEAM FROM ITS FROZEN FILE, SINCE 2.30.1 (Sprints) AND 2.31.0 (no count line) MOVED IT PAST WHAT THE UNDOING UNDOES; FOUNDER'S UNDOING STILL HOLDS. */
+    const rebuilt = id === 'team' ? FROZEN_BEFORE.usecases[id]! : oneBefore(projectBefore(useCaseThingsUndone(useCaseDocument(id, TODAY) as Body), id));
+    assert.equal(fingerprintOf(rebuilt), was.released, `${id}: this is not ${was.version} as it was released`);
 
     const sql = openSqlite();
     const k = await openRecord(sql, fixedClock(NOW));
@@ -1900,9 +1355,7 @@ test('THE BOARD’S CARDS AND PEOPLE SHOWN ONCE GO IN ON THEIR OWN over the vers
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
-    const doc = documentFor(k, m)!;
-    const was = LATEST[m];
-    await put(k, sql, was ? { ...withoutCashStale(was.undo(thingsUndone(m, doc))), version: was.version } : doc);
+    await put(k, sql, withoutCashStale(LATEST[m]!.onRecord));
   }
   const port = portOf(k, sql);
 
@@ -2055,9 +1508,7 @@ test('TAKING CASH STALE AWAY IS ASKED: a record on money-core 3.13.0 that holds 
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
-    const doc = documentFor(k, m)!;
-    const was = LATEST[m];
-    await put(k, sql, was ? { ...was.undo(thingsUndone(m, doc)), version: was.version } : doc);
+    await put(k, sql, LATEST[m]!.onRecord);
   }
   const steps = await updateFirstParty(portOf(k, sql));
   assert.deepEqual(
