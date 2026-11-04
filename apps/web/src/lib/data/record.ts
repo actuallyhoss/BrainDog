@@ -13,7 +13,8 @@
 
 import { createClient, type Boot } from '@braindog/client';
 
-import { PAGE, REGISTERS, sortRows } from '../record/api.ts';
+import { PAGE, sortRows } from '../record/api.ts';
+import { REGISTERS } from '../record/held.ts';
 import { readBoot, type Booted } from '../record/boot-live.ts';
 import { declOf, entryOf, learn, namesOf, orderOf, refMapOf, targetsOf, unreadRefs, whereFor, withoutUnread, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
