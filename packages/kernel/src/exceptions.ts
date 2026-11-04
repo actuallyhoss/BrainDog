@@ -103,19 +103,34 @@ function quietLists(sql: Sql, nowMs: number, lists: readonly Watched[]): Excepti
   return out;
 }
 
-/** The doors that took messages and stopped. A door is a pattern that takes messages in; a pull is a feed, below. */
+/**
+ * The doors that took messages and stopped. A door is a pattern that takes messages in; a pull is a feed, below.
+ *
+ * PATTERNS THAT SHARE A DOOR (`door` on the declaration) ARE ONE WAY IN: one kind of message not coming while others come
+ * through the same address is not a way in that stopped, as the sign `doors-silent` reads it. And a pattern with no name
+ * of its own is said by its id's words: Today said "a way in with no name" for a door the sign called bank ipn out sms.
+ */
 function quietDoors(sql: Sql, nowMs: number): Exception[] {
-  const doors = sql.all<{ ingest: string | null; name: string | null }>(
-    `SELECT json_extract(body, '$.ingest') AS ingest, json_extract(body, '$.name') AS name FROM declaration
+  const doors = sql.all<{ ingest: string | null; door: string | null; name: string | null }>(
+    `SELECT json_extract(body, '$.ingest') AS ingest, json_extract(body, '$.door') AS door, json_extract(body, '$.name') AS name FROM declaration
       WHERE kind = 'ingest' AND superseded_at IS NULL AND retired = 0 AND json_valid(body)
         AND json_extract(body, '$.channel') IN ('email', 'webhook', 'api', 'paste') ORDER BY id LIMIT ?`,
     DECLARED_A_READ,
   );
-  const out: Exception[] = [];
+  const doorOf = (d: { ingest: string | null; door: string | null }): string => (typeof d.door === 'string' && d.door !== '' ? d.door : (d.ingest ?? ''));
+  /* A WAY IN STILL TAKING MESSAGES, by any of its patterns: read from the same presence the stop is read from. */
+  const open = new Set<string>();
   for (const d of doors) {
     if (typeof d.ingest !== 'string') continue;
+    const last = lastPresence(sql, 'arrivals', d.ingest);
+    const lastMs = last === null ? Number.NaN : Date.parse(last);
+    if (Number.isFinite(lastMs) && nowMs - lastMs < QUIET_DAYS * DAY_MS) open.add(doorOf(d));
+  }
+  const out: Exception[] = [];
+  for (const d of doors) {
+    if (typeof d.ingest !== 'string' || open.has(doorOf(d))) continue;
     const s = stopped(sql, 'arrivals', d.ingest, nowMs);
-    if (s !== null) out.push(made('door', d.ingest, typeof d.name === 'string' ? d.name : null, s.since, s.was, null));
+    if (s !== null) out.push(made('door', d.ingest, typeof d.name === 'string' && d.name !== '' ? d.name : d.ingest.replace(/[-_.:]+/g, ' ').trim(), s.since, s.was, null));
   }
   return out;
 }

@@ -207,12 +207,19 @@ function readScheduleFailed(sql: Sql, _nowMs: number, tz: string): SignReading {
 
 /* A DOOR IS A LIVE PATTERN THAT FILES WHAT ARRIVES, counted by its receipts. ONE RETIRED IS NOT JUDGED: a door he turned
    off is quiet for a good reason, the risk the brief names ("Risk"), and so is one switched off at its door
-   (`ingest_off.<id>`, the record's `door-switch.ts`). */
+   (`ingest_off.<id>`, the record's `door-switch.ts`).
+
+   PATTERNS THAT SHARE A DOOR ARE JUDGED AS THE DOOR (`door` on the declaration). His phone sends every HSBC text to one
+   address, and seven patterns read what comes through it. One kind of text not coming for three days, while the card's
+   and the cash machine's came through the same address that same day, said a door had gone silent when he had only sent
+   no InstaPay: the question this sign asks is whether the sender stopped. A kind of text the bank rewrites still shows,
+   as texts no pattern reads, in `arrivals-filed`. The kind that went quiet is said in the facts. */
 function readDoorsSilent(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () => undefined): SignReading {
   const quietFrom = new Date(nowMs - DOOR_QUIET_DAYS * DAY).toISOString();
   const busyFrom = new Date(nowMs - (DOOR_QUIET_DAYS + DOOR_BUSY_DAYS) * DAY).toISOString();
-  const doors = sql.all<{ ingest_id: string; before: number; since: number; last: string; first: string | null; quiet: string | null }>(
-    `SELECT r.ingest_id, count(DISTINCT CASE WHEN r.ts < ? THEN r.raw_id END) AS before, count(DISTINCT CASE WHEN r.ts >= ? THEN r.raw_id END) AS since, max(r.ts) AS last,
+  const doors = sql.all<{ ingest_id: string; door: string | null; before: number; since: number; last: string; first: string | null; quiet: string | null }>(
+    `SELECT r.ingest_id, (SELECT json_extract(d.body, '$.door') FROM declaration d WHERE d.id = 'ingest.' || r.ingest_id AND d.superseded_at IS NULL AND json_valid(d.body)) AS door,
+            count(DISTINCT CASE WHEN r.ts < ? THEN r.raw_id END) AS before, count(DISTINCT CASE WHEN r.ts >= ? THEN r.raw_id END) AS since, max(r.ts) AS last,
             min(r.ts) AS first, min(CASE WHEN r.ts >= ? THEN r.ts END) AS quiet
        FROM ingest_receipt r
       WHERE r.ts >= ? AND EXISTS (SELECT 1 FROM declaration d WHERE d.id = 'ingest.' || r.ingest_id AND d.superseded_at IS NULL AND d.retired = 0)
@@ -229,10 +236,30 @@ function readDoorsSilent(sql: Sql, nowMs: number, tz: string, lasts: SignLasts =
     lasts(crossesAt(d.first, (DOOR_QUIET_DAYS + DOOR_BUSY_DAYS) * DAY));
     lasts(crossesAt(d.quiet, DOOR_QUIET_DAYS * DAY));
   }
-  const busy = doors.filter((d) => Number(d.before) >= DOOR_BUSY_LEAST);
+  /* EACH DOOR WITH ALL ITS PATTERNS: one a pattern that names no door. A message read by two patterns counts twice here,
+     which only ever makes a door look busier, and never one that had nothing look as if it had. */
+  const byDoor = new Map<string, { ingest_id: string; before: number; since: number; last: string; patterns: typeof doors }>();
+  for (const d of doors) {
+    const key = typeof d.door === 'string' && d.door !== '' ? d.door : d.ingest_id;
+    const was = byDoor.get(key);
+    if (was === undefined) byDoor.set(key, { ingest_id: key, before: Number(d.before), since: Number(d.since), last: d.last, patterns: [d] });
+    else {
+      was.before += Number(d.before);
+      was.since += Number(d.since);
+      if (d.last > was.last) was.last = d.last;
+      was.patterns.push(d);
+    }
+  }
+  const busy = [...byDoor.values()].filter((d) => d.before >= DOOR_BUSY_LEAST);
   if (busy.length === 0) return reading('none', null, `No way in has had ${DOOR_BUSY_LEAST} messages in two weeks yet, so none is watched for going quiet.`);
-  const silent = busy.filter((d) => Number(d.since) === 0).map((d) => ({ ...d, name: ingestName(sql, d.ingest_id) }));
+  const silent = busy.filter((d) => d.since === 0).map((d) => ({ ...d, name: ingestName(sql, d.ingest_id) }));
   const facts = [`${count(busy.length, 'busy door')}, ${silent.length} quiet for ${DOOR_QUIET_DAYS} days.`];
+  /* ONE KIND OF MESSAGE QUIET AT A DOOR STILL OPEN IS SAID, never judged: it may only be that nothing of that kind was sent. */
+  for (const d of busy)
+    if (d.since > 0)
+      for (const p of d.patterns)
+        if (Number(p.before) >= DOOR_BUSY_LEAST && Number(p.since) === 0)
+          facts.push(`${ingestName(sql, p.ingest_id)} filed nothing in ${DOOR_QUIET_DAYS} days after ${count(Number(p.before), 'arrival')} in the ${DOOR_BUSY_DAYS} days before, the last on ${daySaid(p.last, tz)}. Other messages still come through the same door.`);
   if (silent.length === 0) return reading('green', 0, `Every busy way in has had messages in the last ${DOOR_QUIET_DAYS} days.`, facts);
   facts.push(...silent.map((d) => `${d.name} filed ${count(Number(d.before), 'arrival')} in the ${DOOR_BUSY_DAYS} days before, the last on ${daySaid(d.last, tz)}.`));
   const one = silent[0]!;
