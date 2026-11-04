@@ -482,8 +482,13 @@ export type ChatInput = {
   page?: { path: string; title?: string | undefined; row?: string | undefined } | undefined;
   mode?: ChatMode | undefined;
   attach?: readonly string[] | undefined;
+  /** Which letters of the message name which row, kept with the turn and read back with it, for its bubble alone. */
+  mentions?: readonly ChatMention[] | undefined;
   rethink?: boolean | undefined;
 };
+
+/** `len` letters at `at` in what somebody sent name `ref`. */
+export type ChatMention = { at: number; len: number; ref: string };
 
 /** How deep a turn goes: the included model, the owner's own Anthropic key, or the first and then the second. */
 export type ChatMode = 'quick' | 'deep' | 'auto';
@@ -616,4 +621,4 @@ export type ChatActed ={ ok: true; receipt?: string | undefined; undo?: { batch:
 export type ChatThreads = { threads: { id: string; title: string; at: string }[] };
 
 /** One conversation read back. */
-export type ChatThread = { id: string; turns: { role: 'you' | 'slash'; text: string; actions: ChatAction[] }[] };
+export type ChatThread = { id: string; turns: { role: 'you' | 'slash'; text: string; mentions?: ChatMention[]; actions: ChatAction[] }[] };

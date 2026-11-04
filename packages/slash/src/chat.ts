@@ -53,6 +53,7 @@ import type {
   ChatEvent,
   ChatFigure,
   ChatInput,
+  ChatMention,
   ChatMode,
   ChatRan,
   ChatRun,
@@ -717,12 +718,14 @@ export const chats = (core: Core): Chat => {
         return { role: t.role, text: t.text, actions: actionsSaid(acted) };
       });
 
-  const addTurn = (thread: string, role: 'you' | 'slash', text: string, actions: readonly ChatAction[] = []): void => {
+  const addTurn = (thread: string, role: 'you' | 'slash', text: string, actions: readonly ChatAction[] = [], mentions: readonly ChatMention[] = []): void => {
     const n = (sql.one<{ n: number | null }>('SELECT MAX(n) AS n FROM slash_turn WHERE thread = ?', thread)?.n ?? 0) + 1;
     /* A MODEL'S U+0000 IS DROPPED, NOT STORED: the port refuses a text holding one (`guard`), and what the model said is
        ours to keep, where what a person typed is refused at the door instead. */
     const kept = role === 'slash' ? text.replaceAll('\u0000', '') : text;
-    sql.exec('INSERT INTO slash_turn (thread, n, role, text, actions, ts) VALUES (?, ?, ?, ?, ?, ?)', thread, n, role, kept, JSON.stringify(actions), now());
+    /* A QUESTION'S MENTIONS GO WHERE AN ANSWER'S ACTIONS GO, the same column and no new one: as an object, which everything
+       reading actions takes for none. */
+    sql.exec('INSERT INTO slash_turn (thread, n, role, text, actions, ts) VALUES (?, ?, ?, ?, ?, ?)', thread, n, role, kept, JSON.stringify(mentions.length > 0 ? { mentions } : actions), now());
     sql.exec('DELETE FROM slash_turn WHERE thread = ? AND n <= ?', thread, n - TURNS_KEPT);
     sql.exec('UPDATE slash_thread SET updated = ? WHERE id = ?', now(), thread);
   };
@@ -818,7 +821,7 @@ export const chats = (core: Core): Chat => {
     emit({ type: 'thread', id: thread.id });
     const before = rethink ? again!.before.slice(-TURNS_READ) : thread.fresh ? [] : turnsOf(thread.id, TURNS_READ);
     const beforeDeep = rethink ? again!.before : thread.fresh ? [] : turnsOf(thread.id, DEEP_TURNS_READ);
-    if (!rethink) addTurn(thread.id, 'you', message);
+    if (!rethink) addTurn(thread.id, 'you', message, [], input.mentions);
 
     const list = [...tools.list.filter((t) => t.name !== CALC.name), CALC];
     /* THE LISTS ARE READ WHILE THE PREFETCH RUNS, and awaited before the first model call reads them. */
@@ -1213,15 +1216,18 @@ export const chats = (core: Core): Chat => {
     );
     const turns = sql.all<{ role: 'you' | 'slash'; text: string; actions: string }>('SELECT role, text, actions FROM slash_turn WHERE thread = ? ORDER BY n', id).map((t) => {
       let actions: ChatAction[] = [];
+      let mentions: ChatMention[] = [];
       try {
         const parsed: unknown = JSON.parse(t.actions);
         actions = Array.isArray(parsed) ? (parsed.filter(isRecord) as unknown as ChatAction[]) : [];
+        if (isRecord(parsed) && Array.isArray(parsed['mentions'])) mentions = parsed['mentions'].filter(isRecord) as unknown as ChatMention[];
       } catch {
         actions = [];
       }
       return {
         role: t.role,
         text: t.text,
+        ...(mentions.length > 0 ? { mentions } : {}),
         actions: actions.map((a) => {
           const h = held.get(a.id);
           if (h === undefined) return a;

@@ -128,6 +128,7 @@ export type SlashChatInput = {
   page?: { path: string; title?: string; row?: string };
   mode?: 'quick' | 'deep' | 'auto';
   attach?: string[];
+  mentions?: { at: number; len: number; ref: string }[];
   rethink?: boolean;
 };
 
@@ -644,6 +645,13 @@ const shown = (value: unknown): string => JSON.stringify(value) ?? String(value)
 /** The sentence a host that hands no conversation tools answers at its doors. */
 const NO_CHAT: Refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'Talking with Slash is not answered by this host yet. Ask from the palette instead.' };
 
+/** A mention's mark on a message: whole letters of it, naming a thing the door could be sent. */
+function mentionFits(m: unknown, message: string): boolean {
+  if (typeof m !== 'object' || m === null) return false;
+  const { at, len, ref } = m as Record<string, unknown>;
+  return Number.isInteger(at) && Number.isInteger(len) && (at as number) >= 0 && (len as number) > 0 && (at as number) + (len as number) <= message.length && typeof ref === 'string' && ROW_REF.test(ref);
+}
+
 /** The most a message to Slash may weigh as sent, its page and thread included: the engine reads the first 1,000 bytes of the words. */
 const CHAT_BODY_LIMIT = 8_000;
 
@@ -708,6 +716,8 @@ async function conversation<C>(route: 'chat' | 'act', body: Record<string, unkno
   const attach = body['attach'];
   if (attach !== undefined && attach !== null && (!Array.isArray(attach) || attach.length > ATTACH_MOST || !attach.every((r) => typeof r === 'string' && ROW_REF.test(r))))
     return refusal(422, { code: 'VALUE_MALFORMED', fix: `attach is up to ${ATTACH_MOST} things by their ids: a row such as "tasks#12", or decide:, run: or sign: and an id.`, at: 'attach' });
+  /* WHICH LETTERS NAME WHICH ROW, for the bubble alone: what the model reads is `attach`. Marks that do not fit are not kept. */
+  const mentions = Array.isArray(body['mentions']) && typeof message === 'string' ? (body['mentions'] as unknown[]).slice(0, ATTACH_MOST).filter((m): m is { at: number; len: number; ref: string } => mentionFits(m, message)) : [];
   const page = body['page'];
   const at = typeof page === 'object' && page !== null && !Array.isArray(page) ? (page as Record<string, unknown>) : null;
   if (page !== undefined && page !== null && (at === null || typeof at['path'] !== 'string'))
@@ -718,6 +728,7 @@ async function conversation<C>(route: 'chat' | 'act', body: Record<string, unkno
     ...(typeof thread === 'string' && thread !== '' ? { thread } : {}),
     ...(mode === 'quick' || mode === 'deep' || mode === 'auto' ? { mode } : {}),
     ...(Array.isArray(attach) && attach.length > 0 ? { attach: [...new Set(attach as string[])] } : {}),
+    ...(mentions.length > 0 ? { mentions: mentions.map((m) => ({ at: m.at, len: m.len, ref: m.ref })) } : {}),
     ...(again ? { rethink: true } : {}),
     ...(at === null
       ? {}
