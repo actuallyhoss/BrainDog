@@ -1,7 +1,8 @@
 /**
- * Where a forecast's value axis starts: fitted to the walk unless the block says `axis: zero`,
- * and a fitted axis that leaves zero out says so, with a break at its end nearest zero beside the real amount and the
- * words in the chart's name. And the what-if is held in memory only, so a page come back to draws the host's walk.
+ * Where a forecast's value axis starts: at zero, always, since 3d1cd2f8a (2 Nov). A wash over a fitted axis read as near
+ * nothing at its foot, with a break beside the last figure to say it was not, so an axis is no longer cut and nothing
+ * draws a break. `axisFit` still fits when it is not told to hold zero, for what else reads it. And the what-if is held
+ * in memory only, so a page come back to draws the host's walk.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,20 +51,19 @@ test('a block that says nothing is fitted, and `zero` is the one other word the 
   assert.equal(forecastModel([...HIGH, axisRow('wide')])!.axis, 'fit', 'a word the record would refuse draws the board\'s axis');
 });
 
-test('FITTED WITH ZERO OFF THE AXIS IS CUT: the lowest label is the real amount, and the name says where it starts', () => {
+test('A WALK FAR ABOVE ZERO STILL STANDS ON ZERO: the foot is nought, nothing is cut, and the name says nothing of it', () => {
   const m = forecastModel(HIGH)!;
   const plan = planOf(HIGH);
-  assert.ok(plan.lo > 0, `the axis starts above zero, at ${plan.lo}`);
-  assert.equal(plan.cut, true);
-  assert.ok(plan.axis.every((a) => !a.zero), 'no level is zero');
+  assert.equal(plan.lo, 0, 'an area\'s foot is zero or it misleads');
+  assert.equal(plan.cut, false);
   const foot = plan.axis.at(-1)!;
-  assert.equal(foot.cut, true, 'the foot carries the break');
-  assert.equal(foot.label, forecastFigure(m, plan.lo, 'axis'), 'and its label is the amount the axis starts at, not nought');
+  assert.equal(foot.zero, true, 'the foot is zero');
+  assert.ok(!foot.cut, 'and carries no break');
+  assert.equal(foot.label, forecastFigure(m, 0, 'axis'));
   assert.equal(foot.at, '1', 'at the very bottom');
-  assert.equal(plan.axis.filter((a) => a.cut).length, 1, 'one end only');
-  assert.equal(plan.foot, `The axis starts at ${forecastFigure(m, plan.lo, 'read')}.`);
-  assert.ok(plan.sentence.endsWith(` ${plan.foot}`), 'the chart\'s name ends on it');
-  assert.doesNotMatch(plan.foot, /—/u, 'no em dash');
+  assert.ok(plan.axis.every((a) => !a.cut), 'no end is cut');
+  assert.equal(plan.foot, '');
+  assert.doesNotMatch(plan.sentence, /The axis (starts|stops)/u);
 });
 
 test('`axis: zero` holds nought however far the walk is from it, and nothing is cut', () => {
@@ -87,14 +87,14 @@ test('a walk that crosses zero holds it under both words, and neither is cut', (
   }
 });
 
-test('a walk under zero throughout is cut at its top, the end nearest zero, unless the block holds zero', () => {
+test('a walk under zero throughout has zero at its top, and the block saying zero changes nothing', () => {
   const m = forecastModel(UNDER)!;
   const plan = planOf(UNDER);
-  assert.ok(plan.hi < 0);
-  assert.equal(plan.cut, true);
-  assert.equal(plan.axis[0]!.cut, true, 'the top carries the break');
-  assert.equal(plan.axis[0]!.label, forecastFigure(m, plan.hi, 'axis'));
-  assert.equal(plan.foot, `The axis stops at ${forecastFigure(m, plan.hi, 'read')}.`);
+  assert.equal(plan.hi, 0);
+  assert.equal(plan.cut, false);
+  assert.equal(plan.axis[0]!.zero, true, 'the top is zero');
+  assert.equal(plan.axis[0]!.label, forecastFigure(m, 0, 'axis'));
+  assert.equal(plan.foot, '');
   const held = planOf([...UNDER, axisRow('zero')]);
   assert.equal(held.hi, 0);
   assert.equal(held.cut, false);
@@ -109,22 +109,15 @@ test('axisFit holds zero when asked, over a band it would otherwise fit', () => 
   assert.equal(axisFit(-34_000, -31_000, undefined, true).hi, 0, 'and from under, its top');
 });
 
-test('THE STRING DRAWER AND THE MODEL AGREE ON `cut`: a break at the cut end, the words in the chart\'s name', () => {
+test('THE STRING DRAWER DRAWS NO BREAK, on any walk: zero is the axis\'s own tick', () => {
   for (const rows of [HIGH, [...HIGH, axisRow('zero')], CROSSING, UNDER]) {
     const plan = planOf(rows);
     const html = htmlOf(rows);
-    const cuts = html.match(/data-cut=""/gu)?.length ?? 0;
-    assert.equal(cuts, plan.cut ? 1 : 0, `one cut tick where the model is cut, none where it is not (${rows[0]![3]})`);
-    assert.equal(html.includes(`>${FORECAST_AXIS_BREAK}</span>`), plan.cut, 'the break is drawn exactly where the model says');
-    if (plan.cut) assert.ok(html.includes(`aria-label="${plan.sentence.replace(/&/gu, '&amp;')}"`) && html.includes(plan.foot), 'the chart\'s name says where the axis starts');
+    assert.equal(plan.cut, false, `nothing is cut (${rows[0]![3]})`);
+    assert.doesNotMatch(html, /data-cut=""|forecast-axis-break/u);
+    assert.equal(html.includes(`>${FORECAST_AXIS_BREAK}</span>`), false);
+    assert.match(html, /<li class="forecast-axis-tick" data-zero="" style="--at:[\d.]+">/u, 'zero has its tick');
   }
-  /* THE BREAK SITS IN THE CUT TICK, BEFORE THE REAL AMOUNT, and is never a colour alone: there is a mark and a figure. */
-  const m = forecastModel(HIGH)!;
-  const plan = planOf(HIGH);
-  const tick = /<li class="forecast-axis-tick" data-cut="" style="--at:1"><span class="forecast-axis-break" style="[^"]+">(<svg[^>]*><path[^>]*><\/path><\/svg>)<\/span>([^<]+)<\/li>/u.exec(htmlOf(HIGH));
-  assert.ok(tick, 'the foot tick holds the break and then its label');
-  assert.equal(tick[2], forecastFigure(m, plan.lo, 'axis'));
-  assert.doesNotMatch(tick[0], /(?<!current)color|#[0-9a-f]{3}/iu, 'the break takes the label\'s own ink');
 });
 
 test('THE WHAT-IF IS HELD IN MEMORY ONLY: nothing reaches the address or the browser\'s storage', () => {

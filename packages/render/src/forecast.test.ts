@@ -115,7 +115,7 @@ test('the plan holds the zero it crosses in view, gaps in the past, a wash, a ro
   assert.equal('up' in plan || 'down' in plan, false, 'no stems: a movement is the readout\'s and the table\'s');
   assert.equal(plan.base, '', 'no baseline until a knob moves');
   assert.ok(forecastPlan(m, scenario(m, { ...baseKnobs(m), late: 5 }), s).base.length > 0);
-  assert.deepEqual(plan.ticks.map((t) => t.label), ['Sep', 'Oct', 'Nov'], 'the month it starts in, at the edge, then each month');
+  assert.deepEqual(plan.ticks.map((t) => t.label), ['Today', 'Oct', 'Nov'], 'today among the months, in the place of a month too near it (3d1cd2f8a), then each month');
   assert.deepEqual(plan.ticks.map((t) => t.edge ?? false), [true, false, false]);
   const read = readoutAt(m, s, plan, 1);
   assert.equal(read.flip, true);
@@ -127,11 +127,14 @@ test('AN AXIS OF YEARS NAMES THE YEAR IT STARTS IN, and not a month that reads a
   const five = ROWS.map((r) => (r[0] === 'horizon' ? ['horizon', '1825', '', ''] : r));
   const m = forecastModel([['past', '2026-05-01', '', '£600.00'], ...five])!;
   const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
-  assert.deepEqual(plan.ticks.map((t) => t.label), ['2026', '2027', '2028', '2029', '2030', '2031']);
+  /* TODAY IS NAMED UNDER THE CHART SINCE 3d1cd2f8a, and the years too near it give way to it. */
+  assert.deepEqual(plan.ticks.map((t) => t.label), ['Today', '2028', '2029', '2030', '2031']);
   assert.equal(plan.ticks[0]!.edge, true);
+  assert.equal(plan.ticks[0]!.now, true);
+  assert.ok(plan.ticks.every((t) => !/^[A-Z][a-z]{2}$/u.test(t.label)), 'not a month that reads as the next year\'s');
   /* From 14 Sep the first January is too near the edge for a name before it, at a phone's width. */
   const near = forecastModel(five)!;
-  assert.deepEqual(forecastPlan(near, scenario(near, baseKnobs(near)), null).ticks.map((t) => t.label), ['2027', '2028', '2029', '2030', '2031']);
+  assert.deepEqual(forecastPlan(near, scenario(near, baseKnobs(near)), null).ticks.map((t) => t.label), ['Today', '2028', '2029', '2030', '2031']);
 });
 
 test('toHTML draws the static walk, no controls, and a sentence without an opening', () => {
@@ -417,7 +420,7 @@ test('axisFit: A STEP WHOSE LEVELS THE AXIS CANNOT SAY IS PASSED OVER for the ne
   assert.ok(axisFit(31_200, 33_400, () => false).levels.length >= 2);
 });
 
-test('A WALK FAR FROM ZERO IS DRAWN IN ITS OWN BAND: no zero on the axis, a rule at its foot, and the wash down to it', () => {
+test('A WALK FAR FROM ZERO STILL STANDS ON ZERO (3d1cd2f8a): zero on the axis, the rule at its foot, and the wash down to it', () => {
   const m = forecastModel([
     ['opening', '2026-09-17', 'Cash now', '£32,400.00'],
     ['past', '2026-09-15', '', '£31,200.00'],
@@ -427,11 +430,11 @@ test('A WALK FAR FROM ZERO IS DRAWN IN ITS OWN BAND: no zero on the axis, a rule
     ['horizon', '30', '', ''],
   ])!;
   const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
-  assert.deepEqual(plan.axis.map((a) => a.label), ['£34k', '£33k', '£32k', '£31k']);
-  assert.deepEqual(plan.axis.filter((a) => a.zero), [], 'nothing on it is zero');
-  assert.deepEqual([plan.lo, plan.hi], [31_000, 34_000]);
+  assert.deepEqual(plan.axis.map((a) => a.label), ['£40k', '£20k', '£0']);
+  assert.deepEqual(plan.axis.filter((a) => a.zero).map((a) => a.label), ['£0'], 'its foot is zero');
+  assert.deepEqual([plan.lo, plan.hi], [0, 40_000]);
   assert.equal(plan.zero, '100', 'the rule is the foot of the axis');
-  assert.equal(plan.grid, 'M0 0H1000 M0 33.33H1000 M0 66.67H1000', 'and no faint rule is drawn over it');
+  assert.equal(plan.grid, 'M0 0H1000 M0 50H1000', 'and no faint rule is drawn over it');
   assert.match(plan.area, /^M0 100 L0 /u);
   assert.match(plan.area, /L1000 100Z$/u);
   assert.equal(plan.below, '', 'nothing is under zero, so nothing is tinted');
@@ -443,7 +446,8 @@ test('A WALK FAR FROM ZERO IS DRAWN IN ITS OWN BAND: no zero on the axis, a rule
   assert.equal(red.zero, '0');
   assert.equal(red.area, '');
   assert.match(red.below, /^M0 0 L0 /u);
-  assert.ok(red.axis.every((a) => a.label.startsWith('−£') && !a.zero), red.axis.map((a) => a.label).join(' '));
+  assert.deepEqual(red.axis.map((a) => a.label), ['£0', '−£20k', '−£40k'], 'zero at the top, and under it what is owed');
+  assert.equal(red.axis[0]!.zero, true);
 });
 
 test('THE AXIS NEVER NAMES TWO LEVELS ALIKE, whatever the walk', () => {
@@ -470,7 +474,7 @@ test('A FIGURE A HOST DREW WITH ITS CODE AFTER IT IS SAID SHORT on the axis, by 
   assert.equal(readoutAt(m, s, plan, 1).balance, '−£900', 'a currency the record did not name as its own is said by its own sign (AM15)');
   assert.deepEqual(countsOf(m).out[0], { label: 'Tax', amount: '−£2,400' });
   const src = ['```forecast', ...rows.map((r) => r.join(' | ')), '```'].join('\n');
-  assert.match(toHTML(parse(src, { page: true })), /<td class="num">−£1,200\.00\u00a0GBP<\/td>/u, 'the table keeps every penny and the code');
+  assert.match(toHTML(parse(src, { page: true })), /<td class="num">−£1,200\.00<\/td>/u, 'the table keeps every penny, by its sign since edbe8c9de');
 });
 
 test('toHTML draws the wash, the axis down one side and no stems', () => {
@@ -527,10 +531,10 @@ test('TODAY IS A DOT WITH ITS BALANCE, and the crossing flag is tied to the line
   assert.match(html, /<path class="forecast-area" data-below="" fill="currentColor"/u);
   assert.match(html, /<path class="forecast-walk" fill="none" stroke="currentColor" stroke-width="2"/u);
   assert.match(html, /<path class="forecast-cross-rule" /u);
-  assert.match(
-    html,
-    /<span class="forecast-now-label num" data-place="under" style="--at:[\d.]+;--y:[\d.]+" aria-hidden="true"><span class="forecast-now-word">Today<\/span><span class="forecast-now-figure">£1,000<\/span><\/span>/u,
-  );
+  /* "TODAY" IS THE AXIS'S WORD SINCE 3d1cd2f8a: no box on the line over the stretch it names, its balance is the summary's. */
+  assert.doesNotMatch(html, /forecast-now-label|forecast-now-figure/u);
+  assert.match(html, /<li class="forecast-tick"(?: data-edge="")? data-now="" style="--at:[\d.]+">Today<\/li>/u);
+  assert.match(html, /from £1,000 today/u);
   assert.equal(plan.now.rule, `M${/^M([\d.]+)/u.exec(plan.now.d)![1]} 0V100`, 'and a hairline down the chart at today');
   assert.match(html, /<path class="forecast-walk" [^>]*style="stroke:url\(#[^)]+-under\)"/u, 'the line is cut at zero: ink above, red under');
 });
@@ -571,7 +575,9 @@ test('TODAY\'S LABEL SITS IN A CORNER THE LINE LEAVES FREE, so a walk that climb
   const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
   assert.notEqual(plan.now.place, 'above', 'over the dot to the end side is where the walk climbs');
   const html = toHTML(parse(['```forecast', ...rows.map((r) => r.join(' | ')), '```'].join('\n'), { page: true }));
-  assert.match(html, new RegExp(`<span class="forecast-now-label num" data-place="${plan.now.place}" style=`, 'u'));
+  /* NOTHING STANDS BESIDE THE DOT TO RUN INTO THE WALK NOW (3d1cd2f8a): Today is under the chart. The model still finds the corner. */
+  assert.doesNotMatch(html, /forecast-now-label|data-place=/u);
+  assert.match(html, /data-now="" style="--at:[\d.]+">Today<\/li>/u);
   assert.equal(plan.now.place, 'under', 'under the dot, where the walk runs above it');
   /* AND A WALK THAT LEAVES THE CORNER OVER THE DOT FREE KEEPS THE LABEL WHERE IT ALWAYS SAT, with no mark. */
   const level = forecastModel([['opening', '2026-10-24', 'Cash now', '£1,000.00'], ['step', '2026-12-10', 'Invoice', '£500.00'], ['horizon', '60', '', '']])!;
@@ -588,9 +594,10 @@ test('A CROSSING NEAR TODAY SETS THE LABELS APART: the balance marked near the f
   const far = model();
   assert.equal(forecastPlan(far, scenario(far, baseKnobs(far)), null).cross?.near, false);
   const html = toHTML(parse(['```forecast', ...rows.map((r) => r.join(' | ')), '```'].join('\n'), { page: true }));
-  assert.match(html, /<span class="forecast-now-label num" data-near-flag="" style=/u);
+  /* THE FLAG STILL STEPS ASIDE, and Today stands at the chart's start, in the start month's place, under the rule. */
+  assert.doesNotMatch(html, /forecast-now-label|data-near-flag/u);
   assert.match(html, /<span class="forecast-pin" data-side="end" style=/u);
-  assert.match(html, /<li class="forecast-tick" data-edge="" style="--at:0">Sep<\/li>/u);
+  assert.match(html, /<li class="forecast-tick" data-edge="" data-now="" style="--at:0">Today<\/li>/u);
 });
 
 test('A CHART CAN OPEN ON THREE MONTHS OVER A LONGER WALK, and the knob offers every length up to the walk\'s own reach', () => {

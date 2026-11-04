@@ -147,6 +147,7 @@ test('THE DANGER TINT IS ONLY THE PART UNDER ZERO: a walk that never goes under 
   const plan = forecastPlan(down, scenario(down, baseKnobs(down)), null);
   assert.notEqual(plan.below, '', 'the part under zero is its own path');
   const html = toHTML(parse('```forecast\n' + rowsOf(MEASURED, 'EGP 60,000.00').map((r) => r.join(' | ')).join('\n') + '\n```', { page: true }));
-  assert.equal(html.match(/data-below=""/gu)?.length, 1, 'one tinted part');
+  /* THE PATH, as the summary's figure of the cash at the end also says it is under (`data-below`, ffa04ea78). */
+  assert.equal(html.match(/<path class="forecast-area" data-below=""/gu)?.length, 1, 'one tinted part');
   assert.doesNotMatch(html, /danger/u, 'the line and the sentence wear no danger of their own');
 });

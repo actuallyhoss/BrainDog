@@ -36,19 +36,18 @@ test('A STAT DRAWS THE WALK AHEAD with today, its lowest point and both ends, an
   assert.equal((html.match(/trend-days/gu) ?? []).length, 1);
 });
 
-test('CASH AHEAD NUMBERS EACH PART OF A PLAN THE LINE DROPS BY, on the line and in the list of movements with its day and amount', () => {
+test('CASH AHEAD LISTS EACH PART OF A PLAN WITH ITS DAY, and neither it nor the pay is a mark on the line', () => {
   const html = toHTML(
     parse(
       '```forecast\nopening | 2026-10-27 | Cash now | EGP 500,000.00\nstep | 2026-10-31 | Pay | EGP 120,000.00\nstep | 2027-01-05 | Car, part 4 of 12 | EGP −90,000.00\nof | Car |  | \nstep | 2027-01-13 | House, part 2 of 30 | EGP −300,000.00\nof | House |  | \nhorizon | 84 |  | \n```',
       { page: true },
     ),
   );
-  assert.equal((html.match(/class="forecast-drop num"/gu) ?? []).length, 2, 'two marks on the line, none for the pay');
-  /* THE PAY IS A DOT ON THE LINE AND A ROW OF THE LIST, unnumbered; each part keeps its number in the list. */
-  assert.match(html, /<path class="forecast-mark" data-dir="in"/u);
+  /* NO NUMBERED DISCS AND NO DOT A MOVEMENT (3d1cd2f8a): the line is the answer, and every movement is a row of the list. */
+  assert.doesNotMatch(html, /class="forecast-drop|class="forecast-mark|forecast-next-n/u);
   assert.match(html, /<li class="forecast-next-item" data-dir="in"><span class="forecast-next-dot" aria-hidden="true"><\/span><span class="forecast-next-day">31 Oct<\/span><span class="forecast-next-label">Pay<\/span>/u);
-  assert.match(html, /<li class="forecast-next-item" data-dir="out"><span class="forecast-next-n num" aria-hidden="true">1<\/span><span class="forecast-next-day">5 Jan 2027<\/span><span class="forecast-next-label">Car, part 4 of 12<\/span><span class="forecast-next-amount num">[^<]*90,000\.00/u);
-  assert.match(html, /<span class="forecast-next-n num" aria-hidden="true">2<\/span><span class="forecast-next-day">13 Jan 2027<\/span><span class="forecast-next-label">House, part 2 of 30<\/span>/u);
+  assert.match(html, /<li class="forecast-next-item" data-dir="out"><span class="forecast-next-dot" aria-hidden="true"><\/span><span class="forecast-next-day">5 Jan 2027<\/span><span class="forecast-next-label">Car, part 4 of 12<\/span><span class="forecast-next-amount num">−EGP 90,000</u);
+  assert.match(html, /<span class="forecast-next-dot" aria-hidden="true"><\/span><span class="forecast-next-day">13 Jan 2027<\/span><span class="forecast-next-label">House, part 2 of 30<\/span>/u);
   /* A WALK WITH NO PLAN IN IT NUMBERS NOTHING, and still lists what moves. */
   const none = toHTML(parse('```forecast\nopening | 2026-10-27 | Cash now | EGP 1,000.00\nstep | 2026-11-01 | Rent | EGP −100.00\nhorizon | 30 |  | \n```', { page: true }));
   assert.match(none, /forecast-chart/u, 'the walk is drawn');
