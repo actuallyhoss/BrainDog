@@ -1368,7 +1368,7 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
       /* A FACT NOBODY WROTE IS NOT DRAWN, as in `Cards.svelte`, and a card with no fact written has no list. */
       const written = L.facts.filter((i) => r.cells[i]);
       const facts = written.length
-        ? `<dl class="cards-facts">${written.map((i) => `<div class="cards-fact"><dt>${escape(label(i))}</dt><dd>${drawn(r, i)}</dd></div>`).join('')}</dl>`
+        ? `<dl class="cards-facts">${written.map((i) => `<div class="cards-fact"${said(r, i) ? ` title="${escape(said(r, i))}"` : ''}><dt>${escape(label(i))}</dt><dd>${drawn(r, i)}</dd></div>`).join('')}</dl>`
         : '';
       const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null;
       const whoMark = L.who >= 0 ? markFor(o, said(r, L.who)) : null;
