@@ -3669,11 +3669,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       KEYS,
       by.label,
     );
+    /* A RETIRED ROW NEVER SHADOWS A LIVE ONE. The move from Sam Brain left a retired row, older and with no value, beside
+       the sealed key of the same label, and oldest-first answered "holds no sealed value" for a key the list calls sealed. */
+    let retired: Entry | null = null;
     for (const { id } of ids) {
       const row = kernel.get(id);
-      if (within(row)) return row;
+      if (!within(row)) continue;
+      if (row.fields.state !== 'retired') return row;
+      retired ??= row;
     }
-    return null;
+    return retired;
   };
 
   /**
