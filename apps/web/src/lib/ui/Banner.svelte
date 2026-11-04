@@ -120,6 +120,8 @@
   @media (width < 640px) {
     .banner-actions {
       flex: 1 1 100%;
+      /* NEVER WIDER THAN THE BANNER: the name ask's one row held it at 313px, so Skip ran off a 320 phone. */
+      min-inline-size: 0;
       flex-direction: column;
       align-items: stretch;
     }
