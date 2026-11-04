@@ -251,14 +251,28 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
 
   const refSaid = (l: { ref: string | null; run: string }): string => (l.ref === null ? l.run : `{{ref:${l.ref}}}`);
 
-  /** One run as a line of an answer. */
+  /** One run as an item of an answer: who and where, then under it what it is doing and when it was heard. */
   const lineOf = (l: Live, showProject = true): string => {
     const where = showProject && l.project !== null ? ` on ${l.project}` : '';
     const doing = l.doing === null ? 'Between steps.' : `${theirs(l.doing, 110).replace(/[.]$/u, '')}.`;
     const heard = l.word === 'working' ? `Heard ${agoSaid(l.heardMs)}.` : `Last heard ${agoSaid(l.heardMs)}.`;
-    const word = l.word === 'working' ? 'Working' : l.word === 'quiet' ? 'Quiet' : 'Gone';
-    const asks = l.asked === null ? '' : ` It asks you: ${theirs(l.asked, 110)}`;
-    return `- ${word}: ${refSaid(l)}${where}. ${doing} ${heard}${asks}`;
+    const asks = l.asked === null ? '' : `\n  It asks you: ${theirs(l.asked, 110)}`;
+    return `- ${refSaid(l)}${where}\n  ${doing} ${heard}${asks}`;
+  };
+
+  /** Runs under the word each stands at, Working, Quiet and Gone, each word with how many, the first `SHOWN_MOST` drawn. */
+  const groupedLines = (roll: readonly Live[], showProject = true): string[] => {
+    const out: string[] = [];
+    let left = SHOWN_MOST;
+    for (const [word, label] of [['working', 'Working'], ['quiet', 'Quiet'], ['gone', 'Gone']] as const) {
+      const here = roll.filter((l) => l.word === word);
+      const drawn = here.slice(0, left);
+      left -= drawn.length;
+      if (drawn.length === 0) continue;
+      if (out.length > 0) out.push('');
+      out.push(`${label} (${here.length})`, ...drawn.map((l) => lineOf(l, showProject)));
+    }
+    return out;
   };
 
   /** A project or repository named in a person's words, among those agents have been on. */
@@ -308,13 +322,7 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
     const waiting = Array.isArray(said) ? said.length : 0;
     const others = waiting - asking.size;
     if (others > 0) out.push(others === 1 ? '- One more question waits for you in Decide.' : `- ${others} more questions wait for you in Decide.`);
-    return out;
-  };
-
-  const countsSaid = (roll: readonly Live[]): string => {
-    const n = (w: RunWord): number => roll.filter((l) => l.word === w).length;
-    const said = ([['working', n('working')], ['quiet', n('quiet')], ['gone', n('gone')]] as const).filter(([, c]) => c > 0).map(([w, c]) => `${c} ${w}`);
-    return `${said.join(', ')}.`;
+    return out.length === 0 ? [] : ['', 'Waiting on you', ...out];
   };
 
   /** Who is running, all of them or on one project: `agents`. */
@@ -328,7 +336,7 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
       const word = about.trim().toLowerCase();
       const hits = roll.filter((l) => `${l.repo ?? ''} ${l.who} ${l.doing ?? ''}`.toLowerCase().includes(word));
       if (hits.length === 0) return { text: `Nothing running is on ${clip(about, 40)}, and I don't know a project by that name.`, step };
-      return { text: [hits.length === 1 ? 'One run matches.' : countsSaid(hits), ...hits.slice(0, SHOWN_MOST).map((l) => lineOf(l))].join('\n'), outside, step };
+      return { text: groupedLines(hits).join('\n'), outside, step };
     }
     const shown = named === null ? roll : roll.filter((l) => l.projectRef === named.ref);
     if (shown.length === 0) {
@@ -340,8 +348,8 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
       return { text: last === null ? `Nothing is on ${named.title} right now.` : `Nothing is on ${named.title} right now. The last was ${last}.`, ...(last === null ? {} : { outside }), step };
     }
     const waits = named === null ? await waitingLines(roll) : [];
-    const more = shown.length > SHOWN_MOST ? [`- And ${shown.length - SHOWN_MOST} more on the Agents page.`] : [];
-    return { text: [countsSaid(shown), ...shown.slice(0, SHOWN_MOST).map((l) => lineOf(l, named === null)), ...more, ...waits].join('\n'), outside, step };
+    const more = shown.length > SHOWN_MOST ? ['', `And ${shown.length - SHOWN_MOST} more on the Agents page.`] : [];
+    return { text: [...groupedLines(shown, named === null), ...more, ...waits].join('\n'), outside, step };
   };
 
   const endedRows = async (projectRef?: string): Promise<RunRow[]> => {
@@ -372,7 +380,8 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
       const working = roll.length;
       return { text: working === 0 ? 'Nothing is stuck, and nothing is running.' : `Nothing looks stuck. ${working === 1 ? 'One agent is' : `${working} agents are`} working and heard from.`, step };
     }
-    return { text: [held.length === 0 ? 'Nothing has gone quiet, but something waits for you.' : held.length === 1 ? 'One looks stuck.' : `${held.length} look stuck.`, ...held.slice(0, SHOWN_MOST).map((l) => lineOf(l)), ...waits].join('\n'), outside: 'what agents wrote about their own work', step };
+    const lead = held.length === 0 ? 'Nothing has gone quiet, but something waits for you.' : held.length === 1 ? 'One looks stuck.' : `${held.length} look stuck.`;
+    return { text: [lead, '', ...groupedLines(held), ...waits].join('\n').replace(/\n{3,}/gu, '\n\n'), outside: 'what agents wrote about their own work', step };
   };
 
   /** One ended or open run as the lines of "what happened". */

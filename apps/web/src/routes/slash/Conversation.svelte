@@ -26,7 +26,7 @@
   import { threadWords } from '$lib/palette/slash-chat.ts';
   import { answer, convo, rethink, rethinkable, undo, UNDO_MS, type LiveAction, type YouTurn, type SlashTurn } from '$lib/palette/thread.svelte.ts';
   import type DecisionCardType from '$lib/decide/DecisionCard.svelte';
-  import Said from './Said.svelte';
+  import Answer from './Answer.svelte';
   import Spoken from '$lib/mention/Spoken.svelte';
   import type { SentMention } from '$lib/mention/mention.ts';
   import SentLine from '$lib/palette/SentLine.svelte';
@@ -181,7 +181,7 @@
           {/if}
 
           {#if turn.text}
-            <p class="text" dir="auto"><Said text={turn.text} figures={turn.figures} {icons} /></p>
+            <Answer text={turn.text} figures={turn.figures} {icons} />
           {:else if turn.streaming}
             <!-- HELD UNTIL THE WORDS COME, even under a card that came first, so the words take the bars' place and the
                  card under them does not move. -->
@@ -423,14 +423,6 @@
     to {
       transform: rotate(360deg);
     }
-  }
-
-  .text {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-row, 15px);
-    line-height: calc(24px * var(--type, 1));
-    white-space: pre-wrap;
   }
 
   /* TWO BARS THE HEIGHT OF TWO LINES OF WORDS, still, so the first words take their place and nothing jumps. */
