@@ -17,7 +17,6 @@ import { SUPPORT_EMAIL } from './shell.ts';
 export const account = {
   shownInNav: (title: string) => `${title} is back in your nav.`,
   showAgain: 'Show again',
-  perPerson: 'Kept for you in this BrainDog, on every device you sign in on.',
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
 
   sourcesAdd: 'Sources come with plugins or agents.',
@@ -63,7 +62,6 @@ export const account = {
   /* "THIS RECORD", NEVER ITS NAME, IN THE TITLE: a record named after its owner read "Delete Marta". */
   deleteWhat: (record: string): string => `Deletes every list and page in ${record}, and all they hold. It cannot be undone.`,
   deleteRecord: 'Delete my BrainDog',
-  holdingPen: 'Not placed. Nothing moved.',
 
   /* settings */
   /* `appearance` WAS THE FIRST LINE OF THIS SECTION AND THE SCREEN NEVER READ IT. Settings names its
@@ -176,8 +174,6 @@ export const account = {
   inviteTitle: 'Invite somebody',
   inviteHow: 'One use, one address, good for 24 hours.',
   invitePerson: 'Invite a person',
-  /* THE INVITE TILE WITH THE FORM IN ITS SHEET (G20), when no invitation is waiting. */
-  invitesNone: 'Nobody is waiting on an invitation. A link is one use, for one address, and good for 24 hours.',
   erasePerson: 'Erase a person',
   eraseWhat: 'Everything one person wrote, removed from sixteen places in one go. It cannot be undone.',
 
@@ -228,7 +224,6 @@ export const account = {
   /* `03 §1`: the three layers are addressable independently, and the governance layer alone IS a
      pack. A product whose only exit is all-or-nothing has three exits it is not offering. */
   takeAway: 'Part of it',
-  takeAwayWhat: 'Take the setup or what you wrote, on its own.',
   exportPack: 'Export the way you work',
   exportRows: 'Export your items only',
 
@@ -236,7 +231,6 @@ export const account = {
   you: 'You',
   signedInAs: 'Signed in as',
   onThisRecord: 'In this BrainDog',
-  identityOutside: 'One sign-in for every BrainDog you have.',
   yourRecords: 'BrainDogs you can open',
   thisOne: 'you are here',
 
@@ -370,12 +364,9 @@ export const account = {
   connectTitle: 'Connect an agent',
   /* THE INBOX, OFF UNTIL THE OWNER TURNS IT ON. What it opens, and what it still cannot do. */
   connectInbox: 'May read the inbox',
-  connectInboxHint: 'May read the inbox: the bank texts and other arrivals no rule has filed yet. It cannot file or archive them.',
 
   /* ingest — `25 §9` draws this screen */
   sources: 'Sources',
-  /* `25 §9`'s own blockquote, and it outranks the screen it is on. */
-  staleShows: 'A stale source shows a gap, never an old number.',
 
   /* notifications: `09` specifies the mechanism and one setting, the quiet hours, so the rest of this reports */
   whenWeInterrupt: 'Interruptions',
@@ -576,8 +567,6 @@ export const account = {
   emailLike: 'you@example.com',
   sendingLink: 'Sending the link',
   linkSentTitle: 'Check your email',
-  /* The host answers alike for an address it does not know, so this cannot say the link was sent. */
-  linkSentBody: (email: string) => `If ${email} can sign in here, a link is on its way. It works once, for fifteen minutes.`,
   useAnotherEmail: 'Use a different email',
   serverKeyWay: 'Sign in with the server key',
   serverKeyLabel: 'Server key',
@@ -598,9 +587,6 @@ export const account = {
   linkLandingTitle: 'Your sign-in link is here',
   claimLandingTitle: 'Your BrainDog is ready to claim',
   useLink: 'Sign in with this link',
-  /* WHOSE ACCOUNT THE LINK OPENS, said before the press, so a link somebody else sent cannot sign you in to theirs unseen. */
-  linkOpens: (kind: 'magic' | 'claim', email: string) =>
-    kind === 'claim' ? `This link is for ${email}. If that is not your address, close this page.` : `This link signs in as ${email}. If that is not your address, close this page.`,
   claimRecord: 'Claim your BrainDog',
   linkExpiredTitle: 'That link has expired or was already used',
   linkExpiredWhy: (kind: 'magic' | 'claim', canAsk: boolean) =>
@@ -714,8 +700,6 @@ export const account = {
   inviteLandingBy: (by: string, record: string | null) => `${by} invited you to ${record ?? 'their BrainDog'}`,
   inviteAs: (role: string) => `You join as ${role}`,
   /* MAILING THE INVITATION (collab pass, 2 Nov): the host sends it, and the link stays to copy. */
-  inviteEmailIt: 'Email it to them',
-  inviteEmailing: 'Sending',
   inviteEmailed: (email: string) => `Sent to ${email}. They open the mail and press Join.`,
   inviteHowMail: 'One use, one address, good for 24 hours. We email it to them, or you can copy the link.',
   /* NAMES THE OPERATOR'S COMMAND (selfhost2 lane, 2 Nov): with no mail, whoever runs the server prints a link that works

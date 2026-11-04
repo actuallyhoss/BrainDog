@@ -19,7 +19,6 @@ export const sharing = {
   sharingEnded: 'Ended',
   sharingEndedLead: 'Last 30 days',
   sharingWaitingLead: 'Not yet accepted',
-  sharingNothing: 'What you share with people, and links you make, is listed here.',
   sharingShare: 'Share something',
   sharingChange: (sentence: string) => `Change this: ${sentence}`,
   sharingStopLabel: (what: string, who: string) => `Stop sharing ${what} with ${who}`,

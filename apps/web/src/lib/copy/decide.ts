@@ -35,8 +35,6 @@ export const decide = {
   /* WHY THE COMMIT IS REFUSING, said where the refusal is. A decision is immutable once made, so the
      reason is the whole of what anybody reading it in six weeks will have. */
   reasonRequired: 'A decision is kept for ever and cannot be edited, so it needs a reason. Write why you chose it.',
-  decidedBy: 'Decided by',
-  immutable: 'A decision cannot be edited once it is made.',
   /* TODAY'S SENTENCE, SO THE TWO SAY IT ONE WAY (T20). */
   noQuestionsWhy: 'When a bill is late or an agent needs a choice from you, it waits here.',
   /* THE QUESTION IS NOT SAID. Its callers used to pass the question's id, `SG2`, and an id is never a word a person

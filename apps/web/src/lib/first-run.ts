@@ -29,9 +29,6 @@ export const firstRun = {
   /* THE PROMPT. A question and one field, with one example of an answer in it (first F6). */
   whoQuestion: 'Who are you?',
   whoPlaceholder: "I'm Mariam. I run a candle shop and want to keep track of orders, stock and what I owe suppliers.",
-  whoGo: 'Show my BrainDog',
-  /* WHILE SLASH READS WHAT WAS SAID: the button's own word, and nothing else moves. */
-  whoReading: 'Reading',
   /* WHERE SIMPLE RULES READ IT BECAUSE THE MONTH'S ASKS ARE SPENT, said once, quietly, so a thin reading is explained. */
   readByRules: "Slash's questions are used for this month, so simple rules read this. Check what was heard, and tell it more.",
   /* WHERE SIMPLE RULES READ IT FOR ANY OTHER CAUSE: no model on this host, no press yet, a refusal or a silence. Said on
@@ -67,19 +64,7 @@ export const firstRun = {
 
   /* THE SENTENCE ONCE IT IS READ, drawn as one line a press opens again for editing. */
   whoEdit: 'Edit what you said',
-
-  /* WHAT WAS HEARD: each phrase of the sentence and what it became, and the name said back. */
-  heardTitle: 'What I heard',
   heardName: (name: string) => `You are ${name}.`,
-  /* A SENTENCE THESE RULES CANNOT READ IS KEPT, NEVER REFUSED: nothing is guessed from it, and the person turns on
-     what they want by hand. */
-  heardNone: 'Nothing here makes a list yet. Turn on what you want below.',
-  /* AND WHERE THE WORDS ARE KEPT, said only where they are: the note on the person's own People entry, which needs a
-     name heard and People kept. Said unconditionally, it promised a note to somebody who gave no name. */
-  heardNote: 'Your words are kept as the note on your entry in People.',
-  /* WITH PEOPLE OFF THE NAME IS SAID BACK AND STORED NOWHERE, because a member's own settings hold no name and People
-     is never turned back on behind somebody who turned it off. */
-  nameNotKept: 'People is off, so your name is kept on your account only.',
   /* An amount typed with no currency is said back, so the person sees why it is not in the entry (`shape.ts`). */
   shapeNoCurrency: 'no currency, so not kept',
   /* A thing a shop does on a day, such as kiln firings, said as the orders it keeps by the day each is due. */
@@ -97,8 +82,6 @@ export const firstRun = {
   minePages: 'Its pages',
   mineHome: 'Its Today',
   mineEntries: 'From what you said',
-  mineIn: (title: string, list: string) => `${title}, in ${list}`,
-  mineKeeps: 'What it keeps',
   keepSwitch: (name: string) => `Keep ${name}`,
   /* A MODULE THE USE CASE STANDS ON stays on while that use case is chosen, and says why. */
   keepNeeded: (title: string) => `${title} needs it.`,

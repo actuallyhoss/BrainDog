@@ -86,7 +86,6 @@ export const packs = {
   browseHome: 'Today',
   browseLists: 'Lists',
   browseNoRail: 'Nothing added to the menu',
-  shareNoUseCase: 'No starter here, so it carries your plugins and placed pages.',
   shareTitle: 'Title',
   shareVersion: 'Version',
   shareSummary: 'What it is for',

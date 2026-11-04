@@ -18,9 +18,6 @@ export const palette = {
   /* NOT `noneMatching`, which counts the rows a LIST holds and reads "0 rows, none matching" here —
      a search is over every list at once, so there is no single total to count against. */
   searchNone: (q: string) => `Nothing matches “${q}”`,
-  /* THE NEXT STEP, NOT A WAY OUT: what to change about the words, and the one
-     other place a thing that is not in a list may have been. */
-  searchNoneNext: 'Try fewer words, or look in History.',
   searchClear: 'Clear the search',
   searchInHistory: 'Open History',
   searchWhere: 'Projects, people, money and more.',

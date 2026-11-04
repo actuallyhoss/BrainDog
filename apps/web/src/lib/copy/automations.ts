@@ -23,13 +23,6 @@ export const automations = {
      token back, and a blank where a value would go reads as "you have none". */
   doorsUnknown: 'Shown only when made. Lost it? Make a new one; the old one stops.',
   doorsReading: 'Reading the web addresses BrainDog takes things in at.',
-  /* THE EMPTY STATE SAYS WHAT FILLS IT AND WHO ADDS ONE, because nothing on this screen can: a door arrives as a
-     change somebody approves. It said "an ingest with channel webhook and verify kind path", which is the file's
-     spelling and not the person's; those words stay in the prompt, which is handed to an agent. */
-  doorsNone: 'Nothing posts in yet',
-  /* WHAT WILL BE HERE, with New web address beside it (G17). */
-  doorsEmpty: 'Each address you make is listed here, with what it writes to.',
-  doorsNoneWhy: 'Ask an agent to set one up.',
   doorsPrompt: 'read my BrainDog, then propose a webhook door with verify kind path for what I want posted in, and name the list it writes to',
   doorsWrites: (list: string) => `Writes to ${list}.`,
   doorsHeld: 'An address is in use. Making a new one stops the old one working.',
