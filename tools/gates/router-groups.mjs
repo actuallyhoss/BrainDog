@@ -223,7 +223,7 @@ export default function routerGroups(
     const GOOGLE_POST = ['google.desktop'];
     /* THE MAC APP'S WAY BACK FROM A BROWSER (`DesktopFlow` in auth.ts): two POSTs on the Worker only, and no flow of the
        Directory's. `desktop.handoff` seals an emailed link to the app's challenge; `desktop` spends it in the app. */
-    const DESKTOP_FLOWS = ['desktop', 'desktop.handoff'];
+    const DESKTOP_FLOWS = ['desktop', 'desktop.handoff', 'app', 'app.handoff'];
 
     const READS = ['methods', 'session', 'passkeys', 'sessions', 'signup.name'];
     const paths = new Set();
