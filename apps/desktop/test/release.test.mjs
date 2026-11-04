@@ -93,7 +93,8 @@ test('RD9: --upload-only NAMES WHAT dist DOES NOT HOLD FOR THE VERSION, the feed
   const all = ['BrainDog.dmg', archiveOf('0.2.0'), 'latest.json'];
   assert.deepEqual(distMissing(all, '0.2.0', '0.2.0'), []);
   assert.deepEqual(distMissing(['BrainDog.dmg', 'latest.json'], '0.2.0', '0.2.0'), [archiveOf('0.2.0')]);
-  assert.deepEqual(distMissing(all, '0.1.9', '0.2.0').length, 2);
+  /* THE FILES ARE ALL THERE AND THE FEED IS FOR ANOTHER VERSION: one thing missing, said with both versions. */
+  assert.deepEqual(distMissing(all, '0.1.9', '0.2.0'), ['latest.json for 0.2.0 (it is for 0.1.9)']);
   assert.deepEqual(distMissing([], null, '0.2.0').sort(), [archiveOf('0.2.0'), 'BrainDog.dmg', 'latest.json'].sort());
 });
 
