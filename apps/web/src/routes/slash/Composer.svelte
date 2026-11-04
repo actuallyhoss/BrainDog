@@ -8,8 +8,7 @@
   WITH NOTHING TYPED, ENTER AND ESC ARE THE WAITING CARD'S (`onempty`): Enter does what Slash asks, Esc leaves it.
 -->
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import Icon from '$lib/ui/Icon.svelte';
+    import Icon from '$lib/ui/Icon.svelte';
   import MentionField from '$lib/mention/MentionField.svelte';
   import { sentOf, type Mention, type SentMention } from '$lib/mention/mention.ts';
 
@@ -54,13 +53,8 @@
   } as const;
 
   let field = $state<ReturnType<typeof MentionField> | null>(null);
-  let box = $state<HTMLTextAreaElement | HTMLInputElement>();
 
   const canSend = $derived(!disabled && !busy && value.trim().length >= 2);
-
-  onMount(() => {
-    if (autofocus && matchMedia('(pointer: fine)').matches) box?.focus({ preventScroll: true });
-  });
 
   /** Focus the field, the caret at its end. */
   export function focus(): void {
@@ -68,7 +62,7 @@
   }
 
   /** A row named from outside: a mention at the head of the sentence. */
-  export function put(row: { ref: string; label: string; icon: string }): void {
+  export function put(row: { ref: string; label: string }): void {
     field?.put(row);
   }
 
@@ -102,7 +96,7 @@
   <div class="input">
     <MentionField
       bind:this={field}
-      bind:field={box}
+      autofocus={autofocus && matchMedia('(pointer: fine)').matches}
       bind:value
       bind:mentions
       label={words.label}

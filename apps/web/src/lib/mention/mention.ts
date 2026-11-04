@@ -11,7 +11,7 @@
  */
 
 /** A mention in the field: which letters of the text, and the row they are. */
-export type Mention = { start: number; end: number; ref: string; label: string; icon: string };
+export type Mention = { start: number; end: number; ref: string; label: string };
 
 /** A mention in a sent sentence: `len` letters at `at` name `ref`. No @ in those letters. */
 export type SentMention = { at: number; len: number; ref: string };

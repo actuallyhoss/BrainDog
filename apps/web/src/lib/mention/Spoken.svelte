@@ -22,7 +22,7 @@
   .spoken {
     padding: 1px 3px;
     border-radius: 4px;
-    background: var(--mention-fill, var(--info-tint));
+    background: color-mix(in oklab, var(--info) 18%, transparent);
     color: inherit;
     font-weight: var(--fw-medium);
     text-decoration: none;

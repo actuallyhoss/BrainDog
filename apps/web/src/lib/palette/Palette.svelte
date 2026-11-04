@@ -102,7 +102,7 @@
   import { latest } from './latest.ts';
   import { best, early, keep, merged } from '../record/search-kept.ts';
   import { palette as opener } from './open.svelte.ts';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
   import { asksFirst, capLine, inOrder, offersSlash, slashWords } from './slash.ts';
   import SlashThread from './SlashThread.svelte';
@@ -366,7 +366,7 @@
     q = '';
     drafted = [];
     asked(question);
-    queueMicrotask(() => input?.focus());
+    focusField();
   }
 
   /** The follow-up field, sent. */
@@ -378,6 +378,9 @@
     asked(text, mentions);
   }
 
+  /** Find's field and Ask's are two elements, so a move between them focuses the one drawn after it. */
+  const focusField = (): void => void tick().then(() => input?.focus());
+
   /** Back to Find, with what its field said before the question. */
   function toFind() {
     modeWas = 'find';
@@ -385,7 +388,7 @@
     q = backTo ?? '';
     backTo = null;
     cursor = 0;
-    input?.focus();
+    focusField();
   }
 
   /** Ask, from the button beside Find's field: the words typed stay in the field, to send or to change. */
@@ -393,7 +396,7 @@
     backTo = q;
     modeWas = 'ask';
     opener.mode = 'ask';
-    input?.focus();
+    focusField();
   }
 
   /** The conversation where it was left, from Find's "Continue" row. */
@@ -402,7 +405,7 @@
     modeWas = 'ask';
     opener.mode = 'ask';
     q = '';
-    input?.focus();
+    focusField();
   }
 
   function fresh() {
@@ -422,7 +425,7 @@
       backTo = null;
       q = '';
       cursor = 0;
-      queueMicrotask(() => input?.focus());
+      focusField();
     });
   });
 
@@ -1984,7 +1987,7 @@
     </div>
   {/if}
   <!-- WHAT THE PLAIN LINE WAS READ AS: a chip for each, under the field, drawn only while the line makes a row. -->
-  {#if plainMade && plainMade.chips.length > 0}
+  {#if plainMade && plainMade.chips.length > 0 && !inAsk}
     <ul class="p-chips" aria-label={createWords.chips}>
       {#each plainMade.chips as chip, i (i)}
         <li class="p-chip" title={chip.said}>{chip.label}</li>

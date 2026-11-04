@@ -34,7 +34,7 @@
   import Conversation from './Conversation.svelte';
   import ThreadList from './ThreadList.svelte';
   import { readBack, namesOf } from './read-back.ts';
-  import { iconOfRef, withOf } from './with.ts';
+  import { withOf } from './with.ts';
   import type { Mention, SentMention } from '$lib/mention/mention.ts';
 
   const words = {
@@ -157,7 +157,7 @@
     const added = refs.filter((r) => !had.has(r));
     queueMicrotask(() => composer?.focus());
     void namesOf(base, added).then((names) => {
-      for (const ref of [...added].reverse()) composer?.put({ ref, label: names.get(ref) ?? ref.replace('#', ' '), icon: iconOfRef(ref, icons) });
+      for (const ref of [...added].reverse()) composer?.put({ ref, label: names.get(ref) ?? ref.replace('#', ' ') });
       composer?.focus();
     });
   });

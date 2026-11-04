@@ -16,7 +16,7 @@
   lands at an end, a selection takes all of it, and Backspace at its end deletes it whole. What became of it is `mention.ts`.
 -->
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { page } from '$app/state';
   import { apiBase } from '../at.ts';
   import { best, early, keep, merged } from '../record/search-kept.ts';
@@ -37,6 +37,7 @@
     above = false,
     lines = 5,
     describedby,
+    autofocus = false,
     onkey,
   }: {
     value?: string;
@@ -51,6 +52,7 @@
     /** How many lines it grows to before it scrolls. */
     lines?: number;
     describedby?: string | undefined;
+    autofocus?: boolean;
     /** A key the field and its list did not take: Enter to send, and so on. */
     onkey?: ((e: KeyboardEvent) => void) | undefined;
   } = $props();
@@ -61,6 +63,9 @@
   let mirror = $state<HTMLDivElement>();
   $effect(() => {
     field = box;
+  });
+  onMount(() => {
+    if (autofocus) box?.focus({ preventScroll: true });
   });
 
   /* WHAT THE FIELD LAST HELD, so an edit can be told from a change made from outside, and each span moved by it. */
@@ -198,7 +203,7 @@
     const token = tokenOf(name);
     const spaceAfter = end < value.length && /\s/u.test(value[end]!);
     replace(t.start, end, spaceAfter ? token : `${token} `);
-    const span: Mention = { start: t.start, end: t.start + token.length, ref: o.ref, label: name, icon: o.icon };
+    const span: Mention = { start: t.start, end: t.start + token.length, ref: o.ref, label: name };
     known.set(token, span);
     mentions = [...mentions.filter((m) => m.end <= span.start || m.start >= span.end), span].sort((a, b) => a.start - b.start);
     const caret = span.end + 1;
@@ -225,11 +230,11 @@
   }
 
   /** A row named from outside (`/slash?with=`): a mention at the start of the sentence, kept off undo as it was no typing. */
-  export function put(row: { ref: string; label: string; icon: string }): void {
+  export function put(row: { ref: string; label: string }): void {
     if (mentions.some((m) => m.ref === row.ref)) return;
     const name = labelOf(row.label);
     const token = `${tokenOf(name)} `;
-    const span: Mention = { start: 0, end: token.length - 1, ref: row.ref, label: name, icon: row.icon };
+    const span: Mention = { start: 0, end: token.length - 1, ref: row.ref, label: name };
     known.set(tokenOf(name), span);
     mentions = [span, ...shifted(mentions, { from: 0, oldTo: 0, newTo: token.length })];
     held = `${token}${value}`;
@@ -388,6 +393,9 @@
     return () => clearTimeout(wait);
   });
 
+  /* (AND IN THE MARKUP, A ZERO-WIDTH MARK ONLY WHERE A LINE WOULD OTHERWISE HAVE NO HEIGHT: empty, or after a new line. After a
+     space at the very edge of a line it would wrap by itself and make the field a line too tall.) */
+
   /* THE SCROLLED LINES OF A LONG SENTENCE: the mirror scrolls as the field does. */
   const follow = () => {
     if (mirror && box) mirror.scrollTop = box.scrollTop;
@@ -398,8 +406,9 @@
     const m = mirror;
     if (!b || !m) return;
     const fit = () => {
-      const width = `${b.clientWidth}px`;
-      if (b.clientWidth > 0 && m.style.inlineSize !== width) m.style.inlineSize = width;
+      const bar = b.offsetWidth - b.clientWidth;
+      const pad = bar > 0 ? `${bar}px` : '';
+      if (m.style.paddingInlineEnd !== pad) m.style.paddingInlineEnd = pad;
       follow();
     };
     const watch = new ResizeObserver(fit);
@@ -413,9 +422,11 @@
 </script>
 
 <div class="mf" style:--mf-lines={lines}>
-  <div class="mf-mirror" bind:this={mirror} dir="auto" aria-hidden="true">{#each pieces as p}{#if p.kind === 'text'}{p.text}{:else if p.kind === 'token'}<span class="mf-token">{p.text}</span>{:else}<span class="mf-at" data-mention-at>{p.text}</span>{/if}{/each}<span>&#8203;</span></div>
+  <div class="mf-mirror" bind:this={mirror} dir="auto" aria-hidden="true">{#each pieces as p}{#if p.kind === 'text'}{p.text}{:else if p.kind === 'token'}<span class="mf-token">{p.text}</span>{:else}<span class="mf-at" data-mention-at>{p.text}</span>{/if}{/each}{#if value === '' || value.endsWith('\n')}&#8203;{/if}</div>
+  <!-- svelte-ignore a11y_autofocus (SvelteKit hands focus to the body as a page lands, unless something says `autofocus`.) -->
   <textarea
     bind:this={box}
+    {autofocus}
     class="mf-input"
     rows="1"
     dir="auto"
@@ -500,6 +511,7 @@
     text-align: start;
     text-indent: 0;
     text-transform: none;
+    text-rendering: auto;
     white-space: pre-wrap;
     overflow-wrap: break-word;
     word-break: normal;
@@ -544,9 +556,10 @@
   /* A MENTION: a fill behind its letters, as Slack and Discord draw one. A shadow gives it room at its ends, since any
      padding would move the letters off the textarea's. */
   .mf-token {
-    background: var(--mention-fill, var(--info-tint));
+    --mention-fill: color-mix(in oklab, var(--info) 18%, transparent);
+    background: var(--mention-fill);
     border-radius: 4px;
-    box-shadow: 0 0 0 1.5px var(--mention-fill, var(--info-tint));
+    box-shadow: 0 0 0 1.5px var(--mention-fill);
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
   }

@@ -210,7 +210,7 @@
     align-items: center;
     gap: var(--sp-2);
     inline-size: 100%;
-    min-block-size: var(--row-menu, calc(36px * var(--dense, 1)));
+    min-block-size: calc(var(--menu-row-h, 32px) + 4px);
     padding-inline: var(--sp-2);
     border: 0;
     border-radius: var(--r-menu-row, 8px);

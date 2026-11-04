@@ -1,6 +1,5 @@
 <!--
-  Attach a row by search: a field, and under it the rows that answer, each one press. The send sheet's "+" and Slash's @
-  open it. Only rows are offered, since a row is what can be attached; a search the record refuses is nothing found.
+  Attach a row by search: a field, and under it the rows that answer, each one press. The send sheet's "+" opens it. Only rows are offered, since a row is what can be attached; a search the record refuses is nothing found.
 -->
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
