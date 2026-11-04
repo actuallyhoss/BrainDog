@@ -18446,7 +18446,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const state: unknown = args?.state;
       const allowed = [...INBOX_STATES, 'all'];
       if (state !== undefined && !(typeof state === 'string' && allowed.includes(state)))
-        return no('VALUE_MALFORMED', `state is one of ${allowed.join(', ')}. Left out, it is untriaged and review together.`, {
+        return no('VALUE_MALFORMED', `state is one of ${allowed.join(', ')}. Left out, it is what waits: untriaged, review and proposed.`, {
           at: 'state',
           allowed,
         });

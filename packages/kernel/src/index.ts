@@ -1381,8 +1381,15 @@ export type ArrivalSettlement = {
  */
 export const INBOX_STATES = ['untriaged', 'review', 'skipped', 'matched', 'proposed', 'ignored'] as const;
 export type InboxState = (typeof INBOX_STATES)[number];
-/** What waits on a person, and what the inbox shows when it is asked for nothing in particular. */
-export const INBOX_WAITING: readonly InboxState[] = ['untriaged', 'review'];
+/**
+ * What waits on a person, and what the inbox shows when it is asked for nothing in particular.
+ *
+ * `proposed` WAITS TOO. A pattern that read a message and would not write it without asking holds it as `proposed`. The
+ * sign `arrivals-filed` counted those while the inbox listed only the other two and filing refused them ("has already
+ * left the inbox, as proposed"), so one whose question had gone read red every day with no screen that showed it and no
+ * press that cleared it. Filing or archiving one closes the question about it (`settleAsked`).
+ */
+export const INBOX_WAITING: readonly InboxState[] = ['untriaged', 'review', 'proposed'];
 
 /**
  * What filing, archiving or returning an arrival did: the arrival, the state it is in now, the row it became when it
@@ -11828,7 +11835,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** Arrivals nothing claimed and nobody has dealt with yet: how many the inbox holds. */
     inboxWaiting: (): number =>
-      Number(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM inbox_raw WHERE state IN ('untriaged', 'review')")?.n ?? 0),
+      Number(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM inbox_raw WHERE state IN ('untriaged', 'review', 'proposed')")?.n ?? 0),
 
     /** What each pattern did with the last `days` days of arrivals, door by door. */
     patternReport: (days = 14): PatternReport => patternReport(sql, clock.now(), days),
@@ -11974,7 +11981,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           const filed = filedAs(id);
           if (filed) return ok<ArrivalSettled>({ id, state: 'matched', entry: filed, already: true });
         }
-        if (raw.state !== 'untriaged' && raw.state !== 'review')
+        if (raw.state !== 'untriaged' && raw.state !== 'review' && raw.state !== 'proposed')
           return no<ArrivalSettled>('OUT_OF_BOUNDS', `This arrival has already left the inbox, as ${raw.state}. Nothing was written.`, {
             at: 'id',
           });
@@ -11999,7 +12006,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const raw = sql.one<{ state: string }>('SELECT state FROM inbox_raw WHERE id = ?', id);
         if (!raw) return no<ArrivalSettled>('OUT_OF_BOUNDS', 'There is no arrival with that id in this inbox.', { at: 'id' });
         if (raw.state === 'ignored') return ok<ArrivalSettled>({ id, state: 'ignored', entry: null, already: true });
-        if (raw.state !== 'untriaged' && raw.state !== 'review')
+        if (raw.state !== 'untriaged' && raw.state !== 'review' && raw.state !== 'proposed')
           return no<ArrivalSettled>('OUT_OF_BOUNDS', `This arrival has already left the inbox, as ${raw.state}. Nothing was changed.`, {
             at: 'id',
           });
@@ -12029,8 +12036,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       transaction(() => {
         const raw = sql.one<{ state: string }>('SELECT state FROM inbox_raw WHERE id = ?', id);
         if (!raw) return no<ArrivalSettled>('OUT_OF_BOUNDS', 'There is no arrival with that id in this inbox.', { at: 'id' });
-        if (raw.state === 'untriaged' || raw.state === 'review')
-          return ok<ArrivalSettled>({ id, state: raw.state, entry: null, already: true });
+        if (raw.state === 'untriaged' || raw.state === 'review') return ok<ArrivalSettled>({ id, state: raw.state, entry: null, already: true });
+        if (raw.state === 'proposed') return ok<ArrivalSettled>({ id, state: 'review', entry: null, already: true });
         const settled = settledBy(id, raw.state);
         if (raw.state === 'matched' && !settled)
           return no<ArrivalSettled>(
@@ -12038,7 +12045,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             'A rule filed this arrival, not a person, so there is no filing here to take back. Its row is edited or archived in its list. Nothing was changed.',
             { at: 'id' },
           );
-        const back = settled?.from;
+        /* ONE TAKEN FROM `proposed` COMES BACK AS `review`: it waits on a person either way, and its question is asked again. */
+        const back = settled?.from === 'proposed' ? 'review' : settled?.from;
         if (!settled || (back !== 'untriaged' && back !== 'review'))
           return no<ArrivalSettled>('OUT_OF_BOUNDS', `This arrival left the inbox as ${raw.state} by a rule, not by a person, so it has nowhere to go back to. Nothing was changed.`, {
             at: 'id',

@@ -43,7 +43,7 @@ const PATTERNS_MOST = 5;
 export function tallyOf(page: InboxPage): Tally | null {
   const c = page.counts;
   if (!c) return null;
-  return { waiting: c.untriaged + c.review, filed: c.matched, archived: c.ignored, ruled: page.ruledThisWeek ?? null };
+  return { waiting: c.untriaged + c.review + (c.proposed ?? 0), filed: c.matched, archived: c.ignored, ruled: page.ruledThisWeek ?? null };
 }
 
 /**

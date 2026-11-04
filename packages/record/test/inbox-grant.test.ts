@@ -58,7 +58,7 @@ test('A TOKEN THE OWNER MINTED WITH THE INBOX REACH READS THE INBOX IN EVERY STA
     const waiting = await api.inbox(undefined, granted(scope));
     assert.ok(waiting.ok, `a ${scope} token with the reach was refused: ${JSON.stringify(refusal(waiting))}`);
     const page = waiting.value as InboxPage;
-    assert.deepEqual(page.arrivals.map((a) => a.subject), ['Text 2', 'Text 1'], 'the default is what waits on a person: untriaged and review');
+    assert.deepEqual(page.arrivals.map((a) => a.subject), ['Text 5', 'Text 2', 'Text 1'], 'the default is what waits on a person: untriaged, review and proposed');
     assert.deepEqual(page.counts, Object.fromEntries(STATES.map((s) => [s, 1])), 'a count for every state, on every page');
   }
   for (const [n, state] of STATES.entries()) {

@@ -69,9 +69,9 @@ test('THE INBOX IS READ BY STATE: a skipped arrival is answered when skipped is 
 test("WITH NO STATE IT IS TODAY'S PAIR, newest first, and the count on the rail is still their sum", async () => {
   const { api, sql } = await record();
   const page = value<InboxPage>(await api.inbox({}, owner));
-  assert.deepEqual(page.arrivals.map((a) => a.subject), ['Text 8, untriaged', 'Text 3, review', 'Text 1, untriaged']);
+  assert.deepEqual(page.arrivals.map((a) => a.subject), ['Text 8, untriaged', 'Text 5, proposed', 'Text 3, review', 'Text 1, untriaged']);
   assert.deepEqual(value<InboxPage>(await api.inbox(undefined, owner)).arrivals, page.arrivals, 'no arguments at all is the same answer');
-  assert.equal(value<Boot>(await api.boot(owner)).counts.inbox, page.counts.untriaged + page.counts.review);
+  assert.equal(value<Boot>(await api.boot(owner)).counts.inbox, page.counts.untriaged + page.counts.review + page.counts.proposed);
   sql.close();
 });
 
