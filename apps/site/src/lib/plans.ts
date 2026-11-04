@@ -51,6 +51,8 @@ type Row = {
   people: number | null;
   /** Whether the plan takes people beyond the owner (the Plus gate on teams). */
   teams: boolean;
+  /** The most every file attached in a record may come to, in bytes. No page draws it yet; `tableDiffers` holds it. */
+  files: number | null;
   extra: { runs: ExtraPrice; requests: ExtraPrice; bytes: ExtraPrice; ms: ExtraPrice } | null;
 };
 
@@ -76,6 +78,7 @@ export const TABLE: { free: Row; hosted: Row; plus: Row } = {
     agents: 3,
     people: 1,
     teams: false,
+    files: GB,
     extra: null,
   },
   hosted: {
@@ -87,6 +90,7 @@ export const TABLE: { free: Row; hosted: Row; plus: Row } = {
     agents: 15,
     people: null,
     teams: false,
+    files: 20 * GB,
     extra: EXTRA,
   },
   plus: {
@@ -98,6 +102,7 @@ export const TABLE: { free: Row; hosted: Row; plus: Row } = {
     agents: 75,
     people: null,
     teams: true,
+    files: 100 * GB,
     extra: EXTRA,
   },
 };
