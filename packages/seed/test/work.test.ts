@@ -119,7 +119,8 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   assert.deepEqual(
     headings,
     [
-      undefined, undefined, undefined, 'What needs doing?', 'Questions for you', 'Late', 'Waiting on you', 'This week', 'With an agent',
+      /* ONE LINE SINCE work 1.26.1 (7438cc7e8), FOR A LIST WITH NOTHING OPEN: the counts over the bands went, each band says its own. And Your work this week since 4daeed99c. */
+      undefined, 'What needs doing?', 'Questions for you', 'Late', 'Waiting on you', 'Your work this week', 'With an agent',
       'Not this week', 'After this week', 'No due day', 'Later', 'Needs a project', 'With no project',
       'Not moved in three months', 'Untouched for 90 days', 'Done lately', 'Done recently',
     ],
@@ -127,7 +128,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   );
   /* NO HALF-EMPTY TILE: the four bands half the row each, two rows, and the three folded groups each a heading across the page, as a section is. */
   const spans = Object.fromEntries((PAGES.work!.blocks as { heading?: string; span?: number }[]).filter((b) => b.heading).map((b) => [b.heading, b.span]));
-  assert.deepEqual([spans['Late'], spans['Waiting on you'], spans['This week'], spans['With an agent']], [6, 6, 6, 6]);
+  assert.deepEqual([spans['Late'], spans['Waiting on you'], spans['Your work this week'], spans['With an agent']], [6, 6, 6, 6]);
   assert.deepEqual([spans['Not this week'], spans['Needs a project'], spans['Done lately']], [12, 12, 12]);
   assert.ok(!('Today' in spans), 'Today is a band of its own again');
   /* THE LINE TO TYPE INTO IS THE HEADER'S, SINCE work 1.16.0, which a page says by where it puts it: the first block the
@@ -136,7 +137,8 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
      down, which is what keeps it a strip on a screen wide enough to set two tiles side by side. */
   const drawn = page.blocks.filter((b) => b.drawn !== false);
   const opening = drawn.findIndex((b) => !(b.kind === 'note' && (b as { lead?: boolean }).lead === true));
-  assert.equal(opening, 1, 'something stands between the page’s sentence and its capture line');
+  /* FIRST OF ALL WITH TASKS OPEN, SINCE work 1.26.1 (7438cc7e8) took the line over it. */
+  assert.equal(opening, 0, 'something stands before the capture line');
   assert.deepEqual(
     [drawn[opening]!.kind, (drawn[opening] as { register?: string }).register, (drawn[opening] as { box?: boolean }).box],
     ['capture', 'tasks', undefined],
@@ -156,7 +158,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   const late = block(page, 'Late');
   assert.equal(late.kind, 'todo');
   assert.deepEqual(late.rows.map((r) => r.fields.what), ['Turn auto-renew back on for kilnfonts.example']);
-  const soon = block(page, 'This week');
+  const soon = block(page, 'Your work this week');
   assert.equal(soon.kind, 'todo');
   assert.ok(soon.rows.every((r) => String(r.fields.by) >= TODAY), 'a late task is drawn under This week');
   const week = soon.rows.map((r) => String(r.fields.by));
@@ -338,7 +340,7 @@ test('WORK INSTALLS ALONE: a homework list with no Projects and no People, its p
   assert.ok(k.create('tasks', { what: 'Problem set 3', state: 'open', by: TODAY }, { actor: 'p_1' }).ok);
   const overview = opened(k, 'work');
   for (const b of overview.blocks) assert.deepEqual(b.refusals, [], `work ${b.heading}`);
-  assert.ok(block(overview, 'This week').rows.some((r) => r.fields.what === 'Problem set 3'));
+  assert.ok(block(overview, 'Your work this week').rows.some((r) => r.fields.what === 'Problem set 3'));
   for (const b of opened(k, 'work-board').blocks) assert.deepEqual(b.refusals, [], `work-board ${b.heading}`);
 });
 
@@ -364,19 +366,16 @@ test('OPEN IS REMEMBERED EACH DAY, so its figure draws a line once the record ha
  * THE CALMER PAGE, since work 1.10.0: one line in the title said from the figures, a glyph on every tile's heading, and
  * a line on every figure once the record has run a night.
  */
-test('WORK OPENS ON ONE LINE SAID FROM ITS FIGURES, and every tile with a heading wears a glyph', async () => {
+/* NO LINE OF COUNTS SINCE work 1.26.1 (7438cc7e8, 3 Nov, "i dont like those briefs at all"): each band and each column counts itself. A line is said only while there is nothing to count. */
+test('WORK AND THE BOARD OPEN ON NO LINE OF COUNTS, only one for nothing open, and every tile with a heading wears a glyph', async () => {
   const k = await seeded();
   for (const slug of ['work', 'work-board']) {
     const page = opened(k, slug);
-    const lead = page.blocks[0]!;
-    assert.equal(lead.kind, 'note', `${slug} does not open on its line`);
-    assert.equal((lead as { lead?: boolean }).lead, true);
-    /* WORK'S LINE IS COUNTS, SINCE work 1.15.0 ("1 late, 3 waiting on you"), where from 1.13.0 it named the task late
-       longest; the Board's is how much is on it. */
     const counts = page.blocks.find(
       (b) => (b as { lead?: boolean }).lead === true && /\{\{(open-tasks|tasks-late-yours)\}\} (open task\(s\)|late)/u.test(String((b as { body?: string }).body)),
     );
-    assert.ok(counts, `${slug} has no line of its counts`);
+    assert.equal(counts, undefined, `${slug} says a line of its counts again`);
+    assert.deepEqual(page.blocks.filter((b) => (b as { lead?: boolean }).lead === true && b.drawn !== false).map((b) => (b as { body?: string }).body), [], `${slug}: a line is said over tasks that are there`);
     const bare = page.blocks.filter((b) => typeof b.heading === 'string' && typeof (b as { icon?: unknown }).icon !== 'string').map((b) => b.heading);
     assert.deepEqual(bare, [], `${slug}: a heading with no glyph`);
   }
@@ -417,10 +416,10 @@ test('A PROJECT’S FINISHED WORK IS COUNTED BY THE WEEK, one project at a time,
  * band's own clauses, so a band is drawn exactly while it holds a task, and the line's 'late' is the Late band's count.
  * An agent's task due today or past its day is drawn with the agent, and no band of yours is drawn for it.
  */
-test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is what is late in Late', async () => {
+test('NO BAND OF WORK IS DRAWN EMPTY, and no line says again what Late holds', async () => {
   const k = await seeded();
   /* EACH BAND IS DRAWN ON THE FIGURE THAT COUNTS IT, and holds what it counts. */
-  const gates: Record<string, string[]> = { Late: ['tasks-late-yours'], 'This week': ['tasks-this-week-yours'], 'With an agent': ['tasks-with-agents'] };
+  const gates: Record<string, string[]> = { Late: ['tasks-late-yours'], 'Your work this week': ['tasks-this-week-yours'], 'With an agent': ['tasks-with-agents'] };
   const check = () => {
     const page = opened(k, 'work');
     for (const [heading, metrics] of Object.entries(gates)) {
@@ -433,17 +432,8 @@ test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is what is late in L
       assert.equal(counted, b.matched ?? b.rows.length, `${heading} holds what ${metrics.join(' and ')} do not count`);
       assert.equal(b.drawn !== false, (b.matched ?? b.rows.length) > 0, `${heading} is drawn ${b.drawn === false ? 'hidden over tasks' : 'empty'}`);
     }
-    /* THE LINE COUNTS WHAT IS LATE AND WHAT WAITS ON YOU, SINCE work 1.15.0, or says nothing is late when nothing is. */
-    const late = block(page, 'Late');
-    /* FOUND BY WHAT IT SAYS, since work 1.14.0 put the line for nothing open first. */
-    const lead = page.blocks.find((b) => b.kind === 'note' && /\{\{tasks-late-yours\}\} late/u.test(String((b as { body?: string }).body))) as
-      | { body?: string; drawn?: boolean; values?: Record<string, unknown> }
-      | undefined;
-    assert.ok(lead, 'Work has no line counting what is late');
-    assert.equal(lead.body, '{{questions-open-in:tasks}} question(s) for you, {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you');
-    const count = late.matched ?? late.rows.length;
-    assert.equal(lead.drawn !== false, count > 0);
-    if (count > 0) assert.equal(lead.values?.['tasks-late-yours'], count);
+    /* NO LINE COUNTS WHAT IS LATE SINCE work 1.26.1 (7438cc7e8): Late is drawn with what it holds, and a figure in a line over it said the same twice. */
+    assert.ok(!page.blocks.some((b) => b.kind === 'note' && /\{\{tasks-late-yours\}\} late/u.test(String((b as { body?: string }).body))), 'a line counts what is late again');
   };
   check();
   const yesterday = new Date(NOW - 86_400_000).toISOString().slice(0, 10);
