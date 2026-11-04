@@ -140,7 +140,7 @@ test('a site inside every bound is green, at the bound itself and in either case
 });
 
 test('a home page one pixel over its height is red, and a taller page with no bound is not', () => {
-  assert.deepEqual(planted('/', { height: 5659 }), ['/ is 5,659 tall at 1440, over its bound of 5,658.']);
+  assert.deepEqual(planted('/', { height: 7201 }), ['/ is 7,201 tall at 1440, over its bound of 7,200.']);
   assert.deepEqual(planted('/pricing', { height: 90000 }), []);
 });
 
@@ -170,7 +170,7 @@ test('a run that looked at no page, or missed a page with a bound, is red and no
   assert.equal(outOfBounds({ routes: {} }, BOUNDS).length, 2);
   const facts = inBounds();
   delete facts.routes['/'];
-  assert.deepEqual(outOfBounds(facts, BOUNDS), ['/ has no height at 1440, and its bound is 5,658.']);
+  assert.deepEqual(outOfBounds(facts, BOUNDS), ['/ has no height at 1440, and its bound is 7,200.']);
 });
 
 test('the routes are the sitemap, as paths, once each', () => {

@@ -116,6 +116,8 @@ const deadLeaves = (): string[] => {
   return leaves(site)
     .filter((leaf) => {
       for (const { path, open } of chains) {
+        /* A chain that goes on past the leaf calls something on it (`home.hero.title.split(...)`), so it has read it. */
+        if (path.length > leaf.length && startsWith(path, leaf)) return false;
         if (!startsWith(leaf, path) || path.length === 0) continue;
         if (path.length === leaf.length || open) return false;
         const key = quote(leaf[path.length] ?? '');

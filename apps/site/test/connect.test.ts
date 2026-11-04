@@ -17,7 +17,7 @@ import type { Component } from 'svelte';
 import { markOf } from '@braindog/skin/agent-marks.ts';
 import { CONNECT, CONNECT_WORDS, hintParts, hintText } from '../src/lib/connect/apps.ts';
 import { agents } from '../src/lib/copy/agents.ts';
-import { APP_NAMES, APPS_AND } from '../src/lib/agents.ts';
+import { APP_NAMES } from '../src/lib/agents.ts';
 import { APP, CLI_INSTALL, MCP } from '../src/lib/links.ts';
 import { BUILD, missing, when } from './built.ts';
 
@@ -106,7 +106,7 @@ test("the page's words hold no em dash and no never-word outside code", () => {
     assert.ok(!s.includes(EM_DASH), `an em dash in "${s}"`);
     assert.doesNotMatch(s, NEVER, `a never-word in "${s}"`);
   }
-  assert.equal(agents.agents.lead.startsWith(`${APPS_AND} can read your BrainDog`), true);
+  assert.equal(agents.agents.lead, 'One address for every agent. You approve each once, and no key is copied anywhere.');
   assert.ok(!('address' in agents.agents.dev), 'the address is the box\'s alone, said once (plan F18)');
 });
 

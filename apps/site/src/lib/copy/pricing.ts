@@ -48,7 +48,7 @@ export const pricing = {
     /**
      * THE EARLY ACCESS PAGE (20 October): what `/pricing` says while `LAUNCH.billing` is off. Free, the one plan
      * anybody can be on, leads with its $0 and the same limits Settings > Billing shows; Cloud and Cloud Plus sit
-     * beside it, named, with no price: "coming soon, priced at launch" (his N2, 1 November). The plans below come back
+     * beside it as one line with no name and no price (fewer words, 3 November; his N2 of 1 November named them). The plans below come back
      * the day billing does. The figures are `TABLE.free`'s, filled in by the page.
      */
     early: {
@@ -67,7 +67,7 @@ export const pricing = {
         ],
       },
       /* ONE LINE FOR WHAT COMES LATER (plan F20): a tile naming Cloud and Cloud Plus with two "Coming soon" rows said
-         nothing a reader could act on. Still his N2 words: both named, coming soon, priced at launch. */
+         nothing a reader could act on. */
       later: { say: 'Paid plans for more agents, more questions and your team come later. Nothing you set up now is lost.' },
       faq: {
         title: 'Questions people ask',

@@ -144,11 +144,11 @@ test("the footer is Product, Who it's for and Help, plain links and no blurb", (
     groups.map((g) => [g.title, g.links.map((l) => l.label)]),
     [
       ['Product', ['Slash', 'Agents', 'Pricing', 'Security']],
-      /* NO TEAMS WHILE INVITING PEOPLE IS HELD: its page answers 404, so the footer draws no link to it. */
-      ["Who it's for", ['Founders', 'Developers']],
+      /* TEAMS IS BACK (1 November, `FOR_SHOWN` in `launch.ts`): inviting people is open, and its page answers. */
+      ["Who it's for", ['Founders', 'Teams and agencies', 'Developers']],
       ['Help', ['Docs', 'Support', 'Legal']],
     ],
   );
-  assert.deepEqual(groups[1]?.links.map((l) => l.href), ['/for/founders', '/docs/agents/connect']);
+  assert.deepEqual(groups[1]?.links.map((l) => l.href), ['/for/founders', '/for/teams', '/docs/agents/connect']);
   assert.ok(!('tagline' in shell.footer), 'the footer carries no blurb');
 });

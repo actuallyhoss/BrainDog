@@ -162,14 +162,14 @@ test('with billing off one h1 and one plan, no paid plan; with it on the plans, 
   const on = await render('routes/pricing/+page.svelte', { billing: true });
   const h1 = (r: { body: string }) => [...r.body.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => words(m[1]!));
   assert.deepEqual(h1(off), ['Free while in early access.'], 'the early access page does not have its one h1');
-  assert.deepEqual(h1(on), ['Free for one person.'], 'the plans page does not have one h1, Free’s');
+  assert.deepEqual(h1(on), ['Free to start.'], 'the plans page does not have one h1, Free’s');
   assert.equal((off.body.match(/<tr\b/g) ?? []).length, 0, 'the early access page draws a table of plans');
-  /* HIS N2 (1 November): the paid plans are named, coming soon and priced at launch, with no figure of theirs. */
+  /* FEWER WORDS (fbf2abe2d, 3 November): one line says paid plans come later, with no name and no figure of theirs. */
   for (const plan of PAID) {
-    assert.ok(words(off.body).includes(plan.name), `the early access page does not name ${plan.name} as coming soon`);
+    assert.ok(!words(off.body).includes(plan.name), `the early access page names ${plan.name}`);
     assert.ok(!words(off.body).includes(plan.price), `the early access page prices ${plan.name}`);
   }
-  assert.match(words(off.body), /Coming soon, priced at launch/, 'the paid plans are not said to be priced at launch');
+  assert.match(words(off.body), /Paid plans for more agents, more questions and your team come later\. Nothing you set up now is lost\./, 'the page does not say paid plans come later');
   assert.match(words(off.body), /Free \$0/, 'the one plan is Free at $0');
   assert.equal((on.body.match(/<tr\b/g) ?? []).length, 1 + 7 + 1 + 4, 'the two tables are not a header and seven meters, and a header and four prices');
   /* The cap is a promise about a checkout that is not sold yet, so it is said only with billing on (`extra-use-capped`). */

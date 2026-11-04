@@ -80,8 +80,8 @@ test("each card's agents and credits are its row's in PLAN_TABLE", () => {
     assert.equal(plan.allowance.agents, held.agents, `${plan.name}: the site says ${plan.allowance.agents} agents, the table holds ${held.agents}`);
     assert.equal(plan.allowance.credits, held.credits, `${plan.name}: the site says ${plan.allowance.credits} credits, the table holds ${held.credits}`);
     const card = cardsFor(LAUNCH).find((c) => c.id === plan.id)!;
-    assert.ok(card.lines.includes(`${held.agents} agents`), `${plan.name}'s card says no "${held.agents} agents" line`);
-    assert.ok(card.lines.some((l) => l.startsWith(`${held.credits} questions`)), `${plan.name}'s card says no "${held.credits} questions" line`);
+    assert.ok(card.lines.includes(`${held.agents} agents connected`), `${plan.name}'s card says no "${held.agents} agents connected" line`);
+    assert.ok(card.lines.includes(`${held.credits} Slash questions a month`), `${plan.name}'s card says no "${held.credits} Slash questions a month" line`);
   }
 });
 

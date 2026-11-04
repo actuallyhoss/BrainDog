@@ -58,10 +58,10 @@ const NEVER: readonly RegExp[] = [
 ];
 
 test("the page's words are the early access copy, and its one count of questions is the plan table's", () => {
-  assert.equal(slashPage.head.title, 'Slash knows your whole business.');
+  assert.equal(slashPage.head.title, 'Ask BrainDog in plain words.');
   assert.deepEqual(
     [slashPage.ask.title, slashPage.find.title, slashPage.make.title, slashPage.tally.title, slashPage.agents.title, slashPage.faq.title],
-    ['Ask', 'Find', 'Make', 'How questions are counted', 'Slash and your AI tools', 'Questions'],
+    ['Ask', 'Find', 'Make', 'How questions are counted', 'Slash and your agents', 'Questions'],
   );
   assert.ok(!('close' in slashPage), 'the page ends on the early access strip, not a close of its own (site F11)');
   assert.equal(slashPage.faq.questions.length, 4);

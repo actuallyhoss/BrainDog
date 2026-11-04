@@ -78,7 +78,10 @@ test('/seen.js imports nothing, reads no cookie and sends no identifier of the b
   }
 });
 
-/** The pages the route tree serves: each `+page.svelte`, cut at its first dynamic segment, less the 404 page and the held. */
+/**
+ * The pages the route tree serves: each `+page.svelte`, cut at its first dynamic segment, less the 404 page and the
+ * held. A page beneath a held address is held with it: `/plugins/by/<who>` prerenders nothing while `/plugins` is held.
+ */
 const served = (): string[] => {
   const routes = new URL('../src/routes/', import.meta.url);
   const out = new Set<string>();
@@ -88,7 +91,7 @@ const served = (): string[] => {
     const dirs = parts.slice(0, -1).filter((d) => !/^\(.*\)$/.test(d));
     const cut = dirs.findIndex((d) => d.startsWith('['));
     const path = `/${(cut === -1 ? dirs : dirs.slice(0, cut)).join('/')}`;
-    if (path === '/404' || (HELD as readonly string[]).includes(path)) continue;
+    if (path === '/404' || HELD.some((held) => path === held || path.startsWith(`${held}/`))) continue;
     out.add(path);
   }
   return [...out].sort();
