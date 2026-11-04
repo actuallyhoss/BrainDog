@@ -1271,6 +1271,11 @@
     margin-block-end: 0;
   }
 
+  /* THE LAST FOLDED LINE'S AIR IS THE CARD'S PADDING: its words stand in the middle of a 44 line. */
+  details.key-group:last-child:not([open]) {
+    margin-block-end: -12px;
+  }
+
   /* A FOLDED PROJECT IS A LINE A THUMB OPENS: its name and how many keys, the whole line the target. Its chevron says
      it opens (a flex summary loses the browser's own marker), pointing on while folded and down once open. */
   summary.group-head {

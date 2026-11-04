@@ -283,6 +283,11 @@
     padding-inline-start: calc(var(--well-l) + var(--sp-3));
   }
 
+  /* FOLDED, ITS GAP HAS NOTHING TO STAND OVER: "How it works" stood 38 over the card's foot, under a 21 at its head. */
+  .lock-how:not([open]) {
+    gap: 0;
+  }
+
   .lock-how-head {
     display: flex;
     align-items: center;

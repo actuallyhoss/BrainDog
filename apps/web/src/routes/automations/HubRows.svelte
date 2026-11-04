@@ -362,6 +362,13 @@
     list-style: none;
     padding-inline: var(--sp-3);
   }
+
+  /* UNDER A THUMB ITS WORDS STAND IN A 44 BOX, and the box's air is the card's padding, not more on it. */
+  @media (pointer: coarse) {
+    .fold-more:last-child {
+      margin-block-end: calc(-1 * var(--sp-3));
+    }
+  }
   .more-press {
     display: inline-flex;
     align-items: center;

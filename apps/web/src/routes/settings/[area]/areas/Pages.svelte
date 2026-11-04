@@ -933,12 +933,20 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
-    margin: var(--sp-4) 0 0;
-    padding: var(--sp-3) var(--sp-2) 0;
+    /* ON THE CARD'S TEXT EDGE, the tile's own 16 over its rule. */
+    margin: 0;
+    padding: var(--sp-3) 0 0;
     border-block-start: 1px solid var(--rule);
     color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: var(--lead-meta);
+  }
+
+  /* UNDER A THUMB "MANAGE" IS 44 TALL, and that box's air is the card's padding, not more on it. */
+  @media (pointer: coarse) {
+    .addons {
+      margin-block-end: calc(-1 * var(--sp-3));
+    }
   }
 
   .addons-icons {
