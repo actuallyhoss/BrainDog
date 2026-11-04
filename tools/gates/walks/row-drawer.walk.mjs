@@ -218,7 +218,7 @@ export const walkedTrue = (seen) => seen.walked?.task === seen.fourth && seen.wa
 const LIST = 'tasks';
 const TITLE_BOX = `new-${LIST}-what`;
 const DUE_BOX = `new-${LIST}-by`;
-const TITLE_HEAD = 'Description';
+const TITLE_HEAD = 'Task';
 const DUE_HEAD = 'Due';
 
 /**
