@@ -249,7 +249,7 @@
   .h-what {
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
     transition: color var(--d-swap) var(--ease-out);
   }
@@ -257,7 +257,7 @@
   .h-why {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 

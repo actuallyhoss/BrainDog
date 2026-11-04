@@ -137,7 +137,7 @@
     border-radius: var(--r-pop);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-decoration: none;
   }
 
@@ -177,7 +177,7 @@
     margin: var(--sp-3) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* UNDER A THUMB A LINK IS 44 (13 §7): the pointer and not the width, as every row is. */

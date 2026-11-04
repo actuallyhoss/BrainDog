@@ -1790,7 +1790,7 @@
     display: grid;
     color: var(--ink);
     font-size: var(--fs-meta);
-    line-height: 16px;
+    line-height: calc(16px * var(--type, 1));
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -1926,7 +1926,7 @@
     background: color-mix(in srgb, var(--tile) 85%, transparent);
     color: var(--ink);
     font-size: var(--fs-meta);
-    line-height: 16px;
+    line-height: calc(16px * var(--type, 1));
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -2885,7 +2885,7 @@
     padding-inline-start: var(--sp-1);
     color: var(--ink-3);
     font-size: var(--fs-cap);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     white-space: nowrap;
   }
 

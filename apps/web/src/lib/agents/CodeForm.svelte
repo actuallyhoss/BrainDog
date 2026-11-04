@@ -347,7 +347,7 @@
     margin: 0;
     color: var(--tone, var(--ink-2));
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 

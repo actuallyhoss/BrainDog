@@ -52,14 +52,14 @@
     font-size: var(--fs-cap);
     font-weight: var(--fw-semi);
     font-variant-numeric: tabular-nums;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .badge[data-size='s'] {
     min-inline-size: 18px;
     block-size: 18px;
     padding-inline: var(--sp-1);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     box-shadow: 0 0 0 2px var(--tile);
   }
 

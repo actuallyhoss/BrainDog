@@ -101,7 +101,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
   }
 
   /* AS MANY TILES AS FIT, each at least a phone's width of words: one column at 390, three or four at 1440. */
@@ -176,7 +176,7 @@
   .heard {
     margin: 0;
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 

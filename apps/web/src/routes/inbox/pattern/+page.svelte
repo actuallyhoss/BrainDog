@@ -556,7 +556,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
   }
 
   .sub {
@@ -564,7 +564,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .note,
@@ -574,7 +574,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .fix {
@@ -648,7 +648,7 @@
     font-family: var(--font-display);
     font-size: var(--fs-figure);
     font-weight: 600;
-    line-height: 34px;
+    line-height: calc(34px * var(--type, 1));
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
   }
@@ -657,7 +657,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     letter-spacing: 0;
   }
 

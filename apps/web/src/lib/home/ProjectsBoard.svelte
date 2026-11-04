@@ -477,7 +477,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-wrap: pretty;
   }
 
@@ -707,7 +707,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .t-n {

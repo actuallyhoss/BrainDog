@@ -73,7 +73,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* The title, the line and the way back, the button a step further from the words than they are from each other. */

@@ -228,7 +228,7 @@
     gap: 0 var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .evo-tag {
@@ -253,7 +253,7 @@
   .evo-title {
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .evo-title a {
@@ -274,7 +274,7 @@
   .evo-meta {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .evo-meta {
@@ -290,7 +290,7 @@
   .evo-diff summary {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     cursor: pointer;
   }
 

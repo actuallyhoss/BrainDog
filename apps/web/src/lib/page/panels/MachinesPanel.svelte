@@ -112,7 +112,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-medium);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .machine-name :global(svg) {
@@ -135,7 +135,7 @@
   .machine-n {
     padding-inline-start: calc(var(--icon-s) + var(--sp-2));
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* A PROFILE IS A CHIP, as Settings › Agents draws one: the quiet fill, the control's radius, its name as it is spelt. */
@@ -165,7 +165,7 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -183,6 +183,6 @@
   .profiles-head {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 </style>

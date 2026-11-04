@@ -475,7 +475,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-head);
     font-weight: var(--fw-semi);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }

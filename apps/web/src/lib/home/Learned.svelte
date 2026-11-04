@@ -65,7 +65,7 @@
     padding: var(--sp-2) 0;
     color: var(--ink);
     font-size: var(--fs-body, 15px);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -73,7 +73,7 @@
     margin: var(--sp-2) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-body, 15px);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   @media (forced-colors: active) {

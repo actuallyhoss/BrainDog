@@ -267,7 +267,7 @@
     padding-inline: var(--sp-2) var(--sp-3);
     border-radius: var(--r-ctl);
     font-size: var(--fs-ctl);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     cursor: pointer;
     user-select: none;
     -webkit-tap-highlight-color: transparent;

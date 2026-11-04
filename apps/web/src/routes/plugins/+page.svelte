@@ -603,7 +603,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .ex-line {

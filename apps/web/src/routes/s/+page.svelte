@@ -435,7 +435,7 @@
     max-inline-size: 68ch;
     color: var(--ink);
     font-size: var(--fs-head);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -443,13 +443,13 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-head);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
   }
 
   .lead + .until {
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* A SECTION'S NAME, on the board over the tiles it names, as the owner's page sets it. */
@@ -459,7 +459,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: var(--fw-semi);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
   }
 
   /* THE NOTE, AT A READING MEASURE: the renderer's blocks at the tile's width, its own headings under the tile's, never
@@ -482,7 +482,7 @@
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
     letter-spacing: 0;
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .note :global(:is(h1, h2, h3):first-child) {
@@ -572,7 +572,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: var(--fw-semi);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -581,7 +581,7 @@
     max-inline-size: 68ch;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
     white-space: pre-line;
   }
@@ -590,7 +590,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* ── A shared project (collab pass 2): two columns from 900 up, the rail a third; rows with hairlines between ── */
@@ -620,7 +620,7 @@
     max-inline-size: 68ch;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .proj-next {
@@ -633,7 +633,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-regular);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .proj-step {
@@ -644,7 +644,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-medium);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .proj-rows {
@@ -686,7 +686,7 @@
   .proj-title {
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -699,7 +699,7 @@
   .proj-day {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .proj-when {
@@ -716,7 +716,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .proj-line {
@@ -729,7 +729,7 @@
   .proj-said {
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -751,14 +751,14 @@
     font-family: var(--font-display);
     font-size: var(--fs-figure);
     font-weight: var(--fw-semi);
-    line-height: 26px;
+    line-height: calc(26px * var(--type, 1));
     white-space: nowrap;
   }
 
   .proj-figure-label {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .proj-line.proj-money {
@@ -768,7 +768,7 @@
   .proj-amount {
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-align: end;
     white-space: nowrap;
   }
@@ -779,7 +779,7 @@
     inline-size: 100%;
     border-collapse: collapse;
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .sheet-cell {

@@ -217,7 +217,7 @@
     min-block-size: 20px;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .said[data-wrong] {

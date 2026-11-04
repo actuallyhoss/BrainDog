@@ -1950,7 +1950,7 @@
   .block-slot > :global(.block[data-kind='section'] .sec-title) {
     gap: var(--sp-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* THE ONE CARD HEAD HERE TOO (space pass, 4 Nov): a 28 row, `--card-head-gap` over what the slot holds under it. Tell

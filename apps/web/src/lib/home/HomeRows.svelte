@@ -379,7 +379,7 @@
     color: var(--ink-3);
     font-size: var(--fs-cap, 12px);
     font-weight: var(--fw-medium);
-    line-height: 12px;
+    line-height: calc(12px * var(--type, 1));
   }
 
   /* "TODAY" IS FIVE LETTERS IN A 37px WELL: at 500 and pulled a hair tighter it clears the ring on both sides. */
@@ -391,7 +391,7 @@
   .hd-date {
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: 16px;
+    line-height: calc(16px * var(--type, 1));
     font-variant-numeric: tabular-nums;
   }
 
@@ -464,9 +464,9 @@
   }
 
   .hd-week {
-    font-size: 10.5px;
+    font-size: calc(10.5px * var(--type, 1));
     font-weight: var(--fw-semi);
-    line-height: 14px;
+    line-height: calc(14px * var(--type, 1));
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
@@ -477,7 +477,7 @@
   }
 
   .hd-chip:not([data-today]) .hd-date {
-    font-size: 19px;
-    line-height: 20px;
+    font-size: calc(19px * var(--type, 1));
+    line-height: calc(20px * var(--type, 1));
   }
 </style>

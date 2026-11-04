@@ -436,7 +436,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-wrap: pretty;
   }
 
@@ -478,7 +478,7 @@
     margin: var(--sp-3) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .drafts {
@@ -520,7 +520,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -534,14 +534,14 @@
   .draft-needs-say {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .draft-where {
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .draft-amount {

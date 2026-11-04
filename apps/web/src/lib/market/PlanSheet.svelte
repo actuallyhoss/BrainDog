@@ -303,7 +303,7 @@
     flex-direction: column;
     gap: var(--sp-5);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .plan-summary {
@@ -333,7 +333,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
   }
 
   .plan-move {
@@ -359,7 +359,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .plan-title {
@@ -424,7 +424,7 @@
     margin: 0;
     color: var(--red);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .plan-key-signin {
@@ -439,7 +439,7 @@
   .plan-detail {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -454,7 +454,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .plan-group .plan-note {

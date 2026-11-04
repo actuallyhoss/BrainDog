@@ -2087,7 +2087,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* ── the head: the greeting and the brief ─────────────────────────── */
@@ -2241,7 +2241,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* ── the board ─────────────────────────────────────────────────────────
@@ -2343,7 +2343,7 @@
     min-block-size: 20px;
     padding-block-start: 0;
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .body[data-board] :global(.board-part) {
@@ -2602,7 +2602,7 @@
     flex: 1 1 auto;
     min-inline-size: 0;
     font-size: var(--fs-meta);
-    line-height: 16px;
+    line-height: calc(16px * var(--type, 1));
   }
 
   .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(n + 2) .cell-figure) {
@@ -2947,7 +2947,7 @@
   .today-hi {
     font-size: var(--fs-head);
     font-weight: var(--fw-semi);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     letter-spacing: -0.01em;
   }
 
@@ -2986,7 +2986,7 @@
   .body[data-board] :global(:is(.block-bar > .block-name, .tile-head .tile-title)) {
     max-inline-size: calc(100% - 18px - var(--sp-2));
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     letter-spacing: -0.005em;
   }
 
@@ -3015,7 +3015,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-page);
     font-weight: var(--fw-semi);
-    line-height: 30px;
+    line-height: calc(30px * var(--type, 1));
     letter-spacing: -0.02em;
   }
 
@@ -3077,8 +3077,8 @@
 
   @media (width < 640px) {
     .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child .cell-figure) {
-      font-size: 24px;
-      line-height: 28px;
+      font-size: calc(24px * var(--type, 1));
+      line-height: calc(28px * var(--type, 1));
     }
 
     /* ONE QUESTION IN THREE LINES AT MOST, and the question is the door to the rest: no "Read all" under it on Today. */
@@ -3248,7 +3248,7 @@
     border-radius: var(--r-pill, 999px);
     background: var(--warn-tint);
     color: var(--warn);
-    font-size: 11.5px;
+    font-size: calc(11.5px * var(--type, 1));
     font-weight: var(--fw-semi);
     line-height: 1;
   }
@@ -3267,7 +3267,7 @@
   .body[data-board] :global([data-board-key][data-size='small'] .block[data-kind='stat'] .grid > .cell:first-child .cell-label) {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:only-child .cell-figure),
@@ -3275,7 +3275,7 @@
     justify-self: start;
     font-size: var(--fs-figure);
     font-weight: var(--fw-semi);
-    line-height: 26px;
+    line-height: calc(26px * var(--type, 1));
     letter-spacing: -0.02em;
     text-align: start;
   }

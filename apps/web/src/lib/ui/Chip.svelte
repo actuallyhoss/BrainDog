@@ -71,7 +71,7 @@
     color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     white-space: nowrap;
     vertical-align: middle;
   }
@@ -115,7 +115,7 @@
     background: none;
     border-radius: 0;
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .chip[data-intent] .chip-word {

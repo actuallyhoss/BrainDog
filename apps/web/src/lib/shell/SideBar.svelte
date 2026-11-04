@@ -940,7 +940,7 @@
     box-sizing: border-box;
     inline-size: 100%;
     /* THE OPS SIDEBAR ROW: 36 tall (34 here, BrainDog's rail is longer), radius 10, 14/400, 2px apart. */
-    min-block-size: 34px;
+    min-block-size: var(--side-row, 34px);
     /* 2 apart, so a row's pitch is 36 (rhythm, 3 Nov: it was 35, the margins collapsing to 1). */
     margin-block: var(--sp-0);
     padding-inline: 10px;
@@ -949,7 +949,7 @@
     border-radius: var(--r-ctl);
     color: var(--ink-2);
     font: inherit;
-    font-size: 14px;
+    font-size: calc(14px * var(--type, 1));
     font-weight: var(--fw-regular);
     line-height: var(--lead-ui);
     text-align: start;
@@ -997,7 +997,7 @@
 
   /* A ROW UNDER ITS PLACE: in under the place's name, a step smaller, no glyph. */
   .s-nested .s-row {
-    min-block-size: 28px;
+    min-block-size: var(--side-sub, 28px);
     padding-inline-start: calc(var(--sp-2) + var(--icon-s, 16px) + var(--sp-2));
     font-size: var(--fs-meta);
     font-weight: var(--fw-regular);

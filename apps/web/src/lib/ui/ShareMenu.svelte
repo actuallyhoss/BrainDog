@@ -353,7 +353,7 @@
     color: var(--ink);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     white-space: nowrap;
     transition: background var(--d-state) var(--ease-out);
   }

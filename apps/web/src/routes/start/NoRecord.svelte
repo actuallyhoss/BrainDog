@@ -125,7 +125,7 @@
     font-size: var(--fs-page);
     font-weight: 600;
     letter-spacing: -0.02em;
-    line-height: 34px;
+    line-height: calc(34px * var(--type, 1));
     text-wrap: balance;
     overflow-wrap: anywhere;
   }
@@ -134,7 +134,7 @@
     .own-h {
       font-family: var(--font-display);
       font-size: var(--fs-figure);
-      line-height: 36px;
+      line-height: calc(36px * var(--type, 1));
     }
   }
 
@@ -144,7 +144,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
   }
 
   .own-note {

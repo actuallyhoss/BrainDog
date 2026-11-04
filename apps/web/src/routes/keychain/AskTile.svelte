@@ -149,7 +149,7 @@
 
   .ask-title {
     font-weight: 500;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -163,7 +163,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .ask-when {

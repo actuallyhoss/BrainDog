@@ -317,7 +317,7 @@
     font: inherit;
     /* 16px IN EVERY BOX, because a phone zooms the page when a smaller one takes focus. */
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     resize: none;
     field-sizing: content;
     max-block-size: 240px;
@@ -371,7 +371,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* ── the days ──────────────────────────────────────────────────────── */
@@ -381,7 +381,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .moments {
@@ -407,7 +407,7 @@
     padding-block-start: 2px;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -456,7 +456,7 @@
     margin: 0;
     padding-block-start: 2px;
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .words {
@@ -506,7 +506,7 @@
     gap: var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     cursor: pointer;
   }
 

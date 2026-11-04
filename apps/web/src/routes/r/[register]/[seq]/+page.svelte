@@ -2331,7 +2331,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .figure-line {
@@ -2363,7 +2363,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .paid-track {
@@ -2438,7 +2438,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 400;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .fact-value {
@@ -2657,7 +2657,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* THE CONTROL THAT OPENS A FIELD, as wide as the trailing column it sits in, so every pencil's glyph lands on one
@@ -2931,7 +2931,7 @@
   .item-detail {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
   }

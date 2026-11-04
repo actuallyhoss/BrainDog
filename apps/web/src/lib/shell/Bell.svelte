@@ -457,7 +457,7 @@
     font-size: var(--fs-cap);
     font-weight: var(--fw-semi);
     font-variant-numeric: tabular-nums;
-    line-height: 16px;
+    line-height: calc(16px * var(--type, 1));
     text-align: center;
   }
 
@@ -635,7 +635,7 @@
     border-radius: var(--r-ctl);
     color: var(--ink-2);
     font-size: var(--fs-ctl);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
   }
@@ -803,7 +803,7 @@
   .bell-in-sheet .bell-row {
     padding-block: 10px;
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .bell-in-sheet .bell-new {

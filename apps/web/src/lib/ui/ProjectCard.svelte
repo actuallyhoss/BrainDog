@@ -284,7 +284,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -293,7 +293,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -332,7 +332,7 @@
     color: var(--red);
     font-size: var(--fs-meta);
     font-weight: 600;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .pc-late .dot {
@@ -355,7 +355,7 @@
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.035em;
-    line-height: 34px;
+    line-height: calc(34px * var(--type, 1));
     white-space: nowrap;
   }
 
@@ -435,7 +435,7 @@
     margin-block-start: 2px;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .pc-move[data-tone='good'] {
@@ -473,7 +473,7 @@
   .pc-quiet {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* ── row D: the next step ── */
@@ -484,7 +484,7 @@
     margin-block-start: 12px;
     color: var(--ink-2);
     font-size: var(--fs-ctl);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .pc-next :global(.icon) {
@@ -619,7 +619,7 @@
 
     .pc-num {
       font-size: calc(var(--fs-figure) + 2px);
-      line-height: 30px;
+      line-height: calc(30px * var(--type, 1));
     }
 
     .pc-line {

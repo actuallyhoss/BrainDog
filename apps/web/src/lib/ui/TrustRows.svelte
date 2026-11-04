@@ -182,7 +182,7 @@
   .trust-said {
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -192,7 +192,7 @@
     gap: 0 var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* THE WORD CARRIES IT AND THE RED AGREES. No pill and no fill: a word in the line. */
@@ -213,7 +213,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* THE MARK ON A RUN, its own line under the agent's last one, quiet as the floors: the words say it, no colour. */
@@ -223,7 +223,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .trust-empty {
@@ -231,6 +231,6 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 </style>

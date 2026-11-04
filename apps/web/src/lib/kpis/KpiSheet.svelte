@@ -808,7 +808,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-medium);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .kpi-source[data-on] .kpi-source-title {
@@ -818,7 +818,7 @@
   .kpi-source-line {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* THE TARGET, ITS UNIT AND ITS DAY: three columns where the sheet is wide, the day on its own row on a phone. */
@@ -910,7 +910,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* THE LINE UNDER A TRACK IS A FIELD'S HELP LINE, in its size and ink. */
@@ -1003,7 +1003,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }

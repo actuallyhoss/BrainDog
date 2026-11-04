@@ -224,7 +224,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .r-project {
@@ -248,7 +248,7 @@
     min-inline-size: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 

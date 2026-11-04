@@ -862,9 +862,8 @@
      is the shape of its rows rather than of a card holding them. A border, a fill and a shadow round
      a list of invoices is a large part of what made the register read as a spreadsheet in a page.
 
-     `--tr-h` IS THE ROW: the reader's density plus room. `--row-h` is 30, 34 or 40, sized for a line
-     of text with nothing round it; a row somebody points at wants air above and below the words, and
-     at Comfortable this lands on 44, the size of a target. Density still moves it by the same steps. */
+     `--tr-h` IS THE ROW, AND IT IS THE READER'S ROW: `--table-row-h` is `--row-h` in the app, 36, 44 or 52, one number
+     for a row wherever it stands. Under a thumb it never falls below a target (below). */
   .table-region {
     --tr-h: var(--table-row-h);
     overflow: auto;

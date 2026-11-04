@@ -219,7 +219,7 @@
     border-radius: var(--r-pop);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-decoration: none;
   }
 
@@ -247,7 +247,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     text-align: center;
   }
 
@@ -264,14 +264,14 @@
     padding: 0 var(--sp-3) var(--sp-2);
     color: var(--ink-2, var(--ink-3));
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .s-more {
     margin: var(--sp-3) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* THE FOLD: its summary a quiet line under the list, its lines plain words, none of them a press. */
@@ -300,7 +300,7 @@
   .s-tidy-line {
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 

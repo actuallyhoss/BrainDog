@@ -317,7 +317,7 @@
     gap: var(--sp-3);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .entry-detail {
@@ -373,7 +373,7 @@
     margin: var(--sp-3) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* THE PARTS IT CAN ALSO KEEP WRAP AS CAPSULES, 6 apart, never a 28px chip riding a 20px line of text. */

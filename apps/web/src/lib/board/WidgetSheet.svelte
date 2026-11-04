@@ -470,7 +470,7 @@
     color: var(--ink-3);
     font-size: var(--fs-cap);
     font-weight: var(--fw-medium);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     pointer-events: none;
   }
 

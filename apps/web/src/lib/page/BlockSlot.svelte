@@ -1266,7 +1266,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* HOW MANY IT HOLDS, beside the name in the quiet ink, as `ui/Tile.svelte` says a count: one step lighter, never a

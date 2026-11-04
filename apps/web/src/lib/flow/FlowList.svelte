@@ -214,7 +214,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     text-align: center;
   }
 

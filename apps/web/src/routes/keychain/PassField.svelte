@@ -113,6 +113,6 @@
     margin: 0 0 var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 </style>

@@ -107,6 +107,6 @@
     max-inline-size: 75ch;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 </style>

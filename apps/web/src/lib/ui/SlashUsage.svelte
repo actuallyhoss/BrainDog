@@ -205,7 +205,7 @@
     font-family: var(--font-display);
     font-size: var(--fs-figure);
     font-weight: 600;
-    line-height: 34px;
+    line-height: calc(34px * var(--type, 1));
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
   }
@@ -215,7 +215,7 @@
     margin: auto 0 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* WHAT THE ASKS WERE FOR, a line a purpose under the reading, in the same size. */
@@ -228,7 +228,7 @@
     list-style: none;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     font-variant-numeric: tabular-nums;
   }
 
@@ -245,7 +245,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .spent-gap {
@@ -271,7 +271,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .spent-h-n {

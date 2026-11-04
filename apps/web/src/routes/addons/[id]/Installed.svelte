@@ -1098,7 +1098,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     text-wrap: pretty;
   }
 
@@ -1196,7 +1196,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .turn-ask-do {
@@ -1217,7 +1217,7 @@
     margin: var(--sp-1) 0 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* THE FORM KEEPS THE READING MEASURE, not the page: the page runs the window's width with the rest, and a switch

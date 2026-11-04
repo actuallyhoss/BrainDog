@@ -234,7 +234,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .p-count {
@@ -343,7 +343,7 @@
     overflow: hidden;
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -358,7 +358,7 @@
     overflow: hidden;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;

@@ -381,7 +381,7 @@
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
     letter-spacing: 0;
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* WHAT IT HELD: its words dimmed and struck, as the diff strikes a line it takes out; a chart is only dimmed, since a

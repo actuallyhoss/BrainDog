@@ -82,6 +82,6 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 </style>

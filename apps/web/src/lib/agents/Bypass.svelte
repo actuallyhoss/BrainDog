@@ -88,7 +88,7 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     list-style: none;
     cursor: pointer;
   }

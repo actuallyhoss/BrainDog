@@ -343,7 +343,7 @@
   .question {
     font-weight: 600;
     font-size: var(--fs-head);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     letter-spacing: var(--track-head, -0.01em);
   }
 
@@ -359,7 +359,7 @@
     background: var(--tile-2);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -544,7 +544,7 @@
     color: var(--ink);
     font: inherit;
     font-size: 16px;
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     resize: none;
     outline: none;
     scroll-margin-block: var(--sp-6) var(--sp-8);

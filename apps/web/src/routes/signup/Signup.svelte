@@ -1823,7 +1823,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     /* NO WORD LEFT ALONE ON A PHONE'S LAST LINE ("wrote." under a full line at 390). */
     text-wrap: pretty;
   }
@@ -1831,7 +1831,7 @@
   /* THE TERMS LINE IS THE FORM'S SMALL PRINT, one line on a phone. */
   .agree {
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .form {
@@ -1889,7 +1889,7 @@
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     /* A field takes the browser's own tracking, not the body's, and the marks under it take the body's: the same here,
        or every word drifts a little further from its mark. The gutter is kept on both, so a scrollbar wraps neither. */
     letter-spacing: inherit;
@@ -1931,7 +1931,7 @@
     padding: var(--sp-3) var(--sp-4);
     color: transparent;
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     white-space: pre-wrap;
     overflow-wrap: break-word;
     scrollbar-gutter: stable;
@@ -2002,7 +2002,7 @@
     color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-align: start;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
@@ -2047,7 +2047,7 @@
     gap: var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* ── Keep it ───────────────────────────────────────────────────────────── */
@@ -2063,7 +2063,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -2156,7 +2156,7 @@
     min-inline-size: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* THE LATE READING'S LINE (1 Nov): one held slot under the build, so its words coming and going move nothing. */
@@ -2165,7 +2165,7 @@
     margin: var(--sp-2) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -2208,7 +2208,7 @@
     margin: 0;
     color: var(--red);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* THE READ'S BOT CHECK TAKES NO ROOM until Cloudflare draws something the person must do. */
@@ -2280,7 +2280,7 @@
     padding-inline-start: var(--sp-5);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .missed-why {
@@ -2318,7 +2318,7 @@
     gap: var(--sp-3);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* A STEP'S NUMBER IN A WELL OF THE TILE'S FILL, on the ground beside the sheet: a count of steps is not an alarm. */

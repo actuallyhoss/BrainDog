@@ -66,7 +66,7 @@
     margin: 0;
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 26px;
+    line-height: calc(26px * var(--type, 1));
     color: var(--ink);
   }
 

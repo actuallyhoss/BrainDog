@@ -150,7 +150,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .push-line {

@@ -208,7 +208,7 @@
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     resize: vertical;
     /* IT SCROLLS CLEAR OF THE PHONE'S KEYBOARD with the chips and the press under it still in view. */
     scroll-margin-block: var(--sp-6) var(--sp-9);

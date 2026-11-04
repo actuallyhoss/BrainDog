@@ -571,7 +571,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .h-keep {
@@ -632,7 +632,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .ck-list {
@@ -667,7 +667,7 @@
     min-inline-size: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-decoration: none;
     overflow-wrap: anywhere;
   }
@@ -765,7 +765,7 @@
   .s-said {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .s-aim,
@@ -814,7 +814,7 @@
     padding-block: var(--sp-2);
     border-block-start: 1px solid var(--sep, var(--rule));
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .kv-row dt {
@@ -901,7 +901,7 @@
   .st-day {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .st-words {
@@ -915,7 +915,7 @@
     overflow: hidden;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -923,7 +923,7 @@
   .st-sub {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .stop[data-tone='late'] .st-sub {
@@ -946,7 +946,7 @@
     background: var(--warn-tint);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .n-ban :global(.icon) {
@@ -992,7 +992,7 @@
     max-inline-size: 100%;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -1038,7 +1038,7 @@
   .n-sub {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* WHAT IT PLANS FOR, under what it measured and apart from it. */
@@ -1048,7 +1048,7 @@
     border-block-start: 1px solid var(--sep, var(--rule));
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* ── dates, what was decided and what happened: a day and a line ── */
@@ -1091,7 +1091,7 @@
     min-inline-size: 76px;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     white-space: nowrap;
   }
 
@@ -1127,7 +1127,7 @@
     min-inline-size: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-decoration: none;
     overflow-wrap: anywhere;
   }
@@ -1149,7 +1149,7 @@
   .li-sub {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* ── the row and its parts ──
@@ -1350,7 +1350,7 @@
     overflow: hidden;
     color: var(--ink);
     font-size: var(--fs-row, var(--fs-body));
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1374,7 +1374,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1449,7 +1449,7 @@
     overflow: hidden;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1472,7 +1472,7 @@
   .r-kind {
     overflow: hidden;
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }

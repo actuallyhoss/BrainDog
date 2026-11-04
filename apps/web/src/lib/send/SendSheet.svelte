@@ -292,7 +292,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
-    line-height: 16px;
+    line-height: calc(16px * var(--type, 1));
   }
 
   .ss-vh {
@@ -408,7 +408,7 @@
     overflow: hidden;
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -418,7 +418,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 16px;
+    line-height: calc(16px * var(--type, 1));
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -493,7 +493,7 @@
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     resize: vertical;
   }
 

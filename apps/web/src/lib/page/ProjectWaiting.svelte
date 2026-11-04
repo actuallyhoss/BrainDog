@@ -92,7 +92,7 @@
     font-size: var(--fs-page);
     font-weight: 600;
     letter-spacing: -0.02em;
-    line-height: 34px;
+    line-height: calc(34px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -101,7 +101,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .pw-tile {
@@ -172,7 +172,7 @@
 
     .pw-title {
       font-size: var(--fs-hero);
-      line-height: 40px;
+      line-height: calc(40px * var(--type, 1));
     }
   }
 </style>

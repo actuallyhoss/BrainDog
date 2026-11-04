@@ -436,7 +436,7 @@
     min-inline-size: 0;
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     overflow-wrap: anywhere;
     display: -webkit-box;
     -webkit-box-orient: vertical;

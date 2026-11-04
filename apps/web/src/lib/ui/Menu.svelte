@@ -531,7 +531,7 @@
     font: inherit;
     font-size: var(--fs-ctl);
     font-weight: var(--fw-regular);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-align: start;
     text-decoration: none;
     cursor: pointer;

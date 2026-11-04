@@ -243,7 +243,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-decoration: none;
     overflow-wrap: anywhere;
   }
@@ -267,7 +267,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .ln-when [data-late] {
@@ -397,7 +397,7 @@
     a.ln-title::after {
       content: '';
       position: absolute;
-      inset: -11px 0;
+      inset: min(0px, calc((100% - var(--tap, 44px)) / 2)) 0;
     }
   }
 </style>

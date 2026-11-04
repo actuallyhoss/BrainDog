@@ -368,7 +368,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-wrap: pretty;
   }
 
@@ -410,7 +410,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-wrap: pretty;
   }
 
@@ -444,7 +444,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* THE APP'S MARK BEFORE ITS NAME in the segment, 16 at the label's ink, or its maker's colour. */
@@ -488,7 +488,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* THE STEP'S NUMBER in a 24 well of the quiet fill: a count of steps is not an alarm, so never red. */
@@ -527,7 +527,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .dot {

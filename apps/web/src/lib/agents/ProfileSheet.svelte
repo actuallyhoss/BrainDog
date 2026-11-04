@@ -545,7 +545,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* SAVE AND CANCEL AT THE PAGE'S FOOT, Save last; on a phone they stay in reach while the long form scrolls. */
@@ -580,7 +580,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .part-title label {
@@ -592,7 +592,7 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .pf-quiet,
@@ -610,7 +610,7 @@
     border-radius: var(--r-ctl);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   /* THE SWITCH ROWS IN A SHEET: `settings.css` draws them; in here they run the sheet's width with no top rule

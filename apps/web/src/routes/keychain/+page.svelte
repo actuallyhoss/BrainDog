@@ -1217,7 +1217,7 @@
     font-family: var(--font-display);
     font-size: var(--fs-figure);
     font-weight: 600;
-    line-height: 34px;
+    line-height: calc(34px * var(--type, 1));
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
   }
@@ -1236,7 +1236,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* THE RECORD'S OWN SENTENCE FOR A COUNT IT WOULD NOT GIVE, once, above the rows it is about. */
@@ -1244,7 +1244,7 @@
     margin: 0 0 var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* THE GROUPS: a project's name over its keys, then who they are with, quieter, over each service's own. */
@@ -1257,7 +1257,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* FOLDED PROJECTS SIT AS ONE LIST: rows a hairline apart, not islands 60px apart with nothing
@@ -1407,7 +1407,7 @@
     margin: 0 var(--sp-3) var(--sp-2) calc(var(--well-l) + var(--sp-3) * 2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .key-uses a {
@@ -1441,7 +1441,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* ── the rows ─────────────────────────────────────────────────────────── */
@@ -1561,7 +1561,7 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -1569,7 +1569,7 @@
   .key-last {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     white-space: nowrap;
   }
 
@@ -1729,7 +1729,7 @@
     margin: var(--sp-2) 0 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .code-said:empty {
@@ -1773,7 +1773,7 @@
     margin: 0 0 var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   /* ONE COLUMN AT ANY WIDTH, the box then its words, which wrap rather than push the sheet sideways. The control is

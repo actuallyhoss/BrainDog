@@ -332,7 +332,7 @@
     color: var(--ink);
     font-size: var(--fs-ctl);
     font-weight: 600;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -360,7 +360,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -412,7 +412,7 @@
     .t {
       font-size: var(--fs-body);
       font-weight: 500;
-      line-height: 20px;
+      line-height: calc(20px * var(--type, 1));
     }
 
     .s {
@@ -442,7 +442,7 @@
     font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.03em;
-    line-height: 28px;
+    line-height: calc(28px * var(--type, 1));
   }
 
   .fig-label {
@@ -514,7 +514,7 @@
     gap: 12px;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .m-amount {
@@ -603,7 +603,7 @@
     inset-block-end: -18px;
     color: var(--ink-3);
     font-size: var(--fs-cap);
-    line-height: 14px;
+    line-height: calc(14px * var(--type, 1));
     white-space: nowrap;
   }
 

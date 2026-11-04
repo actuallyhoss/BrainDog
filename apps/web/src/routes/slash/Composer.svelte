@@ -446,7 +446,7 @@
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-row, 15px);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     resize: none;
     overflow-y: auto;
   }
@@ -540,7 +540,7 @@
 
   .keys kbd {
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 11px;
+    font-size: calc(11px * var(--type, 1));
   }
 
   /* NO KEYS ON A PHONE: the send is the thumb's. */

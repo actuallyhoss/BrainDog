@@ -359,7 +359,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     text-align: start;
     cursor: pointer;
   }
@@ -373,7 +373,7 @@
      line, so in an "If so" card at 1512 every line holding one grew and the words wrapped round them in steps. The
      line is opened to hold a chip, and the chip is drawn inline so it sits in the line as a word does. */
   .said:has(.ref) {
-    line-height: 26px;
+    line-height: calc(26px * var(--type, 1));
   }
 
   /* A VALUE THE STEP READS IS A CHIP IN THE SENTENCE, in the UI face and the meta size: `rate` and `what` are names a

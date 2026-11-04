@@ -89,7 +89,7 @@
 [data-money] .lead-head .lead-name {
   font-family: var(--font-display);
   font-size: var(--fs-figure);
-  line-height: 28px;
+  line-height: calc(28px * var(--type, 1));
   letter-spacing: -0.01em;
 }
 
@@ -1821,15 +1821,15 @@
 [data-money] .block[data-form='lead'] .cell:first-child .cell-label,
 [data-money] .block[data-kind='stat'] .cell .cell-label {
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: calc(13px * var(--type, 1));
   font-weight: var(--fw-medium);
-  line-height: 16px;
+  line-height: calc(16px * var(--type, 1));
 }
 
 [data-money] .block[data-form='lead'] .cell:first-child .cell-figure {
   margin-block: var(--sp-2) var(--sp-1);
-  font-size: 40px;
-  line-height: 44px;
+  font-size: calc(40px * var(--type, 1));
+  line-height: calc(44px * var(--type, 1));
   letter-spacing: -0.025em;
 }
 
@@ -1872,9 +1872,9 @@
 
 [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-label {
   color: var(--ink-3);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--type, 1));
   font-weight: var(--fw-semi);
-  line-height: 14px;
+  line-height: calc(14px * var(--type, 1));
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1883,20 +1883,20 @@
   margin-block-start: 3px;
   font-size: var(--fs-head);
   font-weight: var(--fw-semi);
-  line-height: 22px;
+  line-height: calc(22px * var(--type, 1));
   letter-spacing: -0.01em;
 }
 
 [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-note {
   color: var(--ink-3);
   font-size: var(--fs-meta);
-  line-height: 17px;
+  line-height: calc(17px * var(--type, 1));
 }
 
 @container stat (inline-size < 480px) {
   [data-money] .block[data-form='lead'] .cell:first-child .cell-figure {
-    font-size: 34px;
-    line-height: 38px;
+    font-size: calc(34px * var(--type, 1));
+    line-height: calc(38px * var(--type, 1));
   }
 
   /* ON A PHONE THE STRIP STACKS: a hairline over each later fact, from text edge to text edge, none between. */
@@ -1917,16 +1917,16 @@
 
 /* ANY OTHER FIGURE ON MONEY IS A STAT TILE'S: 28/600, tight, in ink (ops 4.28). Colour only for what the colour means. */
 [data-money] .block[data-kind='stat']:not([data-form='lead']) .cell-figure {
-  font-size: 28px;
+  font-size: calc(28px * var(--type, 1));
   font-weight: var(--fw-semi);
-  line-height: 30px;
+  line-height: calc(30px * var(--type, 1));
   letter-spacing: -0.02em;
 }
 
 [data-money] .block[data-kind='stat']:not([data-form='lead']) .cell-note {
   color: var(--ink-3);
   font-size: var(--fs-cap);
-  line-height: 16px;
+  line-height: calc(16px * var(--type, 1));
 }
 
 /* ── rows: the data table's hairlines and wash ── */
@@ -2113,7 +2113,7 @@
 
 [data-money] :is(.series-line-label, .series-ticks) {
   color: var(--ink-3);
-  font-size: 11px;
+  font-size: calc(11px * var(--type, 1));
 }
 
 /* ── cards: an account, a plan ── */

@@ -420,7 +420,7 @@
   .board {
     --gap: var(--tile-gap, 12px);
     /* A ROW IS ABOUT HALF A COLUMN ON A LAPTOP, and a whole one on a phone, so a small is square there (§3.2). */
-    --row: clamp(164px, calc((100cqi - 3 * var(--gap)) / 4 * 0.64), 200px);
+    --row: calc(clamp(164px, calc((100cqi - 3 * var(--gap)) / 4 * 0.64), 200px) * var(--fit, 1));
     position: relative;
     display: grid;
     grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
@@ -431,18 +431,18 @@
   }
 
   .board[data-cols='2'] {
-    --row: clamp(150px, calc((100cqi - var(--gap)) / 2), 190px);
+    --row: calc(clamp(150px, calc((100cqi - var(--gap)) / 2), 190px) * var(--fit, 1));
   }
 
   /* THE SUGGESTION UNDER THE BOARD draws its widget a row tall a cell, as the board's own rows are. */
   .suggest {
     --gap: var(--tile-gap, 12px);
-    --board-u: clamp(164px, calc((100cqi - 3 * var(--gap)) / 4 * 0.64), 200px);
+    --board-u: calc(clamp(164px, calc((100cqi - 3 * var(--gap)) / 4 * 0.64), 200px) * var(--fit, 1));
     margin-block-start: var(--gap);
   }
 
   .board-root:has(.board[data-cols='2']) .suggest {
-    --board-u: clamp(150px, calc((100cqi - var(--gap)) / 2), 190px);
+    --board-u: calc(clamp(150px, calc((100cqi - var(--gap)) / 2), 190px) * var(--fit, 1));
   }
 
   .suggest:empty {
@@ -588,7 +588,7 @@
     inset-block: 0 auto;
     inset-inline: auto 0;
     padding-block-start: 0;
-    line-height: 28px;
+    line-height: calc(28px * var(--type, 1));
     transition: opacity var(--d-state) var(--ease-out);
   }
 
@@ -656,7 +656,7 @@
     inset-block-end: var(--sp-3, 12px);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     pointer-events: none;
   }
 
@@ -673,7 +673,7 @@
     inset-block-end: var(--sp-3, 12px);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     white-space: nowrap;
     text-decoration: none;
     transition: color var(--d-state) var(--ease-out);
@@ -713,7 +713,7 @@
     .board-root:not([data-editing]) .board :global([data-board-key] > a[data-fit-more]::before) {
       content: '';
       position: absolute;
-      inset: calc((28px - var(--tap)) / 2) calc(-1 * var(--sp-2));
+      inset: calc((100% - var(--tap)) / 2) calc(-1 * var(--sp-2));
     }
   }
 
@@ -722,7 +722,7 @@
     inset-block: 0 auto;
     inset-inline: auto 0;
     padding-block-start: 0;
-    line-height: 28px;
+    line-height: calc(28px * var(--type, 1));
   }
 
   .board-root:not([data-editing]) .board :global([data-board-key]:has(.project-cards):is(:hover, :focus-within) > a[data-fit-more]:not(:focus-visible)) {
@@ -753,7 +753,7 @@
     inset-block-end: 100%;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     white-space: nowrap;
     pointer-events: none;
   }

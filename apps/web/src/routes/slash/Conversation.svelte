@@ -273,7 +273,7 @@
     border-radius: 18px 18px 6px 18px;
     color: var(--ink);
     font-size: var(--fs-row, 15px);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
     white-space: pre-wrap;
   }
@@ -346,7 +346,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-row, 15px);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     white-space: pre-wrap;
   }
 

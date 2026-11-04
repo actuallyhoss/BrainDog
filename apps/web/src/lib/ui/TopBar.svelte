@@ -166,7 +166,7 @@
     font-family: var(--font-display);
     font-size: var(--fs-page);
     font-weight: var(--fw-semi);
-    line-height: 32px;
+    line-height: calc(32px * var(--type, 1));
     letter-spacing: var(--track-page);
     text-overflow: ellipsis;
   }

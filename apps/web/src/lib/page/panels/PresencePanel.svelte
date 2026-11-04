@@ -307,7 +307,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .machine-n {
@@ -327,7 +327,7 @@
     min-block-size: 32px;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
     cursor: pointer;
   }
 
@@ -374,7 +374,7 @@
     overflow: hidden;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -387,7 +387,7 @@
   .quiet-said {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .at-work-none,
@@ -395,12 +395,12 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .at-work-none {
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 </style>

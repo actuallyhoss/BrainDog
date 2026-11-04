@@ -245,7 +245,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 
@@ -275,7 +275,7 @@
     background: none;
     color: var(--ink);
     font: inherit;
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     resize: none;
   }
 
@@ -304,7 +304,7 @@
     margin: 0;
     color: var(--red);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .go {
@@ -315,7 +315,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* THE ONE PRESS IS THE COLUMN'S WIDTH, as every way in on sign in is. */
@@ -334,7 +334,7 @@
     margin: var(--sp-2) 0 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
   }
 
   .link {

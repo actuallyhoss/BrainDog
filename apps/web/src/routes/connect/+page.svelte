@@ -295,7 +295,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     overflow-wrap: anywhere;
     text-wrap: pretty;
   }
@@ -405,7 +405,7 @@
     color: var(--tone, var(--ink-2));
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 22px;
+    line-height: calc(22px * var(--type, 1));
     overflow-wrap: anywhere;
   }
 

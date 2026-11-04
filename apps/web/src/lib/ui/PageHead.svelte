@@ -993,7 +993,7 @@
       overflow: hidden;
       color: var(--ink);
       font-family: var(--font-display);
-      font-size: 20px;
+      font-size: calc(20px * var(--type, 1));
       font-weight: var(--fw-semi);
       letter-spacing: var(--track-figure);
       line-height: 1.2;

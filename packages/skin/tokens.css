@@ -146,7 +146,7 @@
          --fs-cap     12/16   tab-bar captions, the count pill, key caps and chart axis ticks. Nothing else.
          --fs-meta    13/18   meta lines, menu group heads, field labels, table heads
          --fs-ctl     14/20   buttons, bar and rail places, chips, segments, toasts
-         --fs-body    15/22   body, rows, menu items, inputs; the reader's Text setting moves this and nothing else
+         --fs-body    15/22   body, rows, menu items, inputs
          --fs-head    17/24   the page sentence, empty-state and sheet titles, the sticky bar title
          --fs-figure  22/26   a tile's figure, the phone page name (Lexend 600)
          --fs-page    28/34   a page name at 900px and up (Lexend 600)
@@ -444,10 +444,8 @@
      custom property resolves its own `var()`s where it is declared, and `:root` has no `--tone`. */
   [data-intent] { --tone-wash: color-mix(in srgb, var(--tone) 12%, transparent); }
 
-  /* The reader's Text setting moves `--fs-body` to 13 or 17, and nothing else (frame 3.9). Three, not a slider: Normal
-     is the 15 `:root` sets, so only Small and Large are written. */
-  html[data-text='sm'] { --fs-body: 13px; }
-  html[data-text='md'] { --fs-body: 17px; }
+  /* The reader's Text setting is the app's (`--type`, `apps/web/src/lib/ui/style.css`): it scales every size there. The
+     site has no such setting, so nothing is written here. */
 
   /* A TILE PADS 16 ON A PHONE, and a hero name steps down to the page size (frame 3.2, 3.3). */
   @media (width < 640px) {

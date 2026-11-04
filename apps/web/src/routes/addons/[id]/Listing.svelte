@@ -1008,7 +1008,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     text-wrap: pretty;
   }
 
@@ -1123,14 +1123,14 @@
 
   .plan-label {
     font-size: var(--fs-meta);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
   }
 
   .plan-n {
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
     font-variant-numeric: tabular-nums;
   }
 

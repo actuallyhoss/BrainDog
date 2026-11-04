@@ -124,7 +124,7 @@
     border-radius: var(--r-pill);
     background: none;
     color: var(--ink-2);
-    font-size: 11px;
+    font-size: calc(11px * var(--type, 1));
     font-weight: var(--fw-medium);
     line-height: calc(14 / 11);
     text-decoration: none;

@@ -80,7 +80,7 @@
     font: inherit;
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
     vertical-align: middle;
     transition:
       background var(--d-state) var(--ease-out),

@@ -172,7 +172,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   .nf-one > :global(svg) {
@@ -223,7 +223,7 @@
     margin: calc(-1 * var(--sp-2)) 0 0 calc(32px + var(--sp-3));
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .nf-lines {
@@ -312,7 +312,7 @@
     line-clamp: 2;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: calc(18px * var(--type, 1));
   }
 
   .nf-go[data-needs],

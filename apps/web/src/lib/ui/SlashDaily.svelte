@@ -105,7 +105,7 @@
     max-inline-size: 75ch;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* THE BRAKE'S LINE, under the sentence and quieter than it: the dim ink, the same size, the same measure. */
@@ -114,7 +114,7 @@
     max-inline-size: 75ch;
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: calc(20px * var(--type, 1));
   }
 
   /* THE WAY ON, a link word with its arrow, as a tile's heading draws one. */

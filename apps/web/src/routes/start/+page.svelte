@@ -1676,7 +1676,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
   }
 
   /* ── the summary, where the field was ─────────────────────────────────── */
@@ -1720,7 +1720,7 @@
   .fact dt {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
   }
 
   .fact dd {
@@ -1732,7 +1732,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: calc(24px * var(--type, 1));
   }
 
   .summary-go {

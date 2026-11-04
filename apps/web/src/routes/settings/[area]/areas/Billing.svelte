@@ -408,7 +408,7 @@
     font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.02em;
-    line-height: 34px;
+    line-height: calc(34px * var(--type, 1));
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
   }
