@@ -1,9 +1,9 @@
 {
   "pack": "work",
-  "version": "1.26.1",
+  "version": "1.26.2",
   "title": "Work",
   "summary": "Tasks, the threads of work they belong to, and how each thread is going.",
-  "changes": "Work, the Board and the Timeline no longer open on a line of counts. What is late, waiting on you or due soon is in the lists under them, as before.",
+  "changes": "With no People on the record, Work draws Late, Your work this week, After this week and No due day again. Tasks with a day were on none of its lists.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -663,8 +663,7 @@
       "format": "int",
       "target": { "lte": 0 },
       "window": "30d",
-      "compare": "none",
-      "when": { "holds": [ "people" ] }
+      "compare": "none"
     },
     {
       "metric": "tasks-today-yours",
@@ -675,8 +674,7 @@
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none",
-      "when": { "holds": [ "people" ] }
+      "compare": "none"
     },
     {
       "metric": "tasks-week-yours",
@@ -687,8 +685,7 @@
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none",
-      "when": { "holds": [ "people" ] }
+      "compare": "none"
     },
     {
       "metric": "tasks-this-week-yours",
@@ -699,8 +696,7 @@
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none",
-      "when": { "holds": [ "people" ] }
+      "compare": "none"
     },
     {
       "metric": "tasks-after-week-yours",
@@ -711,8 +707,7 @@
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none",
-      "when": { "holds": [ "people" ] }
+      "compare": "none"
     },
     {
       "metric": "tasks-undated-yours",
@@ -723,8 +718,7 @@
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none",
-      "when": { "holds": [ "people" ] }
+      "compare": "none"
     },
     {
       "metric": "tasks-not-this-week",

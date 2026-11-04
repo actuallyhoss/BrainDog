@@ -999,6 +999,9 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   (`page.all-numbers`). estate 2.8.1: Services says only what it costs a month, which no tile says whole, and not the
  *   questions Waiting on you counts (`page.estate`). money-core 3.38.5: Filing rules drops what the rules filed in 30
  *   days, said by each rule under it (`page.money-rules`).
+ * - work 1.26.2 (4 Nov, test triage): nothing declared moves on a record with People. On one without it, Late, Your work this
+ *   week, After this week and No due day now stay, with the clause about someone else taken out of each (`emptied`), so a
+ *   record that lost them takes them back on its next night.
  * - money-core 3.38.6 (4 Nov, test triage): `categories.correction` and `transactions.corrects` read "A correction and
  *   not spending". A comma ends a clause, so the record could not read a sentence about the name it prints.
  * - people 4.7.0 (fin-people1104, 3 Nov, Sam: "instead of just long text, i want them to be parsed as fields ... his
@@ -1027,7 +1030,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   people: '4.7.1',
   'money-core': '3.38.6',
   estate: '2.8.1',
-  work: '1.26.1',
+  work: '1.26.2',
 };
 
 type Body = Record<string, unknown>;
@@ -1171,10 +1174,16 @@ const ROLE_KEYS = ['meets', 'rates', 'hand', 'org'] as const;
  */
 const NARROWS: ReadonlySet<string> = new Set(['client']);
 
-/** A sentence with each `<link> is empty` clause taken out, for a gone link that only narrows (`NARROWS`). */
+/**
+ * A sentence with each `<link> is empty` clause taken out, for a gone link that only narrows (`NARROWS`). AND EACH `<link> is
+ * not someone else`, FOR ANY GONE LINK, SINCE work 1.26.2: nobody else can hold a row with nowhere to say who holds it (`withoutNobody` in
+ * `packages/kernel/src/metrics.ts`). Left in, Work with no People lost Late, Your work this week, After this week and No due day whole,
+ * and a task due today was on no band of its page.
+ */
 function emptied(where: string, gone: ReadonlySet<string>): string {
   let out = where;
   for (const f of gone) {
+    out = out.replace(new RegExp(`,\\s*${f} is not someone else(?=\\s*(?:,|$))`, 'gu'), '').replace(new RegExp(`^\\s*${f} is not someone else\\s*(?:,\\s*|$)`, 'u'), '');
     if (!NARROWS.has(f)) continue;
     out = out.replace(new RegExp(`,\\s*${f} is empty(?=\\s*(?:,|$))`, 'gu'), '').replace(new RegExp(`^\\s*${f} is empty\\s*(?:,\\s*|$)`, 'u'), '');
   }

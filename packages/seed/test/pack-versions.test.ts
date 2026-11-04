@@ -3918,6 +3918,25 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'work@1.26.2': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-last-worked metric.project-moved-7d metric.project-open
+      metric.tasks-after-week-yours metric.tasks-dated metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week
+      metric.tasks-due-7d metric.tasks-due-by-week metric.tasks-in-play metric.tasks-late-yours metric.tasks-later
+      metric.tasks-no-project metric.tasks-not-this-week metric.tasks-overdue metric.tasks-this-week-yours metric.tasks-today-yours
+      metric.tasks-undated-yours metric.tasks-waiting metric.tasks-week-yours metric.tasks-with-agents
+      page.roadmap page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: '88e7565c2cf3b377',
+    history: [
+      'work 1.26.2 of 4 November (test triage): `page.work` declares what 1.26.1 did; on a record with no People its bands reading `owner is not someone else` now stay, with that clause taken out -> 88e7565c2cf3b377',
+    ],
+  },
+
   'core@1.3.1': {
     holds: `
       page.activity page.calendar page.health page.scripts

@@ -77,14 +77,15 @@ export function holdsOf(installed: Pick<Installed, 'declarations'>, given: Pick<
  * A sentence without its `<field> is empty` clauses over fields that wait. True of every row where the field is not
  * there, so the rest of the sentence still means what it said: Work's With no project reads `thing is empty, client is
  * empty`, and on a record with Projects and no People it is still the open work with no project. Kept, the kernel
- * refuses the page for a field the list does not have.
+ * refuses the page for a field the list does not have. AND `<field> is not someone else`, as the module's own cut does
+ * (`emptied` in `packages/seed/src/packs/first-party.ts`): nobody else can hold a row with nowhere to say who holds it.
  */
 function emptied(where: string, away: ReadonlySet<string>): string {
   if (away.size === 0) return where;
   return where
     .split(',')
     .filter((clause) => {
-      const said = /^\s*(\S+) is empty\s*$/u.exec(clause);
+      const said = /^\s*(\S+) is (?:empty|not someone else)\s*$/u.exec(clause);
       return said === null || !away.has(said[1]!);
     })
     .join(',')

@@ -424,6 +424,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    { version: '1.26.2', notes: 'With no People on the record, Work draws Late, Your work this week, After this week and No due day again. Tasks with a day were on none of its lists.' },
     { version: '1.26.1', notes: 'Work, the Board and the Timeline no longer open on a line of counts. What is late, waiting on you or due soon is in the lists under them, as before.' },
     { version: '1.26.0', notes: 'The Board\'s first line says what is to check or blocked and what is with an agent before what is kept for later.' },
     { version: '1.25.0', notes: 'A list of tasks heads its names Task, not Description.' },

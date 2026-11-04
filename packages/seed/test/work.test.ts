@@ -164,7 +164,8 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   const week = soon.rows.map((r) => String(r.fields.by));
   assert.deepEqual(week, [...week].sort(), 'This week is not by the day first');
   /* EVERY TASK SAYS ITS PROJECT (proj F10), in the line under it after its day. */
-  for (const b of [late, soon]) assert.deepEqual((b.columns ?? []).map((c) => String(c.field)), ['what', 'by', 'thing']);
+  /* AND ITS CLIENT, SINCE work 1.23.0 (8d08ed712). */
+  for (const b of [late, soon]) assert.deepEqual((b.columns ?? []).map((c) => String(c.field)), ['what', 'by', 'thing', 'client']);
 
   /* DONE RECENTLY IS THE LAST SEVEN DAYS, NEWEST FIRST. */
   const done = block(page, 'Done recently').rows.map((r) => String(r.fields.done_on));
@@ -316,6 +317,10 @@ test('WORK INSTALLS ALONE: a homework list with no Projects and no People, its p
 
   const tasks = (doc.declarations as { register?: string; fields?: { id: string }[] }[]).find((d) => d.register === 'tasks')!;
   assert.ok(!tasks.fields!.some((f) => f.id === 'thing' || f.id === 'owner'), 'no project and no owner on a record without them');
+  /* AND THE BANDS OF WHAT IS YOURS STAY, SINCE work 1.26.2: nobody else can hold a task with no Owner, so the clause goes and not the band. */
+  const onPage = (doc.declarations as { page?: string; blocks?: { heading?: string; where?: unknown }[] }[]).find((d) => d.page === 'work')!.blocks!;
+  for (const heading of ['Late', 'Your work this week', 'After this week', 'No due day'])
+    assert.ok(onPage.some((b) => b.heading === heading && !String(b.where).includes('someone else')), `${heading} left with the Owner field`);
 
   /* A NEW LIST IS THE CAPTURE LINE: every band waits for something to hold, and what is further off stays folded. */
   const fresh = opened(k, 'work');

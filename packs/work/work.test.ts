@@ -312,7 +312,7 @@ test('ITS VERSION IS THE MODULE\'S, ABOVE THE RELEASED ONE, and it says what cha
   assert.ok(released().version < live, 'the frozen file is older than what is served');
   const numbers = (v: string): number[] => v.split('.').map(Number);
   assert.ok(numbers(doc.version)[1]! > numbers(live)[1]!, `${live} was released, so the file is past it and not that one`);
-  assert.equal(doc.version, '1.26.1');
+  assert.equal(doc.version, '1.26.2');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -324,7 +324,8 @@ test('ITS VERSION IS THE MODULE\'S, ABOVE THE RELEASED ONE, and it says what cha
   assert.equal(firstPartyDocument('work')!.config, undefined);
 });
 
-test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: thirty-eight parts wait, each on one neighbour', () => {
+test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-eight parts wait, each on one neighbour', () => {
+  /* WHAT IS YOURS WAITS ON NOBODY SINCE 1.26.2: with no Owner the clause goes and the bands and their six figures stay. */
   const doc = file();
   assert.deepEqual(doc.requires, { format: 1, primitives: 1, packs: {} }, 'Work installs on a record with no other add-on');
   assert.deepEqual(firstPartyManifest('work').requires, [], 'and so does the module');
@@ -337,17 +338,13 @@ test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: thirty-eight p
     { at: '"Work", "thing"', holds: [PROJECTS] },
     /* EVERY TASK SAYS ITS PROJECT AND CLIENT UNDER IT (proj F10), and each column waits for its own. THE BANDS OF YOUR OWN
        WORK ARE DRAWN ON A FIGURE THAT READS THE ASSIGNEE, so they wait for People with it (1.21.0, 4d5f2fe2e). */
-    { at: '"Work", "Late"', holds: [PEOPLE] },
     { at: '"Work", "Late", "thing"', holds: [PROJECTS] },
     { at: '"Work", "Late", "client"', holds: [ORGANISATIONS] },
     { at: '"Work", "Waiting on you", "thing"', holds: [PROJECTS] },
-    { at: '"Work", "Your work this week"', holds: [PEOPLE] },
     { at: '"Work", "Your work this week", "thing"', holds: [PROJECTS] },
     { at: '"Work", "Your work this week", "client"', holds: [ORGANISATIONS] },
     { at: '"Work", "With an agent", "thing"', holds: [PROJECTS] },
-    { at: '"Work", "After this week"', holds: [PEOPLE] },
     { at: '"Work", "After this week", "client"', holds: [ORGANISATIONS] },
-    { at: '"Work", "No due day"', holds: [PEOPLE] },
     { at: '"Work", "No due day", "thing"', holds: [PROJECTS] },
     { at: '"Work", "No due day", "client"', holds: [ORGANISATIONS] },
     { at: '"Work", "Later", "thing"', holds: [PROJECTS] },
@@ -360,9 +357,6 @@ test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: thirty-eight p
     /* NO EVERYTHING OPEN UNDER THE BOARD, so its Project and Owner wait no more. */
     ...['Open', 'Due soon', 'In review', 'Handed back or blocked', 'Changed this week', 'Last worked', 'Done this week', 'Planned with a day'].map(
       (name) => ({ at: `"${name}"`, holds: [PROJECTS] }),
-    ),
-    ...['Yours, late', 'Yours, due today', 'Yours, due this week', 'Yours, due today or this week', 'Yours, after this week', 'Yours, with no due day'].map(
-      (name) => ({ at: `"${name}"`, holds: [PEOPLE] }),
     ),
     { at: '"Done, by week"', holds: [PROJECTS] },
     { at: '"With no project"', holds: [PROJECTS] },
