@@ -235,7 +235,6 @@ export const lists = {
   setState: (field: string) => `Set ${field.toLowerCase()}`,
   archiveSelected: 'Archive them',
   saveAsView: 'Save as a view',
-  editRow: 'Edit',
   /* `Preview` AND IT WAS `Peek`. It is printed as a keyboard hint on every list, `p peek`, which is
      a word the product invented for a thing every other product calls a preview. It opens the panel a
      row is read and changed in (`page/RowPanel.svelte`). */
