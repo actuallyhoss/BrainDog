@@ -486,7 +486,7 @@ export const account = {
   /* AND WHAT IT SEALS, TRUE TO THE BYTE (AI17): a copy is plain SQLite, and only the saved keys inside it are sealed.
      ON DOCKER the data folder is inside a volume, so the way off it is named (AI24). */
   /* NOT "NAMED KEK" (G23): a machine word in the sentence; the Docker command under it names the file where it is needed. */
-  theKeyWhere: 'It is the key file next to your data. Without it your saved keys stay sealed; everything else in a copy is readable, so keep copies as private as the key. Keep a copy of the key somewhere else.',
+  theKeyWhere: 'It is the key file next to your data. Without it your saved keys stay locked; everything else in a copy is readable, so keep copies as private as the key. Keep a copy of the key somewhere else.',
   theKeyDocker: 'On Docker, copy it off the volume with:',
   theKeyDockerCommand: 'mkdir -p ~/braindog-backups && docker compose cp braindog:/data/kek ~/braindog-backups/',
   downloadNeedsKey: 'A downloaded copy is put back with the key file beside it.',

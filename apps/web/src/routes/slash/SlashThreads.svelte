@@ -43,7 +43,7 @@
     fresh: 'New',
     freshLabel: 'New conversation',
     history: 'Past suggestions',
-    placeholder: 'Ask anything. Type @ to add a row.',
+    placeholder: 'Ask anything. Type @ to add an item.',
     followUp: 'Ask a follow-up',
     waiting: 'Waiting on you',
     try: 'Try asking',

@@ -47,7 +47,7 @@
   const words = {
     label: 'Ask Slash',
     send: 'Ask',
-    mention: 'Mention a row',
+    mention: 'Mention an item',
     keys: 'to ask',
     newline: 'new line',
   } as const;
