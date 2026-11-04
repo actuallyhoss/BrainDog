@@ -999,25 +999,35 @@
    * thread on his record, so an arrow held down must not ask for every page it passes.
    */
   let ahead: string | null = null;
-  $effect(() => {
-    const href = open && isLive ? flat[cursor]?.href : null;
-    /* A ROW'S ADDRESS GOES TO ITS PAGE, as the row's screen would send it (`r/[register]/[seq]/+page.ts`). */
+  /* A ROW'S ADDRESS GOES TO ITS PAGE, as the row's screen would send it (`r/[register]/[seq]/+page.ts`). */
+  const slugOfRow = (href: string | null | undefined): string | null => {
     const rowAt = href ? /^\/r\/([^/]+)\/(\d+)$/u.exec(href) : null;
     const rowList = rowAt ? decodeURIComponent(rowAt[1]!) : null;
     const own = rowAt && rowList !== null && opensOnPage(REGISTERS[rowList]) ? ownPage(rowList, Number(rowAt[2]), new URLSearchParams()) : null;
-    const slug = pageSlugOf(own ?? href ?? '');
+    return pageSlugOf(own ?? href ?? '');
+  };
+  $effect(() => {
+    const slug = slugOfRow(open && isLive ? flat[cursor]?.href : null);
     if (slug === null || ahead !== null) return;
     const base = apiBase();
     const t = setTimeout(() => {
       if (keptPage.get(pageKey(base, slug)) !== null) return;
       ahead = slug;
       void import('../record/page-live.ts')
-        .then((m) => m.pageReader(base).read(slug))
+        .then((m) => m.readAhead(base, slug))
         .catch(() => undefined)
         .finally(() => (ahead = null));
     }, AHEAD_MS);
     return () => clearTimeout(t);
   });
+  /* THE PAGE IS GOING TO BE READ ANYWAY, SO FROM THE KEY OR THE PRESS THAT OPENS IT, and not once its route has landed. */
+  function readOnTheWay(href: string | null | undefined): void {
+    const slug = isLive ? slugOfRow(href) : null;
+    if (slug === null) return;
+    const base = apiBase();
+    if (keptPage.get(pageKey(base, slug)) !== null) return;
+    void import('../record/page-live.ts').then((m) => m.readAhead(base, slug)).catch(() => undefined);
+  }
 
   /**
    * How many rows the record matched, beside how many of them are drawn.
@@ -1745,7 +1755,10 @@
       if (way) setTimeout(() => quick.start(way), 0);
       return;
     }
-    if (row.href !== null) goto(at(row.href));
+    if (row.href !== null) {
+      readOnTheWay(row.href);
+      goto(at(row.href));
+    }
   }
 
   /**

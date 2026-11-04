@@ -214,10 +214,14 @@ export async function shapeFrom(base: string, said: unknown, io?: NonNullable<Cl
   const raw = said.row as unknown as RecordRow;
   /* ITS REFS NAMED FROM THE TAB'S WALK, which the page beside it walked already to name its own. */
   const refs = new Map<string, RefMap>();
-  for (const target of [...targetsOf(r), ...spokenTargets(raw.fields, targetsOf(r))]) {
-    const rows = io ? await walkRows(client, target) : await tabRows(client, base, target);
+  /* TOGETHER, in the order they were named: one after another a project's four lists were four round trips with nothing
+     drawn, and Enter on a project waited longest here. */
+  const targets = [...new Set([...targetsOf(r), ...spokenTargets(raw.fields, targetsOf(r))])];
+  const walked = await Promise.all(targets.map((target) => (io ? walkRows(client, target) : tabRows(client, base, target))));
+  targets.forEach((target, i) => {
+    const rows = walked[i];
     if (rows) refs.set(target, refMapOf(target, rows));
-  }
+  });
   const fields = entryOf(r, raw, refs).fields as Readonly<Record<string, unknown>>;
   /* WHAT POINTS AT IT, grouped as a row's page groups it. */
   const links = isObject(said.links) && Array.isArray(said.links.from) ? await linkReader(base, io, recordNow).answered(said.links as unknown as BacklinksValue, n) : null;

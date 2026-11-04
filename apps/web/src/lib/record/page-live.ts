@@ -3035,6 +3035,16 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
      is neither kept nor lets the page's kept answer go. */
   return {
     async read(slug, filter, opts) {
+      /* THE READ THE PALETTE STARTED FOR THIS PAGE, if it is still out (`readAhead`): the first read of the page takes it
+         and nothing goes to the record twice. Only the first: a re-read after a write asks again. */
+      if (io === undefined && opts?.walk === undefined) {
+        const key = pageKey(base, slug, filter);
+        const out = ahead.get(key);
+        if (out) {
+          ahead.delete(key);
+          return out;
+        }
+      }
       const out = await answer.read(slug, filter, opts);
       if (opts?.walk !== undefined) return out;
       const key = pageKey(base, slug, filter);
@@ -3044,6 +3054,25 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
     },
     kept: (slug, filter) => keptAnswers.get(pageKey(base, slug, filter)),
   };
+}
+
+/**
+ * A READ OF THE NEXT PAGE, STARTED BEFORE ITS ROUTE IS: on the key that opens it, or as the highlight rests on its row. Its
+ * screen's own first read takes this one and not a second, so the frame's 50 to 130 ms is not spent waiting to ask. It is a
+ * read like any other, and what it lands is the record's answer and not a view of an older one.
+ */
+const ahead = new Map<string, Promise<Opened>>();
+export function readAhead(base: string, slug: string): Promise<Opened> {
+  const key = pageKey(base, slug);
+  let out = ahead.get(key);
+  if (!out) {
+    out = pageReader(base).read(slug);
+    ahead.set(key, out);
+    void out.catch(() => undefined).finally(() => {
+      if (ahead.get(key) === out) ahead.delete(key);
+    });
+  }
+  return out;
 }
 
 /** A card's when over a figure of days, in words: "Worked on 2 days ago", "Quiet for 40 days" past its target, or nothing. */

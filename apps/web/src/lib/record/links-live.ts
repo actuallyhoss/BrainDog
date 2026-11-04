@@ -80,10 +80,13 @@ export function linkReader(base: string, io?: Fetch, clock: () => number = Date.
 
   async function refsFor(register: string): Promise<Map<string, RefMap>> {
     const refs = new Map<string, RefMap>();
-    for (const target of targetsOf(register)) {
-      const map = await mapOf(target);
+    /* TOGETHER: one after another, a project's links held its page back a round trip a list. */
+    const targets = targetsOf(register);
+    const maps = await Promise.all(targets.map((target) => mapOf(target)));
+    targets.forEach((target, i) => {
+      const map = maps[i];
       if (map) refs.set(target, map);
-    }
+    });
     return refs;
   }
 
@@ -93,6 +96,9 @@ export function linkReader(base: string, io?: Fetch, clock: () => number = Date.
        late, whatever day this browser says it is. */
     const now = clock();
     const groups: Backlink[] = [];
+    /* EVERY LIST THEY POINT FROM, THEN WHAT THOSE NAME, ASKED AT ONCE: the walk below then finds them in hand. */
+    await Promise.all(value.from.map((g) => learn(client.schema, g.register, asked)));
+    await Promise.all(value.from.filter((g) => REGISTERS[g.register]?.fields.some((x) => x.id === g.field)).map((g) => refsFor(g.register)));
     for (const g of value.from) {
       /* A LIST THIS BUILD DOES NOT SHIP IS ASKED FOR FIRST: a use case's own lists are declared by the record alone. */
       await learn(client.schema, g.register, asked);
