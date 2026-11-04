@@ -50,11 +50,19 @@ test('an arrangement reads as one story, in the order a person asks it', () => {
     { label: 'Shows now', value: 'Right now' },
     { label: 'Will show', value: 'Due this week' },
   ]);
-  /* A pack this same proposal installs is not on yet, so the sentence starts from the house word. */
-  assert.deepEqual(words?.part === 'words' && words.lines, ['Home will be called “Today”', 'In Things, “Earning” will be called “Handed in”']);
-  assert.equal(out.summary, '1 key, 1 feed, 2 new pages, 3 new lists, 2 more changes, 2 words change');
+  /* The screen is already called Today, so the word the use case sets is no change and no sentence. */
+  assert.deepEqual(words?.part === 'words' && words.lines, ['In Things, “Earning” will be called “Handed in”']);
+  assert.equal(out.summary, '1 key, 1 feed, 2 new pages, 3 new lists, 2 more changes, 1 word changes');
   /* ON ITS OWN PAGE THE CHANGE IS ONE SENTENCE, and never a list of field names. */
-  assert.equal(out.said, `${out.lead}, with 1 key, 1 feed, 2 new pages, 3 new lists, 2 more changes and 2 words change.`);
+  assert.equal(out.said, `${out.lead}, with 1 key, 1 feed, 2 new pages, 3 new lists, 2 more changes and 1 word changes.`);
+});
+
+test('a pack this same proposal installs is not on yet, so the sentence starts from the house word, and a word it already reads is no sentence', () => {
+  const said = (word: string) =>
+    arrangedOf('settings', { pack: 'usecase-student', values: { voice_home: word }, before: { voice_home: 'Dashboard' } }, {})?.parts.flatMap((p) => ('lines' in p ? p.lines : []));
+  assert.deepEqual(arrangedOf('arrange', { ...STUDENT, settings: [{ pack: 'usecase-student', values: { voice_home: 'Studies' }, before: { voice_home: 'Dashboard' } }] }, {})?.parts.find((p) => p.part === 'words'), { part: 'words', lines: ['Today will be called “Studies”'] });
+  assert.deepEqual(said('Dashboard'), [], 'the word it already reads is said as a change');
+  assert.deepEqual(said('Studies'), ['Dashboard will be called “Studies”']);
 });
 
 test('a settings change says each word before and after, from what the record holds now', () => {

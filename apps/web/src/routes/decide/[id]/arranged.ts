@@ -438,6 +438,9 @@ function settingsLines(s: Row, installing: readonly string[], ctx: Context, body
       const house = VOICE_LINES[voice];
       if (house === undefined) continue;
       const now = was || house;
+      /* THE WORD IT ALREADY READS IS NO CHANGE: a use case that says Today over a screen called Today read "Today will be
+         called “Today”", and counted it among the words that change. */
+      if (value !== null && text(value) === now) continue;
       const nav = voice === 'home' || voice === 'decide' || voice === 'inbox' || voice === 'lists';
       if (value === null) out.words.push(copy.arrangeBackToHouse(now, house));
       else out.words.push(nav ? copy.arrangeCalled(now, text(value)) : copy.arrangeReads(now, text(value)));
