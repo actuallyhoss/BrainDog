@@ -301,6 +301,7 @@ export type { PenItem } from './emergent.ts';
 export type { EngineLedger, EngineLedgerRead } from './methods/engine-readings.ts';
 export { SEALED_FILE_MOST, SEALED_NAME, SEALED_PART_MOST, sealedName, type SealedStore } from './methods/sealed.ts';
 export type { AttachVisualArgs, PictureNamed, SettleVisualArgs, VisualAttached, VisualListed, VisualRead, VisualSettled, VisualStore } from './methods/visuals.ts';
+export { noteFacts } from '@braindog/seed/packs/note-facts';
 export { AGENT_ROLES, AGENT_LIST_FALLBACK, agentLists, fadeDays, fadeOf, listFor, noListSaid, type AgentRole } from './agent-lists.ts';
 import { fadeDays, fadeOf } from './agent-lists.ts';
 import { placesOf as railPlaces, type AddonNav, type Place } from './places.ts';
