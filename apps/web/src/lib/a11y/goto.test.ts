@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { BINDINGS } from './bindings.ts';
-import { chordOf, gotoOf, hrefOf, sayGoto, type Goto } from './goto.ts';
+import { chordOf, gotoOf, hrefOf, sayGoto, sheetOf, type Goto } from './goto.ts';
 
 /** Where a letter goes in a list already read. */
 const to = (list: readonly Goto[], key: string) => list.find((l) => l.key === key)?.href;
@@ -83,10 +83,15 @@ test('a learnt place the rail draws is said by the rail name, and an accent is i
 });
 
 test('the sheet prints the same list, and the `g` row takes it', () => {
+  /* INBOX ONLY WHILE THE RAIL DRAWS IT (1423be97f): the sheet leaves it out, and `g i` still goes there. */
   const rows = [{ href: '/s/money', name: 'Money' }];
-  const line = chordOf(gotoOf(rows));
-  assert.equal(line.key, 'g then h d i s k p , m');
-  assert.equal(line.label, 'Go to Today, Needs you, Inbox, Search, Keychain, Plugins, Settings, Money');
+  const line = chordOf(sheetOf(rows));
+  assert.equal(line.key, 'g then h d s k p , m');
+  assert.equal(line.label, 'Go to Today, Needs you, Search, Keychain, Plugins, Settings, Money');
+  assert.equal(to(gotoOf(rows), 'i'), '/inbox', 'whoever learnt `g i` still has it');
+  const drawn = chordOf(sheetOf([{ href: '/inbox', name: 'Inbox' }, ...rows]));
+  assert.equal(drawn.key, 'g then h d i s k p , m');
+  assert.equal(drawn.label, 'Go to Today, Needs you, Inbox, Search, Keychain, Plugins, Settings, Money');
   const row = BINDINGS.find((b) => b.id === 'goto')!;
   const was = { key: row.key, label: row.label };
   assert.equal(was.key, 'g then h d i s k p ,', 'before the layout hands a list, the row says the seven');

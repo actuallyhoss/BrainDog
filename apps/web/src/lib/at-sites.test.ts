@@ -50,7 +50,30 @@ const RENDERED_IN = new Map([
   ['lib/shell.ts url', 'an outside link opened in this tab (a payment page), which is not an address in the app'],
   ['lib/shell/AppFrame.svelte path', '`appPath` answers only an address of the app, from the Mac app\'s Go menu'],
   ['lib/shell/LightFrame.svelte path', '`appPath` answers only an address of the app, from the Mac app\'s Go menu, as on the app frame'],
+  ['lib/google/GoogleConnect.svelte connectUrl(', '`connectUrl` is `apiBase()` plus the host\'s connect door, under the record'],
+  ['lib/market/PlanSheet.svelte to', 'the sign-in `keyPut` hands back: `reprove` or `signinFor`, both built under the app'],
+  ['lib/phone/share.ts to.href', 'the worker sends a share on to `add` under its own scope, an absolute address'],
+  ['lib/shell/YouMenu.svelte to', 'after signing out, `${BASE}/signin`, handed in on the same line and belonging to no record'],
+  ['routes/signin/+page.svelte goTo', 'what `onwardOf` answers: the address `onward()` resolved and allowed, or the app root'],
+  ['routes/r/[register]/+page.svelte next.size ? `?${next}` : page.url.pathname', 'the page the person is on with `add` taken off its query: `page.url` already holds the record'],
   ['service-worker.ts `${to.href}${url.search}`', 'the start address sent on to the record the copy\'s mark names, an absolute address `keep` wrote from `apiBase`'],
+]);
+
+/**
+ * Links not written with `at()` that are right as they are: `file value`. The value is another origin or a `blob:`, which
+ * the header says is no address in the app, or it was rendered under the app where it was made. A root path written in
+ * the markup never gets here: only `{value}` can be named, and only by the file that holds it.
+ */
+const RENDERED_HREF = new Map([
+  ['lib/attach/AttachmentViewer.svelte pdf', 'a `blob:` the viewer made from the file\'s bytes'],
+  ['lib/ui/Chip.svelte to', 'as `Button` does: `to` is `at(href)`, or the address itself when the chip says it is outside'],
+  ['routes/addons/[id]/Origin.svelte r.href', 'the add-on\'s repository, always an https address `sourceOf` builds'],
+  ['routes/admin/+page.svelte link', 'what `webLink` lets through of a stranger\'s typed link: only http(s)'],
+  ['routes/inbox/+page.svelte UNSIGNED_HELP', 'the docs on brain.dog, a whole address'],
+  ['routes/settings/[area]/areas/Ingest.svelte UNSIGNED_HELP', 'the docs on brain.dog, a whole address'],
+  ['routes/settings/[area]/areas/Billing.svelte i.url', 'the payment provider\'s hosted invoice, a whole address the host sends'],
+  ['routes/settings/[area]/areas/Billing.svelte i.pdf', 'the payment provider\'s invoice file, a whole address the host sends'],
+  ['routes/slash/Composer.svelte needs.href', 'the two callers in `SlashThreads.svelte` hand it `at(\'/settings/agents\')`'],
 ]);
 
 /** The files that read the bare origin on purpose, and what for. Anything else reading it is a record call gone to the root. */
@@ -66,6 +89,11 @@ const BARE_ORIGIN = new Map([
   ['lib/data/offline.ts', 'the service worker scope is an absolute URL, never a record address `at()` builds'],
   ['routes/signin/+page.svelte', 'the Google button goes to `/auth/google/start`, which is the host\'s and not under the app'],
   ['routes/signin/desktop/+page.svelte', 'the one-time code is swapped at `/auth` on the host, which is not under a record'],
+  ['lib/home/kept-frame.ts', 'the kept frame\'s cache key is an absolute URL under the worker\'s scope, as `lib/data/offline.ts`'],
+  ['lib/phone/Phone.svelte', 'the startup pictures are absolute addresses under the app base, not a record call'],
+  ['lib/phone/shared.svelte.ts', 'the service worker scope a share left its photos under, as `lib/data/offline.ts`'],
+  ['lib/shell/AppFrame.svelte', 'two clicks ask whether a link stays on this host, comparing origins and going nowhere'],
+  ['routes/addons/[id]/Connect.svelte', 'the same door mint as `WebhookDoors.svelte`: a door is `/in/…` at the root'],
   ['lib/home/WantMore.svelte', 'the connect sheet\'s setup line names the bare host and adds the record itself, as Settings, Agents writes it'],
 ]);
 
@@ -83,12 +111,12 @@ test('NO ADDRESS IN THE APP IS RENDERED WITHOUT `at()`, and no record call goes 
       /* The shorthand is allowed only where the file itself derived `href` through `at()`. */
       if (m[3] !== undefined && /const href = \$derived\((at|inApp)\(/.test(text)) continue;
       /* `Button` renders its `href` as `to`, which is `at(href)` a few lines above. */
-      if (m[2] !== undefined && (/\b(at|inApp)\(/.test(value) || (name === 'lib/ui/Button.svelte' && value === 'to'))) continue;
+      if (m[2] !== undefined && (/\b(at|inApp)\(/.test(value) || (name === 'lib/ui/Button.svelte' && value === 'to') || RENDERED_HREF.has(`${name} ${value}`))) continue;
       found.push(`${name}:${lineOf(text, m.index)}  <a href=${m[1] !== undefined ? `"${value}"` : `{${value}}`}>`);
     }
     for (const m of text.matchAll(/\b(goto|location\.assign|redirect)\((?:\s*\d+,)?\s*([^,)]*)/g)) {
       const arg = m[2]!.trim();
-      if (arg === '' || /^(at|inApp)\(/.test(arg) || /^[`'"][?#]/.test(arg) || RENDERED.has(arg) || RENDERED_IN.has(`${name} ${arg}`)) continue;
+      if (arg === '' || /^(at|inApp)\(/.test(arg) || /^`\$\{(at|inApp)\(/.test(arg) || /^[`'"][?#]/.test(arg) || RENDERED.has(arg) || RENDERED_IN.has(`${name} ${arg}`)) continue;
       found.push(`${name}:${lineOf(text, m.index)}  ${m[1]}(${arg})`);
     }
     if (!BARE_ORIGIN.has(name)) for (const m of text.matchAll(/location\.origin/g)) found.push(`${name}:${lineOf(text, m.index)}  location.origin`);
