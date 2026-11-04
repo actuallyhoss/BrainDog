@@ -1668,7 +1668,7 @@
       void toggleSide();
       return;
     }
-    /* `/` ASKS, AS `⌘J` DOES, AND `⌘K` IS THE SEARCH (Sam, 4 Nov). */
+    /* `/` ASKS, AS `⌘J` DOES, AND `⌘K` IS THE SEARCH (the owner, 4 Nov). */
     if (e.key === '/') {
       e.preventDefault();
       askSlash();

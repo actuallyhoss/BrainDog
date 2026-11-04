@@ -1,5 +1,5 @@
 /**
- * A retired key never answers for a live one of the same label. The move from Sam Brain left a retired row beside each
+ * A retired key never answers for a live one of the same label. The move from the old register left a retired row beside each
  * sealed key, older and with no value, and the lookup took the oldest: a key the list called sealed "held no sealed value",
  * and a deposit by that label would have gone into the retired row.
  */

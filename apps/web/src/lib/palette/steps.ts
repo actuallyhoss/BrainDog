@@ -1,6 +1,6 @@
 /**
  * The steps Slash takes, as the thread draws them: each with a glyph for what it reads, and one said again is one line with
- * a count (Sam, 4 Nov): "Reading Agent runs (2)", where five of the same line stacked up.
+ * a count (the owner, 4 Nov): "Reading Agent runs (2)", where five of the same line stacked up.
  */
 
 import type { IconName } from '../ui/icons.ts';

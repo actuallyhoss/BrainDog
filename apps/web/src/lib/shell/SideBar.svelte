@@ -439,7 +439,7 @@
 
   /* A PAGE ROW NOW, SO IT IS THERE WITH NO PROJECT YET (4 Nov): it is how the first one gets made, and the rail shows it too. */
   const showProjects = $derived(model.projects !== null);
-  /* THE PAGE IDEAS ARE A ROW OF THEIR OWN AT THE COLUMN'S FOOT, JUST ABOVE THE DIVIDER (Sam, 4 Nov): about the whole record's
+  /* THE PAGE IDEAS ARE A ROW OF THEIR OWN AT THE COLUMN'S FOOT, JUST ABOVE THE DIVIDER (the owner, 4 Nov): about the whole record's
      pages, so neither under Projects, where they read as the projects', nor in the foot beside Settings, where they read
      like a setting. They wait for the first read, so the row never appears and then moves. */
   const penShown = $derived(pen !== null && answered);

@@ -2,7 +2,7 @@
  * THE ANSWERS THIS BROWSER HAS GIVEN AND THE RECORD HAS NOT YET SHOWN BACK, in `localStorage`, because it is the one store
  * that is written before a reload can happen and read before anything is drawn.
  *
- * WHY (Sam, 4 Nov: "i keep closing out the stuff in needs you, and when i refresh, they show back again"). An answer is
+ * WHY (the owner, 4 Nov: "i keep closing out the stuff in needs you, and when i refresh, they show back again"). An answer is
  * held six seconds for its Undo and sent as the page goes (`press.ts`), and a plain `fetch` begun then was answered
  * "This page is being left" by the client without going out, so a reload inside the six seconds lost the answer with no
  * word said. And an answer the record had taken still came back from every drawing older than it: the kept picture of

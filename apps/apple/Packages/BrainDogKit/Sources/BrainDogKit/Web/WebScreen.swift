@@ -444,7 +444,7 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
 
 /// The Mac window's bar, which the web draws and the traffic lights stand in (plan M6). The sidebar is a floating card 12 from
 /// the window (`--window-inset`), so the lights stand inside it: `lead` puts the first on the rows' own left edge, and `centre`
-/// puts all three on the line the mark, the page's name and the bar's controls sit on, not in the card's corner (Sam, 4 Nov:
+/// puts all three on the line the mark, the page's name and the bar's controls sit on, not in the card's corner (the owner, 4 Nov:
 /// "the placement of the close minimize icons").
 ///
 /// THE ROOM IS MEASURED, NOT GUESSED. macOS 26 draws the lights 14 wide on a 23 pitch, 60 for the three, so 28 + 60 and

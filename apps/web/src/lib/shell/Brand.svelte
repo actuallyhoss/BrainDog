@@ -29,7 +29,7 @@
     text-decoration: none;
   }
 
-  /* NOT IN THE MAC APP (Sam, 4 Nov): the head there holds the traffic lights and the sidebar's button, and Today has its own row. */
+  /* NOT IN THE MAC APP (the owner, 4 Nov): the head there holds the traffic lights and the sidebar's button, and Today has its own row. */
   :global(:root[data-shell='mac']) .brand {
     display: none;
   }

@@ -436,7 +436,7 @@ type CommandHeard = { build: string; day: string; machine: string | null; heard:
  * `Windows PC`. `null` for a name that says no kind. (`deviceOf` in the agent door reads the same names.)
  */
 function machineOf(host: unknown, cwd?: unknown): string | null {
-  /* A FOLDER ON A DRIVE LETTER IS WINDOWS, whatever the computer was named: his is called Sam, which says nothing. */
+  /* A FOLDER ON A DRIVE LETTER IS WINDOWS, whatever the computer was named: his is called by his own name, which says nothing. */
   const windows = typeof cwd === 'string' && /^[A-Za-z]:[\\/]/u.test(cwd);
   if (typeof host !== 'string' || host === '') return windows ? 'Windows PC' : null;
   const h = host.toLowerCase();

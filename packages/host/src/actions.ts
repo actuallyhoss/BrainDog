@@ -885,7 +885,8 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
        leaves here, and a text that could not be scrubbed is not handed back. */
     const scrub = (text: string): string => {
       try {
-        return secret.reduce<string>((out, spelling) => (typeof spelling === 'string' ? out.split(spelling).join(REDACTED) : out.replace(spelling, REDACTED)), text);
+        /* A LONG KEY IS STRUCK IN PIECES, so what stood for one key reads as one mark. */
+        return secret.reduce<string>((out, spelling) => (typeof spelling === 'string' ? out.split(spelling).join(REDACTED) : out.replace(spelling, REDACTED)), text).replace(/(?:--redacted--){2,}/g, REDACTED);
       } catch {
         return REDACTED;
       }
