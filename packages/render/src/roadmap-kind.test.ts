@@ -274,10 +274,14 @@ test('A ROW SKIPPED FOR ITS EFFORT IS NOT TOLD ITS DATE IS WRONG', () => {
      skipped when its date is a good day and its effort is not a number of days: `2 days`, or `1,200 d` as the web's
      `display()` groups a four-figure effort. `Glaze | 2026-09-20 | 2 days` was told its date did not read, which
      sends the author to fix the one cell that was right (measured). */
-  const html = toHTML(parse('```roadmap | X\nGlaze | 2026-09-20 | 2 days\nFine | 2026-09-12 | 2\n```'), { now: NOW });
+  const html = toHTML(parse('```roadmap | X\nGlaze | 2026-09-20 | a fortnight\nFine | 2026-09-12 | 2\n```'), { now: NOW });
   const said = /<p class="roadmap-skipped">([^<]*)<\/p>/u.exec(html)?.[1] ?? '';
   assert.match(said, /Glaze/u);
   assert.match(said, /effort/u, `the sentence blames only the date: ${said}`);
+  /* `2 days` IS AN EFFORT SINCE 242b4b2d2, as the list now says one, so that row draws and nothing is said of it. */
+  const days = toHTML(parse('```roadmap | X\nGlaze | 2026-09-20 | 2 days\nFine | 2026-09-12 | 2\n```'), { now: NOW });
+  assert.doesNotMatch(days, /roadmap-skipped/u);
+  assert.match(days, /title="Glaze">Glaze<\/span> <span class="roadmap-item-when num">19 – 20 Sep/u);
 });
 
 test('with nothing to draw the block is its sentence, and today outside the span draws no line', () => {

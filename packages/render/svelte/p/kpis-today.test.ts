@@ -88,7 +88,8 @@ test('A TODAY ROW SAYS ITS PROJECT, ITS NAME AND ITS FIGURE IN ITS OWN CURRENCY,
   assert.match(said, /Kiln Sales a month/u);
   /* MINOR UNITS DIVIDED ONCE: £4,350 for 435,000 pence, never 435,000 and never £43.50. */
   assert.match(said, /£4,350/u);
-  assert.match(said, /Down 5\.4% on Jul/u);
+  /* A TODAY ROW SAYS WHICH PERIOD A FLOW'S FIGURE IS OF, in place of the one its change is against (20911d584). */
+  assert.match(said, /Down 5\.4% in Aug/u);
   /* ONE LINK, over the project and the name, to where the row opens. */
   assert.equal((row.match(/<a /gu) ?? []).length, 1);
   assert.match(row, /<a class="kpi-open" href="\/acme\/p\/kiln">/u);

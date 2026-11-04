@@ -17,8 +17,12 @@ test('a line and the period before it: the lead, the change, and the paths', () 
   assert.equal(plan.change, '+7.7%');
   assert.equal(plan.trend, 'up');
   assert.equal(plan.against, 'Previous 30 days');
-  /* A GAP BREAKS THE LINE: the current line starts again after 2 Sep, and never draws a zero there. */
-  assert.equal((plan.lines[0]!.d.match(/M/gu) ?? []).length, 2);
+  /* NO TWO READINGS SIDE BY SIDE: the gap is only the day between readings, so the line runs through it (5d4647de2). */
+  assert.equal((plan.lines[0]!.d.match(/M/gu) ?? []).length, 1);
+  assert.equal((plan.lines[0]!.d.match(/L/gu) ?? []).length, 1);
+  /* WHERE SOME DO STAND SIDE BY SIDE A GAP BREAKS THE LINE: it starts again after 3 Sep, and never draws a zero there. */
+  const broken = linesPlan(rows('Day | Revenue\n1 Sep | £4,000.00\n2 Sep | £4,100.00\n3 Sep | \n4 Sep | £4,200.00\n5 Sep | £4,300.00'));
+  assert.equal((broken.lines[0]!.d.match(/M/gu) ?? []).length, 2);
   assert.match(plan.lines[0]!.end, /^M1000 /u);
   assert.equal(plan.top, '£4.2k');
   assert.equal(plan.bottom, '£3.6k');

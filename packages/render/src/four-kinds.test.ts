@@ -61,7 +61,7 @@ test('a calendar fence draws its months as tables and its agenda, and the unread
   const html = toHTML(parse('```calendar\nKiln launch | 2026-09-12\nSomeday | soon\n```', { page: true }), { now: Date.UTC(2026, 8, 12, 12) });
   assert.match(html, /<table class="calendar-month"><caption class="calendar-caption">September 2026<\/caption>/u);
   assert.match(html, /<td class="calendar-cell" data-today="" data-count="1"><span class="calendar-num num">12<\/span>/u);
-  assert.match(html, /<ol class="calendar-agenda"><li class="calendar-day" data-today=""><span class="calendar-date num">Sat 12 Sep<\/span>/u);
+  assert.match(html, /<ol class="calendar-agenda"><li class="calendar-day" data-today="" data-shown=""><span class="calendar-date num">Sat 12 Sep<\/span>/u);
   assert.match(html, /<p class="calendar-skipped">Not on the calendar, because the day does not read: Someday\.<\/p>/u);
 });
 

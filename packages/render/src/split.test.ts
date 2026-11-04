@@ -39,9 +39,11 @@ const SPLIT = '```split | Where it goes\nPayroll | GBP 6,000.00 | 4 people\nRent
 test('A SPLIT DRAWS A TRACK NAMED BY ITS SHARES, a legend that prints every figure, and the hole after it', () => {
   const html = toHTML(parse(SPLIT));
   assert.match(html, /<svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="Payroll 60%, Rent 30%, Tools 10%">/u);
-  assert.match(html, /<rect class="split-seg" data-step="1" data-intent="warn" x="600" y="0" width="300" height="100"><\/rect>/u);
-  assert.match(html, /<li class="split-item"><span class="split-dot" data-step="0" aria-hidden="true"><\/span><span class="split-label">Payroll<\/span><span class="split-value num">£6,000<\/span><span class="split-share num">60%<\/span><span class="split-note">4 people<\/span><\/li>/u);
-  assert.match(html, /<td>GBP 6,000\.00<\/td>|>GBP 6,000\.00</u, 'the fold of numbers keeps every penny');
+  assert.match(html, /<rect class="split-seg" data-step="1" data-part="1" data-intent="warn" x="600" y="0" width="300" height="100"><\/rect>/u);
+  assert.match(html, /<li class="split-item"><span class="split-dot" data-step="0" data-part="0" aria-hidden="true"><\/span><span class="split-label">Payroll<\/span><span class="split-value num">£6,000<\/span><span class="split-share num">60%<\/span><span class="split-note">4 people<\/span><\/li>/u);
+  /* THE FOLD SAYS THE FIGURES THE LEGEND SAYS (dfb5ca42f), and a hole, no part of the set, keeps its own cell. */
+  assert.match(html, /<th scope="row">Payroll<\/th><td class="num">£6,000<\/td>/u, 'the fold of numbers says what the legend says');
+  assert.match(html, /<th scope="row">Uncategorised<\/th><td class="num">GBP 900\.00<\/td>/u, 'a hole keeps its cell');
   assert.ok(html.indexOf('split-legend') < html.indexOf('split-hole'), 'the hole sits after the legend');
   assert.match(html, /<div class="split-hole" data-hole data-intent="warn">/u, 'no host, no button');
   assert.match(toHTML(parse(SPLIT), { hole: true }), /<button type="button" class="split-hole" data-hole data-intent="warn">/u);
@@ -71,7 +73,7 @@ test('A LATE PART IS STRIPED AS WELL AS RED: it is filled with a pattern of its 
   const html = toHTML(parse('```split | Owed\nPaid | 600\nOverdue | 300 | 3 invoices | bad\nDue soon | 100 |  | warn\n```'));
   const id = /<pattern class="late-hatch" id="([^"]+)" patternUnits="userSpaceOnUse" width="10" height="60">/u.exec(html)?.[1];
   assert.ok(id, 'a late part drew no pattern');
-  assert.match(html, new RegExp(`<rect class="split-seg" data-step="1" data-intent="bad" style="fill:url\\(#${id}\\) var\\(--chart-late, currentColor\\)" x="600"`, 'u'));
+  assert.match(html, new RegExp(`<rect class="split-seg" data-step="1" data-part="1" data-intent="bad" style="fill:url\\(#${id}\\) var\\(--chart-late, currentColor\\)" x="600"`, 'u'));
   assert.match(html, /<path class="late-stripe" d="M0 0H5L0 30ZM10 0V30L5 60H0Z" fill="currentColor">/u, 'the pattern is a stripe, not a wash');
   assert.equal(html.match(/url\(#/gu)?.length, 1, 'only the late part is striped');
   assert.ok(html.indexOf('<pattern') < html.indexOf('<rect class="split-seg"'), 'the pattern is drawn before the part that paints from it');
