@@ -4285,7 +4285,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '51a1eb436db60ba7',
     history: [
-      'People 4.7.2, rest1104 of 4 November: a comment inside `script.people_fields` named real people and companies, and every install was handed it as source. Invented now; only the source moved.',
+      'People 4.7.2, rest1104 of 4 November: a comment inside `script.people_fields` named real people and companies, and every install was handed it as source. Invented now; only the source moved. -> 51a1eb436db60ba7',
     ],
   },
 
