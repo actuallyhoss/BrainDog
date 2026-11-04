@@ -118,6 +118,15 @@ export function ftsQuery(q: string): string | null {
   return words.map((w) => `"${w}"*`).join(' AND ');
 }
 
+/**
+ * The same words as one phrase at the very start of a row's text: `^"bake gg"*`, which finds `crumb.gg` and `Crumb.gg` and
+ * not `Servers, Crumb.gg`. `null` for a query with no words.
+ */
+export function startQuery(q: string): string | null {
+  const words = searchWords(q);
+  return words.length === 0 ? null : `^"${words.join(' ')}"*`;
+}
+
 /** The words of a search as the index reads them, for a list searched without it (`containsMatched`). */
 export function searchWords(q: string): string[] {
   const query = ftsQuery(q);
@@ -165,7 +174,8 @@ export type Hit = { id: string; register: string; rank: number };
 /* `admits` HOLDS A LIST TO THE CALLER'S GRANT (leak matrix G5): the clause each narrowed list's rows meet, compiled by the
    kernel from `wheres` (`admitClause`), so the hits and `matched` are both the rows the caller is shown. */
 type Admit = { register: string; sql: string; params: readonly (string | number)[] };
-type Ask = { registers?: readonly string[] | undefined; limit?: number; viewer?: string | undefined; admits?: readonly Admit[] | undefined };
+/* `perList` IS THE MOST HITS FROM ANY ONE LIST: asked as somebody types, where a hundred readings of one list used to fill the whole answer. */
+type Ask = { registers?: readonly string[] | undefined; limit?: number; viewer?: string | undefined; admits?: readonly Admit[] | undefined; perList?: number | undefined };
 
 /**
  * A search's whole answer: the page of hits, and how many rows there were to have.
@@ -283,16 +293,39 @@ function matching(q: string, registers: readonly string[] | undefined, viewer?: 
 export function search(sql: Sql, q: string, opts: Ask = {}): Hit[] {
   const m = matching(q, opts.registers, opts.viewer, opts.admits);
   if (!m) return [];
-  return sql.all<Hit>(
-    `SELECT entry_fts.id AS id, entry_fts.register AS register, bm25(entry_fts) AS rank
-       ${m.from}
-      ORDER BY rank
-      LIMIT ?`,
-    ...m.args,
-    /* THE CLAMP STAYS, and it is now visible rather than silent: a caller asking for 500 still gets
-       100, and `matched` is what tells them so. */
-    Math.min(Math.max(1, opts.limit ?? 20), 100),
-  );
+  /* THE CLAMP STAYS, and it is now visible rather than silent: a caller asking for 500 still gets
+     100, and `matched` is what tells them so. */
+  const limit = Math.min(Math.max(1, opts.limit ?? 20), 100);
+  const [, ...rest] = m.args;
+  /* THE ROWS WHOSE TEXT OPENS WITH WHAT WAS TYPED COME FIRST. `bm25` punishes length, so a project with a long note sat
+     under a thousand short readings: on his record (4 Nov) `crumb.gg` matched 1,297 rows, and the project Crumb.gg was not
+     in the hundred sent back at all, behind "Servers, Crumb.gg" a hundred times. A row's title opens its text. */
+  const opening = startQuery(q);
+  const first = opening === null ? [] : sql.all<Hit>(`SELECT entry_fts.id AS id, entry_fts.register AS register, bm25(entry_fts) AS rank ${m.from} ORDER BY rank LIMIT ?`, opening, ...rest, limit);
+  /* ONE LIST CANNOT FILL THE ANSWER WHEN `perList` IS ASKED: the record's own ranking per list, then best first over all. */
+  const most = opts.perList;
+  const ranked =
+    most === undefined
+      ? sql.all<Hit>(`SELECT entry_fts.id AS id, entry_fts.register AS register, bm25(entry_fts) AS rank ${m.from} ORDER BY rank LIMIT ?`, ...m.args, limit)
+      : sql.all<Hit>(
+          /* THE INDEX'S OWN `rank` COLUMN AND NOT `bm25()`, which SQLite refuses inside a window: the same number. */
+          `SELECT id, register, score AS rank FROM (SELECT entry_fts.id AS id, entry_fts.register AS register, entry_fts.rank AS score, row_number() OVER (PARTITION BY entry.register ORDER BY entry_fts.rank) AS at ${m.from}) WHERE at <= ? ORDER BY score LIMIT ?`,
+          ...m.args,
+          most,
+          limit,
+        );
+  if (first.length === 0) return ranked;
+  const seen = new Set(first.map((h) => h.id));
+  const joined = [...first, ...ranked.filter((h) => !seen.has(h.id))];
+  if (most === undefined) return joined.slice(0, limit);
+  const perList = new Map<string, number>();
+  return joined
+    .filter((h) => {
+      const n = (perList.get(h.register) ?? 0) + 1;
+      perList.set(h.register, n);
+      return n <= most;
+    })
+    .slice(0, limit);
 }
 
 /** The same hits, with the count that makes them tellable from the whole answer. See `Searched`. */

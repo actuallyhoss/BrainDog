@@ -2329,6 +2329,9 @@ export type SearchHit = {
   why?: string;
   /** Found by meaning and by no word typed. Counted, never printed beside the row. */
   meaning?: true;
+  /** What tells two rows of one name apart: the row's day and its amount, when the record said them. */
+  on?: string;
+  amount?: { amount: number; currency: string };
 };
 
 /**

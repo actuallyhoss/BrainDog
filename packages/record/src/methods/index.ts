@@ -60,6 +60,7 @@ import { methods as offered } from './offered.ts';
 import { methods as heldTwice } from './held-twice.ts';
 import { methods as sameValues } from './same-values.ts';
 import { methods as about } from './about.ts';
+import { methods as names } from './names.ts';
 import { methods as briefing } from './briefing.ts';
 import { methods as exceptions } from './exceptions.ts';
 import { methods as matched } from './matched.ts';
@@ -310,6 +311,7 @@ export function methods(deps: RecordDeps) {
     ...heldTwice(deps),
     ...sameValues(deps),
     ...about(deps),
+    ...names(deps),
     ...briefing(deps),
     ...exceptions(deps),
     ...matched(deps),

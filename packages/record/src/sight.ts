@@ -258,7 +258,7 @@ export function readSight(kernel: Kernel) {
     mask(ctx, kernel.backlinks({ ...q, viewer: viewer(ctx), grant: ctx.wheres, hide: ctx.hides }));
 
   /** A search, its hits and `matched` both the rows the caller is shown, by the fields she is shown. */
-  const searchMatched = (ctx: Sighted, q: string, opts: { registers?: readonly string[] | undefined; limit?: number } = {}) =>
+  const searchMatched = (ctx: Sighted, q: string, opts: { registers?: readonly string[] | undefined; limit?: number; perList?: number | undefined } = {}) =>
     kernel.searchMatched(q, { ...opts, viewer: viewer(ctx), grant: ctx.wheres, hide: ctx.hides, ...(amountsHidden(ctx) ? { maskMoney: true } : {}) });
 
   /**

@@ -175,6 +175,7 @@ import { grammarOf } from './grammar.ts';
 import { askedFault, declinedInput, describe, pinMoved, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDeclined, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
 import { describedGrammar } from './grammar.ts';
 import { lookLanding, skillBearings, skillDraftInput, skillDraftOf } from './slash.ts';
+import { rowFacts } from './row-facts.ts';
 import { gitLook, parseGit, readGit, repoSaid, shortSha, type GitOffer } from './git-channel.ts';
 import { fileChecksum } from '@braindog/declare/catalogue';
 import {
@@ -918,6 +919,9 @@ const digestOf = async (key: string): Promise<string> =>
 const QUIET_HELD_MS = 300_000;
 /** The most field names one `list` may ask for (`fields`). */
 const LIST_FIELDS_MOST = 64;
+
+/** How many hits one list may fill of a search asked as somebody types (`words`). */
+const WORDS_PER_LIST = 8;
 
 /** The most characters of one text field a `list` asked `short` sends (`shortFields`). */
 const LIST_SHORT = 200;
@@ -18566,6 +18570,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            always ran for an owner. */
         ...(registers.length === every.length ? {} : { registers }),
         ...(args.limit === undefined ? {} : { limit: args.limit }),
+        /* AS SOMEBODY TYPES NO LIST FILLS THE ANSWER: `bake` matched 1,359 rows on his record, nearly all readings of one list. */
+        ...(args.words === true ? { perList: WORDS_PER_LIST } : {}),
       });
       /* THE WORDS' ORDER, SHUFFLED BY MEANING WHERE THE ROWS HAVE VECTORS (`rerank.ts`), and where the words found fewer
          than five, the rows nearest the query's own meaning fused in (`near.ts`), each marked `by: 'meaning'`. Before the
@@ -18588,13 +18594,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       });
       /* A HIT'S RANK IS ITS PLACE AMONG THE HITS SHE IS SHOWN (leak matrix N3), never `bm25`'s score, which reads the
          whole index's statistics and moved when a row she cannot see was written. The order is still the words'. */
-      const shown = sight.rows(ctx, read).map(({ row, by }, i) => ({ row, rank: i + 1, ...(by ? { by } : {}) }));
+      /* A ROW NAMED EXACTLY WHAT WAS ASKED LEADS, then the words' order: `crumb.gg` is the project and the domain before any
+         row that only says it. Folded as the index folds, so `Crumb.gg` and `bake gg` are one name. */
+      const nameKey = (t: unknown): string => String(t ?? '').normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+      const askedName = nameKey(args.q);
+      const named = (row: { register: string; fields: Record<string, unknown> }): boolean => {
+        const t = kernel.register(row.register)?.title;
+        return t !== undefined && t !== null && askedName !== '' && nameKey(row.fields[t]) === askedName;
+      };
+      const held = sight.rows(ctx, read);
+      const leading = [...held.filter(({ row }) => named(row)), ...held.filter(({ row }) => !named(row))];
+      const shown = leading.map(({ row, by }, i) => ({ row, rank: i + 1, ...(by ? { by } : {}) }));
       /* A TITLE IS THE ROW'S OWN WORDS, so an agent handed one from outside the record is marked as `get` marks it. */
       readFrom(ctx, ok({ rows: shown.map((h) => h.row) }));
       return ok({
         hits: shown.map(({ row, rank, by }) => {
-          const title = kernel.register(row.register)?.title;
-          return { register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank, ...(by ? { by } : {}) };
+          const decl = kernel.register(row.register);
+          const title = decl?.title;
+          /* WHAT TELLS TWO ROWS OF ONE NAME APART, read off the row: three "iOS contractor" lines looked identical (`rowFacts`). */
+          return { register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank, ...(by ? { by } : {}), ...rowFacts(decl, row.fields, row.updated_at, masked) };
         }),
         /* THE TOTAL IS NARROWED THE SAME WAY: `fts.searchMatched` counts the live rows of each list this caller may
            read that her grant's `where` admits, in the query the hits come from. */

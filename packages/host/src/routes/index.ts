@@ -42,6 +42,7 @@ import { ROUTES as IMPORTS } from './imports.ts';
 import { ROUTES as sameOne } from './same-one.ts';
 import { ROUTES as heldTwice } from './held-twice.ts';
 import { ROUTES as about } from './about.ts';
+import { ROUTES as names } from './names.ts';
 import { ROUTES as briefing } from './briefing.ts';
 import { ROUTES as exceptions } from './exceptions.ts';
 import { ROUTES as matched } from './matched.ts';
@@ -111,6 +112,7 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...sameOne,
   ...heldTwice,
   ...about,
+  ...names,
   ...briefing,
   ...exceptions,
   ...matched,

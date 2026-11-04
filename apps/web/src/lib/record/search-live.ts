@@ -49,7 +49,7 @@ export type Found = { from: 'live'; value: SearchResult; meaning?: Meaning } | {
 export const byMeaning = (h: Pick<SearchHit, 'meaning'>): boolean => h.meaning === true;
 
 /** One hit as the record's `search` sends it, and only the keys read here. `by` is there only for a hit no word found. */
-type Hit = { register: string; seq: number; title: string; by?: 'meaning' };
+type Hit = { register: string; seq: number; title: string; by?: 'meaning'; on?: string; amount?: { amount: number; currency: string } };
 
 /**
  * What the record answered, in either of the two shapes it can answer in.
@@ -126,6 +126,8 @@ export function groupsOf(
       title: rowNameSaid(h.register, h.title),
       detail: '',
       ...(h.by === 'meaning' ? { meaning: true as const } : {}),
+      ...(h.on ? { on: h.on } : {}),
+      ...(h.amount ? { amount: h.amount } : {}),
       href: `/r/${h.register}/${h.seq}`,
       kind: decl?.name ?? h.register,
       icon: iconFor(decl?.icon, 'rows'),
@@ -227,14 +229,13 @@ export type Searcher = {
   warm(): void;
 };
 
-/** How long a search as somebody types waits for the questions and pages before it answers with its rows alone. */
-const OTHERS_WAIT_MS = 200;
-
 /**
  * A search for one tab. `base` is the page's own origin; the app never holds a token.
  *
- * `words` IS THE PALETTE'S: by the words alone, never waiting on a model for what the query means, and never more
- * than `OTHERS_WAIT_MS` on the questions and pages the first time (slash1104). `/search` keeps both.
+ * `words` IS THE PALETTE'S: by the words alone, never waiting on a model for what the query means, and never waiting on
+ * the questions either: they fill in for the next letter. And no `boot` of its own: the palette already draws the pages
+ * from the rail it has, and on his record that second `boot` was 240 ms of the record's one thread each time the panel
+ * opened (find1104). `/search` keeps all of it.
  */
 export function searcher(base: string, io?: Fetch, { words = false }: { words?: boolean } = {}): Searcher {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
@@ -242,10 +243,11 @@ export function searcher(base: string, io?: Fetch, { words = false }: { words?: 
   /* EVERY OPEN QUESTION AND EVERY DECISION, a page at a time: `boot` sends twenty questions, and one page of
      decisions stopped at the newest two hundred. */
   const othersNow = (): Promise<Others> =>
-    (others ??= Promise.all([client.boot(), everyGovernance(client, { status: 'open' }), everyGovernance(client, { register: 'decision' })]).then(
-      ([b, o, d]) => othersOf(b as Wire, d as Wire, o as Wire),
+    (others ??= Promise.all([words ? { ok: false } : client.boot(), everyGovernance(client, { status: 'open' }), everyGovernance(client, { register: 'decision' })]).then(
+      ([b, o, d]) => (settled = othersOf(b as Wire, d as Wire, o as Wire)),
       () => NO_OTHERS,
     ));
+  let settled: Others | null = null;
   const asked = new Map<string, Promise<void>>();
   return {
     warm: () => void othersNow(),
@@ -258,7 +260,7 @@ export function searcher(base: string, io?: Fetch, { words = false }: { words?: 
         const reached = othersNow();
         /* A LIST THIS BUILD DOES NOT SHIP IS NAMED BY THE RECORD, so a course is grouped under Courses and not its id. */
         await Promise.all([...new Set(answer.hits.map((h) => h.register))].map((r) => learn(client.schema, r, asked)));
-        const known = words ? await Promise.race([reached, new Promise<Others>((r) => setTimeout(() => r(NO_OTHERS), OTHERS_WAIT_MS))]) : await reached;
+        const known = words ? (settled ?? NO_OTHERS) : await reached;
         const value = groupsOf(q, answer.hits, known, answer.matched);
         return { from: 'live', value, ...(answer.meaning ? { meaning: answer.meaning } : {}) };
       }

@@ -32,6 +32,8 @@ export const SIGNED_OUT_KEYS = [
   'braindog.side-copy',
   /* the rows the palette's search found, by their names, so the next letters answer at once (`search-kept.ts`) */
   'braindog.find-copy',
+  /* every name on the record, for the search field to answer before it asks (`search-kept.ts`) */
+  'braindog.find-names',
   /* the sidebar's week, counts, projects' order and lists' facts (`side-read.ts`, `side.ts`, `project-order.ts`) */
   'bd_side_week',
   'bd_side_counts',

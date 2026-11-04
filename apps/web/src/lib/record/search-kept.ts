@@ -20,6 +20,10 @@ import { terms, tokensOf } from './find.ts';
 import { keptPerson } from '../shell/side-copy.ts';
 
 export const FIND_COPY_KEY = 'braindog.find-copy';
+/** Every name on the record, on this device (`learnNames`), under the same record and person rule as the copy above. */
+export const FIND_NAMES_KEY = 'braindog.find-names';
+/** How long the names on this device serve before the panel asks for them again. A row made since is the record's answer's to add. */
+export const NAMES_FRESH_MS = 10 * 60_000;
 const VERSION = 1;
 /** The most rows kept for the record: enough for every name somebody types, small enough to read in a frame. */
 export const POOL_MOST = 1500;
@@ -27,7 +31,40 @@ export const POOL_MOST = 1500;
 const ANSWERS_MOST = 80;
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
-type Kept = { answers: Map<string, SearchResult>; pool: Map<string, SearchHit>; person: string | null; read: boolean; timer: ReturnType<typeof setTimeout> | undefined };
+type Named = { hit: SearchHit; words: string[] };
+type Kept = {
+  answers: Map<string, SearchResult>;
+  pool: Map<string, SearchHit>;
+  person: string | null;
+  read: boolean;
+  timer: ReturnType<typeof setTimeout> | undefined;
+  /* EVERY NAME ON THE RECORD, each with its words folded once, so a letter costs a walk and no tokenising (find1104). */
+  names: Named[];
+  namesAt: number;
+};
+
+/** One list of `learnNames`, its name and glyph already said, each row its number, its title and what tells it apart. */
+export type NamesList = { id: string; kind: string; icon: string; rows: readonly (readonly [number, string, string?, number?, string?])[] };
+
+function namedOf(lists: readonly NamesList[]): Named[] {
+  const out: Named[] = [];
+  for (const l of lists)
+    for (const [seq, title, on, minor, currency] of l.rows)
+      out.push({
+        words: tokensOf(title),
+        hit: {
+          href: `/r/${l.id}/${seq}`,
+          title,
+          kind: l.kind,
+          icon: l.icon as SearchHit['icon'],
+          detail: '',
+          spoken: `#${seq}`,
+          ...(on ? { on } : {}),
+          ...(minor !== undefined && currency ? { amount: { amount: minor, currency } } : {}),
+        },
+      });
+  return out;
+}
 
 const kept = new Map<string, Kept>();
 
@@ -45,7 +82,7 @@ export const keyOf = (q: string): string => (terms(q) ?? []).join(' ');
 function keptFor(base: string, store: Store | null): Kept {
   let k = kept.get(base);
   if (!k) {
-    k = { answers: new Map(), pool: new Map(), person: null, read: false, timer: undefined };
+    k = { answers: new Map(), pool: new Map(), person: null, read: false, timer: undefined, names: [], namesAt: 0 };
     kept.set(base, k);
   }
   if (!k.read) {
@@ -61,8 +98,72 @@ function keptFor(base: string, store: Store | null): Kept {
     } catch {
       /* a copy that does not read is no copy */
     }
+    try {
+      const raw = store?.getItem(FIND_NAMES_KEY);
+      const e = raw ? (JSON.parse(raw) as { v?: number; base?: string; person?: string; at?: number; lists?: NamesList[] }) : null;
+      if (e && e.v === VERSION && e.base === base && k.person !== null && e.person === k.person && Array.isArray(e.lists)) {
+        k.names = namedOf(e.lists);
+        k.namesAt = typeof e.at === 'number' ? e.at : 0;
+      }
+    } catch {
+      /* the same */
+    }
   }
   return k;
+}
+
+/**
+ * Whether the names on this device are old enough to ask for again.
+ */
+export function namesStale(base: string, now = Date.now(), store: Store | null = here()): boolean {
+  return now - keptFor(base, store).namesAt > NAMES_FRESH_MS;
+}
+
+/**
+ * THE RECORD'S NAMES, FOR THE DEVICE TO ANSWER FROM (find1104). Kept for the tab, and on this device beside the shell's
+ * copy for the same record and person, and a sign-out takes it (`signed-out.ts`). Too big to store is the tab's alone.
+ */
+export function learnNames(base: string, lists: readonly NamesList[], now = Date.now(), store: Store | null = here()): void {
+  const k = keptFor(base, store);
+  k.names = namedOf(lists);
+  k.namesAt = now;
+  keptCount.n += 1;
+  if (!store || k.person === null) return;
+  try {
+    store.setItem(FIND_NAMES_KEY, JSON.stringify({ v: VERSION, base, person: k.person, at: now, lists }));
+  } catch {
+    /* full or blocked storage: the tab still has them */
+  }
+}
+
+/** How well a title answers: its whole self, then opening with the words, then its first word, then anywhere. Lower leads. */
+function tierOf(want: readonly string[], words: readonly string[]): number {
+  if (want.length === words.length && want.every((w, i) => w === words[i])) return 0;
+  if (want.every((w, i) => (i === want.length - 1 ? words[i]?.startsWith(w) : words[i] === w))) return 1;
+  return words[0]?.startsWith(want[0] ?? '') ? 2 : 3;
+}
+
+/**
+ * THE ANSWER IN THE ORDER A PERSON MEANS IT: whatever is named exactly first, whatever opens with the words next, and
+ * within a tier the list named `lead` (the projects) first. Rows of one list stay together under its best one.
+ */
+export function best(q: string, value: SearchResult, lead: string | null = null): SearchResult {
+  const want = terms(q);
+  if (!want) return value;
+  const tierHit = (h: SearchHit): number => tierOf(want, tokensOf(h.title));
+  const leads = (h: SearchHit): number => (lead !== null && h.kind === lead ? 0 : 1);
+  const sort = (hits: readonly SearchHit[]): SearchHit[] =>
+    hits
+      .map((h, i) => ({ h, i, t: tierHit(h), l: leads(h) }))
+      .sort((a, b) => a.t - b.t || a.l - b.l || a.i - b.i)
+      .map((x) => x.h);
+  const groups = value.groups.map((g) => ({ ...g, hits: sort(g.hits) }));
+  const groupBest = (g: { hits: readonly SearchHit[] }): [number, number] => [Math.min(...g.hits.map(tierHit)), Math.min(...g.hits.map(leads))];
+  const ordered = groups
+    .map((g, i) => ({ g, i, b: groupBest(g) }))
+    .sort((a, b) => a.b[0] - b.b[0] || a.b[1] - b.b[1] || a.i - b.i)
+    .map((x) => x.g);
+  return { ...value, groups: ordered, hits: ordered.flatMap((g) => g.hits) };
 }
 
 function persist(base: string, k: Kept, store: Store | null): void {
@@ -93,7 +194,7 @@ export function keep(base: string, q: string, value: SearchResult, store: Store 
     for (const h of g.hits) {
       if (!h.href.startsWith('/r/')) continue;
       k.pool.delete(h.href);
-      k.pool.set(h.href, { href: h.href, title: h.title, kind: h.kind, icon: h.icon, detail: '', ...(h.spoken ? { spoken: h.spoken } : {}) });
+      k.pool.set(h.href, { href: h.href, title: h.title, kind: h.kind, icon: h.icon, detail: '', ...(h.spoken ? { spoken: h.spoken } : {}), ...(h.on ? { on: h.on } : {}), ...(h.amount ? { amount: h.amount } : {}) });
     }
   while (k.pool.size > POOL_MOST) k.pool.delete(k.pool.keys().next().value!);
   keptCount.n += 1;
@@ -125,21 +226,26 @@ function says(want: readonly string[], title: string): boolean {
  * What was kept that answers `q`, at once: `exact` when the record answered this very query before, else the kept rows
  * whose titles answer it, grouped by their list in the order they were last seen. `null` when nothing kept answers it.
  */
-export function early(base: string, q: string, limit: number, store: Store | null = here()): { value: SearchResult; exact: boolean } | null {
+export function early(base: string, q: string, limit: number, lead: string | null = null, store: Store | null = here()): { value: SearchResult; exact: boolean } | null {
   const k = keptFor(base, store);
   const key = keyOf(q);
   if (key === '') return null;
   const same = k.answers.get(key);
-  if (same) return { value: same, exact: true };
+  if (same) return { value: best(q, same, lead), exact: true };
   /* NOTHING FOR LESS IS NOTHING FOR MORE: every word typed must start a word of the row, so a query that only adds
      letters or words to one the record found nothing for finds nothing either, and says so at once. */
   for (const [was, value] of k.answers) if (value.total === 0 && key.startsWith(was)) return { value, exact: true };
   const want = key.split(' ');
+  /* THE NAMES FIRST, THEN WHAT WAS KEPT THAT THEY DO NOT HOLD: a row the record answered since the names were read. */
+  const named = new Set<string>();
+  const found: SearchHit[] = [];
+  for (const n of k.names) {
+    named.add(n.hit.href);
+    if (want.every((w) => n.words.some((t) => t.startsWith(w)))) found.push(n.hit);
+  }
   /* NEWEST SEEN FIRST, AND A TITLE THAT STARTS WITH WHAT WAS TYPED BEFORE ONE THAT HAS IT LATER ON. */
-  const found = [...k.pool.values()].reverse().filter((h) => says(want, h.title));
+  for (const h of [...k.pool.values()].reverse()) if (!named.has(h.href) && says(want, h.title)) found.push(h);
   if (found.length === 0) return null;
-  const first = want[0]!;
-  found.sort((a, b) => Number(!(tokensOf(a.title)[0] ?? '').startsWith(first)) - Number(!(tokensOf(b.title)[0] ?? '').startsWith(first)));
   const groups = new Map<string, SearchHit[]>();
   for (const h of found) groups.set(h.kind, [...(groups.get(h.kind) ?? []), h]);
   const value: SearchResult = {
@@ -150,7 +256,7 @@ export function early(base: string, q: string, limit: number, store: Store | nul
       return { kind, total: hits.length, hits, href: register ? `/r/${register}?q=${encodeURIComponent(q.trim())}` : null };
     }),
   };
-  return { value: roundRobin(value, limit), exact: false };
+  return { value: roundRobin(best(q, value, lead), limit), exact: false };
 }
 
 /**

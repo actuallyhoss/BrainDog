@@ -624,6 +624,8 @@ export type HeldTwice = Answer<'heldTwice'>;
  * answer to the name when more than one does, and none is picked. See `AboutAnswer` in `@braindog/record`.
  */
 export type About = Answer<'about'>;
+/** `names`: every row's name, for the search field to keep on the device (`record/src/methods/names.ts`). */
+export type Names = Answer<'names'>;
 
 /**
  * `matched`: who the record matched on its own and still holds as one, newest first, 50 at most: who was folded into
@@ -2822,7 +2824,7 @@ export function createClient(options: ClientOptions) {
       call<{ register: string; by: string; counts: { value: unknown; n: number }[]; matched: number; more?: { values: number; n: number }; capped?: true }>('countBy', args as Record<string, unknown>),
     /** `words`: by the words alone, never waiting on a model for what the query means (the palette, as somebody types). */
     search: (q: string, limit?: number, opts: { words?: boolean } = {}) =>
-      call<{ register: string; seq: number; title: string }[]>('search', { q, ...(limit === undefined ? {} : { limit }), ...(opts.words === true ? { words: true } : {}) }),
+      call<{ register: string; seq: number; title: string; on?: string; amount?: { amount: number; currency: string } }[]>('search', { q, ...(limit === undefined ? {} : { limit }), ...(opts.words === true ? { words: true } : {}) }),
     history: (register: string, seq: number) => call<unknown[]>('history', { register, seq }),
     /** What points at one row, held to the lists this caller may read. `limit` is rows across the whole answer. */
     backlinks: (args: { register: string; seq: number; limit?: number; cursor?: string }) =>
@@ -3248,6 +3250,7 @@ export function createClient(options: ClientOptions) {
      * is picked. Held to the lists the caller may read, and it changes nothing. READ+.
      */
     about: (args: { name: string }) => call<About>('about', args as Record<string, unknown>),
+    names: () => call<Names>('names', {}),
     /**
      * Who the record matched on its own and still holds as one: `{ matches }`, newest first, or `null` on a record
      * that keeps no people. Each carries the `batch` an Undo takes. It reads and changes nothing. READ+.

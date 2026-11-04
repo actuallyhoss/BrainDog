@@ -10481,6 +10481,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       registers?: readonly string[] | undefined;
       limit?: number;
       viewer?: string | undefined;
+      /** The most hits from any one list, asked as somebody types (`fts.ts`). */
+      perList?: number | undefined;
       grant?: Readonly<Wheres> | undefined;
       hide?: Readonly<Record<string, readonly string[]>> | undefined;
       /**

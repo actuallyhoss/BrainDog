@@ -56,7 +56,10 @@
   import { apiBase, at } from '../at.ts';
   import { keptRead } from '../shell/side-read.ts';
   import { isGlyph } from '../ui/icons.ts';
-  import { goto, invalidateAll } from '$app/navigation';
+  import { goto, invalidateAll, preloadCode } from '$app/navigation';
+  import { kept as keptPage, pageKey } from '../record/kept-pages.ts';
+  import { ownPage } from '../record/row-href.ts';
+  import { opensOnPage } from '../record/project.ts';
   import { page } from '$app/state';
   import { moneyWhole, readable, readFigure, since } from 'braindog-render';
   import { homeCurrency } from '../record/api.ts';
@@ -97,7 +100,7 @@
   import type { Hits, Reader } from '../record/palette-live.ts';
   import type { Metric } from '../record/api.ts';
   import { latest } from './latest.ts';
-  import { early, keep, merged } from '../record/search-kept.ts';
+  import { best, early, keep, merged } from '../record/search-kept.ts';
   import { palette as opener } from './open.svelte.ts';
   import { untrack } from 'svelte';
   import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
@@ -165,6 +168,8 @@
     told?: TellOffer | undefined;
     /** How many rows of one title this line stands for, past the first. */
     folded?: number | undefined;
+    /** What tells this row from another of its name: its day and amount (`factsOf`). */
+    facts?: string | undefined;
     /** The group a row was found in before it was drawn as the best match, so its count still says what it counts. */
     from?: string | undefined;
     /** The group a "Show all" row opens. */
@@ -574,6 +579,11 @@
     if (reading?.base !== base) reading = { base, reader: import('../record/palette-live.ts').then((m) => m.paletteReader(base)) };
     return reading.reader;
   };
+  /* THE LIST WHOSE ROWS LEAD WHEN TWO ANSWER EQUALLY WELL: the rail's, its projects. Said by the name a hit carries. */
+  const leadList = (): string | null => {
+    const id = keptRead(apiBase())?.list;
+    return id ? (listNamed.get(id)?.name ?? null) : null;
+  };
 
   /**
    * THE RECORD'S HITS, FOR THE TEXT THEY ANSWER, and never for any other.
@@ -656,6 +666,29 @@
   const BEST = 'Best match';
   /** The most rows a group shows before its "Show all" row. */
   const GROUP_CAP = 6;
+  /** The most rows of one name a group keeps apart, each with its day and amount, before they fold into a count. */
+  const TOLD_APART = 4;
+  /** A row's day and amount in a line: "12 Oct 2025 · £450". This year's day says no year. */
+  const factsOf = (hit: { on?: string; amount?: { amount: number; currency: string } }): string | undefined => {
+    const parts: string[] = [];
+    if (hit.on && /^\d{4}-\d{2}-\d{2}/u.test(hit.on)) {
+      const when = new Date(`${hit.on.slice(0, 10)}T12:00:00Z`);
+      const year = new Date().getUTCFullYear() === when.getUTCFullYear();
+      parts.push(when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC', ...(year ? {} : { year: 'numeric' }) }));
+    }
+    if (hit.amount) parts.push(moneyWhole(hit.amount.amount, hit.amount.currency, homeCurrency())?.text ?? '');
+    const line = parts.filter(Boolean).join(' · ');
+    return line === '' ? undefined : line;
+  };
+  /** The screens a row opens, whose code is fetched as the panel opens. */
+  const PRELOADED = ['/p/x', '/r/x', '/r/x/1', '/search', '/decide/x'];
+  /** How long the highlight rests on a row before its page is read ahead. */
+  const AHEAD_MS = 140;
+  /** The page a row opens, by its slug, or `null` for a row that opens anything else. */
+  const pageSlugOf = (href: string): string | null => {
+    const m = /^\/p\/([^/?#]+)$/u.exec(href);
+    return m === null ? null : decodeURIComponent(m[1]!);
+  };
   const showAll = (n: number): string => `Show all ${n.toLocaleString('en')}`;
 
   /**
@@ -837,7 +870,7 @@
   /* WHAT WAS KEPT, AT ONCE: this very query answered before, or the rows kept whose names answer it. */
   const kept = $derived.by(() => {
     void keptTick;
-    return searching && isLive && found?.text !== parsed.text ? early(apiBase(), parsed.text, RECORD_CAP) : null;
+    return searching && isLive && found?.text !== parsed.text ? early(apiBase(), parsed.text, RECORD_CAP, leadList()) : null;
   });
   /* THE ORDER LAST DRAWN, so rows kept that grow while typing take their places after the ones already drawn. */
   let drawnLast: Hits['value'] | null = null;
@@ -898,7 +931,7 @@
     asking.ask(text, (answer) => {
       /* IN THE ORDER ALREADY DRAWN, so the answer landing moves none of the rows that stay. */
       const shown = untrack(() => hits);
-      found = { text, hits: answer.fix === null ? { value: merged(shown?.value ?? null, answer.value), fix: null } : answer };
+      found = { text, hits: answer.fix === null ? { value: merged(shown?.value ?? null, best(text, answer.value, untrack(leadList))), fix: null } : answer };
       drawnLast = found.hits.value;
     });
     return () => asking.cancel();
@@ -919,22 +952,59 @@
     return () => clearTimeout(t);
   });
 
+  /* AS THE PANEL OPENS: every name on the record, when what this device holds has aged, and the screens a row opens, so
+     the first Enter waits on no chunk. Nothing else: asking every figure here held the record's one thread for 5 to 9 s. */
   $effect(() => {
     if (!open || !isLive) return;
+    void reader().then((r) => r.names());
+    for (const screen of PRELOADED) void preloadCode(at(screen)).catch(() => undefined);
+  });
+  /* THE FIGURES WHOSE NAMES ANSWER WHAT IS TYPED, once the typing rests, and only those (`figureIdsFor`). */
+  $effect(() => {
+    const text = parsed.text;
+    if (!open || !isLive || !(parsed.prefix === null || parsed.prefix === '/') || text.trim().length < 2 || !terms(text)) {
+      extra = null;
+      return;
+    }
     let gone = false;
     const known = lists;
-    reader()
-      /* NOT THE ROWS ANYONE CHANGED LAST: on his record that was an import's rows. Recent is what he opened. */
-      .then((r) => r.figures(known))
-      .then(
-        (figures) => {
-          if (!gone) extra = { recent: [], figures };
-        },
-        () => {},
-      );
+    const want = terms(text) ?? [];
+    const t = setTimeout(() => {
+      void reader()
+        .then((r) => r.figures(known, (name) => { const has = tokensOf(name); return want.every((w) => has.some((tok) => tok.startsWith(w))); }))
+        .then(
+          (figures) => {
+            if (!gone) extra = { recent: [], figures };
+          },
+          () => {},
+        );
+    }, ABOUT_WAIT);
     return () => {
       gone = true;
+      clearTimeout(t);
     };
+  });
+
+  /**
+   * THE HIGHLIGHTED ROW'S PAGE, READ BEFORE IT IS ASKED FOR, once the highlight has rested on it. Enter then draws what
+   * this read kept (`kept-pages.ts`). One at a time, and never one already kept: each is 300 to 900 ms of the record's one
+   * thread on his record, so an arrow held down must not ask for every page it passes.
+   */
+  let ahead: string | null = null;
+  $effect(() => {
+    const href = open && isLive ? flat[cursor]?.href : null;
+    const slug = href ? pageSlugOf(href) : null;
+    if (slug === null || ahead !== null) return;
+    const base = apiBase();
+    const t = setTimeout(() => {
+      if (keptPage.get(pageKey(base, slug)) !== null) return;
+      ahead = slug;
+      void import('../record/page-live.ts')
+        .then((m) => m.pageReader(base).read(slug))
+        .catch(() => undefined)
+        .finally(() => (ahead = null));
+    }, AHEAD_MS);
+    return () => clearTimeout(t);
   });
 
   /**
@@ -1201,9 +1271,17 @@
       for (const hit of kept) {
         /* DRAWN ONCE, as a page is: the thing the name means is already a row, with what it is, at this address. */
         if (aboutAt.has(hit.href)) continue;
+        /* A ROW WITH A PAGE OF ITS OWN IS THAT PAGE: drawn once, and opened with no stop at the row's address on the way. */
+        const rowAt = /^\/r\/([^/]+)\/(\d+)$/u.exec(hit.href);
+        const rowList = rowAt ? decodeURIComponent(rowAt[1]!) : null;
+        /* AS THE ROW'S SCREEN DECIDES IT (`r/[register]/[seq]/+page.ts`): a person's row keeps its own screen. */
+        const own = rowAt && rowList !== null && opensOnPage(REGISTERS[rowList]) ? ownPage(rowList, Number(rowAt[2]), new URLSearchParams()) : null;
+        if (own !== null && listed.has(own)) continue;
+        const facts = factsOf(hit);
         out.push({
           id: `h-${hit.href}`,
           title: hit.title,
+          ...(facts ? { facts } : {}),
           /* AND WHY IT IS IN THE LIST, when the title does not contain what was typed. `services`
              declares its provider searchable, so `nordhaven` now reaches three domains named after
              none of it: useful, and unreadable without the reason. A row the record sends with
@@ -1211,7 +1289,7 @@
              a list's name is something a person reads and a number is not. */
           detail: hit.why ?? (hit.detail || hit.kind),
           /* NEVER WHY IT RANKED: a row found by meaning carries a mark, not a caption, so it says its list. */
-          href: hit.href,
+          href: own ?? hit.href,
           group: hit.kind,
           icon: hit.icon,
           complete: hit.title,
@@ -1388,13 +1466,24 @@
           Object.assign(had, { ...about, href: page.href ?? about.href, icon: about.marked === true ? about.icon : (page.icon ?? about.icon) });
           continue;
         }
-        if (had && r.href !== null && had.href !== null && group !== GO_TO) {
+        /* A BEST MATCH IS NEVER FOLDED: a project and a domain both called crumb.gg are two things, and folded they were one
+           line that opened a search. And a few rows of one name stay rows, each saying its day and amount: three "iOS
+           contractor" lines folded told nothing apart. Past `TOLD_APART` of them they are readings, and a count says it. */
+        const sameName = items.filter((x) => x.title.trim().toLowerCase() === key).length;
+        const toldApart = group === BEST || (sameName <= TOLD_APART && items.some((x) => x !== r && x.title.trim().toLowerCase() === key && x.facts !== r.facts));
+        if (had && r.href !== null && had.href !== null && group !== GO_TO && !toldApart) {
           had.folded = (had.folded ?? 1) + 1;
           had.href = `/search?q=${encodeURIComponent(r.title)}`;
           continue;
         }
+        /* TOLD APART BY THEIR DAY AND AMOUNT, and in Best match by the list each comes from as well. */
+        const say = (x: Row): string | undefined => (group === BEST ? [x.from ?? x.detail, x.facts].filter(Boolean).join(' · ') || x.detail : (x.facts ?? x.detail));
         const own = { ...r };
-        seen.set(key, own);
+        if (had && toldApart) {
+          own.detail = say(r);
+          if (!had.id.startsWith('about-')) had.detail = say(had);
+        }
+        if (!had) seen.set(key, own);
         folded.push(own);
       }
       if (folded.length > GROUP_CAP && !opened.has(group))

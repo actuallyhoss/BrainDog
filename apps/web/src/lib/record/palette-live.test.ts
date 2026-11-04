@@ -11,7 +11,7 @@ import { REGISTERS } from './api.ts';
 import { METRICS } from './declared.ts';
 import { isTemplate } from './metrics.ts';
 import { FIGURE_IDS, recentOf, roundRobin, type List } from './palette.ts';
-import { paletteReader } from './palette-live.ts';
+import { FIGURES_ASKED, paletteReader } from './palette-live.ts';
 import type { Fetch } from './search-live.ts';
 
 const BASE = 'http://record.test';
@@ -124,7 +124,8 @@ test('a figure is drawn from the record\'s reading, and one refused or over no r
     if (id === second) return json(403, { ok: false, refusal: { code: 'METRIC_UNKNOWN', fix: 'No such figure.' } });
     return json(200, { ok: true, value: { value: 0, unit: null, rows: 0, met: null, refusals: [] } });
   });
-  const out = await paletteReader(BASE, io).figures();
+  const named = new Set([METRICS[first]!.name, METRICS[second]!.name]);
+  const out = await paletteReader(BASE, io).figures(undefined, (name) => named.has(name));
   assert.deepEqual(out.map((m) => m.id), [first]);
   assert.equal(out[0]!.label, METRICS[first]!.name);
   assert.equal(rest.length + 2, FIGURE_IDS.length);
@@ -132,11 +133,11 @@ test('a figure is drawn from the record\'s reading, and one refused or over no r
 
 test('A FIGURE OVER A LIST THE RECORD DOES NOT HOLD IS NOT ASKED FOR', async () => {
   const { io, sent } = host(() => json(200, { ok: true, value: { value: 1, unit: null, rows: 1, met: true, refusals: [] } }));
-  assert.deepEqual(await paletteReader(BASE, io).figures([{ id: 'courses' }, { id: 'assignments' }]), []);
+  assert.deepEqual(await paletteReader(BASE, io).figures([{ id: 'courses' }, { id: 'assignments' }], () => true), []);
   assert.equal(sent.length, 0);
   const money = FIGURE_IDS.filter((id) => METRICS[id]?.source === 'register.obligations');
-  await paletteReader(BASE, io).figures([{ id: 'obligations' }]);
-  assert.equal(sent.length, money.length);
+  await paletteReader(BASE, io).figures([{ id: 'obligations' }], () => true);
+  assert.equal(sent.length, Math.min(money.length, FIGURES_ASKED));
 });
 
 test('only the newest query is answered, however the replies arrive', async () => {
