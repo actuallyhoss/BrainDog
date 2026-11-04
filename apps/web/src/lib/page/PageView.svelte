@@ -307,11 +307,17 @@
   let partsFailed = $state(false);
   setContext(SHAPE_KEY, shapeBox);
   const shapeSaid = $derived(mode === 'page' ? ((live?.page.page as { shape?: unknown } | undefined)?.shape ?? null) : null);
+  /* ONLY THE LAST ASK SPEAKS. Each run below waits on the same two `import()`s, and the browser does not finish them in
+     the order they were asked. A cold open runs it over the shell's copy (`owner` false, as a copy is, `drawnFrom`) and
+     again a few ms later once the live shell lands, and when the first run's answer came second it set `owner` back to
+     false for good: no box to tell agents, and with it Numbers and Dates 13 taller at a desk. */
+  let shapeAsked = 0;
   $effect(() => {
     const of = about;
     const said = shapeSaid;
     const isOwner = shell?.me?.owner === true;
     const line = modelLine;
+    const asked = ++shapeAsked;
     untrack(() => {
       if (!of) {
         shapeBox.hold = null;
@@ -323,6 +329,7 @@
       void Promise.all([import('./shape-hold.svelte.ts'), import('./ProjectPart.svelte')]).then(([{ ShapeHold }, part]) => {
         /* AND KEPT WHERE A SLOT DRAWS IT AT ONCE (`part-landed.ts`), not a frame after the hold. */
         partLanded.part = part.default;
+        if (asked !== shapeAsked) return;
         if (about?.register !== of.register || about.seq !== of.seq || said !== shapeSaid) return;
         const hold = shapeBox.hold ?? new ShapeHold();
         hold.owner = isOwner;
