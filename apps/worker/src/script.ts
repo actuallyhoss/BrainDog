@@ -192,7 +192,7 @@ export class ScriptOutbound extends WorkerEntrypoint<Wired, Linked> {
     });
     if ('error' in reply) {
       console.info(`script fetch: ${reply.error}`);
-      return new Response(reply.error, { headers: { [REFUSED_HEADER]: '1' } });
+      return new Response(reply.error, { headers: { [REFUSED_HEADER]: '1', 'cache-control': 'no-store' } });
     }
     return Response.json(reply.ok);
   }
