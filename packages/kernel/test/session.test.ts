@@ -53,6 +53,9 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<ty
   const clock = fixedClock(NOW);
   const k = await openRecord(sql, clock);
   value(await k.install([TASKS]));
+  /* THE KEYS THIS FILE WRITES WITH: `t_1` is the owner's, and `t_2` somebody else's. Only the maker's own keys name a run they made (`othersRun`). */
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_1', 'p_owner', 'h1', 'write', 'One', '2026-09-01T00:00:00.000Z')");
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_2', 'p_other', 'h2', 'write', 'Two', '2026-09-01T00:00:00.000Z')");
   return { k, sql, clock };
 }
 
@@ -495,12 +498,17 @@ test('A RUN BELONGS TO THE TOKEN THAT OPENED IT: another key naming it, holding 
   sql.close();
 });
 
-test('A RUN A PERSON MADE IS SHARED with any key that names it, and a run a key makes by hand is that key’s', async () => {
+test('A RUN A PERSON MADE IS FOR THEIR OWN KEYS, one an automation made is shared with any key that names it, and a run a key makes by hand is that key’s', async () => {
   const { k, sql } = await record();
   value(k.create('session', { doing: 'For whoever picks it up' }, { actor: 'p_owner' }));
   value(k.create('tasks', { what: 'Picked up' }, agent({ spoken: 'S1' })));
-  value(k.create('tasks', { what: 'Me too' }, { actor: 'p_other', principal: { kind: 'token', token: 't_2' }, session: { spoken: 'S1' } }));
+  const notHis = refusal(k.create('tasks', { what: 'Me too' }, { actor: 'p_other', principal: { kind: 'token', token: 't_2' }, session: { spoken: 'S1' } }));
+  assert.deepEqual([notHis.code, notHis.at], ['FORBIDDEN', 'session']);
   assert.deepEqual(runs(sql), [1]);
+  value(k.create('session', { doing: 'For any key' }, { actor: 'system' }));
+  value(k.create('tasks', { what: 'Mine too' }, { actor: 'p_other', principal: { kind: 'token', token: 't_2' }, session: { spoken: 'S2' } }));
+  value(k.create('tasks', { what: 'And mine' }, agent({ spoken: 'S2' })));
+  assert.deepEqual(runs(sql), [1, 2]);
 
   const made = value<Entry>(k.create('session', { doing: 'By hand' }, agent()));
   assert.equal(made.fields.token_id, 't_1');
@@ -526,11 +534,13 @@ test('A NOTE AND A QUESTION ARE NEVER SIGNED AS ANOTHER KEY’S RUN: naming it i
   assert.equal(Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM suggestion')?.n), 0);
   assert.deepEqual(runs(sql), [1], 'a refused key opened a run');
 
-  /* Its own run signs as it did, and a run a person made is still any key's to name. */
+  /* Its own run signs as it did, a run the owner made is not its to name (`othersRun`), and an automation's still is any key's. */
   value(k.log('tasks', task.seq!, other({ client_id: 'cc-2' }), 'Mine now'));
   assert.equal(events(sql, task.id).at(-1)?.actor, 'S2');
-  value(k.create('session', { doing: 'For whoever picks it up' }, { actor: 'p_owner' }));
-  value(k.log('tasks', task.seq!, other({ spoken: 'S3' }), 'Picked up'));
-  assert.equal(events(sql, task.id).at(-1)?.actor, 'S3');
+  value(k.create('session', { doing: 'For the owner\'s keys' }, { actor: 'p_owner' }));
+  assert.deepEqual([refusal(k.log('tasks', task.seq!, other({ spoken: 'S3' }), 'Picked up')).code], ['FORBIDDEN']);
+  value(k.create('session', { doing: 'For whoever picks it up' }, { actor: 'system' }));
+  value(k.log('tasks', task.seq!, other({ spoken: 'S4' }), 'Picked up'));
+  assert.equal(events(sql, task.id).at(-1)?.actor, 'S4');
   sql.close();
 });

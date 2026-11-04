@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { openRecord, type Declaration, type PageBlock } from '../src/index.ts';
+import { NEVER_FILED } from '../src/sources/signs.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 12);
@@ -80,8 +81,10 @@ test('THE VITAL SIGNS ARE A PAGE SOURCE: a signs block reads every sign the reco
   const { k, sql } = await record();
   const read = k.block({ kind: 'table', source: 'signs', columns: [{ field: 'name' }, { field: 'state' }, { field: 'said' }] } as PageBlock);
   assert.ok(!read.refusals.some((r) => r.code === 'NOT_IN_THIS_BUILD'), JSON.stringify(read.refusals));
-  const signs = value<{ signs: { sign: string }[] }>(k.signs()).signs;
+  const signs = value<{ signs: { sign: string; state: string; said: string }[] }>(k.signs()).signs;
   assert.ok(signs.length > 0);
-  assert.equal(read.matched, signs.length);
+  /* EVERY SIGN, those nothing was filed for folded into one line (`foldUnfiled`). */
+  const never = signs.filter((s) => s.state === 'none' && s.said === NEVER_FILED).length;
+  assert.equal(read.matched, signs.length - (never > 1 ? never - 1 : 0));
   sql.close();
 });

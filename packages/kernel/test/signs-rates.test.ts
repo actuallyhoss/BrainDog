@@ -90,7 +90,7 @@ test('OLD RATES READ RED, a day past the line, and say the cure in the words an 
   assert.equal(old.state, 'red');
   assert.equal(old.value, RATE_STALE_DAYS + 1);
   assert.match(old.said, /8 days old\. Turn on Keep rates current, on Money's plugin page, for a feed of rates once a day\./u);
-  assert.ok(old.facts?.some((f) => f.includes('EGP and USD')), JSON.stringify(old.facts));
+  assert.ok(old.facts?.some((f) => f.includes('Egyptian Pound and US Dollar')), JSON.stringify(old.facts));
   for (const line of [old.said, ...(old.facts ?? [])]) assert.doesNotMatch(line, /—|\bfx\b|bills|rec_/u, line);
 });
 
@@ -102,5 +102,5 @@ test('ONE CURRENCY READS NONE, however old its rates, and so do no money and no 
   assert.equal(read(await record([], [AGO(40)])).state, 'none');
   const unrated = read(await record(['EGP', 'USD'], []));
   assert.equal(unrated.state, 'none', 'nought would say the rates are fresh on a record that has none');
-  assert.match(unrated.said, /no exchange rate yet/u);
+  assert.match(unrated.said, /No exchange rate is kept yet/u);
 });

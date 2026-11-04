@@ -45,7 +45,9 @@ for (const id of Object.keys(QUIET)) {
       assert.notEqual(q.said, s.said);
       assert.doesNotMatch(q.said, /—|undefined|null|NaN/);
       assert.deepEqual(q.facts, []);
-      assert.deepEqual({ ...q, said: s.said, facts: s.facts }, s);
+      /* A FAILURE IS TITLED BY ITS QUESTION'S WORDS (AG7), so a quiet one goes back to the sign's own name. */
+      if (id === 'questions-by-cause') assert.equal(q.name, 'Each problem is asked once');
+      assert.deepEqual({ ...q, said: s.said, facts: s.facts, name: s.name }, s);
     });
   }
 }

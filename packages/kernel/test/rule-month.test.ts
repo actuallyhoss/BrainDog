@@ -20,7 +20,7 @@ test('EACH FIRING RAISES THE WHOLE COUNT AND ITS MONTH’S', async () => {
   raiseStat(sql, 'file-coffee', 'entry_2', OCT);
   raiseStat(sql, 'file-coffee', 'entry_3', NOV);
   assert.equal(sql.one<{ fired: number }>('SELECT fired FROM rule_stat WHERE rule = ?', 'file-coffee')?.fired, 3);
-  assert.deepEqual(sql.all('SELECT month, fired FROM rule_month WHERE rule = ? ORDER BY month', 'file-coffee'), [
+  assert.deepEqual(sql.all('SELECT month, fired FROM rule_month WHERE rule = ? ORDER BY month', 'file-coffee').map((r) => ({ ...r })), [
     { month: '2026-10', fired: 2 },
     { month: '2026-11', fired: 1 },
   ]);

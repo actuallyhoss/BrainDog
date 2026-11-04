@@ -198,10 +198,11 @@ test('A MEASURE MOVES BY A SHARE, so a doubling outranks EGP 4,000 more on EGP 4
     { at: at(1), value: 9, name: 'Once' },
   ];
   const { lines, latest } = measureLines(readings, { nowMs: NOW, back: 7, fallback: '' });
-  assert.deepEqual(lines.map((m) => m.name), ['Trials', 'Sign-ups', 'Cash', 'Refunds']);
+  /* REFUNDS HAS ONLY EVER SAID NOUGHT, so it draws no line at all (`spoke`); nought to nought ranks nothing either way. */
+  assert.deepEqual(lines.map((m) => m.name), ['Trials', 'Sign-ups', 'Cash']);
   assert.deepEqual(latest.map((m) => [m.measure, m.value]), [['Once', 9]]);
   /* A STAT KEEPS THE ONE READING AS A TILE, after the measures that moved. */
-  assert.deepEqual(measureSeries(readings, { nowMs: NOW, back: 7, fallback: '' }).map((m) => m.name), ['Trials', 'Sign-ups', 'Cash', 'Refunds', 'Once']);
+  assert.deepEqual(measureSeries(readings, { nowMs: NOW, back: 7, fallback: '' }).map((m) => m.name), ['Trials', 'Sign-ups', 'Cash', 'Once']);
 });
 
 test('TWO PROJECTS’ MEASURES OF ONE NAME ARE TWO MEASURES, each named for its project, and the newest before the period is each one’s', async () => {

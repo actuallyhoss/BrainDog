@@ -26,6 +26,8 @@ const token: WriteContext = { actor: 'p_owner', principal: { kind: 'token', toke
 test("A PERSON'S PATCH NAMING A RUN FACT is IMMUTABLE_FIELD at the field, and the same patch from its agent is written", async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
+  /* ITS AGENT IS A KEY OF THE PERSON WHO MADE THE RUN: nobody else's key works as it (`othersRun`). */
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_1', 'p_owner', 'h1', 'write', 'One', '2026-09-01T00:00:00.000Z')");
   const run = value<Entry>(k.create('session', { doing: 'Tidy the folder' }, { actor: 'p_owner' }));
   assert.ok(RUN_FACTS.includes('cwd'));
 

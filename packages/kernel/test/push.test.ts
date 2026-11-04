@@ -167,8 +167,9 @@ test('AN INTERRUPT QUEUES ONE notify.push PER OWNER SUBSCRIPTION, and each names
      of both. Mara reads the record and is not an owner, so her phone is not rung for it. */
   assert.deepEqual(
     queued(sql, 'notify.push').map((p) => JSON.stringify(p)).sort(),
-    [{ sub: { id: 'ps_ada_laptop' } }, { sub: { id: 'ps_ada_phone' } }].map((p) => JSON.stringify(p)),
-    'the push jobs are not one per owner subscription, by id alone',
+    /* THE ID, WHERE A TAP OPENS AND THE KIND, which the owner's switches read: a path and a word, never an address or a sentence. */
+    [{ sub: { id: 'ps_ada_laptop' }, open: '/r/tasks', kind: 'needs' }, { sub: { id: 'ps_ada_phone' }, open: '/r/tasks', kind: 'needs' }].map((p) => JSON.stringify(p)),
+    'the push jobs are not one per owner subscription, by id, where it opens and its kind',
   );
   /* AND NO ADDRESS AND NO WORDS IN THE OUTBOX, WHICH TRAVELS. The outbox is in the `data` section, so whatever a payload
      holds is in the next `.brain` file; an endpoint there is a way to ring Ada's phone from a copied backup. */
@@ -281,9 +282,10 @@ test('A KIND AN OWNER TURNED OFF RINGS NONE OF THEIR PHONES, and every other kin
   sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('p_ada', 'push.off', '[\"money\",\"summary\"]', ?)", new Date(NOW).toISOString());
   assert.deepEqual(ownersPushSubs(sql, 'money'), []);
   assert.deepEqual(ownersPushSubs(sql, 'summary'), []);
-  assert.deepEqual(ownersPushSubs(sql, 'needs'), ['ps_1']);
+  /* EVERY ONE OF ADA'S PHONES, the two `record` seeds and this one, for the kinds she left on. */
+  assert.deepEqual(ownersPushSubs(sql, 'needs'), ['ps_1', 'ps_ada_laptop', 'ps_ada_phone']);
   /* WITH NO KIND, every owner's phone, as before: the test press and the counts read it so. */
-  assert.deepEqual(ownersPushSubs(sql), ['ps_1']);
+  assert.deepEqual(ownersPushSubs(sql), ['ps_1', 'ps_ada_laptop', 'ps_ada_phone']);
   void k;
   sql.close();
 });

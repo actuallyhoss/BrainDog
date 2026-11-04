@@ -1975,7 +1975,7 @@ test('A GENERATOR WITH NO CEILING FILLS THE RECORD, and `bound:` is what buys th
   const said = validateDeclaration(rule({ then: [{ create: { register: 'skus', fields: { code: 'x' } } }] }));
   assert.equal(said?.code, 'CREATE_UNBOUNDED');
   assert.equal(said?.at, 'bound');
-  assert.match(said?.fix ?? '', /fills the record/);
+  assert.match(said?.fix ?? '', /fills your BrainDog/);
   assert.equal(refusedWith(rule()), null, 'a bounded create was refused');
 });
 
@@ -2262,7 +2262,7 @@ test('A RESERVED FIELD ID IS REFUSED AT INSTALL, and `title` is the one an autho
   const said = refusal(await k.install([notes]));
   assert.equal(said.code, 'FIELD_UNKNOWN');
   assert.equal(said.at, 'title');
-  assert.match(said.fix, /the record's own/);
+  assert.match(said.fix, /BrainDog's own/);
   assert.equal(k.register('notes'), undefined, 'a register that can hold no row was installed anyway');
 
   /* ALL NINE OF `34 §4`'s, and the same code at both moments. */

@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { guard, type Param, type Row, type Sql } from '@braindog/ports';
+import { DO_LIMITS, guard, type Param, type Row, type Sql } from '@braindog/ports';
 
 import { openRecord, type Declaration, type Entry, type WriteContext } from '../src/index.ts';
 import { importBrainl } from '../src/brainl.ts';
@@ -185,12 +185,13 @@ test('referenced: a list with 250 fields pointing here still keeps the row one o
   sql.close();
 });
 
-test('brainl, import: a row 250 columns wide goes in through one parameter, each value as it was written', async () => {
+test('brainl, import: a row as wide as a table may be goes in through one parameter, each value as it was written', async () => {
   const sql = openSqlite();
   await openRecord(sql, fixedClock(NOW));
-  /* A TABLE WIDER THAN THE DURABLE OBJECT'S HUNDRED BOUND PARAMETERS, added to this record's section map so the import
-     reads it as one of its own. The columns carry no type, so a value comes back as the type it was bound. */
-  const cols = Array.from({ length: MANY - 2 }, (_, i) => `c${i}`);
+  /* A TABLE AS WIDE AS THE DURABLE OBJECT LETS ONE BE, its hundred columns, added to this record's section map so the
+     import reads it as one of its own, in one parameter and a blob's rather than a hundred. The columns carry no type,
+     so a value comes back as the type it was bound. */
+  const cols = Array.from({ length: DO_LIMITS.column - 2 }, (_, i) => `c${i}`);
   sql.exec(`CREATE TABLE wide (id TEXT PRIMARY KEY, ${cols.join(', ')}, b BLOB)`);
   sql.exec("INSERT INTO dog_section (table_name, section) VALUES ('wide', 'data')");
   const cell = (i: number): string | number | null =>
@@ -199,6 +200,7 @@ test('brainl, import: a row 250 columns wide goes in through one parameter, each
   const db = capped(sql);
   const out = importBrainl(db, (fn) => sql.transactionSync(fn), lines);
   assert.ok(out.ok, JSON.stringify(out));
+  assert.ok(db.most() <= 2, `the import bound ${db.most()} parameters for ${cols.length} columns`);
   const row = sql.one<Record<string, unknown>>('SELECT * FROM wide WHERE id = ?', 'w1');
   assert.ok(row, 'the wide row did not go in');
   for (let i = 0; i < cols.length; i++) assert.deepEqual(row[`c${i}`], cell(i), `c${i} came back changed`);

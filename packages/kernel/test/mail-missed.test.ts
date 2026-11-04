@@ -17,7 +17,7 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<ty
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const k = await openRecord(sql, clock);
-  assert.ok(k.createRecord({ id: '01JD0000000000000000000000', slug: 'studio', name: 'Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  assert.ok(k.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'studio', name: 'Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
   assert.ok(k.invite('p_1', { person: 'p_mia', email: 'mia@example.test', name: 'Mia', level: 'read' }).ok);
   return { k, sql, clock };
 }

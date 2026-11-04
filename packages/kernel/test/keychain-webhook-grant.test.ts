@@ -221,7 +221,7 @@ test('A RECORD KEY BEHIND A PASSPHRASE IS REFUSED AS THE RECORD KEY, not as a co
   leasedPost(sql, 'collector');
   const why = refusal(k.sealedGrant({ outbox: 'ob_1', leasedUntil: LEASE, grant: 'collector' }, 'digest:monday'));
   assert.equal(why.code, 'WRONG_KEY');
-  assert.match(why.fix, /record key/);
+  assert.match(why.fix, /BrainDog’s own key/);
   assert.doesNotMatch(why.fix, /connector/);
   sql.close();
 });

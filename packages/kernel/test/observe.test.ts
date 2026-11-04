@@ -126,7 +126,7 @@ test('A RECORD TOO NEW TO HAVE A HABIT SAYS NOTHING', async () => {
 
   const out = k.analyse();
   assert.equal(out.candidate, null);
-  assert.match(out.suspended ?? '', /rows|days|fortnight/);
+  assert.match(out.suspended ?? '', /too few to show a habit/);
   sql.close();
 });
 

@@ -16,7 +16,7 @@ const NOW = Date.UTC(2026, 9, 31, 23, 30);
 async function record() {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  const made = k.createRecord({ id: 'rec_zone', slug: 'studio', name: 'Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.test', name: 'Ada' } });
+  const made = k.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'studio', name: 'Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.test', name: 'Ada' } });
   assert.ok(made.ok, JSON.stringify(made));
   return { k, sql };
 }

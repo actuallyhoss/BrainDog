@@ -51,6 +51,8 @@ async function record() {
   const clock = fixedClock(NOW);
   const k = await openRecord(sql, clock);
   value(await k.install([PROJECTS, TASKS]));
+  /* THE KEY THE AGENTS HERE WRITE WITH IS THE OWNER'S: a run a person made is for their own keys (`othersRun`). */
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_1', 'p_owner', 'h1', 'write', 'One', '2026-09-01T00:00:00.000Z')");
   value(k.create('things', { name: 'BrainDog', repos: ['github.com/actuallyhoss/BrainDog'] }, { actor: 'p_owner' }));
   value(k.create('things', { name: 'Kiln', folders: ['/Users/sam/Code/kiln-type'] }, { actor: 'p_owner' }));
   return { k, sql, clock };

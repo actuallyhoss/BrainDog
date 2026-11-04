@@ -59,7 +59,7 @@ const asked = (k: Kernel): { raw: string; question: string } => {
   return { raw: got.raw, question: got.suggestion };
 };
 
-const statusOf = (sql: NodeSql, id: string) => sql.one<{ status: string; resolved_as: string | null }>('SELECT status, resolved_as FROM suggestion WHERE id = ?', id);
+const statusOf = (sql: NodeSql, id: string) => ({ ...sql.one<{ status: string; resolved_as: string | null }>('SELECT status, resolved_as FROM suggestion WHERE id = ?', id) });
 const stateOf = (sql: NodeSql, raw: string): string | undefined => sql.one<{ state: string }>('SELECT state FROM inbox_raw WHERE id = ?', raw)?.state;
 const lastStateBatch = (sql: NodeSql, raw: string): string =>
   sql.one<{ batch: string }>("SELECT batch FROM event WHERE target = ? AND kind = 'state' ORDER BY rowid DESC LIMIT 1", `inbox_raw:${raw}`)!.batch;
@@ -161,13 +161,15 @@ test('A REMITTANCE FROM ANOTHER ADDRESS AT A FREE MAIL HOST OFFERS NOTHING (RM3)
       { id: 'name', type: 'text', required: true },
       { id: 'email', type: 'email' },
       { id: 'met', type: 'list', of: 'text' },
+      { id: 'merged_into', type: 'ref', to: 'folk' },
     ],
-    meets: { name: 'name', email: 'email', met: 'met' },
+    meets: { name: 'name', email: 'email', met: 'met', merged_into: 'merged_into' },
   });
   const dues = DECLS[0]!;
   const body = dues.body as unknown as { fields: object[] };
   const withParty: Declaration = { ...dues, body: { ...body, fields: [...body.fields, { id: 'party', type: 'ref', to: 'folk' }] } as never };
-  assert.ok((await k.install([folk, withParty, DECLS[1]!])).ok);
+  const put = await k.install([folk, withParty, DECLS[1]!]);
+  assert.ok(put.ok, JSON.stringify(put));
   const omar = value(k.create('folk', { name: 'Omar', email: 'omar@gmail.com' }, PERSON)) as { id: string };
   value(k.create('dues', { what: 'Omar INV-7', direction: 'owed_to_me', amount: { amount: 50000, currency: 'GBP' }, due: '2026-10-15', party: omar.id }, PERSON));
   const got = mail(k, 'Sam <sam@gmail.com>', 'Paid', 'We have paid your invoice INV-7.\n');

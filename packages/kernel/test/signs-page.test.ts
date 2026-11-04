@@ -83,7 +83,7 @@ test('WHERE NARROWS BY STATE, and the count is of what matched', () => {
 test('A COLUMN A SIGN DOES NOT HAVE, AN ORDER, AND A HOST THAT READS NO SIGNS ARE EACH SAID, not drawn empty', () => {
   const bad = readBlock(depsWith([RED]), { ...TABLE, columns: [{ field: 'colour' }] });
   assert.equal(bad.refusals[0]?.code, 'FIELD_UNKNOWN');
-  assert.deepEqual(bad.refusals[0]?.allowed, ['sign', 'name', 'state', 'value', 'said']);
+  assert.deepEqual(bad.refusals[0]?.allowed, ['sign', 'name', 'state', 'value', 'said', 'to']);
   const ordered = readBlock(depsWith([RED]), { ...TABLE, order: [{ field: 'state' }] });
   assert.equal(ordered.refusals[0]?.code, 'DECLARATION_INVALID');
   const unwired = readBlock(depsWith(null), TABLE);
@@ -118,7 +118,8 @@ test('THROUGH A REAL RECORD: the record’s own signs read through the source, e
   /* A RECORD NOBODY HAS FILED FOR: the signs the record and the host file read none, never green, said once together. */
   const folded = read.rows.find((r) => r.fields.sign === 'never-filed');
   assert.equal(folded?.fields.state, 'none');
-  assert.match(String(folded?.fields.name), /The model answers/u);
+  assert.match(String(folded?.fields.name), /^\d+ checks with nothing filed yet$/u);
+  assert.match(String(folded?.fields.said), /The model answers/u);
   assert.equal(read.rows.filter((r) => r.fields.said === NEVER_FILED).length, 0, 'the sentence is never said once a sign');
   sql.close();
 });
@@ -127,7 +128,7 @@ test('TWO OR MORE SIGNS NOTHING WAS FILED FOR FOLD INTO ONE LINE, where the firs
   const other = { ...NONE, sign: 'tools-listed', name: 'Agents get the tool list' };
   const read = readBlock(depsWith([RED, NONE, GREEN, other]), TABLE);
   assert.deepEqual(read.rows.map((r) => r.fields.sign), ['arrivals-filed', 'never-filed', 'oldest-question']);
-  assert.equal(read.rows[1]!.fields.name, 'The model answers and Agents get the tool list');
-  assert.equal(read.rows[1]!.fields.said, 'Nothing has been filed for these yet.');
+  assert.equal(read.rows[1]!.fields.name, '2 checks with nothing filed yet');
+  assert.equal(read.rows[1]!.fields.said, 'Nothing has been filed yet for The model answers and Agents get the tool list.');
   assert.deepEqual(foldUnfiled(readBlock(depsWith([NONE]), TABLE).rows).map((r) => r.fields.sign), ['model-answers']);
 });
