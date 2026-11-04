@@ -76,9 +76,9 @@ test('the placeholders are an invented record and owner, and the container is th
   assert.match(OVERRIDE, new RegExp(`^ {4}image: ${IMAGE}$`, 'm'), 'the image built would replace a person’s own braindog image');
   /* THE DEFAULT BRIDGE IS docker0, the one the workflow's outbound block names. */
   assert.match(OVERRIDE, /^ {4}network_mode: bridge$/m);
-  /* AND THE README'S COMPOSE FILE STILL PUBLISHES THROUGH BRAINDOG_PORT, or the port above is never used. */
+  /* AND THE README'S COMPOSE FILE STILL PUBLISHES THROUGH BRAINDOG_PORT, or the port above is never used, on this machine alone unless BRAINDOG_PUBLISH says otherwise. */
   const compose = readFileSync(fileURLToPath(new URL('../../../docker-compose.yml', import.meta.url)), 'utf8');
-  assert.match(compose, /"\$\{BRAINDOG_PORT:-8080\}:8080"/);
+  assert.match(compose, /"\$\{BRAINDOG_PUBLISH:-127\.0\.0\.1\}:\$\{BRAINDOG_PORT:-8080\}:8080"/);
   assert.match(compose, /^ {2}braindog:$/m);
 });
 

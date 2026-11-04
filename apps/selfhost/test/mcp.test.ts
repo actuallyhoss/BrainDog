@@ -214,7 +214,8 @@ test('405, 415 AND 413 ON A REAL SOCKET, a chunked body included, and the server
       const r = await s.http('/mcp', { method, headers: auth });
       assert.equal(r.status, 405, method);
       assert.equal(r.headers.get('allow'), 'POST');
-      assert.equal(r.raw, '');
+      /* WITH THE CODE AND THE SENTENCE EVERY OTHER DOOR ANSWERS A METHOD WITH, and nothing about the record. */
+      assert.deepEqual(JSON.parse(r.raw), { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/mcp takes a POST of one JSON-RPC message, with a bearer.' } });
       answers.push(r);
     }
 

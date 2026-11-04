@@ -234,7 +234,7 @@ test('AND A COMMAND THIS HOST DOES NOT HAVE IS ONE SENTENCE, not a stack', async
     assert.equal(out.code, 1);
     /* THE LAST LINE, because Node prints its own experimental-SQLite warning first and that is the
        runtime's sentence rather than this command's. */
-    assert.match(out.said.trim().split(String.fromCharCode(10)).at(-1) ?? '', /^There is no nonsense here\. It has serve, init, backup and restore; node \S+main\.ts --help says what each takes\.$/);
+    assert.match(out.said.trim().split(String.fromCharCode(10)).at(-1) ?? '', /^There is no nonsense here\. It has serve, init, backup, restore and invite; node \S+main\.ts --help says what each takes\.$/);
 
     /* AND --help IS AN ANSWER, not a refusal: each command as it is run here, and exit 0. */
     const help = run(data, '--help');
@@ -245,7 +245,7 @@ test('AND A COMMAND THIS HOST DOES NOT HAVE IS ONE SENTENCE, not a stack', async
        a record nobody created, which is what an empty file quietly becomes. */
     const empty = run(data, 'serve');
     assert.equal(empty.code, 1);
-    assert.match(empty.said, /braindog init <slug> --owner <email>/);
+    assert.match(empty.said, /main\.ts init <name> --owner <your email>/);
   } finally {
     rmSync(data, { recursive: true, force: true });
   }

@@ -138,6 +138,8 @@ test('THE WHOLE INVITATION: minted by the owner, opened by a stranger who cannot
       level: 'write',
       lists: [],
       shared: null,
+      /* AND WHO INVITED THEM, by the name they go by here, which is what the landing line says. */
+      by: 'Ada',
       signedInAs: null,
     });
     const unproved = await s.call('/auth/invite', { body: { inviteToken: token, accept: true } });
