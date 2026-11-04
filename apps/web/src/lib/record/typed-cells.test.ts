@@ -13,6 +13,8 @@ import assert from 'node:assert/strict';
 import { UNNAMED } from 'braindog-render';
 
 import './fixtures/fill.ts';
+/* A FIGURE'S FORMAT IS READ FROM WHAT THE TAB WAS TOLD (`figures-known.ts`, c5e02b64f), and this build's own table is told it on load. */
+import './declared.ts';
 import { display, runWho, runWords, stepLeft, toRows } from './api.ts';
 import { answeredTypes, blockOf, namedResolverOf, pageReader, resolverOf, runsNamed, type Fetch } from './page-live.ts';
 

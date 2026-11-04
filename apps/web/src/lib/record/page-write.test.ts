@@ -364,7 +364,7 @@ test('A WRITE THAT LANDS SAYS THE VERSION IT MADE, which is the version Put back
 test('ON A LIVE PAGE THE ROWS GO THROUGH keepInPlace AND A LANDED WRITE PUSHES A RECEIPT WITH AN UNDO', () => {
   const view = readFileSync(fileURLToPath(new URL('../page/page-writes.ts', import.meta.url)), 'utf8');
   assert.match(view, /\.keepInPlace\(/);
-  assert.match(view, /toasts\.push\(hold\.said\(m\.words\), \{ intent: 'good', undo:/);
+  assert.match(view, /toasts\.push\(hold\.said\(m\.words, patch\), \{ intent: 'good', undo:/);
 });
 
 /* ── Done as the person's own look ─────────────────────────────────────────

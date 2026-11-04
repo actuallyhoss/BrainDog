@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { doneEffects, plannedEffects, said, windowOf, type Ev } from './task-effects.ts';
 
 const ev = (ts: string, extra: Partial<Ev>): Ev => ({ ts: `2026-10-20T${ts}:00Z`, actor: 'agent:a', kind: 'update', ...extra });
-const task = [ev('08:00', { kind: 'create', actor: 'p_1' }), ev('11:00', { field: 'state', from: 'open', to: 'done', register: 'jobs', seq: 7 })];
+/* FINISHED BY AN AGENT'S RUN, which is what says a window's changes are the task's (1ca2e89d2). */
+const task = [ev('08:00', { kind: 'create', actor: 'p_1' }), ev('11:00', { field: 'state', from: 'open', to: 'done', register: 'jobs', seq: 7, run_by: { run: 'S1' } })];
 const win = windowOf(task, 'state', ['done']);
 
 test('the window runs from the task creation to the line that finished it', () => {
@@ -23,6 +24,11 @@ test('rows the finisher touched inside the window come back net, before to after
     ev('10:45', { register: 'jobs', seq: 7, field: 'note', from: '', to: 'x' }),
   ];
   assert.deepEqual(doneEffects({ register: 'jobs', seq: 7 }, win, recent), [{ what: 'Rent: status', before: 'due', after: 'paid' }]);
+
+  /* A PERSON'S HAND ACROSS THE SAME HOURS IS EVERYTHING THEY DID, so a task a person finished says nothing of it. */
+  const byHand = windowOf([task[0]!, ev('11:00', { actor: 'p_1', field: 'state', from: 'open', to: 'done', register: 'jobs', seq: 7 })], 'state', ['done']);
+  assert.equal(byHand?.run, null);
+  assert.deepEqual(doneEffects({ register: 'jobs', seq: 7 }, byHand, recent.map((e) => ({ ...e, actor: 'p_1' }))), []);
 });
 
 test('a change that nets to nothing, or has no short words, is not shown', () => {
@@ -30,7 +36,10 @@ test('a change that nets to nothing, or has no short words, is not shown', () =>
     ev('09:00', { register: 'a', seq: 1, field: 'f', from: 'x', to: 'y' }),
     ev('10:00', { register: 'a', seq: 1, field: 'f', from: 'y', to: 'x' }),
     ev('10:10', { register: 'a', seq: 2, field: 'g', from: [1], to: [2] }),
+    ev('10:20', { register: 'a', seq: 3, field: 'h', from: 'x', to: 'y' }),
   ];
+  assert.equal(doneEffects({ register: 'jobs', seq: 7 }, win, recent).length, 1, 'and one that does change is shown, so this reads the window at all');
+  recent.pop();
   assert.deepEqual(doneEffects({ register: 'jobs', seq: 7 }, win, recent), []);
 });
 

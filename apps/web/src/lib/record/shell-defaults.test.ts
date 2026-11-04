@@ -99,8 +99,12 @@ test('THE SETTINGS PICKER IS ORDERED BY THE SAVED CURRENCY, so a pick does not m
 
   /* A SOURCE SCAN, BECAUSE NOTHING IN THIS APP RENDERS A ROUTE'S COMPONENT UNDER `node --test`. Comments blanked, as
      `at-sites.test.ts` blanks them, because a comment may say what the page used to draw. */
-  const source = readFileSync(fileURLToPath(new URL('../../routes/addons/[id]/Installed.svelte', import.meta.url)), 'utf8').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
-  const asked = [...source.matchAll(/currencyChoices\(([^)]*)\)/gu)].map((m) => m[1]);
-  assert.equal(asked.length, 1, 'the settings screen asks for the choices in one place');
-  assert.equal(/\bd\.text\b/u.test(asked[0]!), false, `the settings picker is ordered by its draft: currencyChoices(${asked[0]})`);
+  /* NAMED NOW, SO BOTH PICKERS ASK `currencyOptions` (ecf4b4fed), which leads with what it is handed: the add-on's page, and Settings › Words. */
+  for (const path of ['../../routes/addons/[id]/Installed.svelte', '../../routes/settings/[area]/areas/Words.svelte']) {
+    const source = readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
+    const asked = [...source.matchAll(/currencyOptions\(([^)]*)\)/gu)].map((m) => m[1]);
+    assert.equal(asked.length, 1, `${path} asks for the choices in one place`);
+    assert.equal(asked[0], 'heldIn', `the settings picker is ordered by something other than the saved code: currencyOptions(${asked[0]})`);
+    assert.match(source, /const heldIn = /u);
+  }
 });

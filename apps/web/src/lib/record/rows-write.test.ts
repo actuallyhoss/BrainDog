@@ -374,7 +374,7 @@ test('what cannot be inferred is left for the record to refuse in its own words'
   /* A register with one required enum beyond its title fills that and nothing else. */
   const task = capturedFields('tasks', 'Chase Halden', [], at);
   assert.deepEqual(task.fields, { what: 'Chase Halden', state: 'open' });
-  assert.deepEqual(task.filled, ['status open']);
+  assert.deepEqual(task.filled, ['status Open']);
 });
 
 test('the currency comes from the rows on screen, never from a guess', () => {

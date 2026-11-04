@@ -107,7 +107,8 @@ test('the rows changed last come from the log, and a log that cannot be read is 
   );
   const out = await paletteReader(BASE, io).recent(LISTS, 5);
   assert.deepEqual(out.map((r) => r.target), ['people#1']);
-  assert.ok(sent[0]!.pathname.endsWith('/recentHistory'));
+  /* WHAT A SEARCH REACHES BESIDES ROWS IS ASKED AS THE PALETTE OPENS (`search.warm`, 745faa64e), so the log is not the first thing sent, and it is sent once. */
+  assert.equal(sent.filter((u) => u.pathname.endsWith('/recentHistory')).length, 1);
 
   const down = host(() => {
     throw new TypeError('fetch failed');
