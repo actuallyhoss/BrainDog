@@ -356,15 +356,15 @@ function rows(held: KpiHeld[]) {
 test('A KEY NUMBER\'S MENU: the two ways it is not on Today, then Lead unless it leads', () => {
   const ids = (k: KpiHeld) => kpiActionsFor(k, true).map((a) => a.id);
   assert.deepEqual(ids(kpi(1, {})), ['kpi-pin', 'kpi-hide', 'kpi-lead']);
-  assert.deepEqual(ids(kpi(1, { today: 'pinned' })), ['kpi-hide', 'kpi-auto', 'kpi-lead']);
+  assert.deepEqual(ids(kpi(1, { today: 'pinned' })), ['kpi-auto', 'kpi-hide', 'kpi-lead']);
   assert.deepEqual(ids(kpi(1, { today: 'hidden', headline: true })), ['kpi-pin', 'kpi-auto']);
   /* AN EMPTY `today` READS AUTO, as the record's default does. */
   assert.deepEqual(ids(kpi(1, { today: undefined as never })), ['kpi-pin', 'kpi-hide', 'kpi-lead']);
   assert.deepEqual(
     kpiActionsFor(kpi(1, {}), true).map((a) => a.label),
-    ['Show on Today', 'Hide from Today', 'Lead the card with this'],
+    ['Pin to Today', 'Hide from Today', 'Lead the card with this'],
   );
-  assert.equal(kpiActionsFor(kpi(1, { today: 'pinned' }), true)[1]!.label, copy.kpiMenuAuto);
+  assert.equal(kpiActionsFor(kpi(1, { today: 'pinned' }), true)[0]!.label, copy.kpiMenuAuto);
 });
 
 test('NOTHING IS OFFERED to a reader who may not write, nor on a suggestion, a stopped number or a deleted one', () => {

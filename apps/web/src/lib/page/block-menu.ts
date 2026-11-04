@@ -338,9 +338,10 @@ export function kpiActionsFor(kpi: Pick<KpiHeld, 'fields'>, may: boolean): KpiAc
   if (!may || !kept(kpi.fields)) return [];
   const today = todayOf(kpi.fields);
   const out: KpiAction[] = [];
-  if (today !== 'pinned') out.push({ id: 'kpi-pin', label: copy.kpiMenuPin });
+  if (today === 'pinned') out.push({ id: 'kpi-auto', label: copy.kpiMenuAuto });
+  else out.push({ id: 'kpi-pin', label: copy.kpiMenuPin });
   if (today !== 'hidden') out.push({ id: 'kpi-hide', label: copy.kpiMenuHide });
-  if (today !== 'auto') out.push({ id: 'kpi-auto', label: copy.kpiMenuAuto });
+  else out.push({ id: 'kpi-auto', label: copy.kpiMenuLetChoose });
   if (kpi.fields.headline !== true) out.push({ id: 'kpi-lead', label: copy.kpiMenuLead });
   return out;
 }

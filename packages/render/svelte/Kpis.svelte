@@ -240,7 +240,7 @@
   <div class="kpis" data-form="project" data-lead={lead ? undefined : 'none'}>
     {#if lead && plan.lead}
       {@const k = plan.lead}
-      <div class="kpi kpi-lead" style={hue(k)} data-state={state(k)} data-kind={k.kind} data-chart={k.chart?.form}>
+      <div class="kpi kpi-lead" data-menu-host={menu ? '' : undefined} style={hue(k)} data-state={state(k)} data-kind={k.kind} data-chart={k.chart?.form}>
         <div class="kpi-head">
           {@render title(k)}
           {@render figure(k)}

@@ -248,32 +248,63 @@
      guesses 240 for the list's height; once the list is drawn `fit` measures it and places it again, before the first
      frame, so a long row menu never runs off the bottom of the window. It pops from the edge nearest the rect. */
   const HEIGHT = 240;
-  let fitted = $state.raw<{ top: number; from: string; room: number | null } | null>(null);
+  let fitted = $state.raw<{ left: number; top: number; from: string; room: number | null } | null>(null);
   const placed = $derived.by(() => {
     const spot = at ?? point ?? kept;
     if (!spot || typeof window === 'undefined') return { left: 0, top: 0, from: '0%', room: null as number | null };
     const below = spot.y + spot.height + 4;
     const flip = below + HEIGHT > window.innerHeight;
     return {
-      left: Math.max(GUTTER, Math.min(spot.x, window.innerWidth - 260)),
+      left: fitted?.left ?? Math.max(GUTTER, Math.min(spot.x, window.innerWidth - 260)),
       top: fitted?.top ?? (flip ? Math.max(GUTTER, spot.y - HEIGHT) : below),
       from: fitted?.from ?? (flip ? '100%' : '0%'),
       room: fitted?.room ?? null,
     };
   });
 
+  /**
+   * THE LIST'S ROOM, AND WHERE ITS `left` AND `top` ARE MEASURED FROM. On the page, the window. In a dialog, the dialog clips what
+   * hangs past its edge, so the list stays inside it; and a dialog with a blur or a transform is what `position: fixed` inside
+   * it is measured from, so the numbers are written from its corner (the palette, 5 Nov).
+   */
+  function roomOf(): { left: number; top: number; right: number; bottom: number; x: number; y: number } {
+    const room = { left: GUTTER, top: GUTTER, right: window.innerWidth - GUTTER, bottom: window.innerHeight - GUTTER, x: 0, y: 0 };
+    const frame = list?.closest('dialog');
+    if (!frame) return room;
+    const box = frame.getBoundingClientRect();
+    const seen = getComputedStyle(frame);
+    if (seen.overflowY !== 'visible' || seen.overflowX !== 'visible') {
+      room.left = Math.max(room.left, box.left + GUTTER);
+      room.top = Math.max(room.top, box.top + GUTTER);
+      room.right = Math.min(room.right, box.right - GUTTER);
+      room.bottom = Math.min(room.bottom, box.bottom - GUTTER);
+    }
+    const blur = (seen as unknown as { backdropFilter?: string; webkitBackdropFilter?: string }).backdropFilter ?? (seen as unknown as { webkitBackdropFilter?: string }).webkitBackdropFilter ?? 'none';
+    if (seen.transform !== 'none' || seen.filter !== 'none' || blur !== 'none' || seen.translate !== 'none') {
+      room.x = box.left + frame.clientLeft;
+      room.y = box.top + frame.clientTop;
+    }
+    return room;
+  }
+
   function fit() {
     const spot = at ?? point ?? kept;
     if (!list || !spot || sheet || !floating) return;
     const height = list.offsetHeight;
+    const width = list.offsetWidth;
+    const room = roomOf();
+    const left = Math.max(room.left, Math.min(spot.x, room.right - width)) - room.x;
     const below = spot.y + spot.height + 4;
-    const roomBelow = window.innerHeight - GUTTER - below;
-    const roomAbove = spot.y - 4 - GUTTER;
-    if (height <= roomBelow || roomBelow >= roomAbove) {
-      fitted = { top: below, from: '0%', room: height > roomBelow ? Math.max(roomBelow, 0) : null };
+    const roomBelow = room.bottom - below;
+    const roomAbove = spot.y - 4 - room.top;
+    /* NOT BELOW NOR ABOVE, IN A SHORT DIALOG: it takes the whole of the room there is, and scrolls. */
+    if (roomBelow < 120 && roomAbove < 120) {
+      fitted = { left, top: room.top - room.y, from: '0%', room: Math.max(room.bottom - room.top, 0) };
+    } else if (height <= roomBelow || roomBelow >= roomAbove) {
+      fitted = { left, top: below - room.y, from: '0%', room: height > roomBelow ? Math.max(roomBelow, 0) : null };
     } else {
       const drawn = Math.min(height, roomAbove);
-      fitted = { top: Math.max(GUTTER, spot.y - 4 - drawn), from: '100%', room: height > roomAbove ? roomAbove : null };
+      fitted = { left, top: Math.max(room.top, spot.y - 4 - drawn) - room.y, from: '100%', room: height > roomAbove ? roomAbove : null };
     }
   }
 

@@ -35,7 +35,8 @@
   import { untrack } from 'svelte';
   import { apiBase, at as inApp } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { kpiActionsFor, kpiSaidOf, kpiWritesOf, rowIcon, runKpiWrites, undoKpiWrites, type KpiAction, type KpiDone } from '$lib/page/block-menu.ts';
+  import { kpiActionsFor, kpiSaidOf, kpiWritesOf, rowIcon, runKpiWrites, undoKpiWrites, type KpiAction, type KpiDone, type KpiWrite } from '$lib/page/block-menu.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import type { KpiAnswered } from '$lib/page/kpis-in.ts';
   import { homeCurrency } from '$lib/record/api.ts';
   import { spokenOf } from '$lib/record/row-href.ts';
@@ -47,6 +48,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Menu from '$lib/ui/Menu.svelte';
+  import { MENU_AT, type MenuAt } from '$lib/ui/context-menu.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { draftsOf, findKpiList, findReadingList, keptOf, projectsOf, readKpis, rowOf, type Reads } from './kpi-rows.ts';
   import { staleFixOf, type ReadingFor, type StaleFix } from './stale-fix.ts';
@@ -187,6 +189,11 @@
       if (!(await ready(true)) || !list) return void toasts.push(copy.kpiNotRead, { intent: 'bad' });
       const row = rowOf(rows ?? [], k.input.kpi);
       if (!row) return void toasts.push(copy.kpiNotRead, { intent: 'bad' });
+      /* TODAY SHOWS FOUR AT MOST, so a fifth pin is a choice of which: the chooser says so and holds the four. */
+      if (a.id === 'kpi-pin' && (rows ?? []).filter((r) => r.fields.today === 'pinned' && r.fields.state !== 'retired' && r.fields.draft !== true).length >= 4) {
+        toasts.push(copy.kpiChooseFull);
+        return void openChooser();
+      }
       const thing = typeof row.fields.thing === 'string' ? row.fields.thing : String(row.fields.thing ?? '');
       const w = writer();
       const at = list;
@@ -278,6 +285,52 @@
     readingOpen = true;
   }
 
+  let tileAt = $state.raw<{ x: number; y: number; height: number } | null>(null);
+  /* THE TILE IS A HOST FOR WHO MAY CHOOSE; for anybody else a press is left unclaimed, and the block around it answers. */
+  const tileHost = (node: HTMLElement) => {
+    if (writes === null) return;
+    node.setAttribute('data-menu-host', 'self');
+    const on = (e: Event) => {
+      if (!writable) return;
+      e.preventDefault();
+      tileAt = (e as CustomEvent<MenuAt>).detail;
+    };
+    node.addEventListener(MENU_AT, on);
+    return () => node.removeEventListener(MENU_AT, on);
+  };
+
+  /* ── what shows on Today, chosen (`KpiChooser.svelte`) ── */
+
+  let chooserOn = $state(false);
+  let chooserOpen = $state(false);
+  let projectNames = $state.raw<ReadonlyMap<string, string>>(new Map());
+
+  async function openChooser(): Promise<void> {
+    if (!(await ready(true)) || !list) return void toasts.push(copy.kpiNotRead, { intent: 'bad' });
+    const projects = projectsOf(list);
+    const title = projects ? (REGISTERS[projects] as { title?: string } | undefined)?.title : undefined;
+    const names = new Map<string, string>();
+    if (projects && title) {
+      const got = await readKpis(reads(), projects).catch(() => null);
+      for (const p of got ?? []) if (p.id) names.set(p.id, String(p.fields[title] ?? ''));
+    }
+    projectNames = names;
+    chooserOn = true;
+    chooserOpen = true;
+  }
+
+  async function chosen(writes: readonly KpiWrite[]): Promise<void> {
+    if (!list) return;
+    const w = writer();
+    const at = list;
+    const out = await runKpiWrites(w, at, writes);
+    if (!out.ok) {
+      if (out.done.length) await undoKpiWrites(w, at, out.done);
+      toasts.push(out.fix, { intent: 'bad' });
+    } else if (out.done.length) toasts.push(copy.kpiChooseSaved, { undo: () => void undo(w, at, out.done) });
+    await after();
+  }
+
   let menus = $state<Record<string, boolean>>({});
   /* THE ROWS ARE READ AS A MENU OPENS on Today, so its press has its version in hand. */
   $effect(() => {
@@ -287,13 +340,23 @@
 
 {#snippet menu(k: KpiView)}
   {@const acts = actionsOf(k)}
-  {#if acts.length}
+  {#if acts.length || (writes !== null && (writable || href?.(k.input as KpiAnswered)))}
     <span class="kb-menu" data-open={menus[k.key] ? '' : undefined}>
       <Menu label={copy.kpiMenu(k.name)} align="end" bind:open={() => menus[k.key] === true, (v) => (menus[k.key] = v)}>
         {#snippet trigger()}<span class="kb-mark"><Icon name="more" size="s" /><span class="kb-hidden">{copy.kpiMenu(k.name)}</span></span>{/snippet}
+        <!-- OPEN: the number's sheet for who may change it, its project's page for who may only read. -->
+        {#if writable}
+          <button type="button" class="kb-item" role="menuitem" onclick={() => void openKpi(k.input)}><Icon name="arrow" size="s" />{copy.kpiMenuOpen}</button>
+        {:else if href?.(k.input as KpiAnswered)}
+          <a class="kb-item" role="menuitem" data-link-verb href={href(k.input as KpiAnswered)}><Icon name="arrow" size="s" />{copy.kpiMenuOpen}</a>
+        {/if}
         {#each acts as a (a.id)}
           <button type="button" class="kb-item" role="menuitem" onclick={() => void press(a, k)}><Icon name={rowIcon(a.id)} size="s" />{a.label}</button>
         {/each}
+        {#if writable}
+          <hr />
+          <button type="button" class="kb-item" role="menuitem" onclick={() => void openChooser()}><Icon name="grid" size="s" />{copy.kpiMenuChoose}</button>
+        {/if}
       </Menu>
     </span>
   {/if}
@@ -308,7 +371,14 @@
   <Button size="sm" onclick={() => void addKpi()}><Icon name="plus" size="s" />{copy.kpiAddNumber}</Button>
 {/snippet}
 
-<div class="kb" aria-busy={busy ? 'true' : undefined}>
+<!-- THE TILE AROUND ITS NUMBERS: what shows on Today, a right-click away from anywhere in it. -->
+{#if writable}
+  <Menu label={copy.kpiMenuChoose} open={tileAt !== null} at={tileAt} onclose={() => (tileAt = null)}>
+    <button type="button" class="kb-item" role="menuitem" onclick={() => void openChooser()}><Icon name="grid" size="s" />{copy.kpiMenuChoose}</button>
+    {#if allNumbers}<a class="kb-item" role="menuitem" href={inApp(`/r/${encodeURIComponent(allNumbers)}`)}><Icon name="rows" size="s" />{copy.kpiAllNumbers}</a>{/if}
+  </Menu>
+{/if}
+<div class="kb" aria-busy={busy ? 'true' : undefined} {@attach tileHost}>
   {#if kpis.length === 0}
     <p class="kb-none">{unread ? copy.kpiNotRead : copy.kpiNoneYet}</p>
   {/if}
@@ -339,6 +409,12 @@
     </section>
   {/if}
 </div>
+
+{#if chooserOn && list}
+  {#await import('./KpiChooser.svelte') then { default: KpiChooser }}
+    <KpiChooser bind:open={chooserOpen} rows={rows ?? []} names={projectNames} showing={form === 'today' ? kpis.map((k) => k.kpi) : []} onsave={chosen} />
+  {/await}
+{/if}
 
 {#if readingOn && readingList && list}
   {#await import('./ReadingSheet.svelte') then { default: ReadingSheet }}
