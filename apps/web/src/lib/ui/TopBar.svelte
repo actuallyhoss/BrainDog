@@ -156,6 +156,17 @@
     flex: 0 1 auto;
   }
 
+  /* AT THE LARGE TEXT SIZE THE NAME KEEPS ITS WORD: "Work" read "Wo..." beside its own field and buttons at 1440. The search
+     gives up the room, down to a shorter field, and the name is not cut while there is any. */
+  :global(html[data-text='md']) .crumb:has(+ .bar-page) {
+    flex: none;
+    max-inline-size: 50%;
+  }
+
+  :global(html[data-text='md']) .bar-ask {
+    min-inline-size: 120px;
+  }
+
   .bar-page {
     display: flex;
     flex: 1 0 auto;
