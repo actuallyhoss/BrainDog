@@ -118,10 +118,12 @@
   @media (width < 640px) {
     .ask {
       inline-size: 100%;
+      flex-wrap: wrap;
     }
+    /* NEVER NARROWER THAN A NAME: under about 300px the presses take a row of their own, where the field stood 11px wide. */
     .ask-field {
-      flex: 1 1 0;
-      min-inline-size: 0;
+      flex: 1 1 7rem;
+      min-inline-size: 7rem;
       padding-inline: var(--sp-3);
     }
   }
