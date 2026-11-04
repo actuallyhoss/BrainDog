@@ -1623,7 +1623,20 @@ export function resolvePages(
     });
     /* The pages come out in the template's own order once every row has its address. */
     filled.push(() => {
-      for (const row of rows) here.push({ slug: slugs.get(row)!, decl: fillRow(keyed, row), row });
+      /* FILLED WHEN IT IS READ, NOT WHEN IT IS LISTED. To open one project a read resolved every page that holds an address,
+         and each of them filled its whole template, block by block, to be asked for a slug: `fill` was 44% of a page's time
+         in a profile on a record of 5,000 rows (find1104), and on his the read takes 300 to 900 ms of the record's one thread.
+         A page read answers from one page; a listing reads them all and pays what it paid. */
+      for (const row of rows) {
+        let made: PageDecl | undefined;
+        here.push({
+          slug: slugs.get(row)!,
+          row,
+          get decl(): PageDecl {
+            return (made ??= fillRow(keyed, row));
+          },
+        });
+      }
     });
   });
 
