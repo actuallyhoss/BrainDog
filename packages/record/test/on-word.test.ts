@@ -372,7 +372,7 @@ test('ON HIS WORD A CHANGE THE LADDER WOULD HAVE ASKED IS WRITTEN, his words in 
   const done = value<Entry>(await api.update({ register: 'tasks', seq: ship.seq!, patch: { state: 'done' }, said: 'Ship is done, close it.' }, ctx));
   assert.equal(done.fields.state, 'done');
   /* AND THE QUESTION IT ASKED IS TAKEN BACK, since he has said (AK16): nothing more waits, and none was filed. */
-  assert.equal(openCount(sql), waiting - 1, 'a question was filed, or the one it asked was left waiting');
+  assert.equal(openCount(sql), waiting! - 1, 'a question was filed, or the one it asked was left waiting');
   assert.ok(
     sql.one("SELECT 1 AS y FROM event WHERE note = ? AND target = ?", `On Teodor's word: "Ship is done, close it."`, `entry:${ship.id}`),
     'the change does not say it was on his word',

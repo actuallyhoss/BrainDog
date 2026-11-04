@@ -76,14 +76,16 @@ test('(1) DIARY WRITES DO NOT MOVE THE PLAN OF AN OWNER HELD TO append ON THE DI
   sql.close();
 });
 
-test('(2) HIS PLAN STILL INSTALLS, and a line he reads written between them still makes it stale', async () => {
+test('(2) HIS PLAN STILL INSTALLS, a line he reads written between them moves nothing the plan says (`samePlan`), and a plan that says something else is stale', async () => {
   const { sql, api, hal, planned } = await studio();
-  const stale = await planned(hal);
+  const read = await planned(hal);
   value(await api.create({ register: 'obligations', fields: { what: 'Invoice 42' } }, kit));
-  const refused = (await api.installPack({ doc: DOC, planHash: stale }, hal)) as Out;
-  assert.equal(refused.ok, false, 'a record that moved in a list he reads took a plan read before it');
+  /* WHAT WAS READ IS WHAT GOES IN, whatever the record wrote since: only a plan that says something else is sent back (a0e31b1f0). */
+  const other = `${read.slice(0, read.indexOf('.'))}.${'0'.repeat(64)}`;
+  const refused = (await api.installPack({ doc: DOC, planHash: other }, hal)) as Out;
+  assert.equal(refused.ok, false, 'a plan that says something else went in');
   assert.equal(refused.refusal?.code, 'PLAN_STALE');
-  value(await api.installPack({ doc: DOC, planHash: await planned(hal) }, hal));
+  value(await api.installPack({ doc: DOC, planHash: read }, hal));
   sql.close();
 });
 
