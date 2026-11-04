@@ -628,7 +628,10 @@ function grid(b: Block, o: RenderOptions): string {
       const noted = change
         ? `<span class="cell-note"><span class="cell-change num" data-dir="${change.dir}">${escape(change.change)}</span>${change.rest ? ` ${renderInline(inline(change.rest, o), o)}` : ''}</span>`
         : cell('cell-note', note, o);
-      return `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num"${fitAttrs(r.cells[1] && headlineFigure(r.cells[1], o.home))}>${
+      /* MONEY IN WEARS ITS DIRECTION, as `Grid.svelte` says it from the same sign. */
+      const w = written(r.cells[1] ?? '', o, 'read');
+      const sign = w ? w.minus : leadingCode(headlineFigure(r.cells[1] ?? '', o.home))?.sign;
+      return `<div class="cell"${toneAttrs(r.tone)}${sign === '+' ? ' data-dir="in"' : ''}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num"${fitAttrs(r.cells[1] && headlineFigure(r.cells[1], o.home))}>${
         /* The code quiet or the symbol in its place, as `Grid.svelte` draws it: this printed the
            code at full size, and the two trees differed on every stat with an amount in it. A stat's
            figure is a headline, so it is said the way `headlineFigure` says one: `£33,850`, not `£33,850.00`. */
