@@ -204,7 +204,8 @@ test('OVER EVERY LIST THE SEED INSTALLS, each page offered passes the lint accep
 
   const notDrawn = new Set(['secret', 'document', 'json', 'list']);
   const offered = [...api.kernel.registers()]
-    .filter(([id, decl]) => api.kernel.count(id) > 0 && decl.fields.some((f) => f.retired !== true && !notDrawn.has(f.type)))
+    /* AND NOT A LIST ITS AUTOMATIONS KEEP (`kept_by`), the night's snapshots among them: nobody files there, so nobody is offered a page of it. */
+    .filter(([id, decl]) => api.kernel.count(id) > 0 && (decl as { kept_by?: unknown }).kept_by === undefined && decl.fields.some((f) => f.retired !== true && !notDrawn.has(f.type)))
     .map(([id]) => id);
   assert.ok(offered.length > 0, 'the seed filled no list');
 

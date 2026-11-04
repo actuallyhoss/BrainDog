@@ -60,7 +60,7 @@ async function recordOf() {
                 if (f.id === 'role')
                   f.values = shedding
                     ? (f.values ?? []).filter((v) => v !== 'registrar')
-                    : ['client', 'contractor', 'accountant', 'registrar', 'collaborator', 'other'];
+                    : [...new Set([...(f.values ?? []), 'registrar'])];
             return shedding ? { ...doc, version: NEXT } : doc;
           },
         },

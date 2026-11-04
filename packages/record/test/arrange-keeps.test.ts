@@ -116,7 +116,10 @@ test('an update that reads a list its module update adds is offered, as propose 
     d.declarations.push({ metric: 'extra-count', name: 'Extra count', source: 'register.extra', value: { count: 'id' }, format: 'int', target: { gte: 1 }, window: '30d', compare: 'none' });
   });
   const sql = openSqlite();
-  const catalogue = offering(money).map((e) => (e.id === 'portfolio' ? { ...e, version: portfolioNext, doc: () => structuredClone(portfolio) as never } : e));
+  /* MONEY NAMES PORTFOLIO AS ITS MODULE HERE: the shipped Money stands alone now, and it is a module's update `expand` brings along. */
+  const catalogue = offering(money).map((e) =>
+    e.id === 'portfolio' ? { ...e, version: portfolioNext, doc: () => structuredClone(portfolio) as never } : e.id === 'money-core' ? { ...e, modules: ['portfolio'] } : e,
+  );
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 12)), catalogue });
   for (const id of FIRST_PARTY) {
     const pack = firstPartyDocument(id);
