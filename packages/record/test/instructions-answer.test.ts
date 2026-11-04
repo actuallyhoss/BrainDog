@@ -183,7 +183,7 @@ test('"ACCEPT SG243" LETS THE RUN THAT TOOK IT ANSWER IT ONCE, AS HIS, said as h
   assert.match(read.lines.join(' '), new RegExp(`It lets you answer ${a} as .+? said, with instructions answer ${a}\\.`, 'u'));
 
   const done = value<Mine>(await api.instructionsMine({ answer: a }, ctx));
-  assert.equal(done.answered?.said, `Answered ${a} with accept, on Teodor's order (${told.id}).`);
+  assert.match(done.answered?.said ?? '', new RegExp(`^Answered "[^"]+" \\(${a}\\) with yes, on Teodor's order \\(${told.id}\\)\\.$`, 'u'));
   assert.equal(statusOf(api, a), 'resolved');
   assert.equal(made(), 1);
   const decision = api.kernel.governanceRow('decision', done.answered!.decision!);

@@ -132,10 +132,10 @@ test('A QUESTION A MEMBER\'S AGENT ASKED IS ANSWERED IN BRAINDOG, though its run
   sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_codex', 'p_1', 'hc', 'write', 'Codex', '2026-10-01T00:00:00.000Z')");
   const as = (token: string, person: string, level: string, client: string): CallContext =>
     ({ principal: { kind: 'token', id: token, scope: 'write', person, level }, session: { client_id: client, client: 'claude-code', host: 'mac', repo: 'braindog', agent: 'claude' } }) as never;
-  const ask = async (ctx: CallContext): Promise<string> =>
+  const ask = async (ctx: CallContext, question = 'Ship Friday or wait?'): Promise<string> =>
     value<{ id: string }>(
       await api.propose(
-        { question: 'Ship Friday or wait?', body_kind: 'options', body: { options: [{ id: 'ship', label: 'Ship Friday', because: 'Ready.' }, { id: 'wait', label: 'Wait', because: 'Safer.' }] } } as never,
+        { question, body_kind: 'options', body: { options: [{ id: 'ship', label: 'Ship Friday', because: 'Ready.' }, { id: 'wait', label: 'Wait', because: 'Safer.' }] } } as never,
         ctx,
       ),
     ).id;
@@ -147,7 +147,8 @@ test('A QUESTION A MEMBER\'S AGENT ASKED IS ANSWERED IN BRAINDOG, though its run
   assert.match(out.fix, /was asked by somebody else/u);
   assert.equal(statusOf(api, bobs), 'open');
 
-  const codexs = await ask(as('t_codex', 'p_1', 'owner', 'c-codex'));
+  /* IN WORDS OF ITS OWN: the same words again are the question already open, not a second one. */
+  const codexs = await ask(as('t_codex', 'p_1', 'owner', 'c-codex'), 'Ship Monday or wait?');
   assert.equal(value<Mine>(await api.instructionsMine({ answer: codexs, option: 'wait', said: 'Wait a week.' } as never, agent())).answered?.option, 'wait');
   sql.close();
 });
@@ -158,7 +159,8 @@ test('A RUN A MEMBER MADE IN THE APP IS HIS, though no key opened it: his agent\
   sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_2', '*', 'write')");
   sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_bob', 'p_2', 'hb', 'write', 'Bob Claude', '2026-10-01T00:00:00.000Z')");
   const bob: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'write' }, credentialed: true } as never;
-  const made = value<{ id: string; seq: number }>(await api.create({ register: 'session', fields: { doing: 'Tidy the Q3 drafts' } }, bob));
+  /* RUNS ARE KEPT FOR THE OWNER NOW, so a member makes none today; one from before stands in the record and is made here as it was. */
+  const made = value<{ id: string; seq: number }>(api.kernel.create('session', { doing: 'Tidy the Q3 drafts' }, { actor: 'p_2', principal: { kind: 'person' } }));
   const spoken = `S${made.seq}`;
   assert.equal(sql.one<{ t: unknown }>("SELECT json_extract(fields, '$.token_id') AS t FROM entry WHERE id = ?", made.id)?.t ?? null, null, 'no key opened the run');
   const bobsAgent = { principal: { kind: 'token', id: 't_bob', scope: 'write', person: 'p_2', level: 'write' }, session: { spoken, client: 'claude-code', host: 'mac', agent: 'claude' } } as never as CallContext;
@@ -268,7 +270,7 @@ test('HIS WORDS ARE NEEDED: an empty said is refused, and so is an answer with n
   }
   assert.equal(refusal(await api.instructionsMine({ answer: a, said: 'Go on.' } as never, ctx)).at, 'option');
   /* WITHOUT SAID IT IS AN ORDER'S ANSWER, and with none held it answers nothing, saying how. */
-  assert.match(refusal(await api.instructionsMine({ answer: a }, ctx)).fix, /send option and said/u);
+  assert.match(refusal(await api.instructionsMine({ answer: a }, ctx)).fix, /then send option, and said in their words/u);
   /* AND A WRITE WITH AN EMPTY SAID IS NOT LANDED. */
   assert.equal(refusal(await api.create({ register: 'tasks', fields: { name: 'Ship' }, said: '' }, ctx)).code, 'REQUIRED_MISSING');
   assert.equal(statusOf(api, a), 'open');
@@ -335,17 +337,21 @@ test('NO WORD REACHES A KEY, AN AMOUNT ON WHAT IS THERE, ERASING, DELETING THE R
 
   /* AND WHAT IS AN OWNER'S IN A BROWSER STAYS SO: erasing, deleting the record, the keychain, what this record is. */
   const as: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, registers: '*', credentialed: true, onWord: 'S1' };
-  for (const out of [
-    await api.erase({ subjects: ['tasks#1'] } as never, as),
-    await api.deleteRecord({ slug: 'the-studio' }, as),
-    await api.listGrants(as),
-    await api.setDeclaration({ id: 'register.x', kind: 'register', body: {} } as never, as),
-    await api.setPref({ key: ON_WORD_PREF, value: true }, as),
-  ]) {
+  /* THE DOORS NO AGENT EVER OPENS SAY SO BY NAME (`ownerKeeps`), and the rest that his word answers and does nothing more. */
+  for (const [out, said] of [
+    [await api.erase({ subjects: ['tasks#1'] } as never, as), /No agent does that/u],
+    [await api.deleteRecord({ slug: 'the-studio' }, as), /No agent does that/u],
+    [await api.listGrants(as), /answers on your word and does nothing more/u],
+  ] as const) {
     const no = refusal(out);
     assert.equal(no.code, 'NEEDS_BROWSER_SESSION');
-    assert.match(no.fix, /answers on your word and does nothing more/u);
+    assert.match(no.fix, said);
   }
+  /* AND EVERY OTHER DOOR HIS WORD REACHES, as his switch does (the owner's word of 2 Nov, `admin` in `index.ts`): a change
+     to what the record is gets past the door to its own checks, and a setting of his is set. */
+  const shape = refusal(await api.setDeclaration({ id: 'register.x', kind: 'register', body: {} } as never, as));
+  assert.equal(shape.code, 'PACK_MALFORMED');
+  assert.equal(value<{ value: unknown }>(await api.setPref({ key: ON_WORD_PREF, value: true }, as)).value, true);
   sql.close();
 });
 
@@ -365,7 +371,8 @@ test('ON HIS WORD A CHANGE THE LADDER WOULD HAVE ASKED IS WRITTEN, his words in 
   /* WITH IT, IT IS WRITTEN, and nothing more is asked. */
   const done = value<Entry>(await api.update({ register: 'tasks', seq: ship.seq!, patch: { state: 'done' }, said: 'Ship is done, close it.' }, ctx));
   assert.equal(done.fields.state, 'done');
-  assert.equal(openCount(sql), waiting, 'no question was filed');
+  /* AND THE QUESTION IT ASKED IS TAKEN BACK, since he has said (AK16): nothing more waits, and none was filed. */
+  assert.equal(openCount(sql), waiting - 1, 'a question was filed, or the one it asked was left waiting');
   assert.ok(
     sql.one("SELECT 1 AS y FROM event WHERE note = ? AND target = ?", `On Teodor's word: "Ship is done, close it."`, `entry:${ship.id}`),
     'the change does not say it was on his word',

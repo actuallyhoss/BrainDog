@@ -109,8 +109,8 @@ function optionSaid(row: Record<string, unknown>, option: string): string {
 }
 
 /** A question by its own words with its handle beside them, "Which licence? (SG14)", or the handle where it has none. */
-function askedSaid(row: Record<string, unknown>, given: string): string {
-  const words = typeof row.question === 'string' ? row.question.replace(/\s+/gu, ' ').trim() : '';
+function askedSaid(question: string | null, given: string): string {
+  const words = (question ?? '').replace(/\s+/gu, ' ').trim();
   if (words === '') return given;
   return `"${words.length > 80 ? `${words.slice(0, 79)}…` : words}" (${given})`;
 }
@@ -542,7 +542,7 @@ export function methods(deps: RecordDeps) {
     return ok(
       mineOf(run, ctx, {
         instruction: toldOf(sql, now),
-        answered: { question: given, option: named.option, decision, said: `Answered ${askedSaid(row, given)} with ${optionSaid(row, named.option)}, on ${nameMid(byName)}'s order (${i.id}).` },
+        answered: { question: given, option: named.option, decision, said: `Answered ${askedSaid(kernel.question(id), given)} with ${optionSaid(row, named.option)}, on ${nameMid(byName)}'s order (${i.id}).` },
       }),
     );
   };
@@ -645,7 +645,7 @@ export function methods(deps: RecordDeps) {
     const decided = (typeof out.value === 'object' && out.value !== null ? out.value : {}) as { decision?: unknown; batch?: unknown };
     const decision = typeof decided.decision === 'string' ? decided.decision : null;
     if (decision !== null) kernel.keepWordAnswer({ run, decision, by, byName, said: words, batch: typeof decided.batch === 'string' ? decided.batch : undefined });
-    return ok(mineOf(run, ctx, { answered: { question: given, option: chosen, decision, said: `Answered ${askedSaid(row, given)} with ${optionSaid(row, chosen)}, on ${nameMid(byName)}'s word. Undo is in BrainDog.` } }));
+    return ok(mineOf(run, ctx, { answered: { question: given, option: chosen, decision, said: `Answered ${askedSaid(kernel.question(id), given)} with ${optionSaid(row, chosen)}, on ${nameMid(byName)}'s word. Undo is in BrainDog.` } }));
   };
 
   /** What a run is answered with: its stamp, what is pending, what stops it, and the lines in his voice. */
