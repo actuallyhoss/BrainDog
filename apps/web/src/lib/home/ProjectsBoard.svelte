@@ -29,7 +29,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
-  import { pinWords, togglePin } from '$lib/shell/pin-project.ts';
+  import { isPinnedAt, pinWords, togglePin } from '$lib/shell/pin-project.ts';
   import ProjectWell from '$lib/ui/ProjectWell.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -109,9 +109,9 @@
   let point = $state<{ x: number; y: number; height: number } | null>(null);
 </script>
 
-{#snippet pinButton(href: string, name: string, labelled: boolean)}
-  {@const on = navPrefs.isPinned(href)}
-  <button type="button" class="pin tap" data-bare={labelled ? undefined : ''} aria-pressed={on} aria-label={on ? pinWords.unpinName(name) : pinWords.pinName(name)} title={on ? pinWords.unpin : pinWords.pin} onclick={() => void togglePin(href, name)}>
+{#snippet pinButton(href: string, name: string, labelled: boolean, key?: string)}
+  {@const on = isPinnedAt(href, key)}
+  <button type="button" class="pin tap" data-bare={labelled ? undefined : ''} aria-pressed={on} aria-label={on ? pinWords.unpinName(name) : pinWords.pinName(name)} title={on ? pinWords.unpin : pinWords.pin} onclick={() => void togglePin(href, name, key)}>
     <Icon name="pin" size="s" />{#if labelled}<span>{on ? words.pinned : words.pin}</span>{/if}
   </button>
 {/snippet}
@@ -134,7 +134,7 @@
           <span class="small c-meta">{r.laneWord}{#if r.laneWord && HEALTH[r.health]}{' · '}{/if}{#if HEALTH[r.health]}<span class="c-health" data-tone={HEALTH[r.health]!.tone}><span class="dot" aria-hidden="true"></span>{HEALTH[r.health]!.word}</span>{/if}</span>
         {/if}
       </div>
-      {@render pinButton(r.href, r.name, true)}
+      {@render pinButton(r.href, r.name, true, r.key)}
     </div>
     <div class="c-next">
       <p class="c-step own-dir" data-none={r.next === '' ? '' : undefined}>{r.next || words.noNext}</p>
@@ -162,7 +162,7 @@
     </div>
     {#if r.chip}<div class="l-state">{@render chipOf(r)}</div>{/if}
     {#if r.number.kind === 'kpi'}<span class="l-num num">{r.number.figure}</span>{/if}
-    {@render pinButton(r.href, r.name, false)}
+    {@render pinButton(r.href, r.name, false, r.key)}
 {/snippet}
 
 {#snippet shelfRow(p: Parked)}
@@ -263,8 +263,8 @@
 <ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.href} send={menuRow?.key ?? null}>
   {#if menuRow}
     {@const m = menuRow}
-    {@const on = navPrefs.isPinned(m.href)}
-    <button role="menuitem" type="button" onclick={() => void togglePin(m.href, m.name)}><Icon name="pin" size="s" /><span class="mi-name">{on ? pinWords.unpin : pinWords.pin}</span></button>
+    {@const on = isPinnedAt(m.href, m.key)}
+    <button role="menuitem" type="button" onclick={() => void togglePin(m.href, m.name, m.key)}><Icon name="pin" size="s" /><span class="mi-name">{on ? pinWords.unpin : pinWords.pin}</span></button>
   {/if}
 </ItemMenu>
 

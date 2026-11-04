@@ -10,6 +10,7 @@
  */
 
 import type { Shell } from './boot-live.ts';
+import { learnRowPages, saidRowPages } from './row-href.ts';
 
 /** Bump when the shell's shape changes: a copy of another version is ignored and dropped. */
 export const COPY_VERSION = 1;
@@ -23,7 +24,7 @@ export const GUEST_COPY_MS = 24 * 3_600_000;
 export const COPY_KEY = 'braindog.boot-copy';
 
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
-type Entry = { v: number; base: string; at: number; shell: Shell };
+type Entry = { v: number; base: string; at: number; shell: Shell; rows?: ReturnType<typeof saidRowPages> };
 
 const here = (): Store | null => {
   try {
@@ -37,7 +38,7 @@ const here = (): Store | null => {
 export function saveCopy(base: string, shell: Shell, now: number = Date.now(), store: Store | null = here()): void {
   if (!store || shell.refused || !shell.live) return;
   try {
-    const entry: Entry = { v: COPY_VERSION, base, at: now, shell };
+    const entry: Entry = { v: COPY_VERSION, base, at: now, shell, rows: saidRowPages() };
     store.setItem(COPY_KEY, JSON.stringify(entry));
   } catch {
     /* full or blocked storage: the shell just waits for the network as before */
@@ -83,6 +84,10 @@ export function readCopy(base: string, now: number = Date.now(), store: Store | 
       dropCopy(store);
       return null;
     }
+    /* AND WHICH ROW OPENS WHICH PAGE, WHICH A SHELL DOES NOT HOLD (4 Nov). A cold open draws this copy and reads its lists before
+       `boot` answers, so a project's address came out `/r/things/2` where it is `/p/kiln`. A pin is kept by that address, so
+       on every reload with a copy kept the sidebar found no pinned project and they went from it. */
+    if (e.rows) learnRowPages(e.rows.pages, e.rows.byRow);
     return drawnFrom(e.shell);
   } catch {
     dropCopy(store);

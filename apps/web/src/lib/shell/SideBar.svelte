@@ -37,6 +37,7 @@
   import { knowProjects } from '../page/known-project.ts';
   import { keepOrder } from './project-order.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
+  import { isPinnedAt, togglePin } from './pin-project.ts';
   import { frame } from './frame.svelte.ts';
   import Brand from './Brand.svelte';
   import { glide, ms, opens as opening, placeIn } from '$lib/motion/index.ts';
@@ -273,14 +274,14 @@
     e.preventDefault();
     row.focus();
   }
-  function pin(href: string): void {
-    void navPrefs.setPinned(href, !navPrefs.isPinned(href));
+  function pin(p: SideProject): void {
+    void togglePin(p.href, shownName(p.name), p.key);
   }
 
   const busy = $derived(new Set(working.filter((w): w is string => typeof w === 'string' && w !== '')));
   const full = (r: SideRow): SideProject => {
     const w = week.get(r.key);
-    return { ...r, late: w?.late ?? 0, moved: w?.moved ?? false, working: busy.has(r.name), pinned: pins.includes(r.href) };
+    return { ...r, late: w?.late ?? 0, moved: w?.moved ?? false, working: busy.has(r.name), pinned: pins.length > 0 && isPinnedAt(r.href, r.key) };
   };
   const split = $derived(read ? splitOf(read.rows.map(full), read.lanes) : null);
   const play = $derived(split ? byWeek(split.play) : []);
@@ -508,7 +509,7 @@
       {/if}
     </a>
     {#if !phone}
-      <button type="button" class="s-pin tap" tabindex="-1" onkeydown={fromPin} data-on={p.pinned ? '' : undefined} aria-pressed={p.pinned} aria-label={p.pinned ? words.unpin(name) : words.pin(name)} title={p.pinned ? words.unpin(name) : words.pin(name)} onclick={() => pin(p.href)}>
+      <button type="button" class="s-pin tap" tabindex="-1" onkeydown={fromPin} data-on={p.pinned ? '' : undefined} aria-pressed={p.pinned} aria-label={p.pinned ? words.unpin(name) : words.pin(name)} title={p.pinned ? words.unpin(name) : words.pin(name)} onclick={() => pin(p)}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4.75h6l-1 5.5 3.25 3.5H6.75L10 10.25zM12 13.75v5.5" /></svg>
       </button>
     {/if}

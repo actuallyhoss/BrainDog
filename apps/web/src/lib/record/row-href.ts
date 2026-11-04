@@ -71,8 +71,14 @@ let learnt: ReadonlyMap<string, string> = new Map();
    answers as the run's own page, so `boot` need not list 900 of them. */
 let byRowLearnt: ReadonlySet<string> = new Set();
 
+/* WHAT WAS LEARNT, AS IT WAS SAID, for the device's copy of the shell (`boot-copy.ts`). */
+let said: { pages: PageAbout[]; byRow: string[] } = { pages: [], byRow: [] };
+/** What `learnRowPages` was last told, as far as a row's address needs it. */
+export const saidRowPages = (): { pages: readonly PageAbout[]; byRow: readonly string[] } => said;
+
 /** `boot`'s pages, as the shell reads them, and the lists whose rows open by the row. Called with nothing, every row opens on its screen. */
 export const learnRowPages = (pages: readonly PageAbout[] | null | undefined, byRow: readonly string[] = []): void => {
+  said = { pages: (pages ?? []).filter((p) => p.about || p.opens).map((p) => ({ slug: p.slug, ...(p.about ? { about: { register: p.about.register, seq: p.about.seq } } : {}), ...(p.opens ? { opens: p.opens } : {}) })), byRow: [...byRow] };
   learnt = rowPagesOf(pages);
   byRowLearnt = new Set(byRow);
   learntLists = listPagesOf(pages);

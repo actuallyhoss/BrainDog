@@ -362,7 +362,7 @@
   ]);
 
   /* THE PERSON'S OWN RAIL, as `boot` answered it, before anything draws it (`nav-prefs.svelte.ts`). */
-  $effect.pre(() => navPrefs.adopt(data.me.prefs, apiBase()));
+  $effect.pre(() => navPrefs.adopt(data.me.prefs, apiBase(), undefined, data.stale === true));
   /* SCREENSHOT MODE WHEN THE PERSON'S OWN `look.shot` SAYS SO (`lib/shot/mode.ts`), loaded only then, so the own words and
      the plate's sheet stay out of the entry. A boolean, so a navigation with the same answer starts nothing, and a bare
      surface (a shared page) never takes it. The palette, the key and Settings turn it on and off themselves. */

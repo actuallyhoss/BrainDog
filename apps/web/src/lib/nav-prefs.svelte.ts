@@ -319,11 +319,16 @@ export class NavPrefs {
    * in one browser's cookie set the top bar for the person everywhere, and a second browser's menu then lost to it. The
    * record learns a shape or a switch when somebody chooses one (`setShape`, `setSuggest`). The cookie's `bar` is the
    * one exception, for `deviceChose`'s reason.
+   *
+   * A COPY OF THE SHELL IS NO ANSWER (`copy`, 4 Nov). A cold open draws the last shell kept (`boot-copy.ts`), which holds the
+   * prefs as they were at the last `boot`, and this took those and then shut its door on the live answer. So a project pinned
+   * since was gone from the sidebar for that whole tab, every other reload. Until `boot` answers this device's own copy
+   * of these stands (`fromDevice`), which is the newer of the two.
    */
-  adopt(prefs: Prefs | undefined, base: string, send: Send = sendTo(base)): void {
+  adopt(prefs: Prefs | undefined, base: string, send: Send = sendTo(base), copy = false): void {
     if (prefs === undefined) return;
     this.#send = send;
-    if (this.#adopted) return;
+    if (this.#adopted || copy) return;
     this.#adopted = true;
     if (prefs['nav.order']) {
       this.order = strings(prefs['nav.order']);
