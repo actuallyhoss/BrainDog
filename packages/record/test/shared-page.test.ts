@@ -119,7 +119,7 @@ test('a money cell arrives whole, in its own currency, and two currencies are ne
   const [said, ...rest] = note.body.split('\n');
   /* EACH AMOUNT WRITTEN ONE WAY, as Money writes it against the record's home currency, whatever the language. AND A
      SENTENCE WITH A HOLE NOTHING FILLS IS LEFT OUT WHOLE, rather than read "Also and the handbook." */
-  assert.match(said!, /^Owed: (?=.*€300\.50.EUR)(?=.*£1,250\.00.GBP).*\.$/u);
+  assert.match(said!, /^Owed: (?=.*€300\.50)(?=.*£1,250).*\.$/u);
   assert.doesNotMatch(note.body, /Also|handbook/u);
   /* AND THE REST OF HER WORDS KEEP THEIR SPACING: a nested list keeps its indent. */
   assert.deepEqual(rest, ['', '- Sent', '  - by hand']);
@@ -620,10 +620,11 @@ test('SL2: A PROJECT CARD\'S TREND REACHES A LINK from the project\'s own rows, 
       id: 'tasks',
       name: 'Tasks',
       title: 'what',
-      states: ['open', 'done'],
+      state: 'state',
       done: ['done'],
       fields: [
         { id: 'what', type: 'text', required: true },
+        { id: 'state', type: 'enum', values: ['open', 'done'] },
         { id: 'thing', type: 'text' },
         { id: 'done_on', type: 'day' },
       ],

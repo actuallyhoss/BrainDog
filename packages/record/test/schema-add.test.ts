@@ -199,7 +199,8 @@ test('THE MCP propose DESCRIPTION TEACHES A change THE RECORD ACCEPTS: add for m
     if (said[end] === '{') depth++;
     if (said[end] === '}' && --depth === 0) break;
   }
-  const body = JSON.parse(said.slice(at, end + 1)) as { to: { add?: unknown } };
+  /* THE WORDS SHORTEN THE FIELDS TO FIT THE TOOL'S BUDGET, so a field stands where they do. */
+  const body = JSON.parse(said.slice(at, end + 1).replace('[...]', '[{"id":"note","type":"text"}]')) as { to: { add?: unknown } };
   assert.ok(body.to.add, 'the register example is not an addition');
   const { sql, file, accept, live } = await record();
   const filed = await file(body as never);

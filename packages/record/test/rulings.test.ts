@@ -274,6 +274,11 @@ test('ruling 305: each of the twelve module questions is confirmed or replaced, 
   /* EVERY FRAME IS THE HOST'S DRAWN FRAME (a drawn component's, a visual's): it runs code the record keeps, in a sandbox, in
      the host's own frame document, and loads nothing from another site. */
   const host = (t: string) => [...t.matchAll(/<iframe\b[^>]*>/gu)].every((m) => m[0].includes('src={SRC}') && m[0].includes('sandbox="allow-scripts"')) && t.includes('const SRC = `${BASE}/drawn-frame`;');
-  const framed = sources().filter((f) => (f.startsWith('apps/web/') || f.startsWith('packages/render/')) && read(f).includes('<iframe') && !host(read(f)));
+  /* AND A PDF IN THE BROWSER'S OWN VIEWER, from a `blob:` the app made of the record's own bytes with that type and no other: from no other site, and no page. */
+  const pdf = (t: string) => {
+    const frames = [...t.matchAll(/<iframe\b[^>]*>/gu)].filter((m) => !(m[0].includes('src={SRC}') && m[0].includes('sandbox="allow-scripts"')));
+    return frames.every((m) => m[0].includes('src={pdf}')) && t.includes("new Blob([bytes], { type: 'application/pdf' })");
+  };
+  const framed = sources().filter((f) => (f.startsWith('apps/web/') || f.startsWith('packages/render/')) && read(f).includes('<iframe') && !host(read(f)) && !pdf(read(f)));
   assert.deepEqual(framed, [], 'an outside embed is drawn in a frame');
 });

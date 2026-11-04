@@ -174,7 +174,10 @@ test('THE LINT IN SLICES FILES THE SIGN ONE TICK FILES, and keeps where it stopp
   assert.deepEqual(sliced.api.kernel.prefsOf('braindog:page-lint')['round'], whole.api.kernel.prefsOf('braindog:page-lint')['round']);
   /* AND NOTHING IS LEFT UNDER WAY, so the next tick is the day's every-tick part alone. */
   assert.equal(sliced.api.kernel.prefsOf('braindog:signs')['pages-clean.run'], undefined);
-  assert.deepEqual(await sliced.api.lintTick({ budget: onePage() }), { ran: false, why: 'today' });
+  /* THE WORDS' WALK IS A SHARE A TICK TOO, after the day's lint, so the ticks say later until it is done (`keepWordsSliced`). */
+  let after = await sliced.api.lintTick({ budget: onePage() });
+  for (let i = 0; i < 2_000 && !after.ran && after.why === 'later'; i++) after = await sliced.api.lintTick({ budget: onePage() });
+  assert.deepEqual(after, { ran: false, why: 'today' });
 });
 
 /** Count every slice of the night's walk the record reads while `run` runs. */

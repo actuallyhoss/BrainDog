@@ -225,7 +225,9 @@ test('A TICK THAT COMES IN WHILE THE NIGHT IS STILL ASKING asks nothing: the day
   while (heard.length === 0) await new Promise((r) => setTimeout(r, 1));
   /* THE WORKER TICKS AFTER EVERY REQUEST, so another lands while the model is still writing the night's lines. */
   clock.set(T0 + 20 * DAY + HOUR);
-  assert.deepEqual(await api.slashTick(), { ran: false, why: 'today' });
+  /* IT GOES ON FROM THE STEP THE LOOK KEPT, which is the headlines' walk: it files nothing, and the walk it found under way asks nothing. */
+  const during = await api.slashTick();
+  assert.deepEqual(during.ran ? during.filed : [], []);
   assert.equal(heard.length, 1, 'a tick during the night’s ask asked the same pages again');
   answer();
   assert.ok((await night).ran);
