@@ -1132,6 +1132,12 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
+  /* THE CARD'S LAST ROW ENDS ON THE CARD'S PADDING: Your agents stood 33 under its last row with 20 over its head. */
+  :global(.tile) > :last-child > .agent-row:last-child,
+  :global(.tile) > .agent-row:last-child {
+    padding-block-end: 0;
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .agent-row:has(.agent:hover) {
       background: var(--hover);

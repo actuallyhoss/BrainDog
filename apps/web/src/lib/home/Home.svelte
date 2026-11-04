@@ -2277,6 +2277,20 @@
     margin-block-end: calc(-1 * var(--divider-space));
   }
 
+  /* EACH MORE LINE IN THE FOOT LETS THE FRAME 45 TALLER (a 44 line and its rule): held to its cells, a second line took a
+     question away at a desk and a third took the whole foot and the vital sign away at 1280 and on a phone. */
+  .body[data-board] :global(.block-slot[data-board-key='needs-you']:has(.nf-lines > li:nth-child(2))) {
+    --foot-more: 45px;
+  }
+
+  .body[data-board] :global(.block-slot[data-board-key='needs-you']:has(.nf-lines > li:nth-child(3))) {
+    --foot-more: 90px;
+  }
+
+  .body[data-board] :global(.block-slot[data-board-key='needs-you']:has(.nf-lines > li:nth-child(4))) {
+    --foot-more: 135px;
+  }
+
   /* NEEDS YOU HOLDS TWO QUESTIONS ON A LAPTOP'S LARGE (Q17): each question without its well, so its buttons sit on its
      second line, and the foot's lines at a press's height, not a row's. */
   /* ONLY WHERE THE QUESTION STILL HAS ITS ROOM BESIDE THEM (UI pass 1 Nov): at 1280 the tile is 440 wide inside, and the
@@ -3082,13 +3096,17 @@
       padding-block-start: 0;
     }
 
-    .body[data-board] :global([data-board-key] .cards-grid > .cards-item:first-child) {
-      padding-block-start: var(--sp-2);
-    }
+  }
 
-    .body[data-board] :global([data-board-key] .cards-grid > .cards-item:last-child) {
-      padding-block-end: 0;
-    }
+  /* A FRAME'S CARDS GET THEIR AIR AS A GAP BETWEEN THEM, not 12 inside each: a frame clips its block, so the first and last
+     card's air could not be given back with a margin, and People to get back to stood 24 under its head and 32 over the
+     tile's foot. */
+  .body[data-board] :global([data-board-key] .cards-grid) {
+    row-gap: calc(2 * var(--cards-air));
+  }
+
+  .body[data-board] :global([data-board-key] .cards-grid > .cards-item) {
+    padding-block: 0;
   }
 
   @media (width < 600px) {

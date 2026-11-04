@@ -504,7 +504,7 @@
 
   .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-board-key]) {
     --most: var(--row);
-    max-block-size: var(--most);
+    max-block-size: calc(var(--most) + var(--foot-more, 0px));
   }
 
   .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key]:is([data-size='tall'], [data-size='large'])) {
@@ -523,7 +523,7 @@
   .board-root:not([data-editing]) .board:not([data-cols='2']) :global([data-board-key][data-board-key]) {
     --span: 1;
     align-self: start;
-    max-block-size: calc(var(--span) * var(--row) + (var(--span) - 1) * var(--gap));
+    max-block-size: calc(var(--span) * var(--row) + (var(--span) - 1) * var(--gap) + var(--foot-more, 0px));
   }
 
   .board-root:not([data-editing]) .board:not([data-cols='2']) :global([data-board-key][data-board-key]:is([data-size='tall'], [data-size='large'])) {

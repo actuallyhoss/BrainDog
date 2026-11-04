@@ -168,6 +168,20 @@
     cursor: default;
   }
 
+  /* A LINE THAT OPENS IS A 44 TARGET UNDER A THUMB, its drawn 19 unchanged. The first is always open and takes no press. */
+  @media (pointer: coarse) {
+    .cs-line:not(:disabled) {
+      position: relative;
+    }
+
+    .cs-line:not(:disabled)::before {
+      content: '';
+      position: absolute;
+      inset-block: calc((100% - var(--tap)) / 2);
+      inset-inline: 0;
+    }
+  }
+
   .cs-to {
     color: var(--ink);
     font-weight: var(--fw-medium);

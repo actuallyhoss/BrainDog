@@ -1044,6 +1044,11 @@
     font-size: var(--fs-ctl);
   }
 
+  /* THE LAST ROW'S BAR ENDS ON THE CARD'S PADDING. */
+  .progress-row:last-child {
+    padding-block-end: 0;
+  }
+
   .progress-row > .progress-share,
   .progress:not([data-form='budget']) > .progress-row:not([data-intent]) > .progress-left {
     display: none;

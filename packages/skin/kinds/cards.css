@@ -75,7 +75,8 @@
 
   /* A CARD'S ROWS CARRY THEIR OWN AIR FOR THE WASH, so in a tile the list gives it back: the first name stood 24 under
      the head and the last 32 over the tile's foot ("People to get back to"), where a tile's list stands 12 and 20. Money's
-     accounts are drawn cards, whose fill is the air, and keep it. */
+     accounts are drawn cards, whose fill is the air, and keep it. On Today a frame clips its block, so Home gives the air
+     back as padding instead. */
   .cards-grid {
     --cards-air: var(--sp-3);
   }
@@ -84,11 +85,11 @@
     --cards-air: var(--sp-2);
   }
 
-  :not([data-money] *).block-slot > .block-bar + .block > .cards-grid {
+  :not([data-money] *).block-slot:not([data-board-key]) > .block-bar + .block > .cards-grid {
     margin-block-start: calc(-1 * var(--cards-air));
   }
 
-  :not([data-money] *).block-slot > .block:last-child > .cards-grid {
+  :not([data-money] *).block-slot:not([data-board-key]) > .block:last-child > .cards-grid {
     margin-block-end: calc(-1 * var(--cards-air));
   }
 
