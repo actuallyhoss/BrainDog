@@ -26,6 +26,7 @@
   import { copy } from '../copy.ts';
   import { now as nowLines, starters, threadWords, type NowLine, type PageContext } from './slash-chat.ts';
   import { answer, convo, undo, type LiveAction, type SlashTurn } from './thread.svelte.ts';
+  import { stepLines } from './steps.ts';
 
   let {
     here,
@@ -153,8 +154,8 @@
           <li class="t-slash">
             {#if turn.steps.length > 0}
               <ul class="t-steps" aria-label={threadWords.steps}>
-                {#each turn.steps as step, j (j)}
-                  <li in:lineIn data-now={turn.streaming && j === turn.steps.length - 1 && turn.text === '' ? '' : undefined}>{step}</li>
+                {#each stepLines(turn.steps) as step (step.text)}
+                  <li in:lineIn data-now={turn.streaming && step.last && turn.text === '' ? '' : undefined}><Icon name={step.icon} size="s" /><span>{step.text}{step.times > 1 ? ` (${step.times})` : ''}</span></li>
                 {/each}
               </ul>
             {/if}
@@ -324,6 +325,16 @@
     gap: 2px;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+  }
+
+  .t-steps li {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .t-steps li > :global(svg) {
+    flex: none;
   }
 
   .t-steps li[data-now] {

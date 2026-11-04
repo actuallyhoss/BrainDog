@@ -4,7 +4,7 @@ Slash is the assistant built into BrainDog. Ask it what you spent on food this m
 
 ## Ask
 
-Press Ctrl+J (⌘J on a Mac), or click **Ask or change anything** in the bar, and type. The bar widens in place and the answer drops down under it. / and Ctrl+K (⌘K) open the same palette for finding and going places.
+Press / or Ctrl+J (⌘J on a Mac), or click **Ask or change anything** in the bar, and type. The bar widens in place and the answer drops down under it. Ctrl+K (⌘K) opens the same palette for finding and going places.
 
 ```steps
 Ask in plain words | "What did I spend on food this month?" or "What's late?" | In the bar
@@ -52,10 +52,10 @@ In Settings, under Agents, the owner can give Slash a key from a model provider 
 ```comparison | Slash, and your agents
 Question | Slash | Your agents
 <!-- launch: codex -->
-Where it lives | In BrainDog. Press Ctrl+J (⌘J) | Claude, Codex, Cursor and any MCP client you connect
+Where it lives | In BrainDog. Press / or Ctrl+J (⌘J) | Claude, Codex, Cursor and any MCP client you connect
 <!-- /launch -->
 <!-- launch: !codex -->
-Where it lives | In BrainDog. Press Ctrl+J (⌘J) | Claude, Cursor and any MCP client you connect
+Where it lives | In BrainDog. Press / or Ctrl+J (⌘J) | Claude, Cursor and any MCP client you connect
 <!-- /launch -->
 What it reads | Your BrainDog | What the key or sign-in you gave it allows
 What it writes | What you ask for, with an undo; money, keys, sharing and deletes wait for your yes | Proposals for you to decide, or rows directly, as you allowed
