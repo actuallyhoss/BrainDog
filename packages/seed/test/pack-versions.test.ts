@@ -3928,6 +3928,25 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'portfolio@1.31.2': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-lane-earning
+      metric.projects-live metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track
+      metric.projects-parked metric.projects-past-aim metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      metric.readings-held
+      page.all-numbers page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.kind-offers-kpis rule.project-past-aim
+      script.kind_drafts script.kpi_backfill
+    `,
+    declares: 'bd1a4374b7547281',
+    history: [
+      'portfolio 1.31.2 of 4 November (Projects page): `page.portfolio` drops How they are going, the bar of health over the projects -> bd1a4374b7547281',
+    ],
+  },
+
   'portfolio@1.31.1': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged

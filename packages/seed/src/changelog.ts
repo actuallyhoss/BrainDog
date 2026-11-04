@@ -20,6 +20,7 @@ export type ModuleChange = { version: string; notes: string };
 
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
+    { version: '1.31.2', notes: 'Projects opens on your projects. The bar of how they are going is gone; each project says it if it is at risk or off track.' },
     { version: '1.31.1', notes: 'Numbers no longer opens on a line saying what it lists. It still says how to add a key number while it has none.' },
     { version: '1.31.0', notes: 'Numbers with no reading yet says what it will list and how to add a key number, rather than a line about readings over none.' },
     {

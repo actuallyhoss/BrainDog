@@ -1016,10 +1016,12 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   (`people-notes:<row>`), to take out their name as a heading and a one-line deal the Deal field holds, and to keep a
  *   short opening line as About. The facts are still asked as 4.7.0 asked them, so a no to that question stays a no.
  *   Only the script's source moved, no id, so a patch step that goes in quietly and keeps every row.
+ *   portfolio 1.31.2 (4 Nov, Projects page): `page.portfolio` drops How they are going, the bar of health over the projects;
+ *   each project's card says it. No id added or taken away.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
-  portfolio: '1.31.1',
+  portfolio: '1.31.2',
   people: '4.7.1',
   'money-core': '3.38.5',
   estate: '2.8.1',

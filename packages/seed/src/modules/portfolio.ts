@@ -1147,26 +1147,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
          the row, beside two splits a third its height, so the row ended at three heights. In play is the line's now;
          what aims within thirty days is Coming up, folded under Earnings, agents and dates; and what an agent holds is
          With an agent beside it. */
-      {
-        /* HOW THE PROJECTS IN PLAY ARE GOING, AS ONE TILE, SINCE portfolio 1.11.0. Where they are and How they are going
-           were two half-width tracks under a line that already counts the projects in play and the ones at risk, so the
-           row said the line twice; the health track is the one that says something the line does not (which part is
-           off track, and how much of it nobody has said about). What is parked or finished is folded under the cards, and
-           `projects-by-lane` is drawn again above it since 1.17.0. EACH PART IN ITS INTENT, so off track reads as
-           trouble at a glance, in the theme's colour and not only in words. */
-        kind: 'split',
-        heading: 'How they are going',
-        icon: 'activity',
-        span: 12,
-        source: 'metric.projects-by-health',
-        unset: 'Not said yet',
-        tones: { on_track: 'good', at_risk: 'warn', off_track: 'bad' },
-        /* ONLY PAST FOUR PROJECTS IN PLAY, SINCE portfolio 1.12.0 (the visual review of October 2nd). Three projects drew
-           three equal thirds, which says nothing the line and the cards under it do not; a bar earns its row when there
-           are too many cards to read at a glance. AND ONLY WHILE ONE OF THEM SAYS HOW IT IS GOING, SINCE portfolio 1.17.0:
-          with no health set on any it drew one bar of Not said yet. */
-        when: { all: [{ metric: 'projects-live', gt: 4 }, { metric: 'projects-with-health', gt: 0 }] },
-      },
+      /* NO HOW THEY ARE GOING, SINCE portfolio 1.31.2 (4 Nov, Sam: "projects page looks poor"): past four projects a whole
+         tile of coloured bar stood over the projects, and said how many are at risk, not which. Each card says so now
+         beside its lane. `metric.projects-by-health` stays declared, since a page somebody made may draw on it. */
       /* NO NEEDS YOU TABLE, SINCE portfolio 1.11.0. It listed the projects at risk with their health and next step, and
          the cards under it say both on every project in play, while the line counts them: Kiln's next step was on the
          page three times. */
