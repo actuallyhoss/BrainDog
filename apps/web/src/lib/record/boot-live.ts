@@ -142,6 +142,8 @@ type ShellBase = {
  * `upTo` is the newest line of what is new, which is what marking it all read sends.
  */
 export type Shell = ShellBase & {
+  /** On a kept copy only (`boot-copy.ts`): the holding pen when it was kept, so its row in the sidebar holds its place. */
+  drewPen?: ShellBase['pen'];
   me: {
     person: string;
     /**
@@ -153,6 +155,8 @@ export type Shell = ShellBase & {
     email?: string;
     level: string;
     owner: boolean;
+    /** On a kept copy only (`boot-copy.ts`): this reader was the owner when it was kept. It draws links; it permits nothing. */
+    drewOwner?: boolean;
     /* THE SWITCHER'S OWN ROW, so a record where somebody holds some lists arrives with `level: null` and `held`. */
     records: SwitcherRow[];
     /**

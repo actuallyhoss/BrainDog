@@ -47,7 +47,12 @@ function rowsOf(tiles: readonly HTMLElement[], heights: ReadonlyMap<HTMLElement,
 export function masonry(host: HTMLElement): () => void {
   let page: HTMLElement | null = null;
   let frame = 0;
-  const sized = new ResizeObserver(() => schedule());
+  /* A TILE THAT GREW IS PACKED BEFORE IT IS PAINTED, in the observer's own turn: a frame later, as a read's answer filled
+     a tile, every tile under it stood over its neighbour for a frame. Packing changes where a tile stands, not its size. */
+  const sized = new ResizeObserver(() => {
+    cancelAnimationFrame(frame);
+    lay();
+  });
   const watched = new Set<Element>();
 
   const tiles = (p: HTMLElement): HTMLElement[] => [...p.children].filter((c): c is HTMLElement => c instanceof HTMLElement);

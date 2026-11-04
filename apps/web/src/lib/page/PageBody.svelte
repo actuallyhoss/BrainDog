@@ -13,6 +13,7 @@
 -->
 <script lang="ts">
   import SkeletonCard from '$lib/ui/SkeletonCard.svelte';
+  import { holdOf } from '$lib/home/today-hold.svelte.ts';
   /** The height a Today card still arriving was last drawn at, which its cell keeps until it is in. */
   const pendingH = (b: unknown): string | undefined => {
     const p = (b as { pending?: { h?: unknown } | true } | null)?.pending;
@@ -1299,7 +1300,8 @@
       data-board-key={cell?.key}
       data-size={cell?.size}
       aria-busy={(block as { pending?: unknown }).pending !== undefined ? 'true' : undefined}
-      style:min-block-size={pendingH(block)}
+      data-standing={(block as { pending?: unknown }).pending !== undefined ? '' : undefined}
+      style:min-block-size={pendingH(block) ?? holdOf(cell?.key)}
       data-full={(spans.get(slot.i) ?? slot.span) >= COLUMNS ? '' : undefined}
       data-arranging={arranging ? '' : undefined}
       data-cursor={!arranging && mode === 'page' && reading[cursor]?.slot.i === slot.i ? '' : undefined}

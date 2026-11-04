@@ -75,6 +75,7 @@
   import type NameAskView from '$lib/sharing/NameAsk.svelte';
   import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
+  import { frameGone, pageOpened } from '$lib/shell/first-frame.ts';
   import { KEYS_REGISTER } from '$lib/record/keys-register.ts';
   import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, litOfUp, rowsAsLists, sideModel, sideOrder, upFirst, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
@@ -258,6 +259,21 @@
     return at === '/start' || at === '/signin' || at.startsWith('/signin/') || at === '/signup' || at === '/invite' || at === '/connect' || at === '/connect/approve' || at === '/s' || at.startsWith('/s/');
   });
 
+  /* THE FIRST FRAME (`app.html`, `first-frame.ts`): on every page opened, its kept outline stands behind it until it has
+     drawn, and a surface with no shell, an error or an ended access draws none of it. */
+  let framed = false;
+  $effect(() => {
+    const none = bare || endedSaid !== undefined || page.error !== null;
+    const address = page.url.pathname + page.url.search;
+    untrack(() => {
+      if (none) return frameGone();
+      const first = !framed;
+      framed = true;
+      void address;
+      pageOpened(first);
+    });
+  });
+
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why
      `/[id]`'s `Search` button navigated Home instead of searching. */
   let keymapOpen = $state(false);
@@ -380,7 +396,7 @@
     ...(operator.yes ? [{ ...ADMIN } as SideLink] : []),
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' }] : []),
     /* ADD-ONS AND USAGE ARE THE OWNER'S (collab pass, 2 Nov): a colleague can install nothing and pays for nothing. */
-    ...(data.me.owner ? [{ href: '/plugins', label: copy.packs, icon: 'plug' } as SideLink, { href: '/usage', label: USAGE, icon: 'observe' } as SideLink] : []),
+    ...(data.me.owner || data.me.drewOwner ? [{ href: '/plugins', label: copy.packs, icon: 'plug' } as SideLink, { href: '/usage', label: USAGE, icon: 'observe' } as SideLink] : []),
     { href: '/settings', label: copy.settings, icon: 'settings' },
   ]);
 
@@ -773,7 +789,7 @@
     if (name !== '') shellTitle(name);
   });
   /* SUGGESTED CHANGES, AT THE SIDEBAR'S FOOT WHEN ANY WAIT: an update that adds a page lands hidden. */
-  const penWaits = $derived(penCount(data.pen, (id) => navPrefs.isDismissed(id)));
+  const penWaits = $derived(penCount(data.stale ? (data.drewPen ?? data.pen) : data.pen, (id) => navPrefs.isDismissed(id)));
   const sidePen = $derived(penWaits > 0 ? { label: suggested(penWaits), href: '/settings/navigation#suggestions' } : null);
 
   /* WHERE THE PALETTE'S "GO TO" LEADS WITH NOTHING TYPED: the sidebar's places, the projects, and Settings. */
@@ -1927,6 +1943,10 @@
   .banner-room {
     block-size: 62px;
     margin: var(--page-top) var(--gutter) 0;
+    /* THE BANNER'S OWN TILE, EMPTY, so it stands while its code comes and the banner fills it. */
+    background: var(--tile);
+    box-shadow: var(--card);
+    border-radius: var(--r-tile);
   }
   @media (width < 730px) {
     .banner-room {

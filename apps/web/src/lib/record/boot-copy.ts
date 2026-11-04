@@ -60,7 +60,10 @@ export function drawnFrom(shell: Shell): Shell {
     ...shell,
     stale: true,
     pen: [],
-    me: { ...shell.me, level: 'read', owner: false, lists: [], levels: {} },
+    /* WHAT THE LINKS DREW WITH (`drewOwner`, `drewPen`), which offer no write and only hold their rows' places: the foot of
+       the sidebar and the Settings index drew a shorter picture for the copy, and grew when `boot` answered. */
+    drewPen: shell.pen,
+    me: { ...shell.me, level: 'read', owner: false, drewOwner: shell.me.owner === true, lists: [], levels: {} },
   };
 }
 

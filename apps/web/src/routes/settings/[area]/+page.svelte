@@ -142,7 +142,9 @@
      Their addresses still open, so a link still lands, and the record still refuses every write there. */
   const OWNERS_AREAS: ReadonlySet<string> = new Set(['ingest', 'plugins', 'billing', 'tidy', 'backups', 'export', 'delete']);
   const OWNERS_PLACES: ReadonlySet<string> = new Set(['/keychain', '/usage', '/p/health']);
-  const owner = $derived(Boolean((shell.me as { owner?: boolean }).owner) || shell.me.level === 'owner');
+  /* `drewOwner`: A KEPT SHELL DRAWS THE INDEX ITS OWNER HAD (`boot-copy.ts`): every reload drew the plain chooser's list for
+     the copy, then the index's tiles, and the page changed shape under the reader. Nothing written here reads this. */
+  const owner = $derived(Boolean((shell.me as { owner?: boolean }).owner) || shell.me.level === 'owner' || shell.me.drewOwner === true);
   const groups = $derived<readonly AreaGroup[]>(
     owner
       ? declaredGroups

@@ -43,6 +43,8 @@
   /* EVERY VIEW TRANSITION'S RULES ARRIVE ONCE THE FIRST SCREEN HAS DRAWN (speed4, 2 Nov): nothing in them draws a still
      screen, so they are not in the sheet every screen waits on. Asked when the browser is next idle, within a second. */
   onMount(() => {
+    /* THE LIGHT FRAME DRAWS NOTHING OF THE SHELL: `app.html`'s first frame goes the moment it is here. */
+    if (data.light) (globalThis as { __bdFrame?: { gone(): void } }).__bdFrame?.gone();
     const ask = () => void import('$lib/motion/transitions.css');
     if (typeof requestIdleCallback === 'function') requestIdleCallback(ask, { timeout: 1000 });
     else setTimeout(ask, 300);

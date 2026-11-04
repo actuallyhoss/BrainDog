@@ -472,7 +472,8 @@
     content: '';
     position: fixed;
     inset: 0;
-    z-index: -1;
+    /* UNDER THE FIRST FRAME (`#ff` in `app.html`), which stands at -1 and comes first in the page. */
+    z-index: -2;
     background: var(--ambient);
     pointer-events: none;
   }
