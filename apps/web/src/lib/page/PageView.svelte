@@ -62,6 +62,8 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
+  import ProjectWaiting from './ProjectWaiting.svelte';
+  import { knownRow } from './known-project.ts';
   import type { Subject } from '$lib/sharing/share-state.ts';
   import { canShare } from '$lib/sharing/may-share.ts';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
@@ -1118,6 +1120,16 @@
     <div class="hosted">
       <PageHead icon={railed.icon} hue={railed.hue} title={railed.title} headless={railed.row === true} back={railed.row ? railedBack : undefined} sentence={railed.row ? '' : undefined} />
       <div class="waiting-body"><Waiting /></div>
+    </div>
+  {:else if got !== null && live && mode === 'page' && about}
+    <!-- THE PAGE HAS ANSWERED AND ITS SHAPE IS BEING TURNED, FOR A BLINK: its own head and shape stand till the parts land.
+         Bare bars come only after 300ms, so this drew a blank between the frame and the page, and the name went and came
+         back, about 80 ms on every project opened (find1104 #10). The same picture the route drew while the page read. -->
+    <div class="hosted">
+      <PageHead title={live.page.page.title} kicker={headKicker} back={projectBack} headless sentence="" />
+      <div class="waiting-body">
+        {#if waiting}{@render waiting()}{:else}<ProjectWaiting project={knownRow(apiBase(), `${about.register}#${about.seq}`) ?? { name: live.page.page.title, mark: '', hue: null, lane: '' }} />{/if}
+      </div>
     </div>
   {:else}
     <!-- Bars until the record answers. -->
