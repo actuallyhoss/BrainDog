@@ -385,7 +385,7 @@
     if (listing) drew('ready');
   });
 
-  /* THE BAR'S CRUMB IS "Plugins › <name>", the store first, whatever the sidebar lights (3 Nov, Sam). */
+  /* THE BAR'S CRUMB IS "Plugins › <name>", the store first, whatever the sidebar lights (3 Nov, the owner). */
   $effect(() => {
     const up = { label: words.plugins, href: STORE_AT };
     frame.up = up;

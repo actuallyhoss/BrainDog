@@ -6,7 +6,7 @@
   the card's head, what the last sync brought as three figures, and Sync now and Disconnect. Only an owner sees the
   buttons; anybody else sees the state.
 
-  EACH FACT ONCE (3 Nov, Sam: "Connected as" above a sentence that said the counts, and a status line under the
+  EACH FACT ONCE (3 Nov, the owner: "Connected as" above a sentence that said the counts, and a status line under the
   buttons that said "connected" again, squeezed into a 100px column). The state is the head's chip; the counts are
   figures; what an action did is a toast, which goes away; only a failure stays, as a full-width line at the top of the
   card. The old Apps Script's stop steps are behind one disclosure, for the few who still run it.

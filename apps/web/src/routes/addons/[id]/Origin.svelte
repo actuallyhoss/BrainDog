@@ -6,7 +6,7 @@
   the trust from the catalogue and the pack's source, "what it may do here" from the declarations it put in this
   BrainDog. Who made a made-here plugin is the run that asked to install it, read off its question on Decide.
 
-  EACH FACT ONCE, AS STRUCTURE (3 Nov, Sam: a "Made by BrainDog" chip followed by "Made by BrainDog", and "Lists: Mail."
+  EACH FACT ONCE, AS STRUCTURE (3 Nov, the owner: a "Made by BrainDog" chip followed by "Made by BrainDog", and "Lists: Mail."
   as raw text). Who made it is a row of the Details card, with a chip only where the chip says more. What it may do is
   rows with glyphs (`$lib/market/may.ts`): its lists and pages are left to the "What it adds" card when the page draws
   one (`adds`), and the scripts that run inside BrainDog fold into one row.

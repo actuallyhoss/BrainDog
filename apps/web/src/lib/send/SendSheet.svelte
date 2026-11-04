@@ -3,7 +3,7 @@
 
   THE APP'S ONE SHEET (`Sheet.svelte`, narrow): from 900 up a drawer in from the right edge over a dimmed page, 420 wide
   and the window's height; below 900 the bottom sheet with its handle. Esc, a press on the dimmed page and Close shut it,
-  the focus stays inside while it is open and goes back to what opened it after (Sam, 3 Nov: "on pc it should show from
+  the focus stays inside while it is open and goes back to what opened it after (the owner, 3 Nov: "on pc it should show from
   the right side, not from the bottom"). It used to hang under the button as a popover, and rose from the bottom on a
   desk whenever a menu opened it, since a closed menu left nothing to hang from.
 

@@ -341,7 +341,7 @@
   });
 
   /**
-   * THE RECORD CHANGED UNDER THIS ROW, AND THE ROW NEVER HEARD (collab pass 2, 2 Nov). Sam marked a task done in his
+   * THE RECORD CHANGED UNDER THIS ROW, AND THE ROW NEVER HEARD (collab pass 2, 2 Nov). The owner marked a task done in his
    * browser; Mira, on the same task, still read To do with Mark done offered five seconds later, and her press met "changed
    * elsewhere". The list already asks again when the shell's poll says the record moved (`live.version`); the row now does
    * too, in place: the row, its history and what points at it, read again and drawn over what is there, with no wait drawn
@@ -1005,7 +1005,7 @@
    * organisation: "Client · 24 people, on Kiln and Portage." Each part only when the row has it.
    */
   /**
-   * EACH PROJECT ITS OWN CHIP, EACH OPENING ITS PAGE (3 Nov, Sam): a person's or an organisation's projects were one chip,
+   * EACH PROJECT ITS OWN CHIP, EACH OPENING ITS PAGE (3 Nov, the owner): a person's or an organisation's projects were one chip,
    * "Sketchpad, Roomy", that opened nothing, and the sentence beside it named them again. A list whose rows name several
    * projects cannot move a row in one press (`movable`), so its chip was only ever words; these are links.
    */
@@ -1053,7 +1053,7 @@
       return {
         parts: roleAlone ? null : whoParts({ role: roleSaid, org, projects }),
         named: projects.length > 0 || chipSays(meets.projects),
-        /* WHEN, AS A SMALL FACT OF ITS OWN (3 Nov, Sam): "Last in touch 2 Nov", and where they were first met as another,
+        /* WHEN, AS A SMALL FACT OF ITS OWN (3 Nov, the owner): "Last in touch 2 Nov", and where they were first met as another,
            "Met Oct 2026 · Roomy creator outreach mail", where the two were one garbled sentence. Yourself, never: "Last in
            touch" over your own name said nothing, so your page says it is you. */
         last: self ? seenWords.isYou : null,
@@ -1662,7 +1662,7 @@
       {#if changes && archived}
         <Button weight="primary" disabled={saving} data-head-primary onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
       {/if}
-      <!-- ASK ABOUT IT, in Slash with the row in it (3 Nov, Sam): on a person's page the one thing it is opened to send, so
+      <!-- ASK ABOUT IT, in Slash with the row in it (3 Nov, the owner): on a person's page the one thing it is opened to send, so
            it stands where Send to stands on any other row and `s` presses it; on any other row it sits beside Send. -->
       {#if askAbout && !archived}
         <Button href={askAbout.href} aria-label={askAbout.label} data-ask-about

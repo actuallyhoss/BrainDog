@@ -1,7 +1,7 @@
 <!--
   Settings > Appearance: how BrainDog looks to this person, in one section, and the record's own look under it.
 
-  EVERYTHING A PERSON SETS IS SHOWN (4 Nov, Sam: "remove the dropdowns from the appearance page, make them all shown").
+  EVERYTHING A PERSON SETS IS SHOWN (4 Nov, the owner: "remove the dropdowns from the appearance page, make them all shown").
   Three groups in one card, beside the preview: how it reads (scheme, text size, density, colour, look, contrast), getting
   around (navigation, the phone bar), and screenshot mode. Only the record's own look stays folded under it: it is
   everybody's, and long.

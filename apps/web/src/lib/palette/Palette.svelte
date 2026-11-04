@@ -2649,7 +2649,7 @@
     min-block-size: min(520px, calc(100dvh - var(--kb, 0px)));
   }
 
-  /* SLASH IS A CONVERSATION, SO IT GROWS (Sam, 4 Nov: "make the whole thing grow bigger when it's slash mode"). Search
+  /* SLASH IS A CONVERSATION, SO IT GROWS (the owner, 4 Nov: "make the whole thing grow bigger when it's slash mode"). Search
      stays 640 by 640, the size of a list; asking takes 860 and most of the window's height, from wherever it opened. */
   @media (width >= 640px) {
     .palette[data-mode='ask'][open] {
@@ -2678,7 +2678,7 @@
     }
   }
 
-  /* WHO IT GOES TO SITS RIGHT UNDER THE FIELD (Sam, 4 Nov), field and controls as one block with the thread below. */
+  /* WHO IT GOES TO SITS RIGHT UNDER THE FIELD (the owner, 4 Nov), field and controls as one block with the thread below. */
   .p-ask-foot {
     flex: none;
     border-block-start: 0;

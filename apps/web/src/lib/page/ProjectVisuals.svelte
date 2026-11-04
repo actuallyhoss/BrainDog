@@ -582,7 +582,7 @@
     pointer-events: none;
   }
 
-  /* THE NEWEST MONTH SAYS ITS FIGURE, AND A NEWEST MONTH AT NOUGHT SAYS NONE (leftovers9, Sam 2 Nov: "remove any $0
+  /* THE NEWEST MONTH SAYS ITS FIGURE, AND A NEWEST MONTH AT NOUGHT SAYS NONE (leftovers9, the owner 2 Nov: "remove any $0
      cards"): a month just begun drew "$0" over its stub. Its figure still shows on a hover, as every month's does. */
   .mval[data-last] {
     opacity: 1;

@@ -4,8 +4,8 @@
  * Six refusals, each over every component, stylesheet and script of the app, the skin and the renderer (and the site
  * where it says so), read as text with the comments taken out, so a comment that quotes an old spelling is not a use:
  *
- * THE FRAME MOVED ON PURPOSE ON 3 NOV (04d4cf6d4, `loop/plans/ops-look-2026-11-03/SPEC.md`): Sam asked for the ops
- * dashboard's style, and "Look B's no pills, no glass, no shadows is retired by Sam's ask". So 1, 2 and 4 hold the new
+ * THE FRAME MOVED ON PURPOSE ON 3 NOV (04d4cf6d4, `loop/plans/ops-look-2026-11-03/SPEC.md`): the owner asked for the ops
+ * dashboard's style, and "Look B's no pills, no glass, no shadows is retired by the owner's ask". So 1, 2 and 4 hold the new
  * frame, by the same means: glass and elevation come from the style layer's tokens, and from nowhere else.
  *
  *   1. GLASS ONLY ON FLOATING CHROME (SPEC 1 rule 1). Nothing blurs what is behind it (`backdrop-filter`, either

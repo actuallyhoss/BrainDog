@@ -91,7 +91,7 @@
     const r1 = r && !other ? r.charAt(0).toUpperCase() + r.slice(1) : '';
     const where = at === null ? '' : namedOrg(at);
     const what = !where ? r1 : r1 ? seenWords.roleAt(r1, where) : seenWords.at(where);
-    /* AND WHO THEY ARE, IN THE NOTE'S FIRST SENTENCE (29 October): "Engineer on Otters.gg", "Family", where the line said
+    /* AND WHO THEY ARE, IN THE NOTE'S FIRST SENTENCE (29 October): "Engineer on Kiln", "Family", where the line said
        nothing past the name for most people here. One line, cut by the row's width; the whole note is on their page. */
     const said = whoOf(m.entry);
     /* THE ORGANISATION ONCE (1 Nov, L5): "Client at Hart Street Grocer · Buys for Hart Street Grocer" said it twice, so

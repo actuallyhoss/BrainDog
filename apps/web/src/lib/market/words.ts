@@ -7,7 +7,7 @@
 import type { Category } from '@braindog/declare/catalogue';
 
 export const words = {
-  /* PLUGINS, THE READER'S WORD (3 Nov, Sam: "rename addons to plugins"). The code, the API, the MCP acts and the
+  /* PLUGINS, THE READER'S WORD (3 Nov, the owner: "rename addons to plugins"). The code, the API, the MCP acts and the
      database keep `addon` and `pack`; only what a person reads says plugin. */
   plugins: 'Plugins',
   reading: 'Reading',

@@ -436,7 +436,7 @@
     if (from === 'ready') drew('ready');
   });
 
-  /* THE BAR'S CRUMB IS "Plugins › <name>" (3 Nov, Sam: "Projects › HSBC Egypt alerts"): the page says where it sits, the
+  /* THE BAR'S CRUMB IS "Plugins › <name>" (3 Nov, the owner: "Projects › HSBC Egypt alerts"): the page says where it sits, the
      store, so the crumb's first step is the way back there whatever the sidebar lights. */
   $effect(() => {
     const up = { label: market.plugins, href: STORE_AT };

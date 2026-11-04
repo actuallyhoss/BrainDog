@@ -57,7 +57,7 @@ export function windowOf(task: readonly Ev[], stateField: string | null, done: r
 /** The changes the finisher made to other rows inside the window, net per row and field, before -> after. */
 export function doneEffects(task: { register: string; seq: number }, win: ReturnType<typeof windowOf>, recent: readonly Ev[]): Effect[] {
   /* AN AGENT'S RUN, NOT A PERSON (collab pass 2): a run is one piece of work, so what it changed while the task was open
-     is what doing the task changed. A person's hand across the same days is everything they did that week: Sam handing
+     is what doing the task changed. A person's hand across the same days is everything they did that week: the owner handing
      Mira another task was said as what finishing this one changed. */
   if (!win || win.run === null) return [];
   const mine = recent

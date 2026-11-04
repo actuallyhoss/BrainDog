@@ -3,7 +3,7 @@
 
   A 56px head on the bar's line: BrainDog's mark and name (`Brand.svelte`) and the button that hides it.
   Then the places, Today, Needs you and the record's own (Work, Money, Agents, People), each with its count, the red one
-  only for what needs you and a live dot for an agent at work. PROJECTS IS A PLACE LIKE THEM (Sam, 4 Nov: "it's confusing
+  only for what needs you and a live dot for an agent at work. PROJECTS IS A PLACE LIKE THEM (the owner, 4 Nov: "it's confusing
   in the sidebar without having things pinned, make it look like a page"): its row opens the portfolio page, its count is
   what is in play, "+" comes up on the row under a pointer, and UNDER IT STAND ONLY THE PROJECTS PINNED HERE (`nav.pins`,
   Pin to sidebar on a project's page and on Projects), by name, each with its late count and live dot. The lists that
@@ -258,7 +258,7 @@
   });
 
   /* THE PINS ARE THE PERSON'S (`nav.pins`, kept by the record and on every device), and ONLY A PINNED PROJECT IS LISTED
-     HERE (Sam, 3 Nov: "i dont need all of our projects to show in the sidebar, only the starred/pinned ones,
+     HERE (the owner, 3 Nov: "i dont need all of our projects to show in the sidebar, only the starred/pinned ones,
      everything else is under projects page"). The rest are on the Projects page the heading leads to. */
   const pins = $derived(navPrefs.pins);
   /* THE PIN IS OUT OF THE TAB ORDER (audit Q57: a stop beside every project doubled the walk to the page): the arrow

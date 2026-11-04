@@ -1,7 +1,7 @@
 /**
  * What the palette's search has already found, kept so the next letter is answered at once (slash1104, 3 Nov).
  *
- * SAM: "fix the long 'Loading...' experience when using slash (search field)". Every letter waited on the record:
+ * THE OWNER: "fix the long 'Loading...' experience when using slash (search field)". Every letter waited on the record:
  * a 120 ms pause, then `/api/search`, which on app.brain.dog answers in 160 ms on a good try and 1 to 3 s on a bad one
  * (measured from this Mac, 3 Nov). Meanwhile the list dropped its record rows and said "Looking…" alone. Now every
  * answer is kept here, and a query is first answered from what was kept: the same query again exactly, or any row kept

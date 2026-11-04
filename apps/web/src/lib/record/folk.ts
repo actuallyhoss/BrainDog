@@ -642,7 +642,7 @@ export const seenWords = {
   more: (n: number): string => `${n} more`,
   people: (n: number): string => (n === 1 ? '1 person' : `${n} people`),
   lastInTouch: (day: string): string => `Last in touch ${day}.`,
-  /* THE HEAD'S SMALL FACTS (3 Nov, Sam): "Last in touch 2 Nov" and "Met Oct 2026 · Roomy creator outreach mail", each
+  /* THE HEAD'S SMALL FACTS (3 Nov, the owner): "Last in touch 2 Nov" and "Met Oct 2026 · Roomy creator outreach mail", each
      on its own, where the head glued them into "Last in touch 2 Nov, at Arrived in Roomy creator outreach mail, Oct 2026." */
   inTouch: (day: string): string => `Last in touch ${day}`,
   metWhen: (when: string, where: string): string => `Met ${when} · ${where}`,

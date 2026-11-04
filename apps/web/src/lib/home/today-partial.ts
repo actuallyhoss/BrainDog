@@ -1,5 +1,5 @@
 /**
- * TODAY'S CARDS AS THEY ARRIVE (finish 3 Nov). Sam: "loading on the cards themselves, so whatever cards are available
+ * TODAY'S CARDS AS THEY ARRIVE (finish 3 Nov). The owner: "loading on the cards themselves, so whatever cards are available
  * loads first". Today's cards all came from one `today` read, so nothing drew until the slowest card was drawn. The
  * record now hands each card on as it draws it (`TodayLine`, `today-read.ts` `todayInLines`), and this turns what has
  * arrived into a page the board draws at once: each card that is in, drawn as it will be, and every card still being

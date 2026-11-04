@@ -161,7 +161,7 @@ export function originOf(a: AddonAnswer, maker: string | null): { line: string; 
 export type SourceRow = { label: string; value: string; href?: string; chip?: { text: string; tone: 'good' | 'warn' | 'info' }; mark?: 'check' };
 
 /**
- * WHERE IT CAME FROM, AS ROWS (3 Nov, Sam: a green "Made by BrainDog" chip and then "Made by BrainDog" in words). Each
+ * WHERE IT CAME FROM, AS ROWS (3 Nov, the owner: a green "Made by BrainDog" chip and then "Made by BrainDog" in words). Each
  * fact once: who made it, a review chip only where it says something the maker does not (never for BrainDog's own), and
  * where a linked one was read from. The note, when there is one, is one line.
  */

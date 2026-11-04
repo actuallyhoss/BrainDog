@@ -38,7 +38,7 @@ const CHART = '.series, [role="img"], svg';
 const HEAD_COUNT = '.project-cards';
 
 /**
- * FITS EVERY FRAME, AND HANDS BACK THE ARRIVALS STILL PLAYING (blink fix, 3 Nov). Sam saw Today blink: the fit measured a
+ * FITS EVERY FRAME, AND HANDS BACK THE ARRIVALS STILL PLAYING (blink fix, 3 Nov). The owner saw Today blink: the fit measured a
  * frame with its own last answer still drawn in it (the "1 more" line in the flow, a grown height, a quiet foot's room), so
  * Your work this week measured short with the line, cut nothing and took the line away, measured long without it and put
  * it back, and each link it added or took away was a change the board's watch fitted again, about 120 times a second. Now

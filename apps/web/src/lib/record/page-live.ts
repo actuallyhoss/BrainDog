@@ -1040,7 +1040,7 @@ export function tileOf(
     /* AND A FIGURE THAT ADDED UP NO ROW SAYS SO, so a widget on Today over nothing but such figures says its `empty:`. */
     ...(r.rows === 0 ? { readNone: true } : {}),
     /* AND MONEY THAT ADDED UP NO ROW TO NOUGHT SAYS SO, so a page being read leaves its "$0" tile off (`noughtOverNone`
-       in the kernel's `drawn.ts`; leftovers9, Sam 2 Nov: "remove any $0 cards"). */
+       in the kernel's `drawn.ts`; leftovers9, the owner 2 Nov: "remove any $0 cards"). */
     ...(r.rows === 0 && r.value === 0 && typeof r.unit === 'string' && /^[A-Z]{3}$/u.test(r.unit) && (r as { beyond?: unknown }).beyond === undefined ? { noughtOverNone: true } : {}),
     /* AND WHAT BACKS IT, so two figures of one entry are said once and two of one amount are not. */
     ...backsOf(r),

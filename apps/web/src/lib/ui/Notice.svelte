@@ -1,5 +1,5 @@
 <!--
-  A STATUS LINE INSIDE A CARD OR A FORM, AS A FULL-WIDTH BANNER (ui-perfect, 3 Nov). Sam saw "Google is connected. Mail,
+  A STATUS LINE INSIDE A CARD OR A FORM, AS A FULL-WIDTH BANNER (ui-perfect, 3 Nov). The owner saw "Google is connected. Mail,
   events and contacts arrive within a few minutes." squeezed into a 100px column under two buttons, one or two words a
   line, and still there long after the card said "Connected". This is the one shape for a line like that:
 

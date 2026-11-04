@@ -42,7 +42,7 @@ export function between(a: Shape, b: Shape, t: number): string {
   return `${b.pre}${said}${b.post}`;
 }
 
-/* A STRONG EASE-OUT, cubic-bezier(0.22, 1, 0.36, 1) (leftovers9, Sam: "the animation of the numbers moving too slowly
+/* A STRONG EASE-OUT, cubic-bezier(0.22, 1, 0.36, 1) (leftovers9, the owner: "the animation of the numbers moving too slowly
    is shit, make it faster and smoother"). Over 420ms on a cubic, a figure crawled through its last digits for the second
    half of the count; now it covers about nine tenths of the way in the first third of `--form-count`, 300ms, and
    settles without a step. The curve's x is solved for each frame's share of the time (Newton's method, then halving

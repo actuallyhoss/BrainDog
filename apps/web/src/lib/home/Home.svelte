@@ -1432,7 +1432,7 @@
   const phoneOnly = $derived(isPhoneOnly(got));
 
   /* ── the skeleton (ui-perfect, 3 Nov) ──────────────────────────────────
-     Sam: "proper skeleton loading ... layouts accurate and cached, and loading on the cards themselves". While Today's
+     the owner: "proper skeleton loading ... layouts accurate and cached, and loading on the cards themselves". While Today's
      board has nothing to draw (no answer yet, or the reader's code not landed), each card it last drew stands in its own
      cell at its own height as bars (`TodaySkeleton.svelte`), and fills there when the answer lands: nothing moves. The
      shape is kept per record and per board width once the board has drawn from the record and rested. */

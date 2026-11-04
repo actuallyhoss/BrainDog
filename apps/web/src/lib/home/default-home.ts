@@ -1180,7 +1180,7 @@ function cashDrawn(b: LiveBlock): LiveBlock {
   const now = all.find((m) => m.id === CASH_NOW);
   /* A CASH NOW OVER NO ACCOUNT HOLDS NOTHING (`nothingHeld`) and is not drawn, though it reads nought. */
   if (now !== undefined && now.value !== MISSING && !now.nothingHeld) {
-    /* BESIDE A BALANCE, MONEY IN OR OUT AT NOUGHT IS LEFT OFF TOO (leftovers9, Sam 2 Nov: "remove any $0 cards"): Today
+    /* BESIDE A BALANCE, MONEY IN OR OUT AT NOUGHT IS LEFT OFF TOO (leftovers9, the owner 2 Nov: "remove any $0 cards"): Today
        read "In, 30 days $0" beside "Cash now $12,500" on a record nothing is due to come into. Money's own hero keeps
        its nought, where it answers the page; Today says what moves. */
     const moving = all.filter((m) => m.id === CASH_NOW || !nought(m.value));

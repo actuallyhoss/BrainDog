@@ -1,6 +1,6 @@
 /**
  * HOW MANY ROWS A CARD DREW LAST TIME, on this device, so its skeleton is drawn at that size while it reads again
- * (3 Nov, Sam: "proper skeleton loading, accurate layouts, cached"). Geometry only, never a word of the record: a count
+ * (3 Nov, the owner: "proper skeleton loading, accurate layouts, cached"). Geometry only, never a word of the record: a count
  * per card, in one localStorage entry. Blocked storage answers nothing, and the card reads as it always did.
  *
  * The shell lane's `shape.ts` keeps every page's card sizes the same way; these cards can move to it once it lands.

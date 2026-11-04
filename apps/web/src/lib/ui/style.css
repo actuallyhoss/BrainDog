@@ -1,6 +1,6 @@
 /* THE STYLE LAYER (3 Nov 2026): BrainDog in the ops dashboard's style, in BrainDog's own colours.
 
-   Sam: "i want the ui to look more like ops encore ui", then "i dont mean ops encore colors, i mean just the style".
+   the owner: "i want the ui to look more like the ops dashboard", then "i dont mean the ops dashboard's colors, i mean just the style".
    So nothing here writes a colour of its own: every new token is a mix of the palette `house.css` generates (the board,
    the tile, the ink, the accent fill), so a person's accent, dark and high contrast follow by themselves. What it adds
    is the STYLE: one face, capsules and circles, a soft ambient ground, solid cards with a two-layer shadow, glass only

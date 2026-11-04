@@ -1,6 +1,6 @@
 <!--
   THE PROJECTS PAGE (`projects-board.ts` works it out, `projects-board-read.ts` reads it): drawn in the slot of the page's
-  block over every project (`key: board`, the Projects template). Sam, 4 Nov: "projects page looks poor".
+  block over every project (`key: board`, the Projects template). The owner, 4 Nov: "projects page looks poor".
 
   THE PROJECTS COME FIRST. In play, Parked and Finished as one switch (Add a project, Share and "⋯" are in the head, as on
   People; `PageView.svelte` draws them). Then three sections by what a person does about them (`sectionsOf`): Needs you and Moving as

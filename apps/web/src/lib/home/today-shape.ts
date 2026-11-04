@@ -1,7 +1,7 @@
 /**
  * TODAY AS THIS DEVICE LAST LAID IT OUT, kept so its skeleton is the board it will be (ui-perfect, 3 Nov).
  *
- * Sam, 3 Nov: "I want proper skeleton loading, it feels inaccurate. Make sure the layouts are accurate and cached, and
+ * The owner, 3 Nov: "I want proper skeleton loading, it feels inaccurate. Make sure the layouts are accurate and cached, and
  * have loading on the cards themselves." Today waited in a list's bars (`ui/Waiting.svelte`), a shape no board has, and
  * then every card came in at once where the bars had been. Now, once the board has drawn from the record and rested,
  * each card's cell, height, kind and how many lines it held are kept here per record and per board width (four

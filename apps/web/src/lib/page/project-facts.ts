@@ -237,7 +237,7 @@ export function numbersOf(f: Pick<FactsIn, 'name' | 'readings' | 'today' | 'form
     every0.filter((m) => !all.includes(m)),
     f.format,
   );
-  /* A NUMBER THAT HAS ONLY EVER SAID NOUGHT DRAWS NO CELL (leftovers9, Sam 2 Nov: "remove any $0 cards"): "Monthly
+  /* A NUMBER THAT HAS ONLY EVER SAID NOUGHT DRAWS NO CELL (leftovers9, the owner 2 Nov: "remove any $0 cards"): "Monthly
      revenue $0, flat" on a project that has earned nothing yet. It still counts as a number the feed sent, so the feed's
      age and Runs on read it as before; the kernel leaves such a measure and key number off the record's own tiles too. */
   const said = all.filter((m) => m.points.some((p) => p.v !== 0));

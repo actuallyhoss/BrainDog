@@ -1,6 +1,6 @@
 <!--
   The plugin screens while they are read: the cards' own shells at the size they land at, so nothing jumps when the
-  record answers and nothing is a page-wide spinner (3 Nov, Sam: "proper skeleton loading on cards at their cached
+  record answers and nothing is a page-wide spinner (3 Nov, the owner: "proper skeleton loading on cards at their cached
   sizes"). Each card is the shared one (`ui/SkeletonCard.svelte`, finish 3 Nov), as Today's are: no shimmer, ink at
   a fixed strength; this file only lays the cards out as the plugin screens land.
 

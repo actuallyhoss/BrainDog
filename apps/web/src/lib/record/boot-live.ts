@@ -1125,7 +1125,7 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
     const last = i === events.length - 1 && events.length >= WHATS_NEW_CAP;
     /* A QUESTION ASKED IS MARKED, so the bell can leave it to Needs you (`happened` in `shell/alerts.ts`). */
     const asked = e.kind === 'suggest' ? { asked: true as const } : {};
-    /* A LINE ABOUT THE READER IS SAID TO THEM (collab pass, 2 Nov): "Sam gave you Draft the home page copy", "Sam
+    /* A LINE ABOUT THE READER IS SAID TO THEM (collab pass, 2 Nov): "Ada gave you Draft the home page copy", "Ada
        mentioned you on Draft the home page copy: ...". The record marks it (`you`); the words are here. */
     const you = (e as EventLine & { you?: 'assigned' | 'mentioned' }).you;
     const yours = you === 'assigned' && e.title ? copy.feedGaveYou(by, e.title) : you === 'mentioned' ? copy.feedMentionedYou(by, e.title, e.note ?? '') : null;

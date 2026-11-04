@@ -1,6 +1,6 @@
 /**
  * THE SHAPE A PAGE LAST HAD, kept per record, page and width, so a page that is loading draws its real cards at their
- * real sizes before a word of the record has arrived (ui-perfect, 3 Nov; Sam: "proper skeleton loading ... accurate and
+ * real sizes before a word of the record has arrived (ui-perfect, 3 Nov; the owner: "proper skeleton loading ... accurate and
  * cached ... loading on the cards themselves").
  *
  * WHAT IS KEPT IS GEOMETRY, NEVER CONTENT: for each card its id, its height, how many rows it drew, the kind of

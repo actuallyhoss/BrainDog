@@ -100,7 +100,7 @@ export const shell = {
   /* The rail's heading for the registers, hard-coded there and needed by the phone nav too. `Your things` AND IT WAS
      `Lists`: what sits under it is the person's invoices and tasks, and "list" is how the record stores them (§35). */
   lists: 'Your things',
-  /* PLUGINS, as Sam says it (3 Nov): "add-ons" was the word until then. The route is still `/packs` and `/settings/addons`. */
+  /* PLUGINS, as the owner says it (3 Nov): "add-ons" was the word until then. The route is still `/packs` and `/settings/addons`. */
   packs: 'Plugins',
   keychain: 'Keychain',
   /* THE SIDEBAR'S ONE ROW FOR KEYS, which opens the Keychain, and is called that (audit 6f AF14): the rail and the

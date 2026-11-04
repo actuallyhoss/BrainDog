@@ -1,5 +1,5 @@
 /**
- * Where an old plugin address lands now. Plugins lived under `/packs`, then under `/addons` (until 3 Nov, when Sam
+ * Where an old plugin address lands now. Plugins lived under `/packs`, then under `/addons` (until 3 Nov, when the owner
  * renamed add-ons to plugins); they live under `/plugins`, and what this record holds is Settings › Plugins. Every old
  * address keeps working: a link somebody shared, a Decide card filed before the move, a push, a bookmark.
  *
