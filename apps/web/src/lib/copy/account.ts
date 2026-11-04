@@ -683,7 +683,7 @@ export const account = {
   inviteLevelLabel: 'What they can do',
   inviteMaking: 'Making a link',
   /* Same words as `TEAMS_HELD_SAID` in the record's directory; a test holds them equal. */
-  inviteHeld: 'Inviting colleagues opens soon. Nobody else can join yet.',
+  inviteHeld: 'Inviting colleagues opens soon. Nobody else can join this BrainDog yet.',
   inviteNoMail: 'Nothing is emailed: copy the link and send it to them yourself.',
   /* COLLAB PASS (2 Nov): the roles side by side, from wherever access is given. */
   rolesCompare: 'What each role can do',
