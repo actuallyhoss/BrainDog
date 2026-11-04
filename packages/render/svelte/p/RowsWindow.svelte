@@ -42,6 +42,7 @@
     focus = $bindable(),
     selected,
     menuHost,
+    onheadmenu,
     onmenu,
     onactivate,
     onsort,
@@ -69,6 +70,7 @@
     selected?: Set<string> | undefined;
     /** A row's `data-menu-host`, so a right-click on it opens its "…" (or, by selector, another menu); absent, none. */
     menuHost?: ((key: string) => string) | undefined;
+    onheadmenu?: ((field: string, point: { x: number; y: number; height: number; back: HTMLElement | null }) => unknown) | undefined;
     /** A row's menu where it is right-clicked or held (`Table`'s). */
     onmenu?: ((key: string, point: Point) => unknown) | undefined;
     onactivate?: ((row: TableRow) => void) | undefined;
@@ -133,6 +135,14 @@
     return first?.kind === 'row' ? first.at : at.row;
   });
   const tabIndex = (r: number, c: number) => (stopRow === r && at.col === c ? 0 : -1);
+  const headHeard = (field: string) => (node: HTMLElement) => {
+    const on = (e: Event) => {
+      e.preventDefault();
+      onheadmenu?.(field, (e as CustomEvent<{ x: number; y: number; height: number; back: HTMLElement | null }>).detail);
+    };
+    node.addEventListener('menuat', on);
+    return () => node.removeEventListener('menuat', on);
+  };
   const headerSort = (column: Column) => ariaSort(column, sort, onsort !== undefined);
 
   let grid = $state<HTMLElement | undefined>(undefined);
@@ -363,7 +373,7 @@
   >
     <div class="tr th-row" role="row" aria-rowindex="1">
       {#each columns as column}
-        <span class="th" role="columnheader" aria-sort={headerSort(column)} data-align={column.align ?? 'start'}>
+        <span class="th" role="columnheader" aria-sort={headerSort(column)} data-align={column.align ?? 'start'} data-menu-host={onheadmenu && !column.hideLabel ? 'self' : undefined} {@attach headHeard(column.field)}>
           {#if column.hideLabel}
             <span class="th-name">{column.label}</span>
           {:else if onsort}

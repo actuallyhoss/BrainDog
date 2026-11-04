@@ -249,14 +249,16 @@ function aboutOf(slug: string): { list: string; seq: number } | null {
   return spoken ? { list: spoken[1]!, seq: Number(spoken[2]) } : null;
 }
 
+/** A page as the record answers it, as far as a menu reads it. */
+type PageBody = { look?: unknown; page?: string; pack?: unknown; requires?: readonly string[]; nav?: { section?: string | null } | null };
+
 /** What a page of money offers: where a statement comes in, and what its figures are counted in. */
-function moneyItems(t: Extract<Thing, { kind: 'page' }>, shell: Shell, body: { page?: { requires?: readonly string[]; page?: string; nav?: { section?: string | null } | null; pack?: unknown } } | null): ThingItem[] {
-  const p = body?.page;
-  if (!p) return [];
+function moneyItems(t: Extract<Thing, { kind: 'page' }>, shell: Shell, body: PageBody | null): ThingItem[] {
+  if (!body) return [];
   const out: ThingItem[] = [];
-  const drawsLedger = (p.requires ?? []).some((r) => /^register\.transactions$|^transactions$/u.test(r));
+  const drawsLedger = (body.requires ?? []).includes('register.transactions');
   if (drawsLedger && may(shell, 'append', 'transactions')) out.push(item('statement', 'add', thingWords.statement, G.page, { href: '/add/statement', icon: 'upload' }));
-  const money = p.nav?.section?.toLowerCase() === 'money' || /^money(-|$)/u.test(p.page ?? '');
+  const money = body.nav?.section?.toLowerCase() === 'money' || /^money(-|$)/u.test(body.page ?? '') || body.pack === 'money-core';
   const currency = shell.index?.currency ?? null;
   if (money && shell.me?.owner === true) out.push(item('currency', 'money', currency ? `Counted in ${currency}` : 'Money’s currency', G.page, { run: () => askPage(t.href, 'currency') }));
   return out;
@@ -267,7 +269,7 @@ async function pageThing(t: Extract<Thing, { kind: 'page' }>, shell: Shell, from
   const about = aboutOf(t.slug);
   const out: ThingItem[] = [];
   const read = await client().page(t.slug).catch(() => null);
-  const body = read && read.ok ? (read.value as { look?: unknown; page?: { requires?: readonly string[]; page?: string } }) : null;
+  const body = read && read.ok ? (read.value as PageBody) : null;
   if (about) {
     const decl = await declOf(about.list);
     const project = decl !== undefined && isProject(decl);
@@ -293,7 +295,7 @@ async function pageThing(t: Extract<Thing, { kind: 'page' }>, shell: Shell, from
     const on = pageBoards.of(t.slug) !== null;
     out.push(item('board', on ? 'fields' : 'board', on ? thingWords.boardOff : thingWords.boardOn, G.page, { run: () => askPage(t.href, 'board') }));
   }
-  if (body?.page?.requires?.some((r) => r.replace(/^register\./u, '') === 'people') && may(shell, 'append', 'people'))
+  if (body?.requires?.includes('register.people') && may(shell, 'append', 'people'))
     out.push(item('contacts', 'add', thingWords.contacts, G.page, { href: '/add/contacts', icon: 'upload' }));
   return out;
 }

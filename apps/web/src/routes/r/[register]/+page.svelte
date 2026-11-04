@@ -127,6 +127,7 @@
   import ListTable from './parts/ListTable.svelte';
   import ListRowMenu from './parts/ListRowMenu.svelte';
   import { answerVerbs } from '$lib/things/page-verbs.ts';
+  import { columnHeading } from '$lib/record/api.ts';
   import { thingWords as verbWords } from '$lib/things/verbs.ts';
   import ShareLazy from '$lib/sharing/ShareLazy.svelte';
   import { canShare } from '$lib/sharing/may-share.ts';
@@ -3261,6 +3262,8 @@
 
   /* This screen's own words: the head's overflow, named with the list it is about. */
   const headWords = { more: (list: string) => `More for ${list}`, whole: 'Add one with all its fields', sortRecent: 'Sort by most recent', sortAz: 'Sort A to Z' } as const;
+  let headMenu = $state.raw<{ field: string; at: { x: number; y: number; height: number } } | null>(null);
+  const colWords = { asc: 'Sort ascending', desc: 'Sort descending', hide: 'Hide this column' } as const;
   /* THE SAME VERBS, ASKED FROM A LINK TO THIS LIST (`things/menu-of.ts`): pressed on a right-click elsewhere, done here. */
   $effect(() =>
     answerVerbs({
@@ -3663,6 +3666,9 @@
         names={result.names ?? undefined}
         onmore={cursor === null ? undefined : more}
         onsort={result.entries.length < 2 ? undefined : sortBy}
+        onheadmenu={(field, point) => {
+          headMenu = { field, at: { x: point.x, y: point.y, height: point.height } };
+        }}
         onactivate={(row) => goto(at(`/r/${id}/${row.key.split('#')[1]}`))}
         {rowAt}
         {fieldOf}
@@ -3758,6 +3764,18 @@
   />
 
   <!-- One row's verbs: `⇧F10`, the context-menu key, and the ⋯ on a grid row or a card. -->
+  <!-- A COLUMN HEAD'S MENU, AT THE POINTER: how the list is sorted by it, and whether it is shown. The same verbs as pressing the
+       head and Display, and a right-click away. -->
+  <Menu label={headMenu ? columnHeading(id, { field: headMenu.field }) : headWords.more(decl.name)} open={headMenu !== null} at={headMenu?.at ?? null} onclose={() => (headMenu = null)}>
+    {#if headMenu}
+      {@const field = headMenu.field}
+      <button type="button" role="menuitem" onclick={() => setParam((p) => p.set('sort', `${field}:asc`))}><Icon name="arrowUp" size="s" /><span class="mi-name">{colWords.asc}</span></button>
+      <button type="button" role="menuitem" onclick={() => setParam((p) => p.set('sort', `${field}:desc`))}><Icon name="arrowDown" size="s" /><span class="mi-name">{colWords.desc}</span></button>
+      <hr />
+      <button type="button" role="menuitem" onclick={() => setColumns([...hidden, field])}><Icon name="eye-off" size="s" /><span class="mi-name">{colWords.hide}</span></button>
+      <button type="button" role="menuitem" onclick={() => (displayOpen = true)}><Icon name="settings" size="s" /><span class="mi-name">{copy.display}</span></button>
+    {/if}
+  </Menu>
   <ListRowMenu
     open={menuOpen}
     rect={menuAt}

@@ -183,6 +183,8 @@ const GATES = [
      flippant register in anything a stranger reads", against 91 string literals carrying
      one, most of them in refusals, which is the prose somebody meets at the moment they are stuck. */
   ['em-dash', call(join(here, 'em-dash.mjs'))],
+  /* EVERY MENU ITEM HAS A GLYPH, ONE ACTION WEARS ONE, AND A NEW "…" IS REACHED BY A RIGHT-CLICK. */
+  ['menu-items', call(join(here, 'menu-items.mjs'))],
   /* AND THE HOUSE WORDS, HELD BY A CHECK: the list in `words.json` (row, credential, register as a noun, an id
      in a sentence, the long dash) over every copy string the app ships. Beside `em-dash` because it reads the same
      copy for a wider list, and its `page` entries are the page lint's, so a page and the source are judged by one. */

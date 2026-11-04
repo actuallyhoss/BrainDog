@@ -66,6 +66,7 @@
     names,
     onmore,
     onsort,
+    onheadmenu,
     onactivate,
     rowAt,
     fieldOf,
@@ -111,6 +112,7 @@
     onmore?: (() => void) | undefined;
     /** Absent when there is nothing to order, so the headers are plain labels. */
     onsort?: ((field: string) => void) | undefined;
+    onheadmenu?: ((field: string, point: { x: number; y: number; height: number }) => unknown) | undefined;
     onactivate: (row: TableRow) => void;
     rowAt: (seq: number) => Entry | undefined;
     fieldOf: (field: string) => FieldDecl | undefined;
@@ -281,6 +283,7 @@
     bind:focus
     {onactivate}
     {onsort}
+    {onheadmenu}
     rowin={rowIn}
     rowout={rowOut}
     {settle}

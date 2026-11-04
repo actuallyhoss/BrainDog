@@ -61,6 +61,7 @@
     selected,
     menuHost,
     onmenu,
+    onheadmenu,
     chunk = TABLE_CHUNK,
     onactivate,
     onsort,
@@ -101,6 +102,8 @@
     menuHost?: ((key: string) => string) | undefined;
     /** A row's menu where it is right-clicked or held, for a row with no "…" of its own; `false` back says it has none. */
     onmenu?: ((key: string, point: Point) => unknown) | undefined;
+    /** A column head's menu, where it is right-clicked or held; absent, the head has none. */
+    onheadmenu?: ((field: string, point: Point) => unknown) | undefined;
     chunk?: number | undefined;
     onactivate?: ((row: TableRow) => void) | undefined;
     onsort?: ((field: string) => void) | undefined;
@@ -243,6 +246,15 @@
      returned `'none'` for any column that was not the sorted one, and `'none'` is the value that
      announces a column as sortable. The rule is in `../types.ts`, next to the roving caret's, and
      for the same reason: an attribute that is absent cannot be seen in a rendered tree. */
+  /* A COLUMN HEAD HEARS ITS RIGHT-CLICK AS AN ITEM WITH NO "…" DOES (the app's `menuat`). */
+  const headHeard = (field: string) => (node: HTMLElement) => {
+    const on = (e: Event) => {
+      e.preventDefault();
+      onheadmenu?.(field, (e as CustomEvent<Point>).detail);
+    };
+    node.addEventListener('menuat', on);
+    return () => node.removeEventListener('menuat', on);
+  };
   const headerSort = (column: Column) => ariaSort(column, sort, onsort !== undefined);
 
   let grid = $state<HTMLElement | undefined>(undefined);
@@ -479,7 +491,7 @@
               >{/if}
 {/snippet}
 
-{#if windowed(rows.length)}{#await import('./RowsWindow.svelte') then m}<m.default {columns} {rows} {total} {cap} {label} {sort} bind:focus {selected} {menuHost} {onmenu} {onactivate} {onsort} {onmore} {cellSnippet} {href} {scope} {icon} {home} {now} {rowActions} {act} />{/await}{:else if rowsAsCards()}
+{#if windowed(rows.length)}{#await import('./RowsWindow.svelte') then m}<m.default {columns} {rows} {total} {cap} {label} {sort} bind:focus {selected} {menuHost} {onmenu} {onheadmenu} {onactivate} {onsort} {onmore} {cellSnippet} {href} {scope} {icon} {home} {now} {rowActions} {act} />{/await}{:else if rowsAsCards()}
 <ul class="table-cards">
   {#each lines as line (line.kind === 'group' ? `\u0000${line.name}` : line.row.key)}
     {#if line.kind === 'group'}
@@ -555,6 +567,8 @@
           role="columnheader"
           aria-sort={headerSort(column)}
           data-align={column.align ?? 'start'}
+          data-menu-host={onheadmenu && !column.hideLabel ? 'self' : undefined}
+          {@attach headHeard(column.field)}
         >
           {#if headCells?.[column.field]}
             {@render headCells[column.field]!()}
