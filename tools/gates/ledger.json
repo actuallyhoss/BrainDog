@@ -477,7 +477,8 @@
       "owes": "proof",
       "file": "tools/gates/one-clock.mjs",
       "lines": [
-        { "at": 7, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." }
+        { "at": 7, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." },
+        { "at": 6, "on": "2026-11-04", "why": "The runs-true sign asks presence.ts for its silent runs, so signs.ts is allowed 1 and not 2." }
       ]
     },
     "tools/gates/orphan-tests.mjs": {
