@@ -81,8 +81,32 @@ export type Spelling = string | RegExp;
 /** A pattern source for `text` exactly, every character a regular expression gives a meaning taken literally. */
 const literally = (text: string): string => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
-/** The tokens, each a pattern source, in order with `gap` allowed, and not required, between any two: a spelling a wrap can fall inside. */
-const wrappable = (tokens: readonly string[], gap: string): RegExp => new RegExp(tokens.join(`(?:${gap})?`), 'g');
+/**
+ * The most tokens one pattern holds. A LONG KEY IS CUT INTO PIECES, each struck on its own, because a regular expression
+ * this long does not compile on a Worker: the optional gap between every two characters is one step of recursion in the
+ * engine's analysis, and a 633-byte key (845 tokens) overflowed the stack on the first answer, so every fetch the key
+ * was used for threw, and the error quoted the pattern, the key's base64 inside it, into the Worker's log and the run's.
+ * Under this length the pattern is whole, as it always was. Over it what is struck is the same text, a few words longer.
+ */
+const PATTERN_TOKENS = 128;
+
+/**
+ * The tokens, each a pattern source, in order with `gap` allowed, and not required, between any two: a spelling a wrap
+ * can fall inside. One pattern, or for a key past `PATTERN_TOKENS` several in a row (the last at least
+ * `SHORTEST_SPELLING` tokens, so no piece is short enough to strike ordinary text).
+ */
+const wrappable = (tokens: readonly string[], gap: string): RegExp[] => {
+  const cuts: (readonly string[])[] = [];
+  for (let at = 0; at < tokens.length; at += PATTERN_TOKENS) cuts.push(tokens.slice(at, at + PATTERN_TOKENS));
+  const last = cuts.at(-1);
+  if (cuts.length > 1 && last !== undefined && last.length < SHORTEST_SPELLING) {
+    cuts.pop();
+    const before = cuts.pop() ?? [];
+    const half = Math.floor(before.length / 2);
+    cuts.push(before.slice(0, half), [...before.slice(half), ...last]);
+  }
+  return cuts.map((cut) => new RegExp(cut.join(`(?:${gap})?`), 'g'));
+};
 
 /** A pattern source for hex digits in either case, `3d` or `3D`, and not a flag: the key's own letters keep their case. */
 const eitherCase = (hex: string): string => hex.replace(/[a-f]/gi, (d) => `[${d.toLowerCase()}${d.toUpperCase()}]`);
@@ -186,7 +210,7 @@ export function spellingsOf(secret: string): Spelling[] {
   const patterns: RegExp[] = [];
   /* ONE PATTERN FOR THE JSON AND THE HTML ESCAPES, since a character may be escaped or not independently of its
      neighbours: System.Text.Json escapes this `+` and not this `=`. The shortest thing it matches is the key itself. */
-  if (secret.length >= SHORTEST_SPELLING) patterns.push(new RegExp([...secret].map(escapable).join(''), 'g'));
+  if (secret.length >= SHORTEST_SPELLING) patterns.push(...wrappable([...secret].map(escapable), ''));
   for (const lead of [0, 1, 2]) {
     const padded = new Uint8Array(lead + bytes.length);
     padded.set(bytes, lead);
@@ -197,13 +221,13 @@ export function spellingsOf(secret: string): Spelling[] {
     const core = btoa(binary).slice(Math.ceil((8 * lead) / 6), Math.floor((8 * (lead + bytes.length)) / 6));
     derived.add(core);
     derived.add(core.replaceAll('+', '-').replaceAll('/', '_'));
-    if (core.length >= SHORTEST_SPELLING) patterns.push(wrappable([...core].map(literally), '\\r?\\n[ \\t]?'));
+    if (core.length >= SHORTEST_SPELLING) patterns.push(...wrappable([...core].map(literally), '\\r?\\n[ \\t]?'));
   }
   const printable = (byte: number): boolean => byte >= 0x20 && byte <= 0x7e && byte !== 0x3d;
   const qp = [...bytes].map((byte) => (printable(byte) ? literally(String.fromCharCode(byte)) : `=${eitherCase(byte.toString(16).padStart(2, '0'))}`));
   /* THE LENGTH OF THE SPELLING, not of the pattern: an `=XX` token is three characters however its hex is written. */
   const qpLength = [...bytes].reduce((n, byte) => n + (printable(byte) ? 1 : 3), 0);
-  if (qpLength >= SHORTEST_SPELLING) patterns.push(wrappable(qp, '=\\r?\\n'));
+  if (qpLength >= SHORTEST_SPELLING) patterns.push(...wrappable(qp, '=\\r?\\n'));
   /* ALL ASCII, or the key has a code unit whose two bytes do not read back as one character and a NUL. */
   if ([...secret].every((c) => c.charCodeAt(0) < 0x80)) {
     derived.add([...secret].map((c) => `${c}\u0000`).join(''));
@@ -857,8 +881,15 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
        TEXTS THE CALLER NAMED (`scrub`) FROM THE START: a key used as the address was opened before this was asked, and
        goes out with no grant, so nothing here would otherwise know to strike it from the answer. */
     const secret: Spelling[] = (request.scrub ?? []).filter((t) => typeof t === 'string' && t.length >= SHORTEST_SPELLING).flatMap((t) => spellingsOf(t));
-    const scrub = (text: string): string =>
-      secret.reduce<string>((out, spelling) => (typeof spelling === 'string' ? out.split(spelling).join(REDACTED) : out.replace(spelling, REDACTED)), text);
+    /* A PATTERN THAT WILL NOT RUN STRIKES THE WHOLE TEXT. Its error quotes the pattern, which is the key, so it never
+       leaves here, and a text that could not be scrubbed is not handed back. */
+    const scrub = (text: string): string => {
+      try {
+        return secret.reduce<string>((out, spelling) => (typeof spelling === 'string' ? out.split(spelling).join(REDACTED) : out.replace(spelling, REDACTED)), text);
+      } catch {
+        return REDACTED;
+      }
+    };
     const refuse = (code: RefusedCode, fix: string): ActionAnswer => ({
       refused: { code, fix: scrub(fix) },
       bytes,

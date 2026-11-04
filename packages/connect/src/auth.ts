@@ -551,7 +551,11 @@ async function authorised(
   if (auth.kind === 'none') return out();
 
   if (auth.kind === 'bearer') {
-    headers.authorization = `Bearer ${field(grant, 'token', 'bearer')}`;
+    const token = field(grant, 'token', 'bearer');
+    /* A LINE BREAK IS NEVER A TOKEN, and no header can carry one: a key holding a whole notes file is said to be wrong
+       here, as a key that does not hold what its kind sends, and not by a throw further on that reads as the network. */
+    if (/[\r\n]/u.test(token.trim())) throw new PullError('PULL_AUTH_REJECTED', 'fetch.auth.bearer', { wanted: 'a grant holding one line' });
+    headers.authorization = `Bearer ${token.trim()}`;
     return out();
   }
 

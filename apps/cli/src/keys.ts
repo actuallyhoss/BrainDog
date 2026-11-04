@@ -551,6 +551,22 @@ const USAGE_HEADERS = 'braindog keys headers takes one label or credentials#n, -
 const USAGE_HELPER = 'braindog keys helper takes one label or credentials#n, --keychain and --host, and nothing else.';
 
 /** `braindog keys list|put|scan|exec|headers|helper`, and the exit code: for `exec`, the command's own once it has run. */
+/**
+ * How many lines a value has, when it holds several and is not one of the two shapes that are meant to: a private key's
+ * armour, or a JSON service account. `null` for anything else.
+ *
+ * A WHOLE NOTES FILE WENT IN AS A KEY. The Sketchpad metrics key held 15 lines of explanation with the token on the last,
+ * sealed with no word when the old PC's secrets were carried over. Every request it signed was wrong, and the first
+ * answer threw while striking 633 bytes of it from the reply, so the script stopped with an error that was not in its
+ * code.
+ */
+export function manyLines(value: string): number | null {
+  const lines = value.split(/\r?\n/u).filter((line) => line.trim() !== '').length;
+  if (lines < 2) return null;
+  const text = value.trim();
+  return text.startsWith('{') || /^-----BEGIN [A-Z ]+-----/u.test(text) ? null : lines;
+}
+
 export async function keys(args: string[], io: KeysIo): Promise<number> {
   /* `keys run` IS `keys exec`, as the top-level `run` is: the help named the pair, and the verb was refused. */
   const [said, ...all] = args;
@@ -660,6 +676,11 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
     value = unbom(read).replace(/\r?\n$/, '') as Plaintext;
     if (!value) {
       io.say(typed ? 'Nothing was typed, so nothing was deposited.' : 'Standard input was empty, so nothing was deposited.');
+      return REFUSED;
+    }
+    const lines = manyLines(value);
+    if (lines !== null) {
+      io.say(`This value has ${String(lines)} lines, and a key is one line, so nothing was deposited. Pipe in the key alone, not the file it is written in.`);
       return REFUSED;
     }
   }

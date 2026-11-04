@@ -567,25 +567,32 @@ export class ScriptRuns {
 
     turn.fetches += 1;
     const method = call.method.toUpperCase();
-    const sent = await turn.send({
-      job: `${turn.job}:${turn.fetches}`,
-      /* `call` FOR ANYTHING BUT A READ, so `idempotentCalls` stamps a POST with a key that is the same on a retry of
-         this job and different for the next fetch in it. */
-      channel: method === 'GET' ? 'pull' : 'call',
-      ingest: decl.id,
-      /* ANY METHOD, AS WRITTEN, as `@braindog/host/script` sends it on the self-host. `ActionRequest` says GET or POST
-         because that is all a declaration can say, and `sendAction` sends whatever it is given. This was
-         `method === 'GET' ? 'GET' : 'POST'`, which sent a script's DELETE to a provider as a POST. */
-      method: method as ActionRequest['method'],
-      url: url.href,
-      origin: url.origin,
-      headers: call.headers,
-      ...(call.body === null ? {} : { body: call.body }),
-      grant,
-      ...(scrub.length === 0 ? {} : { scrub }),
-      timeoutMs: TIMEOUT_MS,
-      maxBytes: MAX_BYTES,
-    });
+    /* A THROW HERE IS THE HOST'S, AND ITS WORDS ARE NOT REPEATED: it may quote what it was scrubbing, and a throw out of this
+       entrypoint went into the Worker's log and the run's. The script hears that the request came to nothing, which it may catch. */
+    let sent: Awaited<ReturnType<Turn['send']>>;
+    try {
+      sent = await turn.send({
+        job: `${turn.job}:${turn.fetches}`,
+        /* `call` FOR ANYTHING BUT A READ, so `idempotentCalls` stamps a POST with a key that is the same on a retry of
+           this job and different for the next fetch in it. */
+        channel: method === 'GET' ? 'pull' : 'call',
+        ingest: decl.id,
+        /* ANY METHOD, AS WRITTEN, as `@braindog/host/script` sends it on the self-host. `ActionRequest` says GET or POST
+           because that is all a declaration can say, and `sendAction` sends whatever it is given. This was
+           `method === 'GET' ? 'GET' : 'POST'`, which sent a script's DELETE to a provider as a POST. */
+        method: method as ActionRequest['method'],
+        url: url.href,
+        origin: url.origin,
+        headers: call.headers,
+        ...(call.body === null ? {} : { body: call.body }),
+        grant,
+        ...(scrub.length === 0 ? {} : { scrub }),
+        timeoutMs: TIMEOUT_MS,
+        maxBytes: MAX_BYTES,
+      });
+    } catch {
+      return { error: `This host could not finish the request to ${url.origin}, so nothing came back.` };
+    }
     if ('refused' in sent) return { error: sent.refused.fix };
     if ('held' in sent && sent.held) return { error: sent.held.say };
     turn.bytes += utf8.encode(sent.body).length;
