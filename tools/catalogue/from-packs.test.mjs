@@ -154,7 +154,7 @@ for (const { folder, id, words } of FRONTS) {
     assert.ok(u.ok, u.ok ? '' : u.refusal.fix);
     const pack = JSON.parse(readFileSync(join(ROOT, 'packs', folder, `${folder}.pack.json`), 'utf8'));
     assert.equal(u.value.usecase, id);
-    assert.equal(u.value.version, '1.0.0');
+    assert.equal(u.value.version, '1.1.0');
     assert.equal(u.value.title, pack.title);
     assert.ok(u.value.summary.length > 0 && !/[\r\n]/u.test(u.value.summary), 'one line of summary');
     assert.equal(u.value.modules.at(-1), pack.pack, 'it stands on its add-on last');

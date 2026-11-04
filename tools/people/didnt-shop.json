@@ -39,7 +39,7 @@
     },
     "heard": {
       "usecase": "none",
-      "title": "Hana",
+      "title": "Hana's BrainDog",
       "lit": ["Hana", "tasks"],
       "places": ["Today", "People", "Work"]
     },

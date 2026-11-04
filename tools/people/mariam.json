@@ -55,7 +55,7 @@
     "question": { "about": "arrivesBy", "choices": 3 },
     "keep": { "lists": ["orders", "products", "people", "transactions", "obligations"], "currency": "EGP" },
     "tell": { "lists": ["people", "orders", "obligations"] },
-    "today": { "first": "source", "lists": ["orders", "people"], "money": "Paid EGP 900" },
+    "today": { "first": "source", "lists": ["orders", "people"], "money": "Came in EGP 900" },
     "offer": {
       "id": "week:orders",
       "before": 13,

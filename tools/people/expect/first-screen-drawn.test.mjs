@@ -108,7 +108,7 @@ test('Mariam: the sidebar and Today are drawn at both moments, every check that 
   /* Told one real thing, Today is hers: its line, and what the rail then holds. */
   const told = todays[1];
   assert.ok(told.text.some((t) => t.includes('Nadia')), told.text.join(' / '));
-  assert.ok(told.roles.some((r) => r.landmark === 'navigation' && r.role === 'link' && r.name === 'Orders'));
+  assert.ok(told.roles.some((r) => r.landmark === 'navigation' && r.role === 'link' && r.name === 'Orders 1'));
   assert.equal(firstScreen['rail-has-rows'](drawn[3]).pass, true);
   const { lines, code } = report(screens, MARIAM);
   assert.match(lines.at(-1), /^62 checks: \d+ green, \d+ red, 0 not seen, \d+ that do not apply\. Exit code [01]\.$/u, lines.join('\n'));

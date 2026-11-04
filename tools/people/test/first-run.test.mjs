@@ -145,15 +145,15 @@ test('5. TELL IT ONE REAL THING: green on three entries added as one and one Und
   assert.match(expect.tell({ ...good, refused: 'CAPTURE_REFUSED: no' }, MARIAM).saw, /the press was refused: CAPTURE_REFUSED/u);
 });
 
-test('6. HER FIRST TODAY: green on the card gone and Paid EGP 900; red on the tile missing, in minor units, or the card still up', () => {
+test('6. HER FIRST TODAY: green on the card gone and Came in EGP 900; red on the tile missing, in minor units, or the card still up', () => {
   const source = [{ kind: 'source', source: { name: "Your bank's texts" } }];
-  const today = { ok: true, tellShown: false, steps: source, hiddenSteps: [], lists: ['orders', 'people'], offers: [], money: [['Paid', 'EGP 900.00']], line: 'EGP 900 came in this week.' };
+  const today = { ok: true, tellShown: false, steps: source, hiddenSteps: [], lists: ['orders', 'people'], offers: [], money: [['Came in', 'EGP 900.00']], line: 'EGP 900 came in this week.' };
   const green = expect.today(today, MARIAM);
   assert.equal(green.pass, true, green.saw);
-  assert.match(green.saw, /the money tile reads "Paid EGP 900"/u);
+  assert.match(green.saw, /the money tile reads "Came in EGP 900"/u);
 
-  assert.match(expect.today({ ...today, money: null }, MARIAM).saw, /no Money this week tile, so no "Paid EGP 900"/u);
-  assert.match(expect.today({ ...today, money: [['Paid', 'EGP 90000']] }, MARIAM).saw, /the money tile reads "Paid EGP 90000", not "Paid EGP 900"/u);
+  assert.match(expect.today({ ...today, money: null }, MARIAM).saw, /no Money this week tile, so no "Came in EGP 900"/u);
+  assert.match(expect.today({ ...today, money: [['Came in', 'EGP 90000']] }, MARIAM).saw, /the money tile reads "Came in EGP 90000", not "Came in EGP 900"/u);
   /* THE LEDGER'S MONEY IN, which never sees a paid item: the tile drawn over nothing. */
   assert.match(expect.today({ ...today, money: [] }, MARIAM).saw, /the money tile reads nothing/u);
 

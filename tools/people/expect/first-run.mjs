@@ -229,7 +229,7 @@ export const expect = {
     if (seen.hiddenSteps.length > 0) missing.push(`Hide left ${seen.hiddenSteps.length} next steps up`);
     for (const id of want.lists) if (!seen.lists.includes(id)) missing.push(`no ${id} in boot`);
     if (seen.offers.length > 0) missing.push(`offered "${seen.offers[0].title}" on her first day`);
-    /* THE MONEY TILE AS HOME DRAWS IT: "Paid EGP 900", each cell its label and its figure, a whole amount said whole. */
+    /* THE MONEY TILE AS HOME DRAWS IT: "Came in EGP 900", each cell its label and its figure, a whole amount said whole. */
     const cells = (seen.money ?? []).map(([label, value]) => `${label} ${String(value).replace(/\.0+$/u, '')}`);
     if (want.money !== undefined && !cells.includes(want.money)) missing.push(seen.money === null ? `no ${MONEY_WEEK} tile, so no "${want.money}"` : `the money tile reads ${cells.length === 0 ? 'nothing' : `"${cells.join('", "')}"`}, not "${want.money}"`);
     const said = seen.line ? `; Today says "${seen.line}"` : '';

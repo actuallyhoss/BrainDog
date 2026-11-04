@@ -164,7 +164,7 @@ test('the judge says a stall alone', () => {
 /* A SHOP SHE SAID SHE NEVER RAN IS NOT BUILT, AND HER RECORD IS NOT NAMED FOR IT. The walk sends
    the page's own reading of her sentence as the record's name (`titleSent`), so a "didn't" read as a yes opens
    "Hana's Shop" here and this goes red. */
-test('HANA KEEPS IT: "I didn\'t run a shop" opens "Hana", never a shop, and the sentence is kept nowhere', async () => {
+test('HANA KEEPS IT: "I didn\'t run a shop" opens "Hana\'s BrainDog", never a shop, and the sentence is kept nowhere', async () => {
   assert.deepEqual(checkPerson(HANA), []);
   assert.equal(HANA.expects, 'none');
   assert.match(HANA.said, /didn't run a shop/u);

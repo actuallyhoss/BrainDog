@@ -201,6 +201,7 @@ test('no line a check says holds a long dash', () => {
 /* ── the web's own sidebar and tab bar, rendered ──────────────────────────────────────────────────────── */
 
 const PLACE = (key, label, href) => ({ key, href, label, icon: 'today', near: [href] });
+const MENU = '/?menu';
 const PLACES = [PLACE('today', 'Today', '/'), PLACE('decide', 'Decide', '/decide'), PLACE('people', 'People', '/p/people'), PLACE('money', 'Money', '/p/money')];
 const DATA = { me: { owner: true, person: 'p1', prefs: {} }, names: { p1: 'Mariam Said' }, pages: [], lists: [] };
 
@@ -226,9 +227,9 @@ test('the sidebar as the web draws it says where each row goes, and its rows are
 });
 
 test('the phone\'s tab bar is a navigation whose tabs say where they go', async () => {
-  const html = await markupOf('lib/shell/TabBar.svelte', { tabs: PLACES, more: false }, { data: DATA, path: '/' });
+  const html = await markupOf('lib/shell/TabBar.svelte', { tabs: PLACES, menu: MENU }, { data: DATA, path: '/' });
   const snap = { path: '/', width: 390, ...readMarkup(html), counts: {}, behind: { '/p/money': EMPTY }, owner: true };
-  assert.deepEqual(snap.roles.filter((r) => r.role === 'link').map((r) => [r.name, r.href, r.landmark]), PLACES.map((p) => [p.label, `${p.href}`, 'navigation']));
+  assert.deepEqual(snap.roles.filter((r) => r.role === 'link').map((r) => [r.name, r.href, r.landmark]), [...PLACES.map((p) => [p.label, `${p.href}`, 'navigation']), ['Menu', MENU, 'navigation']]);
   /* NO MORE TAB since frame B: the rest is under the face at the top of each screen. */
   assert.ok(!snap.roles.some((r) => r.role === 'button' && r.name === 'More' && r.landmark === 'navigation'));
   assert.match(firstScreen['rail-has-rows'](snap).saw, /^Money \(.+\) is in the phone's places with nothing to show$/u);
