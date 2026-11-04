@@ -216,6 +216,9 @@ export const shareDraws = (source: unknown): boolean =>
  */
 const NEVER_READ: ReadonlySet<string> = new Set(['*', 'session']);
 
+/** Who a link reads as, for the sight module: nobody, so a row its maker kept private is not shown (`viewerOfRead`). */
+const LINK = { principal: { kind: 'system', id: 'share' }, outbound: true } as const;
+
 /**
  * The field types whose values a shared row keeps. Absent are `ref` (another row's id), `file` (a stored file the
  * stranger cannot fetch), `document` (a second level of its own), `json`, `secret`, and `url`, which `valueShown` keeps
@@ -1572,8 +1575,7 @@ export function methods(deps: RecordDeps) {
     const row = kernel.get(here.row);
     if (decl === undefined || row === null || row.deleted_at !== null) return undefined;
     const personal = new Set(kernel.personalLists());
-    const hidden = (id: string): boolean => sql.one('SELECT 1 AS x FROM entry_private WHERE entry_id = ? LIMIT 1', id) !== undefined;
-    if (personal.has(register) || NEVER_READ.has(register) || hidden(row.id) || decl.owner_only === true || (!money && moneyList(decl))) return undefined;
+    if (personal.has(register) || NEVER_READ.has(register) || !deps.sight.admits(LINK, row) || decl.owner_only === true || (!money && moneyList(decl))) return undefined;
     const masked = (t: string): string => (money ? t : maskMoneyText(t));
     const words = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? masked(wordsShown(v.trim())).replace(SPOKEN_ID, '').trim() || null : null);
     const enumWord = (list: RegisterDecl, field: string | undefined, v: unknown): string => {
@@ -1603,7 +1605,7 @@ export function methods(deps: RecordDeps) {
       const finishedOn = list.fields.find((f) => f.type === 'day' && /done|finished|closed/u.test(f.id))?.id;
       const finished = new Set(list.done ?? []);
       const state = list.state;
-      const rows = got.value.rows.filter((r) => r.deleted_at === null && !hidden(r.id));
+      const rows = deps.sight.rows(LINK, got.value.rows.filter((r) => r.deleted_at === null));
       const shownTask = (r: Entry): SharedTask | null => {
         const title = titleOfRow(list, r);
         if (title === null) return null;
@@ -1709,7 +1711,7 @@ export function methods(deps: RecordDeps) {
       const row = kernel.get(id);
       if (row === null || row.deleted_at !== null || personal.has(row.register) || NEVER_READ.has(row.register)) return undefined;
       if (!money && moneyList(lists.get(row.register))) return undefined;
-      if (sql.one('SELECT 1 AS x FROM entry_private WHERE entry_id = ? LIMIT 1', row.id) !== undefined) return undefined;
+      if (!deps.sight.admits(LINK, row)) return undefined;
       return kernel.titleOfRow(row.id) ?? undefined;
     };
     const shown = shownPage(out.value, expires_at, lists, { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money, moneyFigure, refSaid });
