@@ -32,7 +32,7 @@ export { SEEN_CAME, SEEN_PAGES, type SeenCame, type SeenPage };
  * Directory keeps. `test/seen.test.ts` holds these to the site's own sections both ways, so a section the site gains or
  * loses fails that test by its path, and holds each one to the Directory's `SEEN_PAGES`.
  */
-export const SITE_PAGES = ['/', '/slash', '/agents', '/packs', '/pricing', '/for', '/docs', '/changelog', '/support', '/security', '/download', '/legal'] as const;
+export const SITE_PAGES = ['/', '/slash', '/agents', '/plugins', '/pricing', '/for', '/docs', '/changelog', '/support', '/security', '/download', '/legal'] as const;
 
 /* EACH NAMED SOURCE BY ITS HOSTS, matched as the host itself or any name under it: `www.google.com` is a search, and so
    is `google.co.uk`, which is why Google is a pattern and the rest are names. AN ASSISTANT THAT ANSWERS WITH A LINK IS A

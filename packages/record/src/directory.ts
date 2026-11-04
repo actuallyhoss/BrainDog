@@ -1380,7 +1380,8 @@ export const APPLY_DECIDED_DAYS = 90;
  * The public site's pages a visit is counted against, each the first part of its path (`home` for `/`). The Worker
  * maps a path to one of these and the Directory checks it again, so a name sent by hand is never kept.
  */
-export const SEEN_PAGES = ['home', 'pricing', 'agents', 'build', 'changelog', 'docs', 'download', 'for', 'legal', 'packs', 'security', 'slash', 'support'] as const;
+/* `packs` STAYS for the days already counted under it, and `plugins` is the store's address since 1ca3a5f94. */
+export const SEEN_PAGES = ['home', 'pricing', 'agents', 'build', 'changelog', 'docs', 'download', 'for', 'legal', 'packs', 'plugins', 'security', 'slash', 'support'] as const;
 export type SeenPage = (typeof SEEN_PAGES)[number];
 
 /**
