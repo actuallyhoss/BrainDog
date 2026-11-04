@@ -25,7 +25,7 @@ import { RECHECK_BOUND, causeFault, moot } from './cause.ts';
 import { openFaults } from './fault.ts';
 import { EXPIRE_MS, PASSED_HEAD, passedSql } from './handoff.ts';
 import { ABANDON_MS, unheardRuns } from './presence.ts';
-import { SWEPT_NOTE, SWEPT_STEP_NOTE } from './schedule.ts';
+import { SWEPT_NO_SESSION_NOTE, SWEPT_NOTE, SWEPT_STEP_NOTE } from './schedule.ts';
 import { SESSION } from './session.ts';
 /* `tidy-keys.ts` IMPORTS ONLY THIS FILE'S TYPES, so the finder it lends adds no load ring. */
 import { keysUnopened } from './tidy-keys.ts';
@@ -131,9 +131,10 @@ const runsStopped: Finder = {
     const stale = unheardRuns(sql, nowMs, ABANDON_MS, ['active', 'idle']);
     const did = count(
       sql,
-      "SELECT COUNT(*) AS n FROM event WHERE kind = 'state' AND actor = 'system' AND note IN (?, ?) AND ts > ? AND ts <= ?",
+      "SELECT COUNT(*) AS n FROM event WHERE kind = 'state' AND actor = 'system' AND note IN (?, ?, ?) AND ts > ? AND ts <= ?",
       SWEPT_NOTE,
       SWEPT_STEP_NOTE,
+      SWEPT_NO_SESSION_NOTE,
       iso(nowMs - DID_MS),
       iso(nowMs),
     );

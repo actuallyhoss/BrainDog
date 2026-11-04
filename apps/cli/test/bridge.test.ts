@@ -564,7 +564,7 @@ test('A RUN THE START HOOK ATTACHED IS LEFT TO THE END HOOK when it comes, and e
     return said.value.spoken;
   };
 
-  /* THE END HOOK CAME: it wrote `seen` before the grace ran out, so the bridge sends no end of its own. */
+  /* THE END HOOK CAME AND ITS END LANDED: `seen` and `ended` before the wait ran out, so the bridge sends no end of its own. */
   const one = await attach('cc-hooked');
   const w = watched();
   const b = bridge(target, s.dir, w.fetch, io, { 'x-braindog-client': 'cc-hooked', 'x-braindog-session': one });
@@ -572,7 +572,7 @@ test('A RUN THE START HOOK ATTACHED IS LEFT TO THE END HOOK when it comes, and e
   await b.ask('tools/call', { name: 'list', arguments: { register: 'things' } });
   const file = sessionPath(env, cwd, 'cc-hooked');
   const ending = b.end();
-  setTimeout(() => writeSession(file, { ...readSession(file)!, seen: new Date().toISOString() }), 100);
+  setTimeout(() => writeSession(file, { ...readSession(file)!, seen: new Date().toISOString(), ended: new Date().toISOString() }), 100);
   await ending;
   assert.equal(ends(w).length, 0, 'the bridge ended the run before the end hook could');
 

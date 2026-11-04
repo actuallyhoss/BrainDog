@@ -121,6 +121,8 @@ export type BridgeIo = {
   env?: Record<string, string | undefined> | undefined;
   /** The folder the app started this server in, where its session files and its repository are: this process's own. */
   cwd?: string | undefined;
+  /** How long the end waits for that hook's end to land (`HOOK_ENDED_MS`). */
+  hookEndedMs?: number;
   /** How long the end waits for Claude Code's end hook to take the run (`END_GRACE_MS`). */
   endGraceMs?: number | undefined;
   /** How often the bridge pulses (`PULSE_MS`), and how often while the run is stopped or paused (`PULSE_HELD_MS`). */
@@ -173,6 +175,9 @@ const REPORTED_MOST = 200;
 /** How long the bridge waits, once its input closed, for the session's end hook to say it is ending the run itself. */
 export const END_GRACE_MS = 1_500;
 
+/** How long after its input closed the bridge waits for that hook's `end` to land, before it sends one itself. */
+export const HOOK_ENDED_MS = 2_000;
+
 /**
  * The most the end itself may take. An app gives a server two seconds between closing its input and SIGTERM, and two
  * more before SIGKILL; the command takes SIGTERM as the end of input (`main.ts`), so the grace and the end fit in four.
@@ -180,7 +185,7 @@ export const END_GRACE_MS = 1_500;
 export const END_MS = 2_000;
 
 /** How long after a stop signal the command leaves whatever it is doing: the grace, the end and a little over. */
-export const SIGNAL_EXIT_MS = END_GRACE_MS + END_MS + 500;
+export const SIGNAL_EXIT_MS = HOOK_ENDED_MS + END_MS + 500;
 
 /**
  * The session headers for a request, given what the app said it is in its hello: `sessionHeaders` in `position.ts`,
@@ -918,7 +923,12 @@ export const attaches = (method: string | undefined, headers: Record<string, str
  * AFTER THE END HOOK, NEVER BEFORE IT. A run the start hook attached has an end hook too, which meets the session's
  * people and sends its command lines before it ends the run; a write after an end brings the run back and starts a new
  * stretch, which would drop the step it left. So the bridge waits up to `END_GRACE_MS` for that hook to write `seen` on
- * the session's file, and leaves the end to it when it does. Nothing here throws or prints on the protocol.
+ * the session's file, and then until `HOOK_ENDED_MS` for it to say the end landed (`ended`). Nothing here throws or prints
+ * on the protocol.
+ *
+ * AND ONLY WHEN IT LANDED DOES THE BRIDGE LEAVE IT. Closing a window kills the hook too, right after `seen` and before its
+ * `end` is sent, so the bridge saw `seen`, left the end to a hook that was gone, and the sweep wrote the run off twelve hours
+ * later: his runs S963 and S971 carry `seen` and no end. `end` is idempotent, so sending it twice changes nothing.
  */
 async function endOnClose(io: BridgeIo, target: Target, ran: Record<string, string>, now: () => Promise<Record<string, string>>, go: typeof globalThis.fetch): Promise<void> {
   const say = io.say ?? (() => undefined);
@@ -928,7 +938,11 @@ async function endOnClose(io: BridgeIo, target: Target, ran: Record<string, stri
     const env = io.env ?? process.env;
     const cwd = io.cwd ?? process.cwd();
     const spoken = headers['x-braindog-session'];
-    if (spoken !== undefined && (await hookEnding(env, cwd, headers['x-braindog-client'] ?? null, spoken, io.endGraceMs ?? END_GRACE_MS))) return;
+    const closed = Date.now();
+    if (spoken !== undefined && (await hookEnding(env, cwd, headers['x-braindog-client'] ?? null, spoken, io.endGraceMs ?? END_GRACE_MS))) {
+      const left = (io.hookEndedMs ?? HOOK_ENDED_MS) - (Date.now() - closed);
+      if (await hookEnded(env, cwd, headers['x-braindog-client'] ?? null, spoken, Math.max(0, left))) return;
+    }
     const at = await positionOf(cwd);
     const body = { ...(at.branch === null ? {} : { branch: at.branch }), ...(at.head === null ? {} : { head: at.head }) };
     const sent = new Headers({ 'content-type': 'application/json', accept: 'application/json', 'x-braindog-cli': cliBuild() });
@@ -939,6 +953,20 @@ async function endOnClose(io: BridgeIo, target: Target, ran: Record<string, stri
     if (said?.ok === true) say('The app closed this session, so its run in BrainDog was ended.');
   } catch {
     /* A host away or slow at the close leaves the run to the record's sweep, as before. The error could quote anything. */
+  }
+}
+
+/** Whether the end hook says its `end` landed, within `ms`: `ended` on a file that names the run, since its start hook wrote it. */
+export async function hookEnded(env: Record<string, string | undefined>, cwd: string, client: string | null, spoken: string, ms: number): Promise<boolean> {
+  const files = [...(client === null ? [] : [sessionPath(env, cwd, client)]), sessionPath(env, cwd)];
+  const until = Date.now() + ms;
+  for (;;) {
+    for (const file of files) {
+      const held = readSession(file);
+      if (held !== null && held.spoken === spoken && held.ended !== undefined && Date.parse(held.ended) >= (Date.parse(held.at) || 0)) return true;
+    }
+    if (Date.now() >= until) return false;
+    await new Promise((done) => setTimeout(done, 100));
   }
 }
 

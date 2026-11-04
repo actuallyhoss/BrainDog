@@ -1125,6 +1125,9 @@ async function hook(args: string[]): Promise<void> {
     } catch {
       /* No stdin at all is an empty event. */
     }
+    /* THE END HOOK OUTLIVES THE WINDOW. Closing a terminal sends SIGHUP to it as well, and it died having written `seen` and
+       not sent `end`. It leaves by itself at `HOOK_MS`, set above, whatever happens. */
+    if (which === 'end') for (const signal of ['SIGHUP', 'SIGTERM', 'SIGINT'] as const) process.on(signal, () => undefined);
     const io = { env: process.env, stdin, cwd: process.cwd(), write };
     await (which === 'start' ? hookStart(io) : which === 'beat' ? hookBeat(io) : hookEnd(io));
   } catch {

@@ -311,7 +311,7 @@ function run(sql: NodeSql, state: string, heardAgo: number): void {
     "INSERT INTO entry (id, register, seq, fields, state, created_at, updated_at) VALUES (?, 'session', ?, ?, ?, ?, ?)",
     `run${runs}`,
     1000 + runs,
-    JSON.stringify({ state, last_seen: heard, client: 'Claude Code', doing: 'work' }),
+    JSON.stringify({ state, last_seen: heard, client: 'Claude Code', client_id: `window-${String(runs)}`, doing: 'work' }),
     state,
     heard,
     heard,

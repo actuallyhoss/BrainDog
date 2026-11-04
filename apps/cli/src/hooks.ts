@@ -86,6 +86,8 @@ export type SessionFile = {
   head_at_start: string | null;
   at: string;
   seen?: string;
+  /** When the end hook's `end` landed: `seen` says it started, and a window closed under it never gets this far. */
+  ended?: string;
   pid?: string;
   cwd?: string;
   repo?: string;
@@ -140,6 +142,7 @@ export function readSession(file: string): SessionFile | null {
     head_at_start: typeof x.head_at_start === 'string' && SHA.test(x.head_at_start) ? x.head_at_start : null,
     at: typeof x.at === 'string' ? x.at : '',
     ...(instant(x.seen) ? { seen: x.seen } : {}),
+    ...(instant(x.ended) ? { ended: x.ended } : {}),
     ...(typeof x.pid === 'string' && PID.test(x.pid) ? { pid: x.pid } : {}),
     ...(typeof x.cwd === 'string' && PRINTABLE.test(x.cwd) ? { cwd: x.cwd } : {}),
     ...(typeof x.repo === 'string' && PRINTABLE.test(x.repo) ? { repo: x.repo } : {}),
@@ -1009,6 +1012,15 @@ export async function hookEnd(io: Io): Promise<void> {
   const where = { ...(at.branch === null ? {} : { branch: at.branch }), ...(at.head === null ? {} : { head: at.head }) };
   const ended = await client.call('end', where);
   if (refused(ended) && OLDER_HOST.has(ended.refusal.code)) await client.handoff({ state: 'idle', ...where });
+  /* THE END LANDED: said on the session's file, for the bridge, which sends it itself when this is not there in time. */
+  if (ended.ok) {
+    try {
+      const now = readSession(file);
+      if (now !== null && now.spoken === held.spoken) writeSession(file, { ...now, ended: new Date().toISOString() });
+    } catch {
+      /* A folder that cannot be written costs one more `end`, which changes nothing. */
+    }
+  }
   await marked;
 }
 

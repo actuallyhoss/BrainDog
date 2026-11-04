@@ -587,7 +587,7 @@ test('THE END HOOK ENDS THE RUN THE SESSION FILE NAMES, sending no state, and pr
   /* When it ended, so a resume within the hour knows the card is still in the conversation. The rest is as it was. */
   const ended = readSession(sessionPath(env, cwd));
   assert.ok(Date.parse(ended?.seen ?? '') >= before - 1_000, JSON.stringify(ended));
-  assert.deepEqual({ ...ended, seen: undefined }, { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: '2026-09-15T00:00:00Z', seen: undefined });
+  assert.deepEqual({ ...ended, seen: undefined, ended: undefined }, { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: '2026-09-15T00:00:00Z', seen: undefined, ended: undefined });
 
   /* Another session in the same folder wrote the file since: its run is not this one's to end. */
   const other = await run(['hook', 'end'], env, JSON.stringify({ session_id: 'claude-run-2', cwd, reason: 'other' }));

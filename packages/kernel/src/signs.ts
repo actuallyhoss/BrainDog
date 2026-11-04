@@ -24,6 +24,7 @@
  * be told apart from one judged by today's.
  */
 
+import { SESSIONLESS_SQL } from './presence.ts';
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { jsonPath, unprivate } from '@braindog/where';
@@ -655,15 +656,19 @@ function readRuns(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined): 
   /* A HANDOFF THE SWEEP WROTE IS A RUN THAT WENT SILENT, not one that ended: `sweepSessions` hands off a run that crashed
      after leaving a step, and its `state` line is by `system`. A run that handed off itself signs its own line. Read in
      the same query, the newest `state` line of each handoff, so a week of runs is one read and not one a run. */
-  const runs = sql.all<{ state: string | null; swept: number; seen: string | null }>(
+  const heard = sql.all<{ state: string | null; swept: number; seen: string | null; none: number }>(
     `SELECT state, (state = 'handoff' AND coalesce((SELECT e.actor FROM event e WHERE e.target = 'entry:' || entry.id AND e.kind = 'state'
-       ORDER BY e.ts DESC, e.rowid DESC LIMIT 1), '') = 'system') AS swept, ${HEARD_HERE} AS seen
+       ORDER BY e.ts DESC, e.rowid DESC LIMIT 1), '') = 'system') AS swept, ${HEARD_HERE} AS seen, ${SESSIONLESS_SQL} AS none
      FROM entry WHERE register = 'session' AND deleted_at IS NULL AND ${HEARD_HERE} >= ?`,
     since,
   );
+  /* A RUN WITH NO SESSION IS NOT JUDGED (`sessionless`): nothing could say it ended, so its end was not lost. A real
+     window always names its session, so this leaves every real lost run counted. Said in the facts, never dropped. */
+  const runs = heard.filter((r) => Number(r.none) !== 1);
+  const unjudged = heard.length - runs.length;
   /* BY THE CLOCK ALONE (`SignLasts`): a run of the week leaves it, and an open run goes silent twelve hours after it was
      last heard from. */
-  for (const r of runs) lasts(crossesAt(r.seen, RUNS_WINDOW_DAYS * DAY));
+  for (const r of heard) lasts(crossesAt(r.seen, RUNS_WINDOW_DAYS * DAY));
   lasts(
     crossesAt(
       sql.one<{ heard: string | null }>(
@@ -686,6 +691,7 @@ function readRuns(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined): 
   const gone = abandoned + swept;
   const lost = ended.length >= RUNS_ENDED_LEAST && gone * RUNS_ABANDONED_ONE_IN > ended.length;
   const facts = [`${count(runs.length, 'run')} this week, ${ended.length} ended, ${abandoned} of them abandoned.`];
+  if (unjudged > 0) facts.push(`${count(unjudged, 'run')} came from a connection with no session, which nothing can say has ended, so ${unjudged === 1 ? 'it is' : 'they are'} not counted.`);
   if (swept > 0) facts.push(`${count(swept, 'run')} went silent and ${swept === 1 ? 'was' : 'were'} left waiting with ${swept === 1 ? 'its' : 'their'} next step, not ended.`);
   if (silent.length > 0) {
     const ago = nowMs - Date.parse(silent[0]!.heard);
@@ -805,7 +811,7 @@ export const VITAL_SIGNS: readonly SignReader[] = [
   filed('briefing-true', 'What agents are told is true', 'record'),
   kernel('questions-by-cause', 'Each problem is asked once', { CAUSE_QUESTIONS_MOST, UNCAUSED_MOST }, (sql, nowMs, _tz, lasts) => readCauses(sql, nowMs, lasts)),
   kernel('oldest-question', 'No question waits too long', { QUESTION_DAYS_MOST }, readOldest),
-  kernel('runs-true', 'Agent runs end cleanly', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs, _tz, lasts) => readRuns(sql, nowMs, lasts), 2),
+  kernel('runs-true', 'Agent runs end cleanly', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs, _tz, lasts) => readRuns(sql, nowMs, lasts), 3),
   /* Version 2: a refused block or a path that named nothing, counted by the pages census, is red too. */
   filed('pages-clean', 'Pages draw without errors', 'host', 2),
   filed('arrived', 'What shipped has arrived', 'record'),

@@ -22,7 +22,7 @@ import type { Json } from './coerce.ts';
 import { clearFault, raiseFault } from './fault.ts';
 import { restDaysOf } from './forecast.ts';
 import { backoffMs, type AckDeps } from './outbox.ts';
-import { ABANDON_MS, quietRuns } from './presence.ts';
+import { ABANDON_MS, quietRuns, sessionless } from './presence.ts';
 import { isHelper, leftFreshStep } from './session.ts';
 import { resolveDay } from '@braindog/where';
 
@@ -630,6 +630,9 @@ export { ABANDON_MS } from './presence.ts';
 /** The note on a run the sweep writes off. */
 export const SWEPT_NOTE = 'Nothing heard from this run in twelve hours.';
 
+/** The note on a run the sweep closes that never had a session: nothing could say it ended, so nothing was lost. */
+export const SWEPT_NO_SESSION_NOTE = 'Nothing more from this connection in twelve hours. It had no session to say it ended.';
+
 /** The note on a run the sweep leaves waiting, because it left a step. */
 export const SWEPT_STEP_NOTE = 'Nothing heard in twelve hours. It left a next step.';
 
@@ -657,7 +660,7 @@ export const SWEPT_STEP_NOTE = 'Nothing heard in twelve hours. It left a next st
 export function sweepSessions(
   sql: Sql,
   nowMs: number,
-  move: (id: string, to: 'abandoned' | 'handoff', note: string) => boolean,
+  move: (id: string, to: 'abandoned' | 'handoff' | 'done', note: string) => boolean,
   limit = 100,
 ): number {
   /* HEARD OR PULSED, read by the one clock (`quietRuns`): a window open on a question pulses and calls nothing. */
@@ -666,7 +669,7 @@ export function sweepSessions(
   for (const row of quiet) {
     const fields = JSON.parse(row.fields) as Record<string, Json>;
     const step = !isHelper(fields) && leftFreshStep(fields);
-    if (step ? move(row.id, 'handoff', SWEPT_STEP_NOTE) : move(row.id, 'abandoned', SWEPT_NOTE)) n++;
+    if (step ? move(row.id, 'handoff', SWEPT_STEP_NOTE) : sessionless(fields) ? move(row.id, 'done', SWEPT_NO_SESSION_NOTE) : move(row.id, 'abandoned', SWEPT_NOTE)) n++;
   }
   return n;
 }

@@ -114,6 +114,22 @@ export function isStale(row: { fields: Record<string, Json>; updated_at: string 
   return heardAt(row) < nowMs - STALE_MS;
 }
 
+/**
+ * A RUN WITH NO SESSION HAS NO END TO LOSE: no host session's id and no pulse, so no window, no end hook and no bridge
+ * that could ever say it closed, and not a helper working for a run that can. An app with no hooks, or a script that opens
+ * `braindog mcp` for a few calls and goes: one run a folder, shared by every call within 45 minutes (`STALE_MS`), since one
+ * run a call would be a hundred rows a day. The sweep closes it as done, and `runs-true` does not judge it. 10 of the 28
+ * runs on his record that read abandoned in the week of 4 November were these. A Claude Code window always names its session.
+ */
+export const sessionless = (fields: Record<string, Json>): boolean =>
+  !isSet(fields.client_id) && !isSet(fields.pulse_at) && !isSet(fields.parent);
+
+const isSet = (v: Json | undefined): boolean => typeof v === 'string' && v !== '';
+
+/** `sessionless` in SQL, over a run's `fields`. */
+export const SESSIONLESS_SQL =
+  "(coalesce(json_extract(fields, '$.client_id'), '') = '' AND coalesce(json_extract(fields, '$.pulse_at'), '') = '' AND coalesce(json_extract(fields, '$.parent'), '') = '')";
+
 /** A beat closer to the last than this moves nothing: one statement a minute at most, however often an agent calls. */
 export const BEAT_MS = 60_000;
 
