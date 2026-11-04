@@ -58,11 +58,10 @@ export function searchable(register: string): FieldDecl[] {
 /**
  * The one line of text a row is found by — `projectedText`, over rendered values.
  *
- * The kernel projects the STORED value; this projects what the screen shows, because those are the
- * words the person typing is looking at. For the eight registers in the seed the two are the same
- * string on every searchable field — all of them are `text` or `document` — and `find.test.ts`
- * asserts it rather than assuming it, so a searchable `money` or `ref` field would be caught the day
- * it is declared instead of quietly making the browser and the record disagree.
+ * The kernel projects the STORED value, and text is projected here as stored too; any other value as the screen says it.
+ * On every searchable field in the seed the two are the same string, all of them `text` or `document`, and
+ * `find.test.ts` asserts it rather than assuming it, so a searchable `money` or `ref` field would be caught the day it
+ * is declared instead of quietly making the browser and the record disagree.
  *
  * Empty values are dropped rather than leaving blank lines: a blank line in the projection is a
  * token boundary that means nothing.
@@ -70,7 +69,10 @@ export function searchable(register: string): FieldDecl[] {
 export function projected(register: string, entry: Entry): string {
   const lines: string[] = [];
   for (const f of searchable(register)) {
-    const shown = display(register, f.id, entry.fields[f.id]);
+    /* THE WORDS STORED, as the record indexes them. A screen may say a line more calmly than it holds it (a bank's capitals
+       and its reference, 57a8634c9; a skill by its name, 8a47e508a), and what it leaves out is still what finds the row. */
+    const raw = entry.fields[f.id];
+    const shown = typeof raw === 'string' ? raw : display(register, f.id, raw);
     if (shown === null) continue;
     /* Whitespace collapsed and trimmed, exactly as `projectedText` does it: a value typed across two
        lines is one run of words to the tokeniser, and an empty one is dropped rather than leaving a

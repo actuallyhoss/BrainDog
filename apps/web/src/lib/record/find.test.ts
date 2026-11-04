@@ -71,10 +71,10 @@ test('A REGISTER WHOSE TITLE IS NOT SEARCHABLE HOLDS ROWS NOBODY CAN FIND BY NAM
 test('the projection is the kernel’s, string for string', () => {
   /**
    * `projectedText` walks the declared fields in order, skips `!search` and `retired`, drops empty
-   * values, collapses whitespace and joins with newlines. This runs the same walk over the RENDERED
-   * value, because those are the words the person typing is looking at — and for every searchable
-   * field in the seed the two are the same string, which is a fact worth asserting rather than
-   * assuming. A searchable `money` or `ref` field would fail here on the day it was declared, which
+   * values, collapses whitespace and joins with newlines. This runs the same walk in the browser,
+   * text as stored (a screen may say it more calmly, 57a8634c9, and the record still finds it by what
+   * it holds), and for every searchable field in the seed the two are the same string, which is a
+   * fact worth asserting rather than assuming. A searchable `money` or `ref` field would fail here on the day it was declared, which
    * is the day to find out.
    */
   let checked = 0;
