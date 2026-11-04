@@ -1,5 +1,5 @@
 <!--
-  A terminal window, drawn the same on every page (3 November, Sam: "it does not look like a terminal"). Dark in both
+  A terminal window, drawn the same on every page (3 November, the owner: "it does not look like a terminal"). Dark in both
   schemes, because a terminal is: a title bar with three dots and the shell's title, then the session in a system mono,
   each command after a coloured prompt in bright ink and its output dimmer, and a blinking block cursor on the last
   line. The cursor holds still under reduced motion.

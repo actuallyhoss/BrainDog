@@ -1328,7 +1328,7 @@ export function forecastPlan(whole: ForecastModel, shown: Scenario, base: Scenar
   const model: ForecastModel = { ...whole, past: pastFrom(whole, start, todayBalance(whole, shown)) };
   const span = Math.max(1, daysBetween(start, end));
   const values = [...model.past.map((p) => p.value), ...shown.days.map((p) => p.balance), ...(base?.days.filter((p) => p.day <= end).map((p) => p.balance) ?? [])];
-  /* THE AXIS HOLDS ZERO, ALWAYS (leftovers9, Sam on Cash ahead: "wtf is that ui"). The walk is drawn over a wash, and a
+  /* THE AXIS HOLDS ZERO, ALWAYS (leftovers9, the owner on Cash ahead: "wtf is that ui"). The walk is drawn over a wash, and a
      wash from EGP 500k read as near nothing at its foot, with a "//" break beside the axis's last figure to say it was
      not. An area's foot is zero or it misleads, so the axis runs to zero and no break is drawn. */
   const { lo, hi, levels } = axisFit(Math.min(...values), Math.max(...values), axisSays, true);

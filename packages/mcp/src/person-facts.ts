@@ -1,7 +1,7 @@
 /**
- * FACTS ABOUT A PERSON GO IN THEIR FIELDS, NOT IN THEIR NOTE (3 Nov, Sam: "instead of just long text, i want them to be
+ * FACTS ABOUT A PERSON GO IN THEIR FIELDS, NOT IN THEIR NOTE (3 Nov, the owner: "instead of just long text, i want them to be
  * parsed as fields"). People 4.7.0 gave the list a field for each thing a note used to say: a legal name, a nationality,
- * a Discord id, a deal, the paperwork still open. An agent that writes "Legal name Callum Doran. Irish. Discord id ..."
+ * a Discord id, a deal, the paperwork still open. An agent that writes "Legal name Mira Chen. Irish. Discord id ..."
  * into `note` puts them back where nobody can sort or edit them apart, so `create` and `update` read a note sent to a
  * list that has those fields with the pack's own reader (`noteFacts`, the one People's script runs) and refuse it,
  * with the call that puts each fact in its field as the `try`.

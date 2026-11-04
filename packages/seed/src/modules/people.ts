@@ -306,8 +306,8 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
       { id: 'email', type: 'email', unique: true, index: true },
       /* THE ORGANISATION THEY ARE WITH, SINCE People 3.0.0: a client's accounts contact is with the client. */
       { id: 'org', label: 'Organisation', type: 'ref', to: 'organisations', index: true },
-      /* WHO SOMEBODY IS, AS FIELDS AND NOT AS SENTENCES, SINCE People 4.7.0 (3 Nov, Sam: "his name should be a field,
-         discord username a field"). Every fact below was a line of `note`, "Legal name **Callum Doran**. Irish. Discord
+      /* WHO SOMEBODY IS, AS FIELDS AND NOT AS SENTENCES, SINCE People 4.7.0 (3 Nov, the owner: "his name should be a field,
+         discord username a field"). Every fact below was a line of `note`, "Legal name **Mira Chen**. Irish. Discord
          id ...", which nobody could sort, search or edit apart, and which an agent had to read whole to find one handle.
          Each is optional, so a row written before keeps every value it had and simply has these empty; the person's
          page hides an empty one and offers it under Add a field. `script.people_fields` offers to move what a note
@@ -326,7 +326,7 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
         values: ['wife', 'husband', 'partner', 'parent', 'child', 'sibling', 'family', 'friend', 'mentor', 'other'],
         labels: { wife: 'Wife', husband: 'Husband', partner: 'Partner', parent: 'Parent', child: 'Child', sibling: 'Sibling', family: 'Family', friend: 'Friend', mentor: 'Mentor', other: 'Other' },
       },
-      /* WHAT THEY DO WHERE, one line each as said, "CPO at Quartz", "Brand owner at Tamsin": the page links the part after
+      /* WHAT THEY DO WHERE, one line each as said, "CPO at Lanternfish", "Brand owner at Kiln": the page links the part after
          "at" to the project or organisation of that name. */
       { id: 'titles', label: 'Roles', type: 'list', of: 'text' },
       /* ONE SHORT LINE ABOUT THEM, drawn under their name; `note` below it is everything else. */
@@ -349,7 +349,7 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
       { id: 'linkedin', label: 'LinkedIn', type: 'text' },
       { id: 'telegram', label: 'Telegram', type: 'text' },
       { id: 'whatsapp', label: 'WhatsApp', type: 'text' },
-      /* THE DEAL IN WORDS, "10% of Otters.gg gross, paid monthly", beside `rate`, which is a figure. */
+      /* THE DEAL IN WORDS, "10% of Kiln gross, paid monthly", beside `rate`, which is a figure. */
       { id: 'terms', label: 'Deal', type: 'text' },
       /* PAPERWORK STILL OPEN, one line each, "Signed IP assignment", "W-8BEN": taken off when it is done. */
       { id: 'paperwork', label: 'Paperwork to do', type: 'list', of: 'text' },
@@ -651,7 +651,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
        button on the whole list, two presses away. It opens the list's name line ("Who?"). */
     header: { action: { verb: 'row.create', label: 'Add a person' } },
     blocks: [
-      /* NO LINE OVER THE PAGE, SINCE People 4.7.0 (3 Nov, Sam, of "1 client organisation, 2 clients in People, 22 other
+      /* NO LINE OVER THE PAGE, SINCE People 4.7.0 (3 Nov, the owner, of "1 client organisation, 2 clients in People, 22 other
          people besides you, 22 other organisations.": "i dont like those briefs at all, remove them"). The line counted
          what the cards under it already show, and said who had gone quiet, which each card's Last spoke says. What it
          said that nothing else did, the questions waiting about somebody here, is Waiting on you below, drawn only while

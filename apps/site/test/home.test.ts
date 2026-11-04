@@ -40,7 +40,7 @@ test('home.ts holds the words of the site story at the key paths the ledger read
     'One place for your projects, decisions and money. Every agent reads it before it starts and writes down what it did. Money, keys and deletes wait for your yes.',
   );
   assert.equal(home.hero.secondary, 'Connect your agents');
-  /* No makers' row (4 November, Sam: "just say agents"). */
+  /* No makers' row (4 November, the owner: "just say agents"). */
   assert.ok(!('makers' in home.hero) && !('works' in home.hero));
   assert.equal(home.who.title, 'How it works');
   assert.deepEqual(

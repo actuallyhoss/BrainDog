@@ -39,7 +39,7 @@ const iso = (t) => new Date(t).toISOString();
 
 /* ── Sentry ─────────────────────────────────────────────────────────────────────────────────────────── */
 
-/* The seed's projects are Kiln, Marlow & Co, Portage and Tallow, so the slugs link by name as Sam's would. */
+/* The seed's projects are Kiln, Marlow & Co, Portage and Tallow, so the slugs link by name as the owner's would. */
 const PROJECTS = [
   ['4508000000000011', 'kiln-type', 'node'],
   ['4508000000000012', 'kiln-site', 'javascript-sveltekit'],

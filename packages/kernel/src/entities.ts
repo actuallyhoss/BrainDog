@@ -472,7 +472,7 @@ export const BURIED_READ = 2000;
  * A ROW MERGED AWAY IS A TOMBSTONE ONLY WHERE ITS CHAIN ENDS IN A DELETED ROW. Merged into somebody still here, its keys
  * answer to them (`rekey`), and a meeting by its address finds them.
  *
- * Measured on 3 November: Sam deleted five people the Gmail script had made, and an older copy of the script still
+ * Measured on 3 November: the owner deleted five people the Gmail script had made, and an older copy of the script still
  * running made all five again an hour later, as new rows, because a deleted row's keys are freed (`rekey`).
  */
 export function buried(sql: Pick<Sql, 'one' | 'all'>, list: KeyedList, keys: readonly string[]): { id: string } | null {

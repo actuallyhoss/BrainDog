@@ -151,6 +151,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '4.7.2', notes: 'A note inside the people-fields script no longer carries real names. Nothing you see changes.' },
     {
       version: '4.7.1',
       notes:

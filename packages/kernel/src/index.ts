@@ -6137,7 +6137,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /**
    * Whether a name an app gives itself is somebody's here: a person's name on the record, whole or its first word, or the
-   * record's own name (RM8). Such an app is said "An app calling itself Sam", never "Sam" alone (`selfNamed`).
+   * record's own name (RM8). Such an app is said "An app calling itself Ada", never "Ada" alone (`selfNamed`).
    */
   function nameTaken(name: string): boolean {
     const said = name.trim().toLowerCase();

@@ -1147,7 +1147,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
          the row, beside two splits a third its height, so the row ended at three heights. In play is the line's now;
          what aims within thirty days is Coming up, folded under Earnings, agents and dates; and what an agent holds is
          With an agent beside it. */
-      /* NO HOW THEY ARE GOING, SINCE portfolio 1.31.2 (4 Nov, Sam: "projects page looks poor"): past four projects a whole
+      /* NO HOW THEY ARE GOING, SINCE portfolio 1.31.2 (4 Nov, the owner: "projects page looks poor"): past four projects a whole
          tile of coloured bar stood over the projects, and said how many are at risk, not which. Each card says so now
          beside its lane. `metric.projects-by-health` stays declared, since a page somebody made may draw on it. */
       /* NO NEEDS YOU TABLE, SINCE portfolio 1.11.0. It listed the projects at risk with their health and next step, and

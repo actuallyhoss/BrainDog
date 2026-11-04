@@ -1,6 +1,6 @@
 /**
  * `invite <email> [--as <level>] [--record <name>]`: the server's operator lets somebody new join a self-host that cannot
- * send mail (2 Nov decision, loop/selfhost-2026-11-02/REPORT.md, "For Sam").
+ * send mail (2 Nov decision, loop/selfhost-2026-11-02/REPORT.md, "For the owner").
  *
  * JOINING ASKS FOR A PROOF THAT THE ADDRESS IS THE PERSON'S, and on the Cloud and a self-host with SMTP that proof rides in
  * a mail. With no mail there was no way for a second person to join at all. Whoever runs the server can already read and

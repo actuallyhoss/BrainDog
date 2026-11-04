@@ -531,7 +531,7 @@ const titled = (name: string, place: string | null): string => (place ? clipTitl
 export const DEVICES: readonly string[] = ['MacBook', 'iMac', 'Mac mini', 'Mac Studio', 'Mac Pro', 'iPhone', 'iPad', 'Windows laptop', 'Windows PC', 'Raspberry Pi'];
 
 /**
- * The kind of machine a host's name says, "MacBook" for `Maras-MacBook-Pro.local`, or `null` where it says none. NEVER THE
+ * The kind of machine a host's name says, "MacBook" for `Adas-MacBook-Pro.local`, or `null` where it says none. NEVER THE
  * HOST'S OWN NAME, which is somebody's label and often an id ("DESKTOP-7F3K2Q"). The same reading as `deviceOf` in the
  * MCP package's words, so a run is "on MacBook" in its name and in what an agent is told.
  */
@@ -584,8 +584,8 @@ const CALLING = 'An app calling itself';
 
 /**
  * An app nobody listed, by the name it gave itself (`plainApp`), or that name after "An app calling itself" where it
- * could pass for a person, the owner, the record or BrainDog's own words: "An app calling itself Sam on MacBook", never
- * "Sam on MacBook". `null` where `plainApp` gives none.
+ * could pass for a person, the owner, the record or BrainDog's own words: "An app calling itself Ada on MacBook", never
+ * "Ada on MacBook". `null` where `plainApp` gives none.
  */
 export function selfNamed(said: unknown, taken: (name: string) => boolean = () => false): string | null {
   const app = plainApp(said);
@@ -675,8 +675,8 @@ export function recordNamed(
   /* AND THE RUN'S OWN APP BY ITS OWN NAME, "Zed on MacBook", which only this run's hello could have given it. */
   const own = plainApp(run.fields.client);
   const apps = own !== null && clientOf(run.fields.client) === undefined && !NAMES.includes(own) ? [own, `${CALLING} ${own}`, ...NAMES] : NAMES;
-  /* THE APP'S OWN NAME IS NOT CARRIED ON: `learned` says it again through `selfNamed`, so a run once titled "Sam on
-     MacBook" is said "An app calling itself Sam on MacBook" at its next call (RM8). */
+  /* THE APP'S OWN NAME IS NOT CARRIED ON: `learned` says it again through `selfNamed`, so a run once titled "Ada on
+     MacBook" is said "An app calling itself Ada on MacBook" at its next call (RM8). */
   for (const name of apps)
     if (doing === `${name} run` || onMachine(doing, name) || places.some((place) => doing === titled(name, place))) return { name: apps !== NAMES && !NAMES.includes(name) ? null : real(name) };
   const day = `${String(Number(run.created_at.slice(8, 10)))} ${MONTHS[Number(run.created_at.slice(5, 7)) - 1] ?? ''}`;

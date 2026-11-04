@@ -144,7 +144,7 @@ const figuresOf = (b: Drawable): readonly unknown[] => (Array.isArray(b.metrics)
 const unsaidFigure = (f: unknown): boolean => isObj(f) && (f.unsaid === true || (isObj(f.reading) && f.reading.unsaid === true));
 
 /**
- * MONEY THAT ADDED UP NO ROW AND CAME TO NOUGHT (leftovers9, Sam 2 Nov: "remove any $0 cards"): a project's "Revenue $0"
+ * MONEY THAT ADDED UP NO ROW AND CAME TO NOUGHT (leftovers9, the owner 2 Nov: "remove any $0 cards"): a project's "Revenue $0"
  * or Today's "Owed to you $0" over a list that holds rows, none of them this figure's. The app's tile says so
  * (`noughtOverNone`), and so does the record's reading by its rows, its value and a currency for its unit. Money that
  * read rows and came to nought, a budget with nothing left, is an answer and is kept, and so is a page's hero (`form:

@@ -3441,7 +3441,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
          written to the row `meet` lands on, through `update` and its ladder. The record's own `meet` never sees it. */
       const { fields: facts, ...meeting } = args;
       if (facts !== undefined && !isObject(facts))
-        return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'fields is an object of the person\'s fields, as {"legal_name":"Callum Doran","discord":"codeize"}.', at: 'fields' } as Refusal } };
+        return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'fields is an object of the person\'s fields, as {"legal_name":"Mira Chen","discord":"mirachen"}.', at: 'fields' } as Refusal } };
       const out = await surface.meet(meeting, ctx);
       if (!out.ok || !isObject(out.value)) return { result: out };
       turn.batch = batchIn(out.value);

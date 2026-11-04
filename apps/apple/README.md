@@ -156,7 +156,7 @@ it, as the SIL Open Font License 1.1 asks:
 
 ## Signing
 
-Nothing signs with the team until Xcode is signed in to it (Settings › Accounts, sam@avery.example). Until then `check`
+Nothing signs with the team until Xcode is signed in to it (Settings › Accounts, the account that holds the app). Until then `check`
 builds unsigned and `sim`/`mac` sign to run locally. The restricted entitlements (associated domains, the App Group,
 the Keychain group, push) are in the Release files only on the Mac (`Mac/BrainDogMac.entitlements`); macOS kills a
 locally signed app that claims them. A native passkey needs a team-signed build and the AASA live on brain.dog.

@@ -1,11 +1,11 @@
 /**
- * A person's note read for the facts it holds, since People 4.7.0 (3 Nov, Sam: "instead of just long text, i want them
+ * A person's note read for the facts it holds, since People 4.7.0 (3 Nov, the owner: "instead of just long text, i want them
  * to be parsed as fields ... his name should be a field, discord username a field"). Before it every fact about
- * somebody was a sentence in one long note: "Legal name **Callum Doran**. Irish. Email ... Discord id ... ## Deal ...".
+ * somebody was a sentence in one long note: "Legal name **Mira Chen**. Irish. Email ... Discord id ... ## Deal ...".
  *
  * `noteFacts` READS ONE NOTE AND SAYS WHAT IT FOUND, and only by plain patterns: a sentence that is nothing but a fact
- * ("Irish.", "Legal name Callum Doran.", "Discord id 668423998777982997.", "Sam's wife.", "CPO of Quartz and brand owner
- * of Tamsin."), an address or a phone, and the `## Deal` and `## Still to do` parts. A sentence it cannot read whole
+ * ("Irish.", "Legal name Mira Chen.", "Discord id 100000000000000001.", "Ada's wife.", "CPO of Lanternfish and brand owner
+ * of Kiln."), an address or a phone, and the `## Deal` and `## Still to do` parts. A sentence it cannot read whole
  * stays in the note, as does every other part (`## Log` among them). A field the row already holds is never written
  * over: a fact that agrees with it leaves the note, and one that differs stays where it was.
  *
@@ -13,8 +13,8 @@
  * Nothing is written without the owner's yes, and each question carries the cause `people-fields:<row>`, so a second
  * run joins the one still open and one he said no to is not asked again.
  *
- * TIDYING WHAT THE FIELDS ALREADY SAY, SINCE People 4.7.1 (4 Nov). 4.7.0 ran on the owner's record and left Codeize's
- * note opening "Engineer on Otters.gg. Deal: 10% of Otters gross, paid monthly. # Codeize Joins the team ...": the fields
+ * TIDYING WHAT THE FIELDS ALREADY SAY, SINCE People 4.7.1 (4 Nov). 4.7.0 ran on the owner's record and left Mira's
+ * note opening "Engineer on Kiln. Deal: 10% of Kiln gross, paid monthly. # Mira Joins the team ...": the fields
  * were right, but the note still said the deal once more, still carried his name as a heading, and a paragraph whose
  * lines were joined to read it came back as one run-on line. So, with `tidy`:
  * - a lone heading that is the person's own name (`name`, `goes_by`, `legal_name` or one of `aliases`) leaves the note;
@@ -95,7 +95,7 @@ export function noteFacts(note, row, tidy) {
     const s = plain(raw).replace(/[.;]+$/, '').trim();
     if (s === '') return true;
     let m;
-    /* A ONE-LINE DEAL, "Deal: 10% of Otters gross, paid monthly": said again when the Deal field holds one or the note's
+    /* A ONE-LINE DEAL, "Deal: 10% of Kiln gross, paid monthly": said again when the Deal field holds one or the note's
        `## Deal` part is setting it, so it leaves; the deal itself when nothing else says one. */
     if (tidy && (m = /^(?:the )?(?:deal|terms|pay)(?: is)?:\s*(.+)$/i.exec(s))) {
       if (!empty(fields.terms) || patch.terms !== undefined) {
@@ -131,7 +131,7 @@ export function noteFacts(note, row, tidy) {
     }
     if ((m = /^speaks (.+)$/i.exec(s))) return add('languages', m[1].split(/,\s*|\s+and\s+/).map((x) => x.trim()).filter(Boolean), 'languages');
     if ((m = /^(?:[A-Z][\w-]*'s|his|her|my|your|our) (\w+)$/i.exec(s)) && Object.hasOwn(KIN, m[1].toLowerCase())) return put('relation', KIN[m[1].toLowerCase()], 'relationship');
-    /* "CPO of Quartz and brand owner of Tamsin": every part a title at an organisation, or none is taken. */
+    /* "CPO of Lanternfish and brand owner of Kiln": every part a title at an organisation, or none is taken. */
     const parts = s.split(/,\s*(?:and\s+)?|\s+and\s+/);
     const titles = parts.map((p) => titleOf.exec(p.trim())).filter(Boolean);
     if (titles.length > 0 && titles.length === parts.length) {
@@ -207,7 +207,7 @@ export function noteFacts(note, row, tidy) {
   for (const i of order) (parts[i].head === null ? open : headed)(parts[i], i);
 
   /* THE OPENING AS `about`, with `tidy`: the note opens on one short sentence, alone in its paragraph once the facts in
-     it left ("Engineer on Otters.gg."), and more of the note follows it. A note that is only that sentence keeps it, since
+     it left ("Engineer on Kiln."), and more of the note follows it. A note that is only that sentence keeps it, since
      it is then the note and not a line over it ("Bank transfers to and from her are filed under Family."). */
   if (tidy && opening !== null && empty(fields.about) && patch.about === undefined) {
     const line = opening[0].trim();

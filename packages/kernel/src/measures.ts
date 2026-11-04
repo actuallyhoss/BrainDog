@@ -206,7 +206,7 @@ const newestFirst = (a: MeasureSeries & { ms: number }, b: MeasureSeries & { ms:
   b.ms - a.ms || a.name.localeCompare(b.name) || (a.of ?? '').localeCompare(b.of ?? '');
 
 /**
- * A MEASURE THAT HAS ONLY SAID NOUGHT IS NOT DRAWN (leftovers9, Sam 2 Nov: "remove any $0 cards"): "Monthly revenue
+ * A MEASURE THAT HAS ONLY SAID NOUGHT IS NOT DRAWN (leftovers9, the owner 2 Nov: "remove any $0 cards"): "Monthly revenue
  * $0, flat" on a project and on the Dashboard, its newest reading nought and every point in the period and the one
  * before nought or none. One reading that was anything else keeps the whole measure, its noughts with it.
  */

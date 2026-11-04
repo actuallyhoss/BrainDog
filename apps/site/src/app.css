@@ -237,7 +237,7 @@
     --g-fill: color-mix(in oklab, var(--ink) 7%, transparent);
   }
 
-  /* THE HERO'S WINDOW IS THE APP IN LIGHT, ALWAYS (Sam, 4 Nov), on a visitor in dark mode too. Every token the dark scheme
+  /* THE HERO'S WINDOW IS THE APP IN LIGHT, ALWAYS (the owner, 4 Nov), on a visitor in dark mode too. Every token the dark scheme
      moves is set back to its light value here, in one place, read from the page in light. */
   [data-desk] {
     color-scheme: light;
