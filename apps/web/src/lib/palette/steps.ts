@@ -3,7 +3,7 @@
  * a count (Sam, 4 Nov): "Reading Agent runs (2)", where five of the same line stacked up.
  */
 
-import type { IconName } from '../ui/Icon.svelte';
+import type { IconName } from '../ui/icons.ts';
 
 export type StepLine = { text: string; times: number; icon: IconName; last: boolean };
 
