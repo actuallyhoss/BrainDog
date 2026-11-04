@@ -92,7 +92,7 @@ test('a key the door does not take is refused by its name', async () => {
 
 test('an empty sentence, a sentence too long and a day that is not a date are refused at their field', async () => {
   const { door } = fakeDoor();
-  for (const [body, at] of [[{ ...good, said: '  ' }, 'said'], [{ ...good, said: 'a'.repeat(1001) }, 'said'], [{ ...good, today: 'Tuesday' }, 'today'], [{ ...good, zone: 3 }, 'zone']] as const) {
+  for (const [body, at] of [[{ ...good, said: '  ' }, 'said'], [{ ...good, said: 'a'.repeat(2001) }, 'said'], [{ ...good, today: 'Tuesday' }, 'today'], [{ ...good, zone: 3 }, 'zone']] as const) {
     const { status, out } = await answer(await serveFirstRead(ask(body), door, NOW));
     assert.equal(status, 400);
     assert.equal(out.refusal?.at, at);

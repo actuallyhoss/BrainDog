@@ -153,21 +153,21 @@ test('THE SAME ENDPOINT IS THE PACKAGE\'S Inference PORT, asked with a schema an
 const ask = (model: string) => ({ model, messages: [], maxTokens: 10, jsonSchema: {} });
 const sentModel = (net: { sent: { init: RequestInit }[] }, i: number): string => (JSON.parse(String(net.sent[i]!.init.body)) as { model: string }).model;
 
-test('A MODEL THE OWNER NAMED REACHES THE ENDPOINT, and SLASH_MODEL stands in only for the package\'s four routing names', async () => {
+test('A MODEL THE OWNER NAMED REACHES THE ENDPOINT, and SLASH_MODEL stands in only for the package\'s routing names', async () => {
   const net = endpoint(() => usedCompletion('{}', { prompt_tokens: 1, completion_tokens: 1 }));
   const inference = endpointInference({ url: 'http://localhost:11434/v1/chat/completions', model: 'ENV_MODEL', send: net.send });
   /* THE FAILURE, AS IT WAS MEASURED: an owner's `llama3:8b` on tier `byo` was posted as `ENV_MODEL`, so a settings route
      would have stored a model that nothing sends. */
   await inference.complete(ask('llama3:8b'));
   assert.equal(sentModel(net, 0), 'llama3:8b');
-  /* THE PACKAGE'S OWN TABLE AND NOT A COPY OF IT, so a fifth model added there and not to `ROUTING_NAMES` is red here. */
+  /* THE PACKAGE'S OWN TABLE AND NOT A COPY OF IT, so a sixth model added there and not to `ROUTING_NAMES` is red here. */
   const shorts = Object.keys(MODELS);
-  assert.equal(shorts.length, 4);
+  assert.equal(shorts.length, 5);
   for (const short of shorts) await inference.complete(ask(short));
-  assert.deepEqual([1, 2, 3, 4].map((i) => sentModel(net, i)), ['ENV_MODEL', 'ENV_MODEL', 'ENV_MODEL', 'ENV_MODEL']);
+  assert.deepEqual([1, 2, 3, 4, 5].map((i) => sentModel(net, i)), ['ENV_MODEL', 'ENV_MODEL', 'ENV_MODEL', 'ENV_MODEL', 'ENV_MODEL']);
   /* WITH NO SLASH_MODEL EVERY NAME PASSES THROUGH, the short ones included. */
   await endpointInference({ url: 'http://localhost:11434/v1/chat/completions', send: net.send }).complete(ask('glm-5.3'));
-  assert.equal(sentModel(net, 5), 'glm-5.3');
+  assert.equal(sentModel(net, 6), 'glm-5.3');
 });
 
 /* A STATUS THAT IS NOT `ok` IS A MODEL THAT DID NOT ANSWER, the retry default taken for the

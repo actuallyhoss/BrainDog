@@ -70,7 +70,7 @@ test('SAME ONE IS ONE DATA WRITE, written once in its file, taking the list and 
   assert.equal(OWN[0]!.postRead, undefined, 'it opens a question, so it is no read sent as a write');
   const what = OWN[0]!.what;
   assert.match(what, /one question/u, 'the sentence says it asks once');
-  assert.match(what, /merges nothing/u, 'the sentence says it merges nothing itself');
+  assert.match(what, /merges them at once, with Undo/u, 'the sentence says only his own agent merges, and with Undo');
   assert.doesNotMatch(what, /—|\bids?\b|\brows?\b|\bentit(y|ies)\b|\blist item\b|\bULIDs?\b/u, 'the sentence names things as a person does');
 });
 
@@ -105,7 +105,7 @@ test('A GET IS REFUSED, since asking opens a question, and the record is never c
   const heard: unknown[] = [];
   const res = await serveApi(new Request(`https://x/api/sameOne?register=people&rows=${encodeURIComponent(JSON.stringify([A, B]))}`), withSameOne(api, ok(ASKED), heard), owner);
   assert.equal(res.status, 405);
-  assert.equal(((await res.json()) as Answer).refusal?.code, 'FORBIDDEN');
+  assert.equal(((await res.json()) as Answer).refusal?.code, 'ROUTE_UNKNOWN');
   assert.deepEqual(heard, []);
   sql.close();
 });

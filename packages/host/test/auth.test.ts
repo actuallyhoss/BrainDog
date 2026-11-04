@@ -59,6 +59,8 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'POST /auth/logout both',
       'GET /auth/sessions both',
       'POST /auth/logout/all both',
+      'POST /auth/session/end both',
+      'POST /auth/app/refresh both',
       'POST /auth/keychain/lock both',
       'POST /auth/switch both',
       'POST /auth/signup/start worker',
@@ -69,6 +71,9 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'POST /auth/google/desktop worker',
       'POST /auth/desktop worker',
       'POST /auth/desktop/handoff worker',
+      'POST /auth/app worker',
+      'POST /auth/app/handoff worker',
+      'POST /auth/app/code worker',
       'POST /auth/claim/mint worker',
       'POST /auth/provision worker',
       'POST /auth/suspend worker',
@@ -399,7 +404,10 @@ test('a path that is no route, the wrong verb, and a route this host does not se
   assert.equal(nothing.body.refusal?.code, 'ROUTE_UNKNOWN');
   assert.ok(!nothing.raw.includes('some-token'), 'the path was echoed');
   assert.equal((await call('/auth/token', { method: 'GET' })).status, 405);
-  assert.equal((await call('/auth/provision', { body: {} })).status, 404, 'the self-host served an operator route');
+  /* A CLOUD ROUTE IS NOT SERVED HERE, AND SAID SO (7f3dc0694): 501 and not a way in, so the operator's door stays shut. */
+  const provision = await call('/auth/provision', { body: {} });
+  assert.equal(provision.status, 501, 'the self-host served an operator route');
+  assert.equal(provision.body.refusal?.code, 'NOT_IN_THIS_BUILD');
 });
 
 test('THE LINK IS MAILED AS A FRAGMENT, NEVER ANSWERED, and an unknown address looks the same', async () => {
