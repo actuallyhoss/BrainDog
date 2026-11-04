@@ -296,6 +296,7 @@ export function lineValues(register: string, typed: string, now: number): Record
 export function whichCurrency(figure: string): string {
   const digits = figure.replace(/^[^\p{N}]+|[^\p{N}kK]+$/gu, '');
   /* The code in the example is the one the sign most likely meant, else the record's, so it never reads as a guess made. */
-  const like = figure.includes('$') ? 'USD' : figure.includes('¥') ? 'JPY' : (homeCurrency() ?? 'EGP');
-  return `Which currency is ${figure} in? Type its code with the figure, like ${digits} ${like}${homeCurrency() === null ? ', or set your home currency in Money' : ''}.`;
+  const like = figure.includes('$') ? 'USD' : figure.includes('¥') ? 'JPY' : homeCurrency();
+  const example = like === null ? '' : `, like ${digits} ${like}`;
+  return `Which currency is ${figure} in? Type its code with the figure${example}${homeCurrency() === null ? ', or set your home currency in Money' : ''}.`;
 }
