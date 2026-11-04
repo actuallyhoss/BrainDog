@@ -494,6 +494,7 @@ answers 404 `ROUTE_UNKNOWN`.
 | `/account/billing` | GET | Cloud | each record the signed-in person owns, whether it is paid for, and whether this host takes payment at all |
 | `/account/billing/checkout` | POST | Cloud | a payment page for a new record, `{ slug, name?, tz? }`, or for paying again, `{ record }` |
 | `/account/billing/portal` | POST | Cloud | the payment provider's page for a record the person owns, `{ record }` |
+| `/account/billing/invoices` | POST | Cloud | the newest invoices of the customer a record the person owns and pays for pays as, `{ record }` |
 | `/account/billing/extra` | POST | Cloud | extra usage past the allowance for a paid record the person owns, under a monthly cap, `{ record, cap_cents }`; 0 turns it off |
 | `/account/billing/webhook` | POST | Cloud | the payment provider saying a payment happened, checked by its signature over the body as sent; no cookie |
 | `/account/close` | POST | Cloud | closes the account, `{ email }` typed to confirm, from a sign-in in the last fifteen minutes |
