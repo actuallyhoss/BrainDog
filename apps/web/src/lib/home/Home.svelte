@@ -110,7 +110,7 @@
   /* TODAY'S SKELETON IS THE BOARD IT WILL BE (`today-shape.ts`, ui-perfect 3 Nov): each card's cell and height as this
      device last drew them, kept once the board rests and stood in its cells while the record answers. */
   import TodaySkeleton from '$lib/home/TodaySkeleton.svelte';
-  import { holdCards, letCardsGo } from '$lib/home/today-hold.svelte.ts';
+  import { holdCards } from '$lib/home/today-hold.svelte.ts';
   import { isPending } from '$lib/home/today-partial.ts';
   import SkeletonCard from '$lib/ui/SkeletonCard.svelte';
   import { cardShape, shapeKey } from '$lib/ui/shape.ts';
@@ -1449,7 +1449,7 @@
   }
   /* EACH CARD HOLDS ITS LAST HEIGHT UNTIL THE PAGE HAS LANDED (`today-hold.svelte.ts`). */
   const HOLD_MS = 1500;
-  holdCards(untrack(() => readShape(apiBase(), skelCols))?.cards ?? []);
+  const letCardsGo = holdCards(untrack(() => readShape(apiBase(), skelCols))?.cards ?? []);
   $effect(() => letCardsGo);
   $effect(() => {
     if (!settled || got === null) return;

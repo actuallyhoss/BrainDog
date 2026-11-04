@@ -105,7 +105,8 @@ function sortRule(doc: Document, rule: CSSRule, into: Parts): void {
 
 /** The picture of the app as drawn now, or `null` when there is nothing settled to keep. */
 export function frameOf(doc: Document, now: number): Frame | null {
-  const root = doc.body.firstElementChild;
+  /* THE APP'S OWN ROOT, THE BODY'S ONE DIV: the first frame (`#ff` in `app.html`) stands before it, and is no picture of Today. */
+  const root = doc.querySelector('body > div') ?? doc.body.firstElementChild;
   const main = doc.querySelector('main#main[data-screen]');
   if (root === null || main === null || doc.getElementById('kept-frame') !== null) return null;
   /* NOTHING OPEN OVER IT: a sheet or a menu in the picture would be drawn over the next open with nothing behind it. */

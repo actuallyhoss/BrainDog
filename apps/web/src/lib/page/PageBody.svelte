@@ -1301,7 +1301,10 @@
       data-size={cell?.size}
       aria-busy={(block as { pending?: unknown }).pending !== undefined ? 'true' : undefined}
       data-standing={(block as { pending?: unknown }).pending !== undefined ? '' : undefined}
-      style:min-block-size={pendingH(block) ?? holdOf(cell?.key)}
+      style:min-block-size={pendingH(block)}
+      style:block-size={pendingH(block) === undefined ? holdOf(cell?.key) : undefined}
+      style:overflow={pendingH(block) === undefined && holdOf(cell?.key) ? 'clip' : undefined}
+      style:overflow-clip-margin={pendingH(block) === undefined && holdOf(cell?.key) ? '12px' : undefined}
       data-full={(spans.get(slot.i) ?? slot.span) >= COLUMNS ? '' : undefined}
       data-arranging={arranging ? '' : undefined}
       data-cursor={!arranging && mode === 'page' && reading[cursor]?.slot.i === slot.i ? '' : undefined}
