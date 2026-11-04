@@ -616,9 +616,8 @@
         /* WHERE A `crash` OR `refuse` LINE IS MAILED, at most once a kind in 15 minutes (`opsAlert` in `src/mail.ts`).
            Production only: empty or absent is no mail, which is what alpha wants. */
         "OPS_ALERT_TO": "admin@brain.dog",
-        /* THE OPERATOR, BY ADDRESS (`src/operator.ts`): signed in as this, the app shows Admin in the sidebar and its
-           session opens `/account/ops/*` and the Kennel's review with no key. Comma separated. Not a secret. */
-        "OPERATOR_EMAILS": "admin@brain.dog",
+        /* THE OPERATOR, BY ADDRESS (`src/operator.ts`), IS A SECRET HERE, `OPERATOR_EMAILS`: it is the address his account signs
+           in with, which stays out of this file. Signed in as it, the app shows Admin at the foot of the sidebar. */
         /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
            the default is a refusal: with no `KEK` bound, `/auth/provision` answers
            `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a
