@@ -505,9 +505,10 @@ test('A KEY IN A COMMAND OR ARGUMENT keeps the server out of the record; a key-s
 
   assert.equal(looksLikeKey(inArgs), true);
   for (const plain of ['eu-west', 'npx', 'kiln-mcp@2', 'https://docs.example/mcp', fakeValue()]) assert.equal(looksLikeKey(plain), false, plain);
-  /* A PATH OF SHORT FOLDERS IS WHERE A PROGRAM LIVES, its slashes and hyphens no change of kind; a key's own slashes hide nothing. */
+  /* A PATH OF SHORT FOLDERS IS WHERE A PROGRAM LIVES; a key with slashes in it, or a key as one of the folders, is still a key. */
   for (const path of ['/Users/ann/Dev/wt/fin-1104/apps/cli/src/main.ts', 'C:/Users/Ann/AppData/Local/Programs/Tool2/main.js']) assert.equal(looksLikeKey(path), false, path);
   assert.equal(looksLikeKey('abCD12/ef34+GH56-ij78_KL90=mn12OP34qr'), true);
+  assert.equal(looksLikeKey('/opt/tools/abCD12ef34GH56ij78KL90mn12OP34qr/main.js'), true);
 });
 
 test('A SCAN DRY RUN deposits, creates and proposes nothing, and writes no lock', async (t) => {

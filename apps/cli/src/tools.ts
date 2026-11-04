@@ -80,24 +80,27 @@ const KEY_SHAPES: readonly RegExp[] = [
   /[?&](?:api[_-]?key|access[_-]?token|token|key|secret)=[^&\s]{8,}/i,
 ];
 
-/**
- * A run of thirty-two or more that mixes lower case, capitals and digits and changes between them often.
- *
- * ONLY THOSE THREE TURN. A slash or a hyphen counted as a change of kind twice over, so a path of short folders with one
- * capital and one digit in it (`/Users/ann/Dev/wt/fin-1/apps/cli/src/main`) read as a key, and a tool started from there
- * was not recorded. A key's own `/`, `+` or `-` still leaves its letters and digits changing as often.
- */
+/** A run of thirty-two or more that mixes lower case, capitals and digits and changes between them often. */
 function randomRun(run: string): boolean {
   if (!/[a-z]/.test(run) || !/[A-Z]/.test(run) || !/[0-9]/.test(run)) return false;
-  const kind = (c: string) => (c >= 'a' && c <= 'z' ? 0 : c >= 'A' && c <= 'Z' ? 1 : 2);
-  const held = run.replace(/[^a-zA-Z0-9]/gu, '');
+  const kind = (c: string) => (c >= 'a' && c <= 'z' ? 0 : c >= 'A' && c <= 'Z' ? 1 : c >= '0' && c <= '9' ? 2 : 3);
   let turns = 0;
-  for (let i = 1; i < held.length; i++) if (kind(held[i]!) !== kind(held[i - 1]!)) turns++;
-  return turns >= 0.4 * (held.length - 1);
+  for (let i = 1; i < run.length; i++) if (kind(run[i]!) !== kind(run[i - 1]!)) turns++;
+  return turns >= 0.4 * (run.length - 1);
 }
 
+/**
+ * A run that starts at a root and goes down three folders or more is where a program lives, so each of its pieces is asked
+ * alone (`holdsTokenShape` in `install.ts` reads a path the same way). Asked whole, a slash and a hyphen each count as a
+ * change of kind, so `/Users/ann/Dev/wt/fin-1104/apps/cli/src/main` read as a key and a tool started from there was not
+ * recorded. A key between two slashes is still a run of its own, and a key that is not a path is asked as it always was.
+ */
+const FOLDERS_DOWN = /^\/(?:[^/]+\/){3,}[^/]*$/;
+
+const randomInRun = (run: string): boolean => (FOLDERS_DOWN.test(run) ? run.split('/').some((piece) => piece.length >= 32 && randomRun(piece)) : randomRun(run));
+
 export const looksLikeKey = (text: string): boolean =>
-  KEY_SHAPES.some((shape) => shape.test(text)) || [...text.matchAll(/[A-Za-z0-9+/=_-]{32,}/g)].some(([run]) => randomRun(run));
+  KEY_SHAPES.some((shape) => shape.test(text)) || [...text.matchAll(/[A-Za-z0-9+/=_-]{32,}/g)].some(([run]) => randomInRun(run));
 
 /**
  * Whether a text holds a key by an issuer's own shape alone, never by a random-looking run: for a whole file of work,
