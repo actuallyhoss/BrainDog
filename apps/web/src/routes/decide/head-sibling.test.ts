@@ -48,6 +48,7 @@ test('under the phone’s switch the page’s own menu is not drawn on a line of
 });
 
 test('on a phone the page under the sentence keeps Home’s room over its body, so the raised menu clears the name’s row', () => {
-  const phone = styles.match(/@media \(hover: none\) and \(width <= 600px\) \{([\s\S]*?)\n {2}\}/u)?.[1] ?? '';
+  /* TWO BLOCKS ON THIS QUERY SINCE 8092f93c3, the raised menu's and this one, so every one is read. */
+  const phone = [...styles.matchAll(/@media \(hover: none\) and \(width <= 600px\) \{([\s\S]*?)\n {2}\}/gu)].map((m) => m[1]).join('\n');
   assert.match(phone, /\.page:has\(> \.body:first-child\) \{\s*padding-block-start: var\(--sp-4\);/u);
 });

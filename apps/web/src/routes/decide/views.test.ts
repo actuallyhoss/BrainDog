@@ -291,7 +291,7 @@ test('nothing waiting says the calm line, with when the last one was decided, an
     } as never,
     CLOCK,
   );
-  assert.deepEqual(decided.rows[0]?.cells.slice(0, 2), ['Pay the bill?', 'Accept']);
+  assert.deepEqual(decided.rows[0]?.cells.slice(0, 2), ['Pay the bill?', 'Accepted']);
   const shaped = decideDrawn([noteBlock(), queueBlock([], 0, true), queueBlock([], 0), decided], CLOCK);
   assert.equal(shaped.open, 0);
   assert.match(shaped.sentence.text, /^Nothing needs you\. The last one was decided .+\.$/u);
@@ -322,7 +322,7 @@ test('how the calls went is one line over those already checked', () => {
 const screen = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
 
 test('the screen draws the declared page through the one reader, and no old screen beside it', () => {
-  assert.match(screen, /<PageView slug="decide" got=\{drawn\} mode="home" select whole \{reread\} opens=\{handled \? handledColumn : undefined\} \/>/u);
+  assert.match(screen, /<PageView\n\s+slug="decide"\n\s+got=\{drawn\}\n\s+mode="home"\n\s+select\n\s+whole\n\s+\{reread\}\n\s+opens=\{handled \? handledColumn : undefined\}\n/u);
   assert.match(screen, /readDecide\(/u);
   assert.match(screen, /decideDrawn\(/u);
   /* `/decide?classic` IS AN ADDRESS SOMEBODY KEPT, and it draws this page: nothing reads the word. */

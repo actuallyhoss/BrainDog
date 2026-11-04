@@ -56,8 +56,10 @@ test('the sentences say where it went and what is left, in words and not a count
 test('one snippet draws the way on, and every state that is not an open question renders it', () => {
   assert.match(page, /import \{ nextOpen, stillWaiting, words as onwardWords \} from '\.\/onward\.ts';/u);
   assert.match(page, /\{#snippet onward\(\)\}/u, 'there is no single way on for the screen to draw');
-  /* NOT FOUND, REFUSED, CLOSED AND SETTLED: four places, and each one draws it. */
-  assert.equal([...page.matchAll(/\{@render onward\(\)\}/gu)].length, 4, 'a terminal state is drawn without the way on');
+  /* NOT FOUND AND REFUSED draw it in their heads, CLOSED AND SETTLED as the receipt's own `wayOn` (abf7ade03): four places,
+     and each one draws a way on. */
+  assert.equal([...page.matchAll(/\{@render onward\(\)\}/gu)].length, 2, 'not found or refused is drawn without the way on');
+  assert.equal([...page.matchAll(/\{@render wayOn\(\)\}/gu)].length, 2, 'closed or settled is drawn without the way on');
 
   /* AND THE SETTLED BLOCK'S WAY ON IS NO LONGER CONDITIONAL ON THIS SESSION HAVING PRESSED. */
   assert.doesNotMatch(page, /\{#if committed && nextId/u, 'a decision the record already carried still ends the page');

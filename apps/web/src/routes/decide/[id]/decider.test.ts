@@ -120,6 +120,8 @@ test('the part draws who decides in one line, its picker only for an owner, a re
   assert.doesNotMatch(svelte, /box-shadow|border:\s*1px|gradient|—/u);
   /* FOLDED BEHIND THE "⋯" AT THE RIGHT OF THE TITLE, never a row of its own above the question (20 Oct walk). */
   const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
-  assert.match(page, /actions=\{!settled && me\.owner \? whoMore : undefined\}/u);
+  assert.match(page, /actions=\{asking && me\.owner \? whoMore : undefined\}/u);
+  /* `asking` IS STILL OPEN (a closed question has no more to ask either): nobody is handed the picker on a settled one. */
+  assert.match(page, /const asking = \$derived\(!settled && !\(from === 'live' && live\?\.closed\)\);/u);
   assert.match(page, /bind:open=\{whoOpen\}/u);
 });

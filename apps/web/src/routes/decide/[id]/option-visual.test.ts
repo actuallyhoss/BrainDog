@@ -104,7 +104,7 @@ test('THE OPTIONS STAND SIDE BY SIDE, EACH WITH ITS DRAWING, and each card’s o
   assert.equal(drawingOf(q, { key: 'retire' }, { now: 0, home: null }), null, 'an option with nothing to draw draws nothing');
 
   const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
-  assert.match(page, /data-across=\{question\.options\.length <= 3 \? '' : undefined\}/u, 'two or three options are a list again');
+  assert.match(page, /data-across=\{question\.options\.length <= 2 \? '' : undefined\}/u, 'two options are a list again');
   assert.match(page, /<OptionVisual visual=\{drawn\} \/>/u, 'an option is drawn without its picture');
   assert.match(page, /\.dc-options \{\n\s+display: grid;\n\s+grid-template-columns: repeat\(auto-fit, minmax\(240px, 1fr\)\);/u);
   assert.match(page, /onclick=\{\(\) => void press\(option\.key\)\}\n\s+onkeydown=\{\(e\) => onChoiceKey\(e, option\.key\)\}\n\s+>\{#if bare\}\{said\}\{:else\}\{gate\.choose\}/u, 'a card’s button says its own answer, or Choose beside the name the card carries');

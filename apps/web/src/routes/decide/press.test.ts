@@ -264,7 +264,7 @@ test('on the queue every answer, Backspace’s too, is held six seconds with Und
   assert.match(card, /removeEventListener\('pagehide', leave\);\n\s+leave\(\);/u, 'a held answer is dropped when the card goes');
 });
 
-test('the suggested answer is the accent’s tint, and not marked where the choice is hard to undo', () => {
+test('the suggested answer is the chosen fill, and not marked where the choice is hard to undo', () => {
   /* THE SKIN MARKS THE SUGGESTION IN A ROW OF ANSWERS THE RENDERER DRAWS with the accent's first tint and the accent's
      words, only where the choice can be taken back; the one decision card draws its choices with
      `lib/decide/form.css` over the same classes, says "Suggested" in the accent's words in its list, and fills the
@@ -275,8 +275,9 @@ test('the suggested answer is the accent’s tint, and not marked where the choi
   const marked = rules.find((r) => r.on.split(',').some((one) => one.trim().startsWith(UNDOABLE) && one.trim().endsWith(SUGGESTED)));
   assert.ok(marked, 'the skin no longer marks the suggested answer only where the choice can be taken back');
   assert.ok(marked.on.includes('.queue-options:not(:has(.queue-because))'), 'the tint reaches a choice in the form, where "Suggested" says it');
-  assert.match(marked.says, /background: var\(--red-tint\);/u, 'the suggested answer is not the accent’s tint');
-  assert.match(marked.says, /color: var\(--red\);/u, 'the suggested answer is not in the accent’s words');
+  /* THE ROLES, NOT THE RED (4ad21ac3f): in dark only the main action is the brand colour, so a suggestion is the chosen fill. */
+  assert.match(marked.says, /background: var\(--chosen\);/u, 'the suggested answer is not the chosen fill');
+  assert.match(marked.says, /color: var\(--link\);/u, 'the suggested answer is not in the link’s words');
   const unmarked = rules.find((r) => r.on.split(',').some((one) => one.trim() === ".queue-card:has(.queue-cost[data-cost='undo']) .queue-rec"));
   assert.ok(unmarked && /display: none;/u.test(unmarked.says), 'a card that is hard to undo still says which answer is suggested');
   const form = readFileSync(fileURLToPath(new URL('../../lib/decide/form.css', import.meta.url)), 'utf8');

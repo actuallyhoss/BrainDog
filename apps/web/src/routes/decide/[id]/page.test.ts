@@ -112,7 +112,7 @@ test('the sentence the controls point at is rendered, and before the first of th
 
      THE OPTIONS COME STRAIGHT UNDER THE TITLE NOW, so the anchor is no longer the cost tile, which is
      folded into "What accepting does" under them: it is the closed branch just above. */
-  const closedAt = page.indexOf('<p class="cost-age">{gate.closedNow}');
+  const closedAt = page.indexOf('<span>{onwardWords.closed}</span>');
   assert.ok(closedAt >= 0, 'the closed branch no longer reads the way this test assumes');
   assert.ok(closedAt < said, 'the sentence is no longer inside the branch that draws an undecided question');
   const between = page.slice(closedAt, said);
@@ -134,21 +134,31 @@ test('the sentence the controls point at is rendered, and before the first of th
  * second treatment beside the options' tile and the comments floating on the board under both.
  */
 test('the options come first with what it changes under them in their tile, and why and the comments are the second tile', () => {
-  const head = page.indexOf('<PageHead icon="decide"');
+  const head = page.indexOf('<PageHead named kicker={copy.decide}');
   const tile = page.indexOf('<Tile class="gate">');
   const options = page.indexOf('<section class="options"');
   const aside = page.indexOf('<Tile class="gate-aside">');
-  const does = page.indexOf('<section class="does"');
   const thread = page.indexOf('<Thread');
   const shut = page.lastIndexOf('</Tile>');
+  /* WHAT IT CHANGES IS ONE SNIPPET NOW (9764d40be), drawn under the answers in their tile, and over them only where it is
+     the choice itself: two answers on rows that change, with no story or preview to read first. */
+  const does = page.indexOf('<section class="does"');
+  const part = page.indexOf('{#snippet doesPart()}');
+  const partEnd = page.indexOf('{/snippet}', does);
+  assert.ok(part >= 0 && part < does && partEnd > does, 'what it changes is not the one snippet');
+  assert.match(page, /const changesFirst = \$derived\(two && !story && !preview && \(updates\.length > 0 \|\| creates\.length > 0 \|\| picking\)\);/u);
+  const over = page.indexOf('{#if changesFirst}{@render doesPart()}{/if}');
+  const under = page.indexOf('{#if !changesFirst}{@render doesPart()}{/if}');
+  assert.equal(page.match(/\{@render doesPart\(\)\}/gu)?.length, 2, 'what it changes is drawn from somewhere else too');
   /* WHAT IT CHANGES UNDER THE ANSWERS, IN THEIR TILE: beside them it left half the board empty under two buttons. */
-  assert.ok(head >= 0 && tile > head && options > tile && does > options && aside > does && thread > aside && shut > thread, 'the tiles no longer read options, then what it changes, then the comments');
+  assert.ok(head >= 0 && tile > head && over > tile && options > over && under > options && aside > under && thread > aside && shut > thread, 'the tiles no longer read options, then what it changes, then the comments');
+  assert.match(page.slice(under), /^\{#if !changesFirst\}\{@render doesPart\(\)\}\{\/if\}\n\s+<\/Tile>/u, 'what it changes is not the end of the answers\' tile');
   /* TWO TILES ON THE SCREEN, and nothing folded shut in the way of what it changes. */
   assert.equal(page.match(/<Tile\b/gu)?.length, 2, 'the gate is one tile again, or three');
   assert.doesNotMatch(page, /<details class="does"/u, 'what accepting does is folded shut again');
-  for (const part of ['<Arranged arranged={story} />', '<Proposed proposed={preview} />', '<ul class="picks">', '<Changes {updates} />', '<CallsOut', '{copy.costOfDelay}']) {
-    const at = page.indexOf(part);
-    assert.ok(at > does && at < aside, `${part} is not inside what accepting does`);
+  for (const inside of ['<Arranged arranged={story} />', '<Proposed proposed={preview} />', '<ul class="picks">', '<Changes {updates} />', '<CallsOut', '{copy.costOfDelay}']) {
+    const at = page.indexOf(inside);
+    assert.ok(at > does && at < partEnd, `${inside} is not inside what accepting does`);
   }
   /* WHY IT IS ASKED IS IN THE SECOND TILE, in the asker's words, before the comments. */
   const why = page.indexOf('<p class="gate-why">');
@@ -306,9 +316,11 @@ test('a reloaded receipt never quotes the sentence the record wrote for a press 
   assert.equal(pressedOnly('Nothing had changed on either side.'), false);
   assert.match(
     page,
-    /\{#if settled\.reason\.trim\(\) !== '' && !pressedOnly\(settled\.reason\)\}<p class="settled-reason">/u,
+    /\{#if settled\.reason\.trim\(\) !== '' && !pressedOnly\(settled\.reason\) && !ownReason\(settled\.reason\)\}<p class="settled-reason">/u,
     'the receipt quotes the record’s own sentence for a press, or quotes nothing at all',
   );
+  /* THE RECORD HAS A SECOND SENTENCE OF ITS OWN FOR A PRESS (`govern.ts`), and the receipt keeps that out of the quotes too. */
+  assert.match(page, /const ownReason = \(reason: string\): boolean => \/\^Answered in one press, for the option's own reason: \/u\.test\(reason\.trim\(\)\);/u);
 });
 
 /**
@@ -344,7 +356,7 @@ test('a merge is the one decision card with Undo, and Backspace is held and neve
   assert.match(page, /if \(holding && holding\.id !== id\) holding\.held\.flush\(\);/u, 'moving on to the next question leaves a held press holding its answers off');
 
   /* AND A QUESTION THAT GATHERED SEVERAL SAYS HOW MANY BESIDE ITS TITLE. */
-  assert.match(page, /title=\{spoken\(question\.title\)\} count=\{joined\}/u, 'a joined question’s count is not in its heading');
+  assert.match(page, /title=\{headed\.ask\} count=\{joined\}/u, 'a joined question’s count is not in its heading');
 });
 
 /**
