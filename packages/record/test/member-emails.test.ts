@@ -11,8 +11,9 @@
  * `acceptInvite`), so whatever the record keeps about a person who joins is kept here too. Then every read a reader
  * can make is asked as the reader, and its whole answer, as JSON, must not hold the owner's or the writer's address.
  *
- * A READ THAT DOES HOLD ONE IS NOT MENDED HERE: the reads live in `packages/record/src/index.ts`. Its case is marked
- * `todo` with the finding in one sentence, so the suite stays green and the finding stays on screen until it is fixed.
+ * THE MEND IS ONE PLACE, `withoutColleagues` in `packages/record/src/index.ts`, asked after every method: joining still
+ * meets the colleague into People with the address, which is the key their row answers to, and only whoever may see the
+ * team is handed it.
  */
 
 import { test } from 'node:test';
@@ -116,22 +117,6 @@ const READS: [string, (t: Awaited<ReturnType<typeof team>>) => Promise<unknown>]
   ['a search for a colleague\'s address', ({ api, reader }) => api.search({ q: WRITER.email }, reader)],
 ];
 
-/**
- * The reads that hold an address today, each with what was found. The mend is in `packages/record/src/index.ts`'s
- * `acceptInvite` (filed for its owner). The case still runs, as `todo`, so it turns into a pass the day the mend lands.
- */
-const MET = 'acceptInvite meets the colleague into People with the address they signed in with, so the People row';
-const FOUND: Record<string, string> = {
-  'the page the app opens on (boot)': `${MET}'s create event reaches boot's whatsNew with the address in its to.email.`,
-  'the people list': `${MET} holds the address in its email field for every reader of People.`,
-  'what happened lately (activity)': `${MET}'s create event holds the address in its to.email for every reader of the activity.`,
-  'what is new since last time': `${MET}'s create event holds the address in its to.email for every reader of what is new.`,
-};
-
-test('EVERY FINDING NAMES A READ THIS FILE MAKES, so a renamed read cannot hide one', () => {
-  for (const name of Object.keys(FOUND)) assert.ok(READS.some(([n]) => n === name), name);
-});
-
 test('THE OWNER SEES THE ADDRESSES, so a read that holds none for the reader is the reader\'s, not an empty record', async () => {
   const t = await team();
   const members = value<unknown>(await t.api.members(t.owner));
@@ -139,9 +124,29 @@ test('THE OWNER SEES THE ADDRESSES, so a read that holds none for the reader is 
 });
 
 for (const [name, read] of READS) {
-  const todo = FOUND[name];
-  test(`A READER'S ${name.toUpperCase()} holds no colleague's address`, todo === undefined ? {} : { todo }, async () => {
+  test(`A READER'S ${name.toUpperCase()} holds no colleague's address`, async () => {
     const t = await team();
     assert.deepEqual(held(await read(t)), [], `the reader's ${name} holds a colleague's address`);
   });
 }
+
+test('THE ADDRESS AND NOT THE ROW: a reader still reads the colleague by name, a contact\'s address and their own', async () => {
+  const t = await team();
+  const typed = 'buyer@acme.example';
+  value(await t.api.create({ register: 'people', fields: { name: 'Acme Buyer', email: typed } }, t.owner));
+  const rows = value<{ rows: { fields: { name: string; email?: string } }[] }>(await t.api.list({ register: 'people' }, t.reader)).rows;
+  assert.ok(rows.some((r) => r.fields.name === WRITER.name && r.fields.email === undefined), 'the colleague is there, with no address');
+  assert.equal(rows.find((r) => r.fields.name === 'Acme Buyer')?.fields.email, typed, 'a contact is the work, and stays');
+  assert.equal(rows.find((r) => r.fields.name === READER.name)?.fields.email, READER.email, 'their own address is theirs');
+});
+
+test('WHOEVER MAY SEE THE TEAM STILL READS THE ADDRESSES ON PEOPLE: the owner, and somebody who decides over the whole record', async () => {
+  const t = await team();
+  const said = value<unknown>(await t.api.list({ register: 'people' }, t.owner));
+  assert.deepEqual(held(said), [WRITER.email]);
+  const decider: CallContext = { principal: { kind: 'person', id: 'p_decider', level: 'decide' } };
+  assert.deepEqual(held(value<unknown>(await t.api.list({ register: 'people' }, decider))), [WRITER.email]);
+  /* AND A MEMBER'S AGENT IS HELD AS THEY ARE: a key at write for the writer reads no colleague's. */
+  const key: CallContext = { principal: { kind: 'token', id: 't_w', scope: 'write', person: 'p_writer', level: 'write' } };
+  assert.equal(JSON.stringify(await t.api.list({ register: 'people' }, key)).includes(READER.email), false);
+});

@@ -3523,6 +3523,59 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       : null;
 
   /**
+   * A COLLEAGUE'S ADDRESS IS FOR WHOEVER MAY SEE THE TEAM (`team`, `members`): an owner, or somebody who decides.
+   *
+   * Joining meets a person into People with the address they signed in with, which `members` holds from a reader. So a
+   * reader who could not ask who is on the record read each colleague's address off People, and off Activity and What's new,
+   * in the line that made the row. It is how that colleague is reached, and the owner never handed it over. So it is taken
+   * off any answer to anybody else: a value that is one of those addresses, or a key of one (`email:<address>`, "Known by").
+   *
+   * THE ADDRESS AND NOT THE ROW, since an address somebody typed about a contact is the work, and THEIR OWN STAYS. A person
+   * asking about themselves is not held from it. Text somebody typed about a colleague is theirs and is not read.
+   */
+  const withoutColleagues = <T>(ctx: CallContext, answer: T): T => {
+    const p = ctx.principal;
+    if (p.kind !== 'person' && p.kind !== 'token') return answer;
+    const who = p.kind === 'token' ? p.person : p.id;
+    const whole = ctx.registers === undefined || ctx.registers === '*';
+    if (who === undefined || p.level === 'owner' || (p.kind === 'person' && p.level === 'decide' && whole)) return answer;
+    if (answer === null || typeof answer !== 'object') return answer;
+    const others = new Set<string>();
+    for (const m of kernel.members()) {
+      const email = typeof m.email === 'string' ? m.email.trim().toLowerCase() : '';
+      if (email !== '' && m.person_id !== who) {
+        others.add(email);
+        others.add(`email:${email}`);
+      }
+    }
+    if (others.size === 0) return answer;
+    const held = (v: unknown): boolean => typeof v === 'string' && v.includes('@') && others.has(v.trim().toLowerCase());
+    const walk = (v: unknown, depth: number): unknown => {
+      if (v === null || typeof v !== 'object' || depth > 64) return v;
+      if (Array.isArray(v)) {
+        const kept = v.filter((x) => !held(x));
+        const out = kept.map((x) => walk(x, depth + 1));
+        return out.length === v.length && out.every((x, i) => x === v[i]) ? v : out;
+      }
+      const proto = Object.getPrototypeOf(v) as unknown;
+      if (proto !== Object.prototype && proto !== null) return v;
+      let changed = false;
+      const next: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(v)) {
+        if (held(x)) {
+          changed = true;
+          continue;
+        }
+        const y = walk(x, depth + 1);
+        if (y !== x) changed = true;
+        next[k] = y;
+      }
+      return changed ? next : v;
+    };
+    return walk(answer, 0) as T;
+  };
+
+  /**
    * NO AGENT WIDENS WHAT AGENTS MAY DO (the owner's call of 4 Nov), on his word, while his switch lets it act without
    * asking, or any other way: every door his word and his switch open stays open, and these stay his, signed in to
    * BrainDog, since an agent that could lift its own limits has none:
@@ -14441,7 +14494,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         drawnBlocks.push(drawn);
         /* THE LEAD LINE OF TODAY'S OWN BODY WAITS FOR THE WHOLE ANSWER, which writes Home's line into it. */
         if (emitBlock === undefined || (decl.page === 'today' && i === 0)) continue;
-        emitBlock({ block: { i, value: sight.mask(ctx, { ...drawn, key: emitKeys[i] }) } });
+        emitBlock({ block: { i, value: withoutColleagues(ctx, sight.mask(ctx, { ...drawn, key: emitKeys[i] })) } });
         if (performance.now() - turned < 6) continue;
         await turnOf();
         turned = performance.now();
@@ -18965,6 +19018,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         throw e;
       }
       return out instanceof Promise ? out.then((v: unknown) => (done(), v), (e: unknown) => (signing.delete(ctx), Promise.reject(e))) : (done(), out);
+    };
+  }
+  /* AND NO ANSWER HOLDS A COLLEAGUE'S ADDRESS (`withoutColleagues`), whichever method made it: the row a joining makes, a
+     line of the log about it, a page, or anything else that carries one. Asked after the method, as a share's mask is. */
+  for (const [name, method] of Object.entries(api)) {
+    if (typeof method !== 'function') continue;
+    (api as Record<string, unknown>)[name] = function (this: unknown, ...argv: unknown[]) {
+      const ctx = argv.find(isCtx) as CallContext | undefined;
+      const out = (method as (...a: unknown[]) => unknown).apply(this, argv);
+      if (ctx === undefined) return out;
+      return out instanceof Promise ? out.then((v: unknown) => withoutColleagues(ctx, v)) : withoutColleagues(ctx, out);
     };
   }
   /* TODAY ASKS EACH PART AS IT IS ASKED ALONE, wrappers and all (`today.ts`). */
