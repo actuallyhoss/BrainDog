@@ -66,6 +66,8 @@ test('A RECORD SWITCH OR A SIGN-OUT DROPS WHAT IS HELD', async () => {
 test("THE BOARD'S OFFER IS LEFT OUT OF TODAY'S READ AND ASKED APART, over the board as drawn; an older record carries it", async () => {
   forgetToday();
   heardLocal(5);
+  /* AN ADDRESS OF ITS OWN: the test above left BASE a host without `today`, and a host stays that for the tab. */
+  const OWN = 'https://offer.test/api';
   const heard: unknown[] = [];
   onOfferHeard((v) => heard.push(v));
   heard.length = 0;
@@ -74,15 +76,16 @@ test("THE BOARD'S OFFER IS LEFT OUT OF TODAY'S READ AND ASKED APART, over the bo
   const newer = {
     call: async (name: string, args: Record<string, unknown> = {}): Promise<never> => {
       sent.push({ name, args });
-      if (name === 'today') return { ok: true, value: ANSWER } as never;
+      /* The record drew the one block asked, with a row in it. */
+      if (name === 'today') return { ok: true, value: { ...ANSWER, page: { ...ANSWER.page, blocks: [{ rows: [{}] }] } } } as never;
       return { ok: true, value: { offers: [offer] } } as never;
     },
   };
   const body = { ...BODY, blocks: [{ kind: 'todo', key: 'late', source: 'register.tasks' }] };
-  await askToday(newer as never, BASE, body, false, null, [{ kind: 'kpis', key: 'numbers', source: 'kpis' }]);
+  await askToday(newer as never, OWN, body, false, null, [{ kind: 'kpis', key: 'numbers', source: 'kpis' }]);
   assert.equal(sent[0]!.args.offer, false);
   assert.deepEqual(heard, [], "Today's read says nothing of the offer");
-  await askOffer(newer as never, BASE);
+  await askOffer(newer as never, OWN);
   assert.equal(sent[1]!.name, 'widgetSuggest');
   assert.deepEqual(sent[1]!.args.board, [
     { key: 'late', source: 'register.tasks', empty: false },

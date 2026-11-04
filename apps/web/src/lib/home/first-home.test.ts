@@ -149,7 +149,7 @@ test('A FRESH SHOP RECORD OPENS ON THE CARD under its line, with no next step ye
   /* HOME MOUNTS THE CARD while `showTell` says so, says its line, and keeps the examples' offer where it was. */
   const src = homeSource();
   assert.match(src, /const tell = \$derived\([^;]*showTell\(/u);
-  assert.match(src, /\{#if tell\}<TellOne options=\{tellOptions\} onadded=\{toldOne\} \/>\{\/if\}/u);
+  assert.match(src, /\{#if tell\}<TellOne options=\{tellOptions\} onadded=\{toldOne\} \/>\{:else if slim\}<TellOne/u);
   /* NO HEAD SENTENCE OVER THE CARD (T7): the made screen just said it, and the card's title and foot say the rest. */
   assert.match(src, /sentence=\{tell \? undefined :/u);
   assert.equal(TELL_LINE, 'Your BrainDog is ready. Start with something from today, and watch where it goes.');
@@ -277,7 +277,7 @@ test('ADD, THEN UNDO, TAKES TODAY BACK TO THE CARD: the counts are read again fr
   assert.match(src, /rereadBoot\(base\)/u);
   assert.match(src, /count: counted \? \(counted\.get\(l\.id\) \?\? 0\)/u);
   assert.match(src, /const told = \$derived\(pressed && counted === null\)/u);
-  assert.match(src, /const tell = \$derived\(first && !told && showTell\(kept, prefs\)\)/u);
+  assert.match(src, /const tell = \$derived\(first && !told && showTell\(kept, \{ \.\.\.prefs, madeWith \}\)\)/u);
 });
 
 test("A COLLEAGUE OR A READER IS NOT ONBOARDED on somebody else's record: no card and no next steps", () => {

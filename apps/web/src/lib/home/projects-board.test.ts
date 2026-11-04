@@ -206,7 +206,7 @@ test('how old the numbers are is the feed\'s newest reading, not the key number 
   const b = boardOf(base({ kpis: [kpi], readings: days.map((at) => ({ project: 'things#1', name: 'Players a day', at })) }));
   assert.match(b.lede ?? '', /Kiln has sent no numbers for 29 days\./u);
   assert.equal(b.week.quiet.said, 'since 28 Sep');
-  assert.deepEqual(b.week.quiet.lines[0], { day: null, project: 'Kiln', text: 'quiet since 28 Sep', href: '/p/kiln' });
+  assert.deepEqual(b.week.quiet.lines[0], { day: null, project: 'Kiln', text: 'Revenue by month, 87 days old', href: '/p/kiln' });
   /* AND THE FIGURE ITSELF SAYS ITS OWN AGE: August's revenue is 87 days old, and not added into the month. */
   const row = b.groups[0]!.rows[0]!;
   assert.equal(row.number.kind === 'kpi' && row.number.sub, '87 days old');

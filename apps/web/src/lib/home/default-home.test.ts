@@ -680,7 +680,7 @@ test('PAID AND CAME IN OF ONE AMOUNT ARE TWO MONEYS, said side by side, and are 
   const line = (values: Record<string, Cell>) => homeDrawn([tile(values)], NOW, undefined, undefined, null, WEEK).sentence?.text;
   /* AN ORDER MARKED PAID AND AN UNRELATED EGP 900 IN THE BANK'S TEXT ARE 1,800: equal amounts say nothing of one payment. */
   assert.equal(line({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 900.00' }), 'EGP 900 came in, and EGP 900 reached your accounts this week.');
-  assert.equal(line({ 'settled-in-7d': 'EGP 900.00 · USD 40.00', 'received-7d': 'EGP 900.00 · USD 40.00' }), 'EGP 900 and USD 40 were paid, and EGP 900 and USD 40 came in this week.');
+  assert.equal(line({ 'settled-in-7d': 'EGP 900.00 · USD 40.00', 'received-7d': 'EGP 900.00 · USD 40.00' }), 'EGP 900 and USD 40 came in, and EGP 900 and USD 40 reached your accounts this week.');
   /* ONE ENTRY BEHIND BOTH FIGURES, as the figures themselves say: the amount is said once, and the tile still names both. */
   const one = { 'settled-in-7d': { value: 'EGP 900.00', backs: ['obligations#4'] }, 'received-7d': { value: 'EGP 900.00', backs: ['obligations#4'] } };
   assert.equal(line(one), 'EGP 900 came in this week.');

@@ -135,7 +135,7 @@ test('A FRESH SHOP READS NO MONEY TILE, and after "Nadia paid 900 on InstaPay" i
   assert.deepEqual(cells(drawn(k).tile), [], 'nothing paid, nothing owed: no tile, never "Paid 0"');
   paid(k, 'Nadia', 90_000, 'EGP');
   const { tile, line } = drawn(k);
-  assert.deepEqual(cells(tile), [['Came in', 'EGP 900.00']], 'the paid invoice is paid; the empty Ledger and nothing owed are not drawn');
+  assert.deepEqual(cells(tile), [['Came in', 'EGP 900']], 'the paid invoice is paid; the empty Ledger and nothing owed are not drawn');
   assert.equal(line, 'EGP 900 came in this week.');
 });
 
@@ -171,7 +171,7 @@ test('A TRANSFER BETWEEN TWO OF HER OWN ACCOUNTS IS NOT MONEY IN: only what some
   assert.doesNotMatch(drawn(k).line ?? '', /came in|paid/u);
   /* WHAT SOMEBODY PAID INTO HER WALLET IS IN, beside the transfer, which still is not. */
   moved(k, wallet, 'in', 30_000, 'EGP', 'A customer');
-  assert.deepEqual(cells(drawn(k).tile), [['Into your accounts', 'EGP 300.00']]);
+  assert.deepEqual(cells(drawn(k).tile), [['Into your accounts', 'EGP 300']]);
 });
 
 /* RED UNTIL `lib/record/metrics.ts` `partsShown` writes a bare `money` format's parts in each currency's own units

@@ -200,7 +200,7 @@ test('AN ENTRY HELD BACK IS SAID ON THE RECEIPT with what it needs, and the rest
   const two = { ...FRESH, accounts: [{ seq: 1, name: 'CIB current' }, { seq: 2, name: 'Cash box' }] };
   const out = press(two);
   assert.equal(out.sent, 2);
-  assert.match(out.said, /^Added an order and a client\. Not added: EGP\u00a0900\.00 from Nadia, by InstaPay\. It needs [Aa]ccount\.$/u);
+  assert.match(out.said, /^Added an order and a client\. Not added: EGP\u00a0900 from Nadia, by InstaPay\. It needs [Aa]ccount\.$/u);
   assert.equal(heldSaid([{ register: 'people', fields: {}, missing: [], said: 'Nadia' }]), '');
 });
 

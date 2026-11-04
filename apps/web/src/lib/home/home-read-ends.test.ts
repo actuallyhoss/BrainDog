@@ -32,7 +32,7 @@ test('R6: a phone’s copy kept in memory is not drawn on a board wider than a p
 });
 
 test('R7: a quiet read that fails over a drawn page closes the screen as drawn', () => {
-  const kept = home.slice(home.indexOf("if (out?.from !== 'live' && (was ||"), home.indexOf("if (out?.from !== 'live' && (was ||") + 300);
+  const kept = home.slice(home.indexOf("if (out?.from !== 'live' && !wasPartial && (was ||"), home.indexOf("if (out?.from !== 'live' && !wasPartial && (was ||") + 300);
   assert.match(kept, /readFailed = true;\s*ok = true;\s*return;/u);
 });
 
