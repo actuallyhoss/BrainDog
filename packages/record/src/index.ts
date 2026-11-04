@@ -18063,7 +18063,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (everywhere && grant !== null && grant.scope !== '*')
         return no(
           'FORBIDDEN',
-          'This keychain access is for one project, so a key it puts away is kept there. Put a key for every project under your own login (braindog keys put <label> --everywhere) or on the Keys screen.',
+          'This keychain access is for one project, so a key it puts away is kept there. A key for every project is the owner's to make, or to replace, on the Keys screen.',
           { at: 'everywhere' },
         );
       if (agent) {
