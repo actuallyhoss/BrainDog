@@ -69,8 +69,12 @@ export const SIGNED_OUT_PREFIXES = [
 /** A drawn widget's picture in the shape kept before it was kept per person (`<code>.<size>.<mode>`, no `whose.`). */
 export const LEGACY_PICTURE = /^bd\.drawn\.pic\.[^.]+\.[^.]+\.(?:light|dark)$/u;
 
-/** Keys kept in `sessionStorage`: who this tab sees the record as (`see-as.svelte.ts`), never carried to the next session. */
-export const SIGNED_OUT_SESSION_KEYS = ['braindog.see-as'] as const;
+/**
+ * Keys kept in `sessionStorage`: who this tab sees the record as (`see-as.svelte.ts`), and the words a person made their
+ * BrainDog from with what the model drafted from them (`first-drafts.svelte.ts`). Neither is carried to the next session:
+ * the drafts are read by the record's address alone, so a colleague signing in on the same tab would have been offered them.
+ */
+export const SIGNED_OUT_SESSION_KEYS = ['braindog.see-as', 'braindog.first.drafts'] as const;
 
 type Store = Pick<Storage, 'length' | 'key' | 'removeItem'>;
 

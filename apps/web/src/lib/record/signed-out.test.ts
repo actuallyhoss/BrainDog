@@ -52,7 +52,7 @@ test('A SIGN-OUT DROPS EVERY KEY OF WHAT THE PERSON READ, and keeps what is the 
     'bd.drawn.pic.abc.page.light': '{"p":"<svg/>","h":120}',
     'bd.drawn.pic.abc.wide.dark': '{"p":"<svg/>","h":120}',
   });
-  const session = store({ 'braindog.see-as': '{"id":"p_2","name":"Ana"}', bd_look_fix: '{}' });
+  const session = store({ 'braindog.see-as': '{"id":"p_2","name":"Ana"}', 'braindog.first.drafts': '{"base":"","drafts":[]}', bd_look_fix: '{}' });
   forgetSignedOut(local, session);
   assert.deepEqual([...local.held.keys()].sort(), [
     'bd.drawn.pic.w1.abc.page.light',
@@ -108,6 +108,7 @@ test('EACH KEY IS THE ONE ITS OWN MODULE KEEPS, so a renamed key is not left beh
   assert.ok(src('../home/tell-line.ts').includes('`bd.tell:${base || \'/\'}:${person}`'));
   assert.deepEqual([...SIGNED_OUT_PREFIXES], ['braindog.seen.', 'braindog.welcomed:', 'bd_board_draft:', 'bd_slash_threads:', 'bd.tell:']);
   assert.ok(src('../sharing/see-as.svelte.ts').includes(`'${SIGNED_OUT_SESSION_KEYS[0]}'`));
+  assert.ok(src('../start/first-drafts.svelte.ts').includes(`'${SIGNED_OUT_SESSION_KEYS[1]}'`));
 });
 
 test('EVERY WAY A SESSION ENDS DROPS THEM: sign-out, signing out here too, a session the record no longer knows, access ended, an account closed', () => {
