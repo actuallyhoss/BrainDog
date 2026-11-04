@@ -36,8 +36,11 @@
     base,
     icons,
     onretry,
+    resting = false,
   }: {
     base: string;
+    /** The panel holding it is closed, so what it follows asks nothing (`SentLine`). */
+    resting?: boolean;
     /** Each list's glyph, by its id. */
     icons: ReadonlyMap<string, string>;
     /** Ask a question again, after one that did not go through. */
@@ -211,7 +214,7 @@
               {/if}
               {#if a.kind === 'ask' && a.state === 'open' && a.detail && a.detail !== a.title}<p class="act-why" dir="auto">{why(a.detail)}</p>{/if}
               {#if a.note}<p class="act-note" role="status">{a.note}</p>{/if}
-              {#if a.sent}<SentLine sent={a.sent} {base} />{/if}
+              {#if a.sent}<SentLine sent={a.sent} {base} {resting} />{/if}
               {#if (a.kind === 'ask' && (a.state === 'open' || (a.state === 'busy' && !a.receipt))) || undoable(a)}
                 <div class="act-do">
                   {#if a.kind === 'ask' && (a.state === 'open' || (a.state === 'busy' && !a.receipt))}
