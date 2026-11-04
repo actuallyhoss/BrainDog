@@ -428,15 +428,17 @@ function updatesAsked(sql: Sql, installed: ReadonlySet<string>): { id: string; o
 /** How far back a computer's command is judged: a key that called in this week. */
 export const COMMAND_WINDOW_DAYS = 7;
 
-/** One computer's command as its key last said it: its build, that build's day, and the kind of machine, when known. */
-type CommandHeard = { build: string; day: string; machine: string | null };
+/** One computer's command as its keys last said it: its build, that build's day, the kind of machine, when known, and when it last called. */
+type CommandHeard = { build: string; day: string; machine: string | null; heard: string };
 
 /**
  * The kind of machine a run's host name says, never the name itself, which often carries its owner's: `MacBook`,
  * `Windows PC`. `null` for a name that says no kind. (`deviceOf` in the agent door reads the same names.)
  */
-function machineOf(host: unknown): string | null {
-  if (typeof host !== 'string' || host === '') return null;
+function machineOf(host: unknown, cwd?: unknown): string | null {
+  /* A FOLDER ON A DRIVE LETTER IS WINDOWS, whatever the computer was named: his is called Sam, which says nothing. */
+  const windows = typeof cwd === 'string' && /^[A-Za-z]:[\\/]/u.test(cwd);
+  if (typeof host !== 'string' || host === '') return windows ? 'Windows PC' : null;
   const h = host.toLowerCase();
   if (h.includes('macbook')) return 'MacBook';
   if (h.includes('imac')) return 'iMac';
@@ -444,7 +446,7 @@ function machineOf(host: unknown): string | null {
   if (/mac-?studio/u.test(h)) return 'Mac Studio';
   if (/^laptop-/u.test(h)) return 'Windows laptop';
   if (/^(desktop|win)-/u.test(h)) return 'Windows PC';
-  return null;
+  return windows ? 'Windows PC' : null;
 }
 
 /**
@@ -452,25 +454,35 @@ function machineOf(host: unknown): string | null {
  * build (`x-braindog-cli`), which its key keeps (`last_build`); a door mark's build is the host's own on a `hello` and the
  * command's only on its hook's mark, so "the newest mark" was this host's build after one session and the command's after
  * the next. A key that called this week, with a build of a day (never a checkout's), and the machine its newest run named.
+ *
+ * ONE COMPUTER IS ONE ANSWER, ITS NEWEST. A computer holds a key for each kind of agent, and a key only says its build when
+ * it calls, so after `braindog update` a key not used yet went on saying the old build for a week and held this sign red
+ * on a computer that had already updated. Keys are grouped by the host name their newest run gave, and the newest build
+ * among them is what that computer runs. A key whose runs name no host stands alone.
  */
 function commandsHeard(sql: Sql, nowMs: number): CommandHeard[] {
   if (!hasTable(sql, 'token')) return [];
   const since = new Date(nowMs - COMMAND_WINDOW_DAYS * DAY).toISOString();
-  const keys = sql.all<{ id: string; build: string }>(
-    'SELECT id, last_build AS build FROM token WHERE revoked_at IS NULL AND last_build IS NOT NULL AND last_used_at >= ? ORDER BY last_used_at DESC',
+  const keys = sql.all<{ id: string; build: string; heard: string }>(
+    'SELECT id, last_build AS build, last_used_at AS heard FROM token WHERE revoked_at IS NULL AND last_build IS NOT NULL AND last_used_at >= ? ORDER BY last_used_at DESC',
     since,
   );
-  return keys.flatMap((k) => {
+  const computers = new Map<string, CommandHeard>();
+  for (const k of keys) {
     const day = buildDayOf(k.build);
-    if (day === null) return [];
-    const host = hasTable(sql, 'entry')
-      ? sql.one<{ host: string | null }>(
-          "SELECT json_extract(fields, '$.host') AS host FROM entry WHERE register = 'session' AND deleted_at IS NULL AND json_extract(fields, '$.token_id') = ? ORDER BY created_at DESC LIMIT 1",
+    if (day === null) continue;
+    const run = hasTable(sql, 'entry')
+      ? sql.one<{ host: string | null; cwd: string | null }>(
+          "SELECT json_extract(fields, '$.host') AS host, json_extract(fields, '$.cwd') AS cwd FROM entry WHERE register = 'session' AND deleted_at IS NULL AND json_extract(fields, '$.token_id') = ? ORDER BY created_at DESC LIMIT 1",
           k.id,
-        )?.host
-      : null;
-    return [{ build: k.build, day, machine: machineOf(host) }];
-  });
+        )
+      : undefined;
+    const at = typeof run?.host === 'string' && run.host !== '' ? `host:${run.host}` : `key:${k.id}`;
+    const was = computers.get(at);
+    if (was === undefined || day > was.day) computers.set(at, { build: k.build, day, machine: machineOf(run?.host, run?.cwd) ?? was?.machine ?? null, heard: was === undefined || k.heard > was.heard ? k.heard : was.heard });
+    else if (k.heard > was.heard) was.heard = k.heard;
+  }
+  return [...computers.values()];
 }
 
 /**
@@ -560,7 +572,7 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
       const { where, one } = machinesSaid(behind);
       const same = behind.every((m) => m.day === oldest.day);
       red.set(' command', {
-        line: `The BrainDog command on ${where} runs ${same ? 'the build' : 'a build as old as that'} of ${daySaid(oldest.day)}, and this host serves the build of ${daySaid(appDay)}. Running braindog update on ${one ? where : 'each'} turns it on.`,
+        line: `The BrainDog command on ${where} runs ${same ? 'the build' : 'a build as old as that'} of ${daySaid(oldest.day)}, and this host serves the build of ${daySaid(appDay)}. Running braindog update on ${one ? where : 'each'} turns it on.${behind.length === 1 ? ` It last called on ${daySaid(behind[0]!.heard)}, and a computer quiet for ${COMMAND_WINDOW_DAYS} days stops counting.` : ''}`,
         who: 'the BrainDog command',
         how: `Running braindog update on ${one ? where : 'each computer'} turns the command on.`,
       });
