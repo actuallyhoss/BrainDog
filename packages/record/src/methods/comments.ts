@@ -104,12 +104,8 @@ export function methods(deps: RecordDeps) {
     return sightOf(theirs, target) !== null;
   };
 
-  const ringNamed = (entry: string, list: string, body: string, comment: string, by: string): void => {
-    const named = namedIn(body, by);
-    if (named.length === 0) return;
-    const row = kernel.get(entry);
-    if (row === null || typeof row.seq !== 'number') return;
-    for (const id of named) if (seenBy(id, `entry:${entry}`)) kernel.tellColleague(id, { by, cause: `mention.${comment}.${id}`, open: `/r/${list}/${row.seq}`, about: entry });
+  const ringNamed = (entry: string, seq: number, list: string, body: string, comment: string, by: string): void => {
+    for (const id of namedIn(body, by)) if (seenBy(id, `entry:${entry}`)) kernel.tellColleague(id, { by, cause: `mention.${comment}.${id}`, open: `/r/${list}/${seq}`, about: entry });
   };
 
   /**
@@ -245,8 +241,11 @@ export function methods(deps: RecordDeps) {
         actor: actorOf(ctx),
       });
       if (written.ok && typeof args?.body === 'string') {
-        if (at.list !== null) ringNamed(at.target.slice('entry:'.length), at.list, args.body, written.value.id, actorOf(ctx));
-        else ringNamedOn(at.target, args.body, written.value.id, actorOf(ctx));
+        if (at.list !== null) {
+          const entry = at.target.slice('entry:'.length);
+          const row = kernel.get(entry);
+          if (row !== null && typeof row.seq === 'number') ringNamed(entry, row.seq, at.list, args.body, written.value.id, actorOf(ctx));
+        } else ringNamedOn(at.target, args.body, written.value.id, actorOf(ctx));
       }
       return tail(written);
     },
