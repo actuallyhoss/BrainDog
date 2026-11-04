@@ -3,11 +3,13 @@
 
   A 56px head on the bar's line: BrainDog's mark and name (`Brand.svelte`) and the button that hides it.
   Then the places, Today, Needs you and the record's own (Work, Money, Agents, People), each with its count, the red one
-  only for what needs you and a live dot for an agent at work. Then the projects: the heading is the portfolio page,
-  "+" adds one, then ONLY THE PROJECTS PINNED HERE (`nav.pins`, Pin to sidebar on a project's page and on Projects), by
-  name, each with its late count and live dot, and the lists that belong to the projects. Every other project is on the
-  Projects page. Then More lists, folded, for whatever has no place. At the foot what the record
-  is run with: the inbox, add-ons, usage, suggested changes when any, and Settings.
+  only for what needs you and a live dot for an agent at work. PROJECTS IS A PLACE LIKE THEM (Sam, 4 Nov: "it's confusing
+  in the sidebar without having things pinned, make it look like a page"): its row opens the portfolio page, its count is
+  what is in play, "+" comes up on the row under a pointer, and UNDER IT STAND ONLY THE PROJECTS PINNED HERE (`nav.pins`,
+  Pin to sidebar on a project's page and on Projects), by name, each with its late count and live dot. The lists that
+  belong to the projects (Stages, Numbers, Key numbers) unfold under it while you are there, as Money's do. Every other
+  project is on the Projects page. Then whatever has no place, folded under More lists from three. At the foot what the
+  record is run with: the inbox, add-ons, usage, suggested changes when any, and Settings.
 
   EACH LIST LIVES UNDER THE PLACE IT BELONGS TO (`side.ts` `homesOf`) and unfolds when you are in that place, so Money's
   lists show on Money and on each of them. EXACTLY ONE ROW IS LIT ON EVERY PAGE (`litOf`), the one the page is on most
@@ -113,14 +115,13 @@
      their own tabs. A tab's place that has places under it (Money's lists) stays, as the way to them. */
   const menuPlaces = $derived(phone ? model.places.filter((p) => !(tabbed.includes(p.href) && p.kids.length === 0)) : model.places);
   /** What in the rail moves to make room for a place arriving: each row, the head of Projects, and the rule. */
-  const ROWS = '.s-list, li, .s-head, .s-rule, .s-tile';
+  const ROWS = '.s-list, li, .s-tile';
 
   const words = {
     title: 'Projects',
     nav: 'Places',
     side: 'Sidebar',
     menu: 'Menu',
-    inPlay: (n: number) => `${n.toLocaleString('en-GB')} in play`,
     add: 'Add a project',
     late: 'late',
     working: 'An agent is at work',
@@ -433,10 +434,23 @@
   }
 
   const showProjects = $derived(model.projects !== null && (read === null ? !answered : holdsProjects(read)));
-  /* THE PAGE IDEAS ARE A QUIET LINE UNDER PROJECTS (plan F1): in the foot beside Settings, "2 page ideas / Review" read
-     like a setting. They stay in the foot only where no projects are drawn, and wait for the first read to say which,
-     so the line never starts in the foot and moves up. */
+  /* THE PAGE IDEAS ARE A ROW OF THEIR OWN AFTER THE PLACES (plan F1): in the foot beside Settings, "2 page ideas / Review"
+     read like a setting, and as a quiet line under Projects they read as the projects' (4 Nov), which they are not: they
+     are about the whole record's pages. They stay in the foot only where no projects are drawn, and wait for the first
+     read to say which, so the row never starts in the foot and moves up. */
   const penUnder = $derived(pen !== null && showProjects && read !== null && split !== null);
+  /* THE PROJECTS' ROW: lit on the page, and on a project not pinned here, whose way back it is. A pinned project lights its
+     own row under it. Its own lists stand open while you are in them, or on the phone once its button was pressed. */
+  const projectsLit = $derived.by(() => {
+    if (!model.projects?.href) return false;
+    if (isLit(model.projects.href)) return true;
+    /* THE SHELL LIGHTS A PROJECT'S OWN ADDRESS WHERE ITS PAGE IS AMONG THE PROJECTS' THINGS, AND ELSE LEAVES IT TO `projectLit`. */
+    const onProject = projectLit !== undefined || model.projects.things.some((t) => isLit(t.href));
+    return onProject && !pinned.some((p) => isLit(p.href));
+  });
+  const projectsOpen = $derived(
+    phone ? (opens['#projects'] ?? false) : model.projects !== null && ((model.projects.href !== null && isLit(model.projects.href)) || model.projects.kids.some((k) => isLit(k.href))),
+  );
   /* MORE LISTS FOLDS ONLY WHAT IS WORTH A FOLD (plan F2): one or two lists stand in the rail as rows of their own, and a
      fold that opened on one row is a press for one thing. From three they fold as before. */
   const MORE_FOLDS = 3;
@@ -581,27 +595,41 @@
 
 {#snippet projectsPart()}
   {#if showProjects && model.projects}
-    <div class="s-head">
-      <!-- LIT ON THE PROJECTS PAGE, AND ON A PROJECT NOT PINNED HERE, whose way back is this heading. -->
-      {#if model.projects.href}<a class="s-title tap" href={at(model.projects.href)} aria-current={isLit(model.projects.href) || (projectLit !== undefined && !pinned.some((p) => p.href === projectLit)) ? 'page' : undefined}>{model.projects.label}</a>{:else}<span class="s-title">{model.projects.label}</span>{/if}
-      {#if split}<span class="s-count">{words.inPlay(split.play.length)}</span>{/if}
-      {#if read}
-        <a class="s-add tap" href={at(`/r/${read.list}?new=1`)} aria-label={words.add} title={words.add}><Icon name="plus" size="m" /><span class="sr-only">{words.add}</span></a>
+    {@const kids = projectsOpen ? model.projects.kids : []}
+    <li class="s-item s-projects" in:placeIn={{ hold: settling() }}>
+      <a class="s-row s-place tap" href={at(model.projects.href ?? '/')} aria-current={projectsLit ? 'page' : undefined}>
+        <Icon name="projects" size="m" /><span class="s-name">{model.projects.label}</span>
+        {#if split && split.play.length > 0}<span class="s-count num">{split.play.length.toLocaleString('en-GB')}</span>{/if}
+      </a>
+      {#if read && !phone}
+        <a class="s-add tap" href={at(`/r/${read.list}?new=1`)} aria-label={words.add} title={words.add}><Icon name="plus" size="s" /></a>
       {/if}
-    </div>
-    {#if read && split}
-      <ul class="s-list">
-        {#each pinned as p (p.key)}{@render project(p)}{/each}
-        {#each model.projects.kids as k (k.href)}{@render link(k, false)}{/each}
-        {#if penUnder && pen}
-          <li>
-            <a class="s-row s-link s-quiet tap" data-nested="" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><span class="s-name">{pen.label}</span></a>
-          </li>
+      {#if phone && model.projects.kids.length > 0}
+        <button type="button" class="s-open tap" aria-expanded={projectsOpen} aria-label={words.open(model.projects.label)} onclick={() => turn(() => (opens['#projects'] = !projectsOpen))}>
+          <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
+        </button>
+      {/if}
+      {#if read && split}
+        {#if pinned.length > 0 || kids.length > 0}
+          <ul class="s-list s-nested">
+            {#each pinned as p (p.key)}{@render project(p)}{/each}
+            {#each kids as k (k.href)}{@render link(k, true)}{/each}
+          </ul>
         {/if}
-      </ul>
-    {:else if !answered && pins.length > 0}
-      {@render outline()}
-    {/if}
+      {:else if !answered && pins.length > 0}
+        <div class="s-nested">{@render outline()}</div>
+      {/if}
+    </li>
+  {/if}
+{/snippet}
+
+{#snippet penPart()}
+  {#if penUnder && pen}
+    <ul class="s-list">
+      <li in:placeIn={{ hold: settling() }}>
+        <a class="s-row s-link tap" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><Icon name="alert" size="m" /><span class="s-name">{pen.label}</span></a>
+      </li>
+    </ul>
   {/if}
 {/snippet}
 
@@ -650,21 +678,18 @@
   <!-- THE PAGE'S NAME FOR A SCREEN READER: the bar says it for the eye. -->
   <h1 class="sr-only" tabindex="-1">{words.menu}</h1>
   <div class="s-phone" bind:this={rows}>
-    {#if menuPlaces.length > 0}
+    {#if menuPlaces.length > 0 || showProjects}
       <nav class="s-tile" aria-label={words.nav}>
         <ul class="s-list">
           {#each menuPlaces as p (p.key)}{@render place(p)}{/each}
+          {@render projectsPart()}
         </ul>
       </nav>
     {/if}
-    {#if showProjects && model.projects}
-      <div class="s-tile">
-        {@render projectsPart()}
-      </div>
-    {/if}
-    {#if placed && model.more.length > 0}
+    {#if (placed && model.more.length > 0) || penUnder}
       <div class="s-tile">
         {@render morePart()}
+        {@render penPart()}
       </div>
     {/if}
     <!-- THE RECORD'S TOOLS AND SETTINGS IN A SHORT TILE OF THEIR OWN AT THE FOOT (plan F9), not run on after More lists. -->
@@ -718,13 +743,13 @@
         <svg class="s-side-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.75" y="4.75" width="16.5" height="14.5" rx="3" /><path d="M9.25 4.75v14.5" /></svg>
       </button>
     </div>
-    <nav class="s-scroll" aria-label={words.nav} bind:this={rows} {@attach litSlide('.s-row[aria-current="page"], .s-title[aria-current="page"]', { fill: 'var(--chosen)' })}>
+    <nav class="s-scroll" aria-label={words.nav} bind:this={rows} {@attach litSlide('.s-row[aria-current="page"]', { fill: 'var(--chosen)' })}>
       <ul class="s-list">
         {#each model.places as p (p.key)}{@render place(p)}{/each}
+        {@render projectsPart()}
       </ul>
-      {@render projectsPart()}
-      {#if placed && model.more.length > 0}<div class="s-rule" role="presentation"></div>{/if}
       {@render morePart()}
+      {@render penPart()}
       {@render footPart()}
     </nav>
     <!-- THE EDGE, DRAGGED. A separator with its value is a widget, so it takes focus and the arrows move it too. -->
@@ -845,51 +870,38 @@
     background-color: color-mix(in oklab, var(--ink) 22%, transparent);
   }
 
-  .s-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    padding-inline: var(--sp-3) 0;
-    margin-block: var(--sp-4) var(--sp-1);
-  }
-
-  /* UNDER A THUMB THE HEAD IS AS TALL AS ITS TARGETS (mobile pass of 2 November): "Projects" and its + are 44 high by
-     `.tap`'s box in a 28px row, so both reached 4px into the first project's row on Menu. The row is now 44 and the
-     rows start under it, with the gap above the head taken in by the same amount so the list barely moves. */
-  @media (width < 900px) {
-    .s-head {
-      min-block-size: var(--tap);
-      margin-block: var(--sp-3) 0;
-    }
-  }
-
-  .s-title {
-    padding: 2px var(--sp-1);
-    margin-inline-start: calc(-1 * var(--sp-1));
-    border-radius: var(--r-xs);
-    color: var(--ink);
-    font-size: var(--fs-ctl);
-    font-weight: var(--fw-semi);
-    text-decoration: none;
-  }
-
-  .s-title[aria-current='page'] {
-    background: var(--nav-selected);
-  }
-
-  .s-head .s-count {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
+  /* "+" ON THE PROJECTS' ROW, AT ITS END: comes up under a pointer or on focus, and the count gives it the room. Never
+     under a thumb, where the Projects page's own Add is the way. */
   .s-add {
+    position: absolute;
+    inset-block-start: 5px;
+    inset-inline-end: 5px;
     display: grid;
     place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    margin-inline-start: auto;
-    border-radius: var(--r-ctl);
+    inline-size: 26px;
+    block-size: 26px;
+    border-radius: var(--r-xs);
     color: var(--ink-3);
+    opacity: 0;
+  }
+
+  .s-add:focus-visible,
+  .s-projects:has(> .s-add:focus-visible) > .s-add {
+    opacity: 1;
+  }
+
+  .s-projects:has(> .s-add:focus-visible) > .s-row .s-count {
+    visibility: hidden;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .s-projects:has(> .s-row:hover, > .s-add:hover) > .s-add {
+      opacity: 1;
+    }
+
+    .s-projects:has(> .s-row:hover, > .s-add:hover) > .s-row .s-count {
+      visibility: hidden;
+    }
   }
 
   .s-list,
@@ -990,10 +1002,12 @@
     font-weight: var(--fw-regular);
   }
 
+  /* A PROJECT PINNED UNDER PROJECTS: its mark on the edge the lists under a place start on, its name a step down from the
+     place's, as tall as its mark needs. */
   .s-nested .s-proj {
-    padding-inline-start: var(--sp-2);
+    min-block-size: 30px;
     font-size: var(--fs-ctl);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-regular);
   }
 
   .s-nested .s-row[aria-current='page'] {
@@ -1019,16 +1033,6 @@
     inline-size: 13px;
     block-size: 13px;
     color: inherit;
-  }
-
-  /* A QUIET LINE UNDER THE PROJECTS (the page ideas): no glyph, its name on the projects' names' edge, the third ink. */
-  .s-quiet {
-    /* On the labels' edge: the row's 10, the glyph's 20 and the gap's 8 (it was 2 short). */
-    padding-inline-start: calc(10px + 20px + var(--sp-2));
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta);
-    font-weight: var(--fw-regular);
   }
 
   /* IN THE DARK THE MARKS GO ONE STEP QUIETER (plan F4): the slot's tint and colour read louder than the place glyphs
@@ -1179,20 +1183,12 @@
     padding: 0;
   }
 
-  .s-rule {
-    block-size: 1px;
-    margin: var(--sp-2) 10px;
-    border-radius: 1px;
-    background: var(--sep);
-  }
-
   @media (hover: hover) and (pointer: fine) {
     .s-row:not([aria-current='page']):hover,
     .s-part:hover,
     .s-add:hover,
     .s-pin:hover,
     .s-hide:hover,
-    .s-title:not([aria-current='page']):hover,
     .s-ricon:not([aria-current='page']):hover {
       background: var(--row-wash);
       color: var(--ink);
@@ -1347,15 +1343,6 @@
     border-block-start: 0;
   }
 
-  .s-phone .s-row.s-quiet {
-    padding-inline-start: calc(var(--sp-2) + 28px + var(--sp-3));
-    font-size: var(--fs-ctl);
-  }
-
-  .s-phone .s-head {
-    margin-block-start: var(--sp-2);
-  }
-
   .s-phone .s-row {
     min-block-size: var(--tap);
     gap: var(--sp-3);
@@ -1370,6 +1357,11 @@
   .s-phone .s-nested .s-row {
     padding-inline-start: calc(var(--sp-2) + var(--icon-s, 16px) + var(--sp-3));
     font-size: var(--fs-ctl);
+  }
+
+  .s-phone .s-nested .s-proj {
+    padding-inline-start: var(--sp-5);
+    font-size: var(--fs-body);
   }
 
   .s-phone .s-pm {
