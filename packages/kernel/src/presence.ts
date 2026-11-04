@@ -252,6 +252,24 @@ export function quietRuns(sql: Sql, nowMs: number, olderMs: number, limit: numbe
 }
 
 /**
+ * The open runs against `olderMs`, as the sign that says runs end cleanly reads them (`runs-true` in `signs.ts`): those
+ * neither heard from nor pulsed in it, oldest first, by when they were heard and who they are; and when the first of the
+ * rest was heard, which is when the sign's answer next moves. At any age, as `quietRuns` reads them.
+ */
+export function openRunsHeard(sql: Sql, nowMs: number, olderMs: number): { silent: { heard: string; agent: string | null }[]; soonest: string | null } {
+  const before = new Date(nowMs - olderMs).toISOString();
+  const soonest = sql.one<{ heard: string | null }>(
+    `SELECT min(${HEARD_OR_OPEN_SQL}) AS heard FROM entry WHERE register = '${RUNS}' AND deleted_at IS NULL AND state IN ('active', 'idle') AND ${HEARD_OR_OPEN_SQL} >= ?`,
+    before,
+  );
+  const silent = sql.all<{ heard: string; agent: string | null }>(
+    `SELECT ${HEARD_OR_OPEN_SQL} AS heard, coalesce(json_extract(fields, '$.client'), json_extract(fields, '$.agent')) AS agent FROM entry WHERE register = '${RUNS}' AND deleted_at IS NULL AND state IN ('active', 'idle') AND ${HEARD_OR_OPEN_SQL} < ? ORDER BY heard`,
+    before,
+  );
+  return { silent, soonest: soonest?.heard ?? null };
+}
+
+/**
  * The runs still open, active or idle, heard from inside `STALE_MS`: what an agent starting here is told is around it.
  * A run silent longer is no company, whatever its state says, so a briefing names no dead run, and a run carried in this
  * morning that was last seen in September is not one either.

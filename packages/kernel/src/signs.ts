@@ -35,6 +35,7 @@ import { nextOccurrence } from './digest.ts';
 import { dayIn } from './finished.ts';
 import { UNVERIFIED } from './ingest.ts';
 import { RATE_STALE_DAYS, ratesFrom, type Rate } from './fx.ts';
+import { openRunsHeard } from './presence.ts';
 import { intervalMs } from './pull.ts';
 import { ratesFeed, ratesFeedSaid } from './rates-feed.ts';
 import { ratesRole, type RoleList } from './roles.ts';
@@ -645,9 +646,6 @@ function readOldest(sql: Sql, nowMs: number, tz: string, lasts: SignLasts = () =
 function readRuns(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined): SignReading {
   lasts(Infinity);
   const since = new Date(nowMs - RUNS_WINDOW_DAYS * DAY).toISOString();
-  /* HEARD OR PULSED, as the sweep reads it (`quietRuns` in `presence.ts`): a window open on a question is not silent. */
-  const HEARD = "max(coalesce(json_extract(fields, '$.last_seen'), updated_at), coalesce(json_extract(fields, '$.pulse_at'), ''))";
-  const AGENT = "coalesce(json_extract(fields, '$.client'), json_extract(fields, '$.agent'))";
   /* A WEEK OF RUNS IS RUNS HEARD FROM HERE THIS WEEK, by `last_seen` alone. A run never heard from here (`presenceOf`'s
      `before`: one carried in from another system, all of them written off there) has no `last_seen`, and read by its
      row's last change, one edit of its project in a week counted every such run as one that ended abandoned this week:
@@ -669,21 +667,11 @@ function readRuns(sql: Sql, nowMs: number, lasts: SignLasts = () => undefined): 
   /* BY THE CLOCK ALONE (`SignLasts`): a run of the week leaves it, and an open run goes silent twelve hours after it was
      last heard from. */
   for (const r of heard) lasts(crossesAt(r.seen, RUNS_WINDOW_DAYS * DAY));
-  lasts(
-    crossesAt(
-      sql.one<{ heard: string | null }>(
-        `SELECT min(${HEARD}) AS heard FROM entry WHERE register = 'session' AND deleted_at IS NULL AND state IN ('active', 'idle') AND ${HEARD} >= ?`,
-        new Date(nowMs - RUN_SILENT_MS).toISOString(),
-      )?.heard,
-      RUN_SILENT_MS,
-    ),
-  );
-  /* STILL OPEN LONG AFTER IT WAS LAST HEARD FROM: the sweep that writes such a run off did not. AT ANY AGE, not only this
-     week's: a run the sweep never wrote off falls out of the window and would read as no run at all. */
-  const silent = sql.all<{ heard: string; agent: string | null }>(
-    `SELECT ${HEARD} AS heard, ${AGENT} AS agent FROM entry WHERE register = 'session' AND deleted_at IS NULL AND state IN ('active', 'idle') AND ${HEARD} < ? ORDER BY heard`,
-    new Date(nowMs - RUN_SILENT_MS).toISOString(),
-  );
+  /* STILL OPEN LONG AFTER IT WAS LAST HEARD FROM OR PULSED, as the sweep reads it: the sweep that writes such a run off did
+     not. AT ANY AGE, not only this week's: a run the sweep never wrote off falls out of the window and would read as no
+     run at all. */
+  const { silent, soonest } = openRunsHeard(sql, nowMs, RUN_SILENT_MS);
+  lasts(crossesAt(soonest, RUN_SILENT_MS));
   if (runs.length === 0 && silent.length === 0) return reading('none', null, `No agent has run in the last ${RUNS_WINDOW_DAYS} days.`);
   const ended = runs.filter((r) => r.state === 'done' || r.state === 'abandoned' || r.state === 'handoff');
   const abandoned = ended.filter((r) => r.state === 'abandoned').length;

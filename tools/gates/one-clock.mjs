@@ -53,8 +53,8 @@ export const ALLOWED = {
   'apps/web/src/lib/record/api.ts': 1,
   /* The ladder's 45 minutes, twice in SQL: the run a write that names none is adopted into. */
   'packages/kernel/src/session.ts': 2,
-  /* The runs-true sign: a week of runs, and the runs still open long after they were heard from. */
-  'packages/kernel/src/signs.ts': 2,
+  /* The runs-true sign: a week of runs. The runs still open long after they were heard from ask `openRunsHeard`. */
+  'packages/kernel/src/signs.ts': 1,
   /* The briefing check: a run a briefing calls live, against `BRIEFING_LIVE_MS`. */
   'packages/record/src/signs.ts': 1,
 };
