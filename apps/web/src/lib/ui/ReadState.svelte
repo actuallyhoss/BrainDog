@@ -29,8 +29,11 @@
     state,
     refusal = null,
     screen,
+    shape,
     onretry,
   }: {
+    /** The name the wait keeps the page's shape under (`Waiting`), for a screen whose head stands apart. */
+    shape?: string | undefined;
     state: 'waiting' | 'empty' | 'refused' | 'offline' | 'fault';
     /** The record's sentence for a refusal, or the technical reason for an offline read or a draw fault. */
     refusal?: string | null | undefined;
@@ -46,7 +49,7 @@
 {/snippet}
 
 {#if state === 'waiting'}
-  <Waiting rows={3} />
+  <Waiting rows={3} {shape} />
 {:else if state === 'empty'}
   <Empty kind="no-data-yet" compact title={copy.readEmpty} />
 {:else if state === 'refused'}

@@ -299,7 +299,7 @@
     <!-- A REFUSED SHELL IS NOT A LIST TO SHOW. The record's sentence is the page, as it is on Home. -->
     <Empty kind="error" heading title={page.data.refused.fix} />
   {:else if jobs.state === 'waiting' || jobs.state === 'refused' || jobs.state === 'offline'}
-    <ReadState state={jobs.state} refusal={jobs.refusal} onretry={jobs.reread} />
+    <ReadState state={jobs.state} refusal={jobs.refusal} onretry={jobs.reread} shape="jobs" />
   {:else if jobs.state === 'empty'}
     <!-- NO RUN YET: what a job is, in three steps, and the machines that could take one, side by side. -->
     <div class="first" data-pair={devices ? '' : undefined}>
