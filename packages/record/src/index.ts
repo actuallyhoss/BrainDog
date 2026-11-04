@@ -16528,7 +16528,6 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          answered. An action that files in a list is shown to a caller who reads that list whole, and the list its
          project row lives in too; one that files nothing, or names a list this build cannot find, to a caller who reads
          every list a grant can reach whole (`readsAcross`), as a clock script is. */
-      const whole = (list: string): boolean => readable(ctx, list) === null && sight.whole(ctx, list) && kernel.scope(ctx, list) === undefined;
       const across = readsAcross(ctx);
       return ok(
         kernel.actions().filter((a) => {
