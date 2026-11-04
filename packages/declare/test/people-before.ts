@@ -14,13 +14,23 @@ type Doc = { version: string; declarations: Record<string, unknown>[]; [k: strin
 
 export const PEOPLE_1_0_0_ROLES = ['client', 'contractor', 'accountant', 'registrar', 'collaborator', 'other'];
 
+/**
+ * The role as 1.0.0 declared it, and no label of a later version: 4.5.0 (`f7adcf8c7`) labelled the values it added, and a
+ * label of a value the list does not hold is `ENUM_VALUE_UNKNOWN` at install. So the record these tests start from was
+ * refused before any of them began.
+ */
+function role1_0_0(f: Field): Field {
+  const { labels: _later, ...rest } = f;
+  return { ...rest, values: [...PEOPLE_1_0_0_ROLES] };
+}
+
 /** The first-party People document as 1.0.0 declared it: `registrar` on `role`. */
 export function peopleBefore(): Doc {
   const d = structuredClone(firstPartyDocument('people')) as unknown as Doc;
   d.version = '1.0.0';
   d.declarations = d.declarations.map((x) =>
     x.register === 'people' && Array.isArray(x.fields)
-      ? { ...x, fields: (x.fields as Field[]).map((f) => (f.id === 'role' ? { ...f, values: [...PEOPLE_1_0_0_ROLES] } : f)) }
+      ? { ...x, fields: (x.fields as Field[]).map((f) => (f.id === 'role' ? role1_0_0(f) : f)) }
       : x,
   );
   return d;

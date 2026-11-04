@@ -82,7 +82,7 @@ test('People 2.0.0 without registrar keeps it on a list whose rows may hold it, 
   said(api.kernel.update('people', row.id, { note: 'Renews in October' }, { actor: 'p_1' }));
   assert.equal(api.kernel.get(row.id)!.fields.role, 'registrar');
   const role = roleOf(api);
-  assert.deepEqual(role.values, ['client', 'contractor', 'accountant', 'collaborator', 'other', 'registrar'], 'registrar came back ahead of the update’s own values');
+  assert.deepEqual(role.values, ['client', 'contractor', 'accountant', 'collaborator', 'other', 'cofounder', 'partner', 'staff', 'registrar'], 'registrar came back ahead of the update’s own values');
   assert.deepEqual(diff.stays.map((s) => [s.id, s.values]), [['register.people', ['role.registrar']]], 'the plan did not say it keeps the value');
   close();
 });
