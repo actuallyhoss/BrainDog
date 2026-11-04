@@ -1323,6 +1323,11 @@
     .block-source:focus-visible {
       flex-shrink: 0;
     }
+
+    /* AND IN A NARROW WINDOW IT TAKES A LINE OF ITS OWN rather than being pushed off the tile's start. */
+    :global(.block-bar:has(.block-source:focus-visible)) {
+      flex-wrap: wrap;
+    }
   }
 
   @media not ((hover: hover) and (pointer: fine)) {

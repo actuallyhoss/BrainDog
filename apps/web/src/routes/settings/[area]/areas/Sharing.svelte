@@ -457,6 +457,14 @@
     min-block-size: calc(var(--ctl-h) - 2px);
   }
 
+  /* AND UNDER A THUMB THE INPUT IS THE WHOLE 44. */
+  @media (pointer: coarse) {
+    .see-as-pick .field-input,
+    .group-add .field-input {
+      min-block-size: var(--tap);
+    }
+  }
+
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
