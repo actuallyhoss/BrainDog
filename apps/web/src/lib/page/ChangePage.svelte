@@ -493,6 +493,11 @@
     white-space: nowrap;
   }
 
+  /* ONE LINE: the menu is as wide as its longest row, so "Counted in USD" never wraps beside Change. */
+  .mi:has(> .change-show) {
+    white-space: nowrap;
+  }
+
   .change-show {
     margin-inline-start: auto;
     padding-inline-start: var(--sp-3);

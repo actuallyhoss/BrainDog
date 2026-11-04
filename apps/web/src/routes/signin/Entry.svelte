@@ -59,6 +59,13 @@
     padding-inline: var(--gutter);
   }
 
+  /* IN THE IPHONE APP THE SURFACE ROUND THIS ALREADY CLEARS NATIVE'S BARS, top and foot (`.bare`, `AppFrame.svelte`), so paying
+     the top inset again left the first run low with a gap over it, and its last line under the Tell line. */
+  :global(html[data-shell='ios']) .entry {
+    min-block-size: 0;
+    padding-block: var(--inset) var(--sp-5);
+  }
+
   .entry-brand {
     display: flex;
     align-items: center;

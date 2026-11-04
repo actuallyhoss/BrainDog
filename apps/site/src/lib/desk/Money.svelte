@@ -95,8 +95,9 @@
     text-align: end;
   }
 
-  .owed {
-    margin-block-start: 16px;
+  /* A HEADING'S ROOM OVER IT, AS THE TILE'S OWN: the window's `.thd` rule outweighed this one, so "Owed to you" sat on Figma's row. */
+  :global(.win) .thd.owed {
+    margin-block-start: 24px;
   }
 
   .li .grow span {
