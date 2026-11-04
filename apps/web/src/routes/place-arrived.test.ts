@@ -103,8 +103,9 @@ test('a page hidden somewhere else silences nothing', () => {
 });
 
 test('the shell hands the rule the rail as it is drawn, addresses and all', () => {
-  /* `near` is `railOf`'s, so the rule reads the places and More straight off the rail and nothing is built for it. */
-  assert.match(code, /const now = \[\.\.\.rail\.places, \.\.\.rail\.rest\];\s+const names = arrivedIn\(drawn, now\);/u);
+  /* `near` is `railOf`'s, so the rule reads the places and More straight off the rail and nothing is built for it. A place
+     a toast just named is left out, so Turn on Money says it once (aaf26fbf3). */
+  assert.match(code, /const now = \[\.\.\.rail\.places, \.\.\.rail\.rest\];\s+const names = arrivedIn\(drawn, now\.filter\(\(i\) => !i\.near\.some\(\(h\) => toasts\.wasNamed\(h\)\)\)\);/u);
 });
 
 test('the words: one sentence, the place by its name', () => {
@@ -119,7 +120,8 @@ test('the shell says it in one toast, with no mark of alarm, and only where a ra
   const block = code.slice(from, code.indexOf('});', from) + 3);
   /* One push for however many places came, so three places are one sentence and not three toasts. */
   assert.equal(block.split('toasts.push(').length - 1, 1);
-  assert.match(block, /toasts\.push\(copy\.placeArrived\(names\)\)/u);
+  /* AND THE WORD FOR WHERE IT IS, under a thumb too (af6459b7d). */
+  assert.match(block, /toasts\.push\(copy\.placeArrived\(names, untrack\(\(\) => \(!narrow \? 'sidebar' : names\.every\(\(n\) => phoneTabs\.some\(\(t\) => t\.label === n\)\) \? 'bar' : 'menu'\)\)\)\)/u);
   /* A screen with no rail (sign-in, the first prompt) and a record that refused draw none, so the next rail is a first draw. */
   assert.match(block, /if \(bare \|\| data\.refused\)/u);
   /* The stack is asked nowhere else for this sentence: no badge, no count, no second saying. */

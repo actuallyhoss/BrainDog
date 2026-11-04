@@ -211,9 +211,12 @@ test('A RULE IN A FAMILY CARRIES THE LIST AND WHAT IT SETS, IN WORDS, beside the
   assert.deepEqual(ruleSaid(row, (id) => (id === 'parcels' ? 'Parcels' : id)), {
     family: { key: 'parcels/inline/set:shelf_code+tag', list: 'Parcels', did: ['Shelf code', 'Tags'] },
     fired: 4,
+    /* THE MONTH'S COUNT WHERE THE RECORD KEEPS ONE (b29a04cc4); this row carries none, so it is no figure. */
+    month: undefined,
     lastAt: iso(NOW),
   });
-  assert.deepEqual(ruleSaid(auto('Loose'), String), { fired: undefined, lastAt: undefined });
+  assert.deepEqual(ruleSaid(auto('Loose'), String), { fired: undefined, month: undefined, lastAt: undefined });
+  assert.equal(ruleSaid({ ...auto('Counted'), fired: 4, month_fired: 2 }, String).month, 2, 'the month the record keeps is the rule\'s');
 });
 
 test('AN OWNER\'S ROW ENDS IN A SWITCH, a row is a link only without one, and the switch is never inside a link', () => {

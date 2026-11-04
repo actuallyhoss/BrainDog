@@ -138,10 +138,10 @@ test('Activity draws the pass as its sentence, and what it did closed until pres
   const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   const markup = page.slice(page.indexOf('{#snippet entry('), page.indexOf('<PageHead'));
   assert.match(markup, /\{@const pass = passOf\(e\)\}/u, 'the line asks whether it is a pass');
-  assert.match(markup, /\{#if pass !== null\}<span class="line-title">\{pass\.said\}<\/span>/u, 'and says its sentence as its whole line');
+  assert.match(markup, /\{:else if pass !== null\}<span class="line-title">\{pass\.said\}<\/span>/u, 'and says its sentence as its whole line');
   assert.match(markup, /aria-expanded=\{open\}/u, 'the press says whether it is open');
-  assert.match(markup, /\{#if open\}\s*<ul class="ledger steps">/u, 'the steps are drawn only once opened');
+  assert.match(markup, /\{#if open\}\s*<ul class="ledger steps" in:opens out:shuts>/u, 'the steps are drawn only once opened');
   assert.match(page, /let passesOpen = \$state<ReadonlySet<string>>\(new Set\(\)\);/u, 'and every pass starts closed');
-  /* AND BY THE PAGE'S OWN COUNT, the tile's, where the record's read stopped short of it (P29). */
-  assert.match(page, /awaySaid\(unseen\.actors, me, names, unseen\.capped, unseen\.byWho, \{ total: whole\.total/u, "the sentence counts by the record's byWho");
+  /* ACTIVITY DROPPED THE COUNT SENTENCE UNDER ITS TITLE (4f6f97102), so it can no longer disagree with the tile's count. */
+  assert.doesNotMatch(page.replace(/<!--[\s\S]*?-->/gu, '').replace(/\/\*[\s\S]*?\*\//gu, ''), /\bawaySaid\(/u, 'the count sentence is back under the title');
 });

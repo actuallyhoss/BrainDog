@@ -87,13 +87,17 @@ test('nothing late is said calmly, with no phrase in red', () => {
   assert.deepEqual(readingOf(bills, done, NOW, WHOLE)?.before, 'Nothing is open.');
 });
 
-test('a list with neither state nor deadline says how many and how new', () => {
+test('a list with neither state nor deadline says what came in this week and which came last, by name (4360c5ae6)', () => {
   const rows = [row({ name: 'Ada' }, '2026-09-26T09:00:00.000Z'), row({ name: 'Bo' }, '2026-09-10T09:00:00.000Z')];
-  assert.equal(readingOf(people, rows, NOW, WHOLE)?.before, '2 people, newest 3d ago.');
-  assert.equal(readingOf(people, rows.slice(0, 1), NOW, WHOLE)?.before, '1 person, newest 3d ago.');
+  assert.equal(readingOf(people, rows, NOW, WHOLE)?.before, '1 added this week: Ada.');
+  assert.equal(readingOf(people, rows.slice(0, 1), NOW, WHOLE)?.before, '1 added this week: Ada.');
+  /* NEVER THE COUNT THE HEAD ALREADY DRAWS, and with nothing new it names the last that came. */
+  assert.doesNotMatch(readingOf(people, rows, NOW, WHOLE)?.before ?? '', /2 people/u);
+  assert.doesNotMatch(readingOf(people, rows.slice(1), NOW, WHOLE)?.before ?? '', /1 person/u);
+  assert.match(readingOf(people, rows.slice(1), NOW, WHOLE)?.before ?? '', /Bo/u);
 });
 
-test('a list whose state is a kind and never finished says no line, since the head already counts what it holds', () => {
+test('a list whose state is a kind and never finished says how it splits, since the head already counts what it holds (L18)', () => {
   /* Projects' lane: Building, Earning, Parked and Finished, none declared finished. "30 open." stood over Parked and
      Finished rows on his record (`things-390-light.png`). */
   const things = {
@@ -109,7 +113,7 @@ test('a list whose state is a kind and never finished says no line, since the he
     ],
   } as unknown as RegisterDecl;
   const rows = [row({ name: 'Kiln', lane: 'building' }), row({ name: 'Portage', lane: 'parked' }), row({ name: 'Tallyard', lane: 'finished' })];
-  assert.equal(readingOf(things, rows, NOW, WHOLE), null);
+  assert.deepEqual(readingOf(things, rows, NOW, WHOLE), { before: '1 building, 1 parked, 1 finished.', needs: '', after: '' });
 });
 
 test('filtered, it says how many match; paging, it says nothing', () => {

@@ -73,13 +73,13 @@ test('the page draws that inbox as one tile, in place of the two tiles and the e
   const never = markup.indexOf('{:else if !refused && never}');
   const board = markup.indexOf('<div class="inbox">');
   assert.ok(never > 0 && board > never, 'the one tile is not chosen before the board');
-  const one = markup.slice(never, markup.indexOf('{:else}', never));
+  const one = markup.slice(never, board);
   assert.equal(one.match(/<Empty\b/gu)?.length, 1);
   assert.doesNotMatch(one, /<Tile\b/u, 'the one tile still draws the ways in or the rules beside it');
   assert.match(one, /title=\{quiet\.title\} body=\{quiet\.why\}/u);
   assert.match(one, /<Button weight="primary" href="\/settings\/ingest">\{quiet\.add\}<\/Button>/u, "the one thing to do is the primary (first F13)");
-  /* AND THE ONE STEP TO AN ADDRESS, where it is a command to copy, folded under one press. */
-  assert.match(one, /\{#if quiet\.command && quiet\.show\}[\s\S]*?<details\b[\s\S]*?<CodeLine text=\{quiet\.command\}/u, 'the self-host command is not drawn to copy');
+  /* AND THE ONE STEP TO AN ADDRESS, where it is a command to copy: the tile's hero on a self-host (T22), never folded. */
+  assert.match(one, /\{#if quiet\.command\}[\s\S]*?<CodeLine text=\{quiet\.command\} \/>[\s\S]*?<Button weight="quiet" href="\/settings\/ingest">\{quiet\.add\}<\/Button>\s*\{:else\}/u, 'the self-host command is not the hero, or the other ways in are not a quiet press under it');
   /* IT WAITS FOR THE TALLY, so the cleared inbox is never drawn first and swapped a moment later. */
   assert.match(markup, /\{:else if !refused && INBOX\.length === 0 && !tallied\}\s*<Waiting \/>\s*\{:else if !refused && never\}/u);
   assert.match(src, /const never = \$derived\(patterns\.length === 0 && nothingEver\(tally, ways, INBOX\.length\)\);/u);

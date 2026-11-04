@@ -136,28 +136,29 @@ test('WHERE SOMEBODY WAS SEEN IS SAID IN PLACES, each once, newest first, with n
 });
 
 test('WHAT SOMEBODY IS KNOWN BY IS SAID BY KIND, each once, a repository by its name and never its host', () => {
-  assert.deepEqual(keySaid('github:jokonkwo'), { label: 'GitHub', value: 'jokonkwo' });
-  assert.deepEqual(keySaid('remote:github.com/kiln/portage'), { label: 'Repository', value: 'portage' });
+  /* A KIND THE KERNEL NAMES CARRIES ITS `kind` (3048e2ed3), which picks the chip's mark and its link; any other has none. */
+  assert.deepEqual(keySaid('github:jokonkwo'), { label: 'GitHub', value: 'jokonkwo', kind: 'github' });
+  assert.deepEqual(keySaid('remote:github.com/kiln/portage'), { label: 'Repository', value: 'portage', kind: 'remote' });
   assert.deepEqual(keySaid('telegram:jo'), { label: 'Telegram', value: 'jo' });
   assert.equal(keySaid('github:'), null);
-  assert.deepEqual(keySaid('phone:+447700900123'), { label: 'Phone', value: '+447700900123' }, 'a number is never taken for a hash');
-  assert.deepEqual(keySaid('github:deadbee1'), { label: 'GitHub', value: 'deadbee1' }, 'nor is a login');
-  assert.deepEqual(keySaid('bank:chillout'), { label: 'Bank texts call it', value: 'chillout' });
-  assert.deepEqual(keySaid('folder:/Users/mara/Developer/portage'), { label: 'Folder', value: 'portage' }, 'a folder by its name, never its path');
+  assert.deepEqual(keySaid('phone:+447700900123'), { label: 'Phone', value: '+447700900123', kind: 'phone' }, 'a number is never taken for a hash');
+  assert.deepEqual(keySaid('github:deadbee1'), { label: 'GitHub', value: 'deadbee1', kind: 'github' }, 'nor is a login');
+  assert.deepEqual(keySaid('bank:chillout'), { label: 'Bank texts call it', value: 'chillout', kind: 'bank' });
+  assert.deepEqual(keySaid('folder:/Users/mara/Developer/portage'), { label: 'Folder', value: 'portage', kind: 'folder' }, 'a folder by its name, never its path');
   assert.deepEqual(keySaid('constructor:x'), { label: 'Constructor', value: 'x' });
   assert.deepEqual(
     knownOf({ email: 'jo@okonkwo.example', keys: ['email:jo@okonkwo.example', 'github:jokonkwo'], handles: ['git:jokonkwo'] }, { email: 'email', keys: 'keys', handles: 'handles' }),
     [
-      { label: 'Email', value: 'jo@okonkwo.example' },
-      { label: 'GitHub', value: 'jokonkwo' },
-      { label: 'Commits as', value: 'jokonkwo' },
+      { label: 'Email', value: 'jo@okonkwo.example', kind: 'email' },
+      { label: 'GitHub', value: 'jokonkwo', kind: 'github' },
+      { label: 'Commits as', value: 'jokonkwo', kind: 'git' },
     ],
   );
   assert.deepEqual(
     knownOf({ domain: 'halden.example', keys: ['domain:halden.example', 'payee:HALDEN TYPE'], aliases: ['Halden'] }, { domain: 'domain', keys: 'keys', aliases: 'aliases' }),
     [
-      { label: 'Website', value: 'halden.example' },
-      { label: 'Bank texts call it', value: 'HALDEN TYPE' },
+      { label: 'Website', value: 'halden.example', kind: 'domain' },
+      { label: 'Bank texts call it', value: 'HALDEN TYPE', kind: 'payee' },
       { label: 'Also called', value: 'Halden' },
     ],
   );

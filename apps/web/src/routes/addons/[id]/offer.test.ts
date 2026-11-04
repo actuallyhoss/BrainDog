@@ -39,7 +39,8 @@ test('nothing waiting says nothing, and neither does a plan it cannot read', () 
 
 test('the install card draws what waits under the plan, and what it sends once, on the plan\'s own lines, in words with no dash in them', () => {
   const page = readFileSync(new URL('./Listing.svelte', import.meta.url), 'utf8');
-  assert.match(page, /extra=\{waits\.length > 0 \? told : undefined\}/u);
+  /* OR A NOTE THAT THE PLAN MOVED SINCE IT WAS READ (a0e31b1f0), and only then: no told part draws for nothing. */
+  assert.match(page, /extra=\{waits\.length > 0 \|\| moved \? told : undefined\}/u);
   /* WHAT IT SENDS IS SAID ONCE, by the plan sheet's calls group (`$lib/market/plan.ts` writes each line with `doesOf`). */
   assert.doesNotMatch(page, /\{#each sends as line/u);
   assert.match(page, /\{#each waits as line \(line\)\}/u);
@@ -148,7 +149,9 @@ test('a run that took nothing in first names nobody, and the page says the old s
   assert.deepEqual(went, ['pack']);
   assert.deepEqual(out, { ok: true, nav: null });
   const page = readFileSync(new URL('./Listing.svelte', import.meta.url), 'utf8');
-  assert.match(page, /out\.first \? turnWords\.installedAfter\(listing\.title, out\.first\) : copy\.shareInstalled\(listing\.title\)/);
+  /* `title` IS THE LISTING'S, or the add-on it added first where that was the press (277e698bf). */
+  assert.match(page, /const title = addingFirst !== null \? moduleTitle\(addingFirst\) : listing\.title;/u);
+  assert.match(page, /out\.first \? turnWords\.installedAfter\(title, out\.first\) : copy\.shareInstalled\(title\)/);
 });
 
 test('two holders are named in the order they went in, and one passed over is left out', async () => {
