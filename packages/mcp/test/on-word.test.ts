@@ -85,7 +85,7 @@ test('A QUESTION HE TOLD THE AGENT TO ANSWER IS ANSWERED ON HIS WORD; empty word
 
   const done = await call(api, agent(), 'instructions', { answer: a, option: 'accept', said: 'Yes, add the bounce report.' });
   assert.notEqual(done.isError, true, done.content[0]!.text);
-  assert.match(done.content[0]!.text, new RegExp(`^Answered ${a} with accept, on Teodor's word\\. Undo is in BrainDog\\.`, 'u'));
+  assert.match(done.content[0]!.text, new RegExp(`^Answered "[^"]+" \\(${a}\\) with yes, on Teodor's word\\. Undo is in BrainDog\\.`, 'u'));
   assert.deepEqual(done.structuredContent.answered, { question: a, option: 'accept' });
   assert.equal(statusOf(api, a), 'resolved');
   sql.close();
