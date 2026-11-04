@@ -15,6 +15,12 @@ const ROWS = '.ln, .qa, .run, li, tr, .cards-item, .feed-row, [data-row]';
 const FOOT = '.late-more, .block-more, .block-slice, .queue-more, .p-more, [data-needs-foot], .signs-line, .t-more, .more, .r-more, [data-draft-mark], .l-foot, .tile-link';
 /** A foot that is the widget's own "N more" or "All …" link, which already says there is more. */
 const SAYS_MORE = /\b(?:more|all)\b/iu;
+/**
+ * A WIDGET'S OWN DOOR ON ITS HEAD'S ROW, which is no foot but says the same: Projects on Today says "All projects" at the
+ * end of its head, over a count of them, and the frame still said "1 more", laid over the first card's avatar (slash lane,
+ * 4 Nov). Where a widget has this door, the frame adds no count of its own. A door that says "N more" is recounted below.
+ */
+const HEAD_DOOR = '.p-more';
 /** The "N more" link this file draws (`moreLinks`), whose words are never read back as the widget's own. */
 const OWN_LINK = 'a[data-fit-more]';
 /** What a foot says in its own words, less the link this file put in it. */
@@ -119,6 +125,7 @@ export function fitBoard(board: HTMLElement): Animation[] {
     }
     feet.sort((a, b) => a.top - b.top);
     const inHead = frame.querySelector(HEAD_COUNT) !== null;
+    const ownDoor = [...frame.querySelectorAll<HTMLElement>(HEAD_DOOR)].some((door) => SAYS_MORE.test(saidBy(door)));
     const past = (at: number) => rects.filter((r) => r.height > 0 && r.bottom > at + 1).length;
     /* WHERE THE ROWS STOP, given the feet that stay. */
     const plan = (kept: typeof feet) => {
@@ -135,7 +142,7 @@ export function fitBoard(board: HTMLElement): Animation[] {
       /* A WIDGET THAT HAS NO "N MORE" OF ITS OWN SAYS HOW MANY IT LEFT OUT, under what it shows: at the frame's foot where
          nothing else is there, and just above its first foot where one is (a quiet line such as "Windows PC: 1 Claude
          session, quiet"), so the two never sit on each other (recheck N3). A foot that says more already says it. */
-      const says = over === Infinity && !kept.some((f) => SAYS_MORE.test(saidBy(f.el)));
+      const says = over === Infinity && !ownDoor && !kept.some((f) => SAYS_MORE.test(saidBy(f.el)));
       const cutAt = says && !inHead && past(limit) > 0 ? limit - MORE_PX : limit;
       return { says, cutAt, shown: rects.some((r) => r.height > 0 && r.bottom <= cutAt + 1) };
     };
