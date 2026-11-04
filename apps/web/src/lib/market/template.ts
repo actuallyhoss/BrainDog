@@ -18,8 +18,11 @@
  * which signs it with the publisher's key in this browser (`author-key.ts`) over kind `pack`, `id`, `version` and the
  * text's checksum, so nothing here holds a key. `signedAs` names what that signature covers, as the Kennel reads it.
  *
- * PURE, AND LOADED BY PLAIN NODE: no import at all, so the page's menu pays nothing for it until it is pressed.
+ * PURE, AND LOADED BY PLAIN NODE: its one import is the file reader the Kennel checks it with, which imports nothing, and the
+ * page's menu reaches this only when it is pressed.
  */
+
+import { usesOf } from '@braindog/declare/uses';
 
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 type Body = Record<string, unknown>;
@@ -204,6 +207,9 @@ export function templateOf(input: { body: Body; states: readonly TemplateState[]
     ...(settings.length > 0 ? { config } : {}),
     declarations: [page],
   };
+  /* WHAT IT USES OF YOURS IS SAID ON THE FILE (`uses.ts`): the Kennel refuses a pack that names a list and leaves it unsaid. */
+  const used = usesOf(doc).map((u) => u.id);
+  if (used.length > 0) doc.uses = used;
 
   const headings: string[] = [];
   const heard = (blocks: unknown): void => {

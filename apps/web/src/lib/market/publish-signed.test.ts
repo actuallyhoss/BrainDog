@@ -186,6 +186,8 @@ test('the Kennel itself takes both, signed, as the key that signed them', async 
   assert.ok(usecase.ok, JSON.stringify(usecase));
   assert.equal(usecase.value.unsigned, undefined);
   const t = templateOf({ body: shelfPage, states: [], format: 1, primitives: 1 });
+  /* What it uses of yours is said on the file: the Kennel refused a shared page that left it unsaid (46cb072f7). */
+  assert.deepEqual(t.doc.uses, ['register.seeds']);
   const template = await submitToKennel(k.fetcher, t.text, sign);
   assert.ok(template.ok, JSON.stringify(template));
   assert.equal(template.value.unsigned, undefined);
