@@ -43,7 +43,7 @@ export const ON_WORD = 'On their word, passed as said, only money and keys still
  * `index.ts`): the May line `context` says, so the agent acts instead of asking, and knows what still waits.
  */
 export const BYPASS_SAYS =
-  "The owner lets you do everything without asking: write, delete, money, settings, plugins, automations, sharing, the team, making keys, imports and exports land at once, each logged with your name and undoable. Still theirs in BrainDog: giving the BrainDog away, deleting it, erasing a person for good, reading a key's value and paying. This holds after reading things from outside BrainDog too, and such a change says so beside it.";
+  "The owner lets you do everything without asking: write, delete, money, settings, plugins, automations, sharing, the team, making keys, imports and exports land at once, each logged with your name and undoable. Still theirs in BrainDog: giving the BrainDog away, deleting it, erasing a person for good, reading a key's value, paying, and letting agents do more. This holds after reading things from outside BrainDog too, and such a change says so beside it.";
 
 /**
  * The one sentence a row's ceiling, lists and projects come to: "Writes Tasks and Learnings; money, keys and deletes are
@@ -131,7 +131,8 @@ export function methods(deps: RecordDeps) {
     async setAgentProfile(args: ProfileRow | undefined, ctx: CallContext): Promise<Result<ProfileView>> {
       const stop = admin(ctx, 'change what an agent may do');
       if (stop) return { ok: false, refusal: stop };
-      if (ctx.principal.kind !== 'person') return no('NEEDS_BROWSER_SESSION', 'Only the owner changes what an agent may do, signed in to BrainDog in a browser.', { at: 'principal' });
+      /* NO AGENT, ON ANY WORD (`agentBehind` in `index.ts`): an answer on his word is made as him, a person, so it is named. */
+      if (ctx.principal.kind !== 'person' || ctx.onWord !== undefined) return no('NEEDS_BROWSER_SESSION', 'Only the owner changes what an agent may do, signed in to BrainDog in a browser.', { at: 'principal' });
       const row = (args ?? {}) as ProfileRow;
       const token = row.match !== null && typeof row.match === 'object' ? (row.match as { token?: unknown }).token : undefined;
       if (typeof token === 'string' && token.trim() !== '' && sql.one<{ id: string }>('SELECT id FROM token WHERE id = ?', token.trim()) === undefined)

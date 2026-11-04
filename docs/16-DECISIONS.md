@@ -1439,6 +1439,13 @@ tokens and sharing stay a browser session's. A token still never calls `decide` 
 words from words an agent made up, so the switch, the words kept and Undo are the controls
 ([44-SPEC-MCP](44-SPEC-MCP.md) §15.14, [12-SECURITY](12-SECURITY.md) §5.2).
 
+**Amended 4 November 2026: no agent widens what agents may do, the owner's call.** His word (2 Nov) passes every owner's
+door but handing over, deleting the record, erasing and the keychain. It does not pass what would let agents do more:
+`agents.answer_on_word`, `agents.bypass` turned on, `agents.answer_in_chat` turned on, a settings row, a yes to a rung
+offered, a new key from a key his settings hold to part of the record, a replacing import that changes the settings rows
+or the members, or a restore past his last change to any of these. The same holds while his agents act without asking.
+Turning a switch off stays open, except his word's own, which he alone turns.
+
 **Rejected:** an `admin` scope, off by default. A scope that exists can be minted, leaked and
 replayed; a group no token can reach cannot.
 

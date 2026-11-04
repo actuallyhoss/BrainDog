@@ -6,16 +6,20 @@
  * WHAT IS HELD: his words are needed and kept, with the run that carried them, and Undo takes the answer back; his
  * switch "Agents may answer when you tell them" is on until he turns it off, and off it refuses by name; a key, an
  * amount set on what is there, erasing, deleting the record and the keychain stay his in BrainDog, whatever was said;
- * and a write the ladder would have filed lands, counted towards no rung.
+ * and a write the ladder would have filed lands, counted towards no rung. AND NO AGENT WIDENS WHAT AGENTS MAY DO: his
+ * two switches, a settings row and a rung stay his (`agentBehind`), though every other owner's door opens on his word.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { Entry } from '@braindog/kernel';
+import { createHash } from 'node:crypto';
+
+import { checkBrainl, signBrainl, type Entry } from '@braindog/kernel';
 
 import { ON_WORD_PREF, createRecordApi, type Asked, type CallContext } from '../src/index.ts';
 import { openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
+import { testSigner } from '../../kernel/test/signer.ts';
 
 const NOW = Date.UTC(2026, 9, 27, 12);
 
@@ -70,9 +74,9 @@ const refusal = (r: unknown): { code: string; fix: string; at?: string; try?: st
   return x.refusal!;
 };
 
-async function record() {
+async function record(extra: { sign?: unknown } = {}) {
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: { now: () => NOW } as never });
+  const api = await createRecordApi({ sql, clock: { now: () => NOW } as never, ...(extra as object) });
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
   value(await api.kernel.install([TASKS, LOGINS]));
   sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_1', 'teo@vance-studio.example', 'Teodor')");
@@ -351,7 +355,194 @@ test('NO WORD REACHES A KEY, AN AMOUNT ON WHAT IS THERE, ERASING, DELETING THE R
      to what the record is gets past the door to its own checks, and a setting of his is set. */
   const shape = refusal(await api.setDeclaration({ id: 'register.x', kind: 'register', body: {} } as never, as));
   assert.equal(shape.code, 'PACK_MALFORMED');
-  assert.equal(value<{ value: unknown }>(await api.setPref({ key: ON_WORD_PREF, value: true }, as)).value, true);
+  assert.equal(value<{ value: unknown }>(await api.setPref({ key: 'decide.agents_apart', value: false }, as)).value, false);
+  sql.close();
+});
+
+/* ── no agent widens what agents may do (the owner's call of 4 Nov, `agentBehind` in `index.ts`) ───────────── */
+
+test('NO AGENT WIDENS WHAT AGENTS MAY DO: his word and his switch stay his, on his word, while it acts without asking, and from an answer made as him', async () => {
+  const { api, sql } = await record();
+  const prefs = () => api.kernel.prefsOf('p_1');
+  const held = (r: unknown) => assert.equal(refusal(r).code, 'NEEDS_BROWSER_SESSION');
+  /* HIS WORDS BESIDE THE CALL (`word`) AND AN ANSWER MADE AS HIM (`onWord`), the two ways his word reaches a door. */
+  const onWord: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, registers: '*', credentialed: true, onWord: 'S1' };
+  const said = 'Turn it on for yourself.';
+
+  for (const v of [true, false, null]) {
+    held(await api.setPref({ key: ON_WORD_PREF, value: v, said } as never, agent()));
+    held(await api.setPref({ key: ON_WORD_PREF, value: v }, onWord));
+  }
+  assert.equal(prefs()[ON_WORD_PREF], undefined, 'his switch is as he left it');
+
+  held(await api.setPref({ key: 'agents.answer_in_chat', value: true, said } as never, agent()));
+  held(await api.setPref({ key: 'agents.answer_in_chat', value: true }, onWord));
+  assert.equal(prefs()['agents.answer_in_chat'], undefined);
+
+  /* TURNING ON WHAT LETS AGENTS DO EVERYTHING WAS OPEN TO AN ANSWER ON HIS WORD, which is made as a person. */
+  held(await api.setPref({ key: 'agents.bypass', value: 'on', said } as never, agent()));
+  held(await api.setPref({ key: 'agents.bypass', value: 'on' }, onWord));
+  assert.equal(prefs()['agents.bypass'], undefined);
+
+  /* THE SETTINGS ROW THAT SAYS WHAT AN AGENT MAY DO. */
+  const row = { id: 'default', ceiling: 'write' } as never;
+  const before = api.kernel.profileFor({}).ceiling;
+  held(await api.setAgentProfile(row, onWord));
+  held(await api.setAgentProfile({ id: 'default', ceiling: 'write', said } as never, agent()));
+  assert.equal(api.kernel.profileFor({}).ceiling, before);
+
+  /* NARROWING STAYS OPEN, as his word told it. */
+  value(await api.setPref({ key: 'agents.answer_in_chat', value: false, said } as never, agent()));
+  assert.equal(prefs()['agents.answer_in_chat'], false);
+  value(await api.setPref({ key: 'agents.bypass', value: 'off', said } as never, agent()));
+  assert.equal(prefs()['agents.bypass'], 'off');
+  sql.close();
+});
+
+test('WHILE AGENTS ACT WITHOUT ASKING THEY STILL WIDEN NOTHING, and may turn that switch off', async () => {
+  const { api, sql } = await record();
+  value(await api.setPref({ key: 'agents.bypass', value: 'on' }, owner));
+  const ctx = agent();
+  assert.equal(refusal(await api.setPref({ key: ON_WORD_PREF, value: false }, ctx)).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(refusal(await api.setPref({ key: 'agents.answer_in_chat', value: true }, ctx)).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(refusal(await api.setAgentProfile({ id: 'default', ceiling: 'write' } as never, ctx)).code, 'NEEDS_BROWSER_SESSION');
+  value(await api.setPref({ key: 'agents.bypass', value: 'off' }, ctx));
+  assert.equal(api.kernel.prefsOf('p_1')['agents.bypass'], 'off');
+  sql.close();
+});
+
+test('A RUNG IS HIS TO GIVE: an agent cannot say yes to the offer of one on his word, and may say no', async () => {
+  const { api, sql } = await record();
+  const offerNow = async (): Promise<string> => {
+    for (let i = 0; i < 10; i += 1) {
+      value<Asked>(await api.create({ register: 'tasks', fields: { name: `Task ${String(i)}` } }, agent('c-kept')));
+      const id = sql.one<{ id: string }>("SELECT id FROM suggestion WHERE status = 'open' AND body_kind = 'rowset' ORDER BY rowid DESC LIMIT 1")!.id;
+      value(await api.decide({ id, decide: { option: 'accept', reason: 'fine' } }, owner));
+    }
+    const offer = sql.one<{ id: string }>("SELECT id FROM suggestion WHERE status = 'open' AND opened_by = 'rule:ladder' LIMIT 1");
+    assert.ok(offer, 'the next rung is offered');
+    return offer.id;
+  };
+  const rung = () => sql.one<{ rung: string }>("SELECT rung FROM ladder WHERE agent = 't_claude' AND kind = 'tasks:add'")?.rung;
+  const offer = await offerNow();
+  assert.equal(rung(), 'ask');
+
+  /* THE FILER IS THE LADDER, not this agent, so "you asked it yourself" never stopped this. */
+  for (const option of ['yes', 'approve']) {
+    const out = refusal(await api.instructionsMine({ answer: offer, option, said: 'Yes, let yourself do that.' } as never, agent()));
+    assert.equal(out.code, 'FORBIDDEN');
+    assert.match(out.fix, /yours alone/u);
+  }
+  const onWord: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, registers: '*', credentialed: true, onWord: 'S1' };
+  /* AND NOT AS ONE OF A GROUP. */
+  const group = value<{ refused: { fix: string }[] }>(await api.decide({ ids: [offer], decide: { option: 'yes', reason: 'told' } } as never, onWord));
+  assert.match(group.refused[0]!.fix, /yours alone/u);
+  assert.equal(statusOf(api, offer), 'open');
+  assert.equal(rung(), 'ask', 'the rung did not move');
+
+  /* A NO CHANGES NOTHING, so it may be said on his word; and his own yes still sets the rung. */
+  value<Mine>(await api.instructionsMine({ answer: offer, option: 'no', said: 'No, keep asking.' } as never, agent()));
+  assert.equal(rung(), 'ask');
+  const again = await offerNow();
+  value(await api.decide({ id: again, decide: { option: 'yes', reason: 'I said so' } }, owner));
+  assert.equal(rung(), 'tell');
+  sql.close();
+});
+
+test('A KEY HIS SETTINGS HOLD TO PART OF THE RECORD MAKES NO NEW KEY ON HIS WORD, which would not be held; a whole key still does', async () => {
+  const { api, sql } = await record();
+  const said = 'Make a new key.';
+  const ctx = agent();
+  /* HIS WHOLE AGENT STILL GOES THROUGH THIS DOOR (the owner's word of 2 Nov). */
+  const made = value<{ id: string; bearer: string }>(await api.createToken({ scope: 'write', label: 'Second', said } as never, ctx));
+  assert.ok(made.bearer);
+
+  value(await api.setAgentProfile({ name: 'Tasks only', match: { token: 't_claude' }, ceiling: 'write', lists_write: ['tasks'] } as never, owner));
+  const keys = () => sql.one<{ n: number }>('SELECT count(*) AS n FROM token')?.n;
+  const count = keys();
+  for (const out of [
+    await api.createToken({ scope: 'write', label: 'Unheld', said } as never, ctx),
+    await api.createReportKey({ register: 'logins', said } as never, ctx),
+    await api.deviceApprove({ user_code: '123456', said } as never, ctx),
+  ]) {
+    const no = refusal(out);
+    assert.equal(no.code, 'NEEDS_BROWSER_SESSION');
+    assert.match(no.fix, /holds? to part of BrainDog|hold to part of BrainDog/u);
+  }
+  assert.equal(keys(), count, 'no key was made');
+
+  /* THE SAME FOR TOOLS SWITCHED OFF: a new key has them on. */
+  value(await api.setAgentProfile({ name: 'No send', match: { kind: 'claude' }, ceiling: 'write', tools: { send: false } } as never, owner));
+  const other = agent();
+  sql.exec("DELETE FROM agent_profile WHERE json_extract(match, '$.token') = 't_claude'");
+  assert.equal(refusal(await api.createToken({ scope: 'write', label: 'Unheld', said } as never, other)).code, 'NEEDS_BROWSER_SESSION');
+  sql.close();
+});
+
+test('NO AGENT WIDENS BY FILE: a file that changes a settings row or who is here is refused, and the same file with neither changed is put back', async () => {
+  const { api, sql } = await record({ sign: testSigner() });
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_other', 'p_1', 'ho', 'write', 'Other', '2026-10-01T00:00:00.000Z')");
+  value(await api.setAgentProfile({ name: 'Careful', match: { token: 't_other' }, ceiling: 'propose' } as never, owner));
+  const said = 'Put it back.';
+  const file = value<string[]>(await api.export({ said } as never, agent()));
+  const signer = testSigner();
+
+  /* ONE ROW EDITED, ITS MANIFEST LINE WORKED OUT AGAIN AND THE FILE SIGNED BY A STRANGER, as `checkBrainl` reads it sound. */
+  const forged = async (table: string, from: string, to: string): Promise<string[]> => {
+    const lines = [...file];
+    const header = lines.findIndex((l) => l.startsWith(`#table ${table} `));
+    const row = lines.findIndex((l, i) => i > header && l.includes(from));
+    assert.ok(header > 0 && row > header, `no ${table} row holds ${from}`);
+    lines[row] = lines[row]!.replace(from, to);
+    let end = header + 1;
+    while (end < lines.length && !lines[end]!.startsWith('#')) end += 1;
+    const rows = lines.slice(header + 1, end);
+    const manifest = lines.findIndex((l) => l.startsWith('#table dog_manifest '));
+    const at = lines.findIndex((l, i) => i > manifest && l.startsWith(`["${table}",`));
+    lines[at] = JSON.stringify([table, rows.length, createHash('sha256').update(rows.join('\n')).digest('hex')]);
+    const sig = lines.findIndex((l) => l.startsWith('#table dog_sig '));
+    return signBrainl(lines.filter((_, i) => i !== sig + 1 || !lines[i]!.startsWith('[')), signer);
+  };
+  const raised = await forged('agent_profile', '"propose"', '"write"');
+  assert.deepEqual((await checkBrainl(raised)).ok, true, 'the forgery reads as sound, so only the door stops it');
+  const other = await forged('member', '"owner"', '"write"');
+  assert.deepEqual((await checkBrainl(other)).ok, true);
+
+  for (const lines of [raised, other]) {
+    const no = refusal(await api.import({ lines, replace: true, said } as never, agent()));
+    assert.equal(no.code, 'NEEDS_BROWSER_SESSION');
+    assert.match(no.fix, /never widens/u);
+  }
+  assert.equal(sql.one<{ c: string }>("SELECT ceiling AS c FROM agent_profile WHERE name = 'Careful'")?.c, 'propose', 'the row is as he set it');
+
+  /* THE DOOR HIS WORD OPENED STAYS OPEN: the file as it is, and a change to anything else. */
+  value(await api.import({ lines: file, replace: true, said } as never, agent()));
+  assert.equal(sql.one<{ c: string }>("SELECT ceiling AS c FROM agent_profile WHERE name = 'Careful'")?.c, 'propose');
+  sql.close();
+});
+
+test('NO AGENT WIDENS BY GOING BACK: a copy older than his last change to what agents may do is his to restore, and a newer one still its', async () => {
+  const sql = openSqlite();
+  let now = NOW;
+  const port = {
+    reopens: false,
+    take: async (label: string) => ({ id: `copy-${label}-${String(now)}`, at: new Date(now).toISOString(), label, bytes: 1 }),
+    list: async () => [{ id: 'old', at: new Date(NOW - 86_400_000).toISOString(), label: 'nightly', bytes: 1 }, { id: 'new', at: new Date(NOW + 60_000).toISOString(), label: 'nightly', bytes: 1 }],
+    restore: async () => {},
+  };
+  const api = await createRecordApi({ sql, clock: { now: () => now } as never, snapshots: port as never });
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_1', 'teo@vance-studio.example', 'Teodor')");
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_claude', 'p_1', 'h', 'write', 'Claude Code', '2026-10-01T00:00:00.000Z')");
+  value(await api.setPref({ key: 'agents.bypass', value: 'off' }, owner));
+  const said = 'Go back.';
+  now = NOW + 120_000;
+  const no = refusal(await api.restore({ bookmark: 'old', said } as never, agent()));
+  assert.equal(no.code, 'NEEDS_BROWSER_SESSION');
+  assert.match(no.fix, /never widens/u);
+  value(await api.restore({ bookmark: 'new', said } as never, agent()));
+  /* AND HE GOES BACK WHERE HE LIKES. */
+  value(await api.restore({ bookmark: 'old' }, owner));
   sql.close();
 });
 

@@ -655,6 +655,9 @@ export function ladder(deps: LadderDeps) {
     return true;
   };
 
+  /** Whether a question is an offer of a rung still waiting, which only the owner says yes to (`agentBehind` in `index.ts`). */
+  const offered = (suggestion: string): boolean => prefRead(OFFERS, suggestion) !== undefined;
+
   /** Who climbs for a question's filer: a grant, or Slash, and `null` for a person, a rule or the system. */
   const agentOfActor = (actor: string): string | null => (actor === SLASH ? SLASH : ladderAgentOf(sql, actor));
 
@@ -866,7 +869,7 @@ export function ladder(deps: LadderDeps) {
     return { agent: plain(after ?? found) };
   };
 
-  return { standing, takeBack, importsFound, adopt, importActors, grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor, landed };
+  return { standing, takeBack, importsFound, adopt, importActors, grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, offered, agentOfActor, landed };
 }
 
 /** The floors as a person reads them, each the start of a sentence. */

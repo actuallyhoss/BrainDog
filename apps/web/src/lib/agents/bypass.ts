@@ -26,7 +26,7 @@ export const bypassWords = {
   off: 'They ask before deletes, money, keys, plugins and settings.',
   more: 'What still needs you',
   /* `NEVER_BYPASS` IS THREE DOORS NOW (2 Nov), and the keychain's rule beside them. */
-  still: "Three things stay only yours: giving this BrainDog to someone else, deleting the whole BrainDog (or erasing a person for good), and reading a key's value. An agent also never makes or changes an owner, and paying stays in Billing. Your colleagues' agents are never covered: they ask, and never do more than their person may.",
+  still: "Three things stay only yours: giving this BrainDog to someone else, deleting the whole BrainDog (or erasing a person for good), and reading a key's value. An agent also never makes or changes an owner, never lets agents do more than you set, and paying stays in Billing. Your colleagues' agents are never covered: they ask, and never do more than their person may.",
   /* THE SAME, AS A LIST (UI pass, 3 Nov): a paragraph of five things is read as a list, so it is drawn as one. */
   stillList: [
     'Giving this BrainDog to someone else',

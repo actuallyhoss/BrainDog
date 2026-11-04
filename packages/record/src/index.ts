@@ -677,7 +677,7 @@ export type CallContext = {
    * GRANTS A KEY NOR SETS AN AMOUNT, and for one `decide` and nothing else. `decide` lets it accept what installs (an
    * add-on, an arrangement, an automation), which is what he asked for. `admin` admits it as it admits his agents while
    * his switch is on (2 Nov), and `ownerKeeps` and `keychain` refuse it, so his word never hands the record over,
-   * erases, deletes the record, reads a key or touches billing.
+   * erases, deletes the record, reads a key or touches billing, and `agentBehind` holds it to what agents already may.
    */
   onWord?: string | undefined;
 
@@ -1362,6 +1362,7 @@ export const BYPASS_PREF = 'agents.bypass' satisfies PrefKey;
  *     input, and read only where it is read today; no token reaches the keychain (`keychain`), bypass or not, an export
  *     made by an agent is always the redacted one, and an agent never lets a device into the keychain.
  *   - An agent never makes an owner, touches an owner, or changes the owner it acts for (`teamKeeps`).
+ *   - An agent never widens what agents may do: his switches, a settings row, a rung (`agentBehind`).
  * Paying, charging a card or changing a plan is billing, the account's door, signed in with a browser session, which no
  * token reaches at all.
  */
@@ -3520,6 +3521,48 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ctx.principal.kind === 'token' || ctx.onWord !== undefined || ctx.word !== undefined || ctx.pressedIn !== undefined || ctx.ordered !== undefined
       ? { code: 'NEEDS_BROWSER_SESSION', fix: `Only you ${what}, signed in to BrainDog. No agent does that, even while agents act without asking.`, at: 'principal' }
       : null;
+
+  /**
+   * NO AGENT WIDENS WHAT AGENTS MAY DO (the owner's call of 4 Nov), on his word, while his switch lets it act without
+   * asking, or any other way: every door his word and his switch open stays open, and these stay his, signed in to
+   * BrainDog, since an agent that could lift its own limits has none:
+   *   - his word and his switch themselves (`ON_WORD_PREF`, and `BYPASS_PREF` turned on);
+   *   - a press inside a chat app answering questions (`agents.answer_in_chat` turned on);
+   *   - the settings rows, which say what each agent may do (`setAgentProfile` in `methods/agent-profile.ts`);
+   *   - a rung on the ladder: a yes to "Let it do this without asking?" (`decide`, `offerAnswer`);
+   *   - a new key for a key his settings hold to part of the record, which the new one would not be held to (`keyOutOfReach`);
+   *   - and all of it by file or by going back: a replacing import that changes it, a restore past his last change to it.
+   * Turning something off is his agent's to do where he told it to, except his word's own switch, which he alone turns.
+   * Not `pressedIn` or `ordered`: `admin` refuses those first, and each is his own press.
+   */
+  const RUNG_IS_HIS = 'Letting an agent do more without asking is yours alone to say, in BrainDog, even when you told it to answer.';
+  const agentBehind = (ctx: CallContext): boolean => ctx.principal.kind === 'token' || ctx.onWord !== undefined || ctx.word !== undefined || ctx.bypass !== undefined;
+  const widensNot = (what: string): Refusal => ({
+    code: 'NEEDS_BROWSER_SESSION',
+    fix: `Only you ${what}, signed in to BrainDog. An agent never widens what agents may do, on your word or not.`,
+    at: 'principal',
+  });
+  /** The tables a file carries that say what an agent may do and who is on the record, held still for an agent's replacing import. */
+  const AGENT_REACH_TABLES = ['agent_profile', 'member'] as const;
+  /** Whether what agents may do was changed after this moment: a settings row, one of his switches, a rung taken back, a key revoked. */
+  const reachMovedSince = (at: string): boolean =>
+    (sql.one<{ n: number }>(
+      `SELECT (SELECT count(*) FROM agent_profile WHERE updated_at > ?)
+            + (SELECT count(*) FROM pref WHERE key IN ('${ON_WORD_PREF}', '${BYPASS_PREF}', 'agents.answer_in_chat') AND updated_at > ?)
+            + (SELECT count(*) FROM ladder WHERE dropped_at > ?)
+            + (SELECT count(*) FROM token WHERE revoked_at > ?) AS n`,
+      at,
+      at,
+      at,
+      at,
+    )?.n ?? 0) > 0;
+  /** Why this agent makes no new key: its settings hold it to some lists, projects or tools, and a new key has no such row. */
+  const keyOutOfReach = (ctx: CallContext): Refusal | null => {
+    if (agentFor(ctx) === null) return null;
+    const row = profileOf(ctx);
+    if (row === null) return null;
+    return row.lists_write !== null || row.projects !== null || Object.keys(row.tools).length > 0 ? widensNot('make a key for an agent your settings hold to part of BrainDog') : null;
+  };
 
   /** An Admin can neither hand out the owner's rung nor touch somebody who holds it. Owners are the only ones who do. */
   const teamKeeps = (ctx: CallContext, args: { person?: string; level?: Level; registers?: Record<string, Level> }): Refusal | null => {
@@ -10075,7 +10118,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         kernel.prefsOf(SELF_HOLDER)[id] !== undefined ||
         kernel.prefsOf(KEPT_HOLDER)[id] !== undefined;
       const held = verdict.option === 'accept' ? rowsetHeld(ctx, target as Record<string, unknown>) : null;
-      const fix = stop?.fix ?? handed ?? held?.fix ?? (special ? alone : null);
+      const rung = ctx.onWord !== undefined && verdict.option === 'yes' && trust.offered(id) ? RUNG_IS_HIS : null;
+      const fix = stop?.fix ?? handed ?? rung ?? held?.fix ?? (special ? alone : null);
       if (fix !== null) refused.push({ id: given, fix });
       else asked.push({ given, id });
     }
@@ -15028,6 +15072,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           key === ON_WORD_PREF ? 'let agents answer on your word' : key === APART_PREF ? "keep agents' suggestions apart" : 'let a chat app answer questions',
         );
         if (owner) return { ok: false as const, refusal: owner };
+        /* AND NO AGENT WIDENS ITS OWN REACH (`agentBehind`): his word's switch is his alone, and a chat press only he turns on. */
+        if (agentBehind(ctx) && (key === ON_WORD_PREF || (key === 'agents.answer_in_chat' && value === true)))
+          return { ok: false as const, refusal: widensNot(key === ON_WORD_PREF ? 'turn "Agents may answer when you tell them" on or off' : 'let a chat app answer questions') };
         if (value !== null && typeof value !== 'boolean') return no('VALUE_MALFORMED', `${key} is true or false, or null to take it away.`, { at: 'value' });
         kept = value as boolean | null;
       } else if (key === BYPASS_PREF) {
@@ -15039,7 +15086,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (owner) return { ok: false as const, refusal: owner };
         if (value !== null && value !== 'on' && value !== 'off') return no('VALUE_MALFORMED', `${key} is on or off, or null to take it away.`, { at: 'value', allowed: ['on', 'off'] });
         /* AN AGENT MAY TURN IT OFF, NEVER ON: only he hands every agent his reach, in Settings > Agents. */
-        if (value === 'on' && ctx.principal.kind !== 'person')
+        /* NOT ON HIS WORD EITHER: an answer on his word is made as him, a person, so asking only that left it open. */
+        if (value === 'on' && agentBehind(ctx))
           return no('NEEDS_BROWSER_SESSION', 'Only you turn on "Let agents do everything without asking", in Settings > Agents.', { at: 'principal' });
         if (value === 'on' && ctx.provedAt !== undefined && clock.now() - ctx.provedAt > kernel.lockAfter() * 60_000)
           return no('NEEDS_BROWSER_SESSION', 'Sign in again to let agents do everything without asking.', { at: 'proof' });
@@ -15902,6 +15950,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AN ANSWER ON HIS WORD MAY ACCEPT WHAT INSTALLS (`onWord`, the owner's decision of 27 October): he told the run to,
          and `instructionsMine` has already held it to an owner whose switch is on and to a question that grants no key.
          Every other door `admin` keeps stays shut to it. */
+      /* A RUNG IS HIS TO GIVE (`agentBehind`): a no to an offer changes nothing, and a yes from an agent is its own promotion,
+         or another's, on whatever words it carries. A filed offer is no agent's own question, so nothing else stops it. */
+      if (ctx.onWord !== undefined && args.decide?.option === 'yes' && trust.offered(String(args.id)))
+        return no('FORBIDDEN', RUNG_IS_HIS, { at: 'option' });
       if (args.decide?.option === 'accept') {
         const asked = kernel.governanceRow('suggestion', String(args.id));
         const kind = asked?.body_kind;
@@ -17130,7 +17182,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * removed does not keep writing through a token they were issued last year.
      */
     async createToken(args: CreateTokenArgs, ctx: CallContext) {
-      const stop = admin(ctx, undefined, 'createToken');
+      const stop = admin(ctx, undefined, 'createToken') ?? keyOutOfReach(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       /* AND A SIGN-IN IN THE LAST FIFTEEN MINUTES, for the reason `invite` gives: a token is the record's reach handed to
          a machine for as long as it lives, so a stale session is not enough to mint one. */
@@ -17187,7 +17239,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       args: { register: string; fixed?: Record<string, JsonValue>; stamp?: string; name?: string; days?: number },
       ctx: CallContext,
     ) {
-      const stop = admin(ctx);
+      const stop = admin(ctx) ?? keyOutOfReach(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (ctx.credentialed === false)
         return {
@@ -17281,7 +17333,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * request that presents it.
      */
     async deviceApprove(args: { user_code: string }, ctx: CallContext): Promise<Result<Approved>> {
-      const stop = admin(ctx);
+      const stop = admin(ctx) ?? keyOutOfReach(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       /* Nothing presented is no sign-in at all, for the reason `createToken` gives. */
       if (ctx.credentialed === false)
@@ -17422,6 +17474,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          read as either answer, because read as true it replaces a record nobody asked to replace. */
       if (args.replace !== undefined && typeof args.replace !== 'boolean')
         return no('VALUE_MALFORMED', 'replace is true or false.', { at: 'replace' });
+      /* NO AGENT WIDENS ITS REACH BY FILE (`agentBehind`). An agent's replacing import is held to the settings rows and the
+         members the record holds now: a file vouches only for itself (`checkBrainl` with no key), so one edited and signed
+         again by a stranger's key reads as sound, and it could raise a row, or make somebody else the owner, past `teamKeeps`
+         and `ownerKeeps`. Anything else in it is the door his word and his switch opened. */
+      if (args.replace === true && agentBehind(ctx)) {
+        const held = await kernel.export({ sections: ['governance'], redactGrants: true });
+        const block = (lines: readonly string[], table: string): string => {
+          const from = lines.findIndex((l) => l.startsWith(`#table ${table} `));
+          if (from < 0) return '';
+          const end = lines.findIndex((l, i) => i > from && l.startsWith('#'));
+          return lines.slice(from + 1, end < 0 ? undefined : end).join('\n');
+        };
+        const moved = held.ok ? AGENT_REACH_TABLES.filter((t) => block(args.lines as string[], t) !== block(held.value, t)) : AGENT_REACH_TABLES;
+        if (moved.length > 0) return { ok: false as const, refusal: widensNot('put back a file that changes what agents may do, or who is on this BrainDog') };
+      }
       /* AND WHAT IT WAS IS KEPT FIRST, as `restore` keeps it, when this host keeps copies: the kernel takes it once the file
          has passed and before anything is cleared, so a file that is refused leaves no copy behind. */
       const before = args.replace === true && snapshots ? () => snapshots.take('before-restore') : undefined;
@@ -17492,6 +17559,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const chosen = kept.find((s) => s.id === args.bookmark);
       if (!chosen)
         return no('OUT_OF_BOUNDS', `${args.bookmark} is not one of the copies kept here.`, { at: 'bookmark', allowed: kept.map((s) => s.id) });
+
+      /* NOR BY GOING BACK (`agentBehind`): a copy older than his last change to what agents may do brings the wider one back. */
+      if (agentBehind(ctx) && reachMovedSince(chosen.at)) return { ok: false as const, refusal: widensNot('go back past a change you made to what agents may do') };
 
       const before = await snapshots.take('before-restore');
       /* READ BEFORE THE PORT ARMS, for a port that reopens: nothing on this object is written after the arm. */
