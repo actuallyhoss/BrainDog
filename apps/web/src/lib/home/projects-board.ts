@@ -146,7 +146,7 @@ export type BoardRow = {
   chip: Chip;
   /** The chip is a day work falls due, which the card says as "Due Thu 5 Nov". */
   due: boolean;
-  /** Something of it waits on a person now: late work, a question, numbers gone quiet, work due today. */
+  /** Something of it waits on a person now: late work, a question, numbers gone quiet, work due today, or it is said to be at risk or off track. */
   needs: boolean;
   /** Worked on, due or asked about this week. */
   moving: boolean;
@@ -641,7 +641,7 @@ export function boardOf(input: BoardInput): Board {
     next: f.p.next,
     chip: chipOf(f, input.today),
     due: f.late.length === 0 && f.due.length > 0,
-    needs: f.late.length > 0 || f.asks.length > 0 || f.quiet || f.due.some((d) => d.day === input.today),
+    needs: f.late.length > 0 || f.asks.length > 0 || f.quiet || f.due.some((d) => d.day === input.today) || f.p.health === 'at_risk' || f.p.health === 'off_track',
     moving: moving(f, input.now),
     number: numberOf(f),
     work: workOf(f, input.now),

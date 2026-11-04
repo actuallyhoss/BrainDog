@@ -109,10 +109,10 @@
   let point = $state<{ x: number; y: number; height: number } | null>(null);
 </script>
 
-{#snippet pinButton(href: string, name: string, labelled: boolean, key?: string)}
+{#snippet pinButton(href: string, name: string, key?: string)}
   {@const on = isPinnedAt(href, key)}
-  <button type="button" class="pin tap" data-bare={labelled ? undefined : ''} aria-pressed={on} aria-label={on ? pinWords.unpinName(name) : pinWords.pinName(name)} title={on ? pinWords.unpin : pinWords.pin} onclick={() => void togglePin(href, name, key)}>
-    <Icon name="pin" size="s" />{#if labelled}<span>{on ? words.pinned : words.pin}</span>{/if}
+  <button type="button" class="pin tap" aria-pressed={on} aria-label={on ? pinWords.unpinName(name) : pinWords.pinName(name)} title={on ? pinWords.unpin : pinWords.pin} onclick={() => void togglePin(href, name, key)}>
+    <Icon name="pin" size="s" /><span>{on ? words.pinned : words.pin}</span>
   </button>
 {/snippet}
 
@@ -134,7 +134,7 @@
           <span class="small c-meta">{r.laneWord}{#if r.laneWord && HEALTH[r.health]}{' · '}{/if}{#if HEALTH[r.health]}<span class="c-health" data-tone={HEALTH[r.health]!.tone}><span class="dot" aria-hidden="true"></span>{HEALTH[r.health]!.word}</span>{/if}</span>
         {/if}
       </div>
-      {@render pinButton(r.href, r.name, true, r.key)}
+      {@render pinButton(r.href, r.name, r.key)}
     </div>
     <div class="c-next">
       <p class="c-step own-dir" data-none={r.next === '' ? '' : undefined}>{r.next || words.noNext}</p>
@@ -162,7 +162,7 @@
     </div>
     {#if r.chip}<div class="l-state">{@render chipOf(r)}</div>{/if}
     {#if r.number.kind === 'kpi'}<span class="l-num num">{r.number.figure}</span>{/if}
-    {@render pinButton(r.href, r.name, false, r.key)}
+    {@render pinButton(r.href, r.name, r.key)}
 {/snippet}
 
 {#snippet shelfRow(p: Parked)}
@@ -171,7 +171,7 @@
       <a class="c-name own-dir" href={at(p.href)}>{p.name}</a>
       {#if p.due}<p class="small l-next" data-warn="">{p.due}</p>{/if}
     </div>
-    {@render pinButton(p.href, p.name, false)}
+    {@render pinButton(p.href, p.name)}
 {/snippet}
 
 {#if board}
@@ -217,6 +217,8 @@
             </section>
           {/each}
         {:else}
+          <!-- WITH NOTHING ELSE TO SWITCH TO THE SWITCH IS NOT DRAWN, so the list says what it is itself. -->
+          {#if views.length === 1}<h3 class="b-sec-head">{views[0]!.label} <span class="num">{views[0]!.n}</span></h3>{/if}
           <ul class="lines">
             {#each view === 'parked' ? b.parked : b.closed as p (p.href)}
               <li class="line" style={slotStyle(p.hue)} in:arrive out:depart animate:flip={springy()}>{@render shelfRow(p)}</li>
@@ -602,12 +604,6 @@
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     cursor: pointer;
-  }
-
-  .pin[data-bare] {
-    justify-content: center;
-    inline-size: 28px;
-    padding: 0;
   }
 
   .pin[aria-pressed='true'] {
