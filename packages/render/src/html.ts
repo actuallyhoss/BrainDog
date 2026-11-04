@@ -1334,7 +1334,7 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
       const name = L.name >= 0 ? `<h3 class="cards-title">${r.cells[L.name] ? drawn(r, L.name) : MISSING}</h3>` : '';
       /* A DAY SAYS WHAT DAY IT IS: its column's label before it ("Last confirmed 2 Nov"), unless the day already says it. */
       const whenLabel = L.when >= 0 ? label(L.when) : '';
-      const whenSaid = whenLabel && !(r.cells[L.when] ?? '').trim().toLocaleLowerCase('en').startsWith(whenLabel.toLocaleLowerCase('en')) ? `${escape(whenLabel)}&nbsp;` : '';
+      const whenSaid = whenLabel && !(r.cells[L.when] ?? '').trim().toLocaleLowerCase('en').startsWith(whenLabel.toLocaleLowerCase('en')) ? `${escape(whenLabel)}\u00a0` : '';
       const when = L.when >= 0 && r.cells[L.when] ? `<span class="cards-when">${whenSaid}${drawn(r, L.when)}</span>` : '';
 
       /* A CARD'S FIGURE THAT NAMES NOTHING IS LEFT OUT, as a tile's is (`drawnRows`): the card keeps its name and facts. */
