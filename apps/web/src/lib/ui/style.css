@@ -440,12 +440,10 @@
     --sp-8: 80px;
     --sp-9: 120px;
   }
-  /* UNDER A THUMB A ROW NEVER FALLS BELOW A TARGET, at any density. */
+  /* UNDER A THUMB A ROW NEVER FALLS BELOW A TARGET, at any density. The sidebar's rows grow their hit area unseen (`.tap`). */
   @media (pointer: coarse) {
     html[data-density='compact'] {
       --row-h: var(--tap);
-      --side-row: var(--tap);
-      --side-sub: var(--tap);
     }
   }
 }

@@ -672,6 +672,21 @@
     overflow-wrap: anywhere;
   }
 
+  /* UNDER A THUMB THE WORDS ARE A 44 TARGET, unseen, at every text size and density; nothing they stand beside moves. */
+  @media (pointer: coarse) {
+    a.ck-text,
+    a.st-words {
+      position: relative;
+    }
+
+    a.ck-text::after,
+    a.st-words::after {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap, 44px)) / 2)) 0;
+    }
+  }
+
   a.ck-text:hover {
     text-decoration: underline;
     text-underline-offset: 3px;
