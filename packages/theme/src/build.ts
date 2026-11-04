@@ -1367,7 +1367,7 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     'switch-off': '#6D6D6D',
     knob: '#FFFFFF',
     'segment-on': '#353535',
-    arrived: '#2D2D2D',
+    arrived: '#2E2E2E',
     'red-fill': '#BA4239',
     'red-fill-hover': '#C64A41',
     'red-fill-press': '#A83A32',
