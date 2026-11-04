@@ -31,6 +31,9 @@ const READING_ROOM: Doc = {
   summary: 'Books and magazines in one place.',
   author: 'Halden',
   license: 'MIT',
+  /* SAID, because the door has refused a file that leaves a place of yours unsaid since 46cb072f7, and this one is to
+     reach the scratch. */
+  uses: ['register.magazines'],
   declarations: [BOOKS, { page: 'reading-room', title: 'Reading room', requires: ['register.magazines'], blocks: [{ kind: 'table', heading: 'Magazines', source: 'register.magazines', span: 12 }] }],
 };
 
@@ -235,9 +238,13 @@ test('a trusted publisher\'s page that names a list it does not bring is refused
   const good = await serveKennel(post('submit', await signed(LIBRARY, key)), deps);
   const listed = (await good.json()) as Envelope;
   assert.equal(good.status, 200, JSON.stringify(listed));
-  assert.equal(listed.value?.state, 'listed');
-  assert.deepEqual(listedIds(files), ['bookshelf']);
+  /* A TRUSTED PUBLISHER'S FIRST VERSION WAITS FOR A PERSON TOO (`atOnce`, DESIGN.md §4.1), and the operator lists it. */
+  assert.equal(listed.value?.state, 'review');
+  assert.deepEqual(listedIds(files), [], 'a first version is not listed until a person has looked');
   assert.equal(opened.length, 2, 'one scratch for each submission');
+  const verdict = await serveKennel(post('review', { kind: 'pack', id: 'bookshelf', version: String(LIBRARY.version), verdict: 'list', reason: '' }, operator), deps);
+  assert.equal(((await verdict.json()) as Envelope).value?.state, 'listed');
+  assert.deepEqual(listedIds(files), ['bookshelf']);
   assert.ok(dropped(opened));
 });
 
