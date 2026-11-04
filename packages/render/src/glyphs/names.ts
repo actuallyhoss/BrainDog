@@ -54,7 +54,7 @@ const CORE_NAMES = {
   users: 1, 'square-check': 1, 'file-text': 1, tag: 1, bell: 1, bot: 1, 'grip-vertical': 1, 'arrow-up': 1,
   'arrow-down': 1, 'layout-grid': 1, pencil: 1, 'trash-2': 1, archive: 1, eye: 1, download: 1, 'rotate-cw': 1,
   star: 1, ban: 1, info: 1, 'circle-question-mark': 1, ellipsis: 1, keyboard: 1, code: 1, activity: 1,
-  history: 1, lock: 1, key: 1, lightbulb: 1, zap: 1, plug: 1, globe: 1, mail: 1,
+  history: 1, lock: 1, key: 1, lightbulb: 1, zap: 1, plug: 1, globe: 1, mail: 1, pin: 1,
 } as const satisfies Record<CoreGlyph, 1>;
 
 const SET_NAMES = {
@@ -79,7 +79,7 @@ const SET_NAMES = {
   'chart-bar': 1, 'chart-no-axes-combined': 1, minus: 1, 'chevron-left': 1, 'chevron-up': 1,
   'chevrons-up-down': 1, 'arrow-up-down': 1, move: 1, laptop: 1, smartphone: 1, tags: 1, 'layout-list': 1,
   'eye-off': 1, upload: 1, 'rotate-ccw': 1, 'refresh-cw': 1, 'ellipsis-vertical': 1, 'map-pin': 1, map: 1,
-  compass: 1, navigation: 1, bookmark: 1, heart: 1, 'thumbs-up': 1, 'thumbs-down': 1, pin: 1, 'link-2': 1,
+  compass: 1, navigation: 1, bookmark: 1, heart: 1, 'thumbs-up': 1, 'thumbs-down': 1, 'link-2': 1,
   hash: 1, 'list-filter': 1, 'arrow-up-narrow-wide': 1, 'arrow-down-wide-narrow': 1, cog: 1, 'settings-2': 1,
   'log-in': 1, 'log-out': 1, menu: 1, 'panel-left': 1, share: 1, 'share-2': 1, printer: 1, save: 1, 'undo-2': 1,
   'redo-2': 1, 'maximize-2': 1, 'minimize-2': 1, expand: 1, shrink: 1, music: 1, video: 1, camera: 1, mic: 1,
