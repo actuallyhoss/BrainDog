@@ -2838,7 +2838,8 @@ export class Directory$ extends DurableObject<Env> {
             ...(passkeys ? { rp: passkeys } : {}),
             magic: Boolean(this.env.AUTH_MAIL_FROM && this.env.EMAIL),
             /* The reason a sign-in failed, for the operator's tail. A flow and a word, never who or with what. */
-            log: (line) => op({ op: 'auth', flow: line.flow, ok: false, why: line.reason }, 'error'),
+            /* A COOKIE THAT NAMES NO LIVE SESSION IS NO FAULT (`why: 'session'`): it ran out or was signed out, it is told to clear itself, and the person signs in. */
+            log: (line) => op({ op: 'auth', flow: line.flow, ok: false, why: line.reason }, line.reason === 'session' ? 'info' : 'error'),
             /* A SWITCH ASKS THE RECORD ITSELF, over RPC to its own object by id: `dir_member` still lists somebody
                `removeMember` took off it, and moving their browser there would answer "opened" to a record that
                refuses every read. */
