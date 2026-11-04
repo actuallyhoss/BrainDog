@@ -242,6 +242,7 @@ const REGISTER = {
     series: 'true for a list of dated facts, such as a rate each day, rather than of things with names',
     scopes: "{repos?, folders?}: on the one list whose rows are projects, the list-of-text fields naming each one's places",
     rates: 'on the one list holding the rates a money figure converts by, the field that plays each part',
+    restates: "{night, unit: <money field>, day: <day field>, match?}: on a list of prices, the night's net worth said again in one unit of what it prices",
     meets: 'on the one list meet writes people into, the field that plays each part',
     org: 'on the one list meet writes organisations into, the field that plays each part: name, keys, kind, domain, merged_into',
     pairs: 'transfer detection: the fields BrainDog matches two legs of one move by',
@@ -286,6 +287,7 @@ const REGISTER = {
     derived: "BrainDog's own; never write it",
     hidden_from_agents: "true: the field's own bookkeeping, such as a mark or a hue; an agent's short answers leave it out and format full keeps it",
     parts_of: "on a json field, a money field of the same list: the row split into parts ({category, amount, note}) adding up to it",
+    on_delete: 'unlink, on a ref or a list of refs: a link the record drew itself, cleared when the row it points at is deleted and put back by Undo',
     when: '{holds: [people]}: the field is there only while this BrainDog holds those lists or roles (rates, meets, org). Never on a required field',
   },
   example: {

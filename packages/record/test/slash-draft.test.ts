@@ -138,7 +138,7 @@ test('slashDraft ANSWERS THE DRAFTS WITH THEIR ROWS AND WHAT THEY DREW, and file
 
   /* THE GRAMMARS A DESCRIPTION IS DRAFTED IN ARE IN WHAT THE MODEL IS SENT, beside the words, trimmed. */
   assert.equal(heard[0]!.asked, 'A desk for my launch.');
-  assert.deepEqual(Object.keys(heard[0]!.grammar ?? {}).sort(), ['ingest', 'metric', 'page', 'register', 'rule']);
+  assert.deepEqual(Object.keys(heard[0]!.grammar ?? {}).sort(), ['design', 'ingest', 'metric', 'page', 'register', 'rule']);
   assert.deepEqual(heard[0]!.kinds, ['change']);
 
   assert.equal(out.by, 'test model');
