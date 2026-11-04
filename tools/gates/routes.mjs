@@ -57,6 +57,8 @@ export const SAMPLE_OF = {
     was: [{ ...fill('[register]', 'obligations'), ...fill('[seq]', '1') }],
   },
   'web:/settings/[area]': { fixed: [...AREAS.keys()].map((area) => fill('[area]', area)) },
+  /* ONE AGENT'S OWN PAGE (`lib/agents/agent-page.svelte.ts`): `defaults`, Defaults for new agents, is there on every record. */
+  'web:/settings/agents/[agent]': { fixed: [fill('[agent]', 'defaults')] },
   /* AN OPTIONAL SEGMENT LEFT EMPTY IS THE ROUTE WITHOUT IT: `/agents/summary` is every summary the record sends, which
      is the page a summary's own address draws one tile of. */
   'web:/agents/summary/[[id]]': { fixed: [fill('[[id]]', '')] },

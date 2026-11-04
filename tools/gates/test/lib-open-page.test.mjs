@@ -314,7 +314,7 @@ test('the record names the ids, and what it has nothing for is said, not invente
   };
   const { routes, unsampled, unseen } = await routesFor(WEB, record);
   assert.deepEqual(unsampled, []);
-  for (const r of ['/SG10', '/decide/SG10', '/automations/rule.close_follow_ups', '/addons/agents', '/addons/personal', '/v/obligations.open', '/p/money', '/r/obligations', '/r/obligations/4'])
+  for (const r of ['/SG10', '/decide/SG10', '/automations/rule.close_follow_ups', '/plugins/agents', '/plugins/personal', '/v/obligations.open', '/p/money', '/r/obligations', '/r/obligations/4'])
     assert.ok(routes.includes(r), `${r} is not among ${routes.join(' ')}`);
   assert.equal(routes.includes('/automations/SG5'), false, 'an automation is opened by its own id');
   assert.deepEqual(unseen.sort(), ['/jobs/j_none', '/scripts/no-script']);
