@@ -15942,14 +15942,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         let picked: Result<Decided>;
         try {
           picked = kernel.transaction(() => {
-            const folded = foldPicked(pick, actorOf(ctx));
-            if (!folded.ok) {
-              halted.refusal = 'refusal' in folded ? folded.refusal : { code: 'VERSION_STALE', fix: 'Something changed while this was merged. Answer it again.' };
-              throw halted;
-            }
+            /* THIS QUESTION ANSWERED FIRST: the fold takes back every open question about the rows it merged (`settleAbout`),
+               and with this one still open that was this one, which then refused its own answer as already made. */
             const decided = kernel.decide(args.id, { decide: { option: 'reject', reason: said } }, actorOf(ctx));
             if (!decided.ok) {
               halted.refusal = 'refusal' in decided ? decided.refusal : { code: 'VERSION_STALE', fix: 'Something changed while this was answered. Answer it again.' };
+              throw halted;
+            }
+            const folded = foldPicked(pick, actorOf(ctx));
+            if (!folded.ok) {
+              halted.refusal = 'refusal' in folded ? folded.refusal : { code: 'VERSION_STALE', fix: 'Something changed while this was merged. Answer it again.' };
               throw halted;
             }
             return decided;
