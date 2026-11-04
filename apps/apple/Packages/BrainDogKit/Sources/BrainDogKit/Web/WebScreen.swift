@@ -30,6 +30,8 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     public private(set) var title: String?
     /// The page's places (the web's `tabsOf`), for the native tab bar.
     public private(set) var places: JSONValue?
+    /// A sheet of the page's own is open (the iPhone), so the tab bar steps aside.
+    public private(set) var modal = false
     /// The first load could not reach the server, and nothing kept could stand in.
     public private(set) var offline = false
     /// The picture over the page until it has drawn: the last Today at launch, a sleeping screen's last look.
@@ -219,6 +221,8 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         case .places(let tabs):
             places = tabs
             onAsk?(ask)
+        case .modal(let open):
+            withAnimation(.easeOut(duration: 0.2)) { modal = open }
         case .scheme(let v):
             Look.shared.heard(v)
         case .haptic(let kind):
@@ -364,7 +368,8 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         let e = error as NSError
-        guard e.domain == NSURLErrorDomain, e.code != NSURLErrorCancelled else { return }
+        /* ANYTHING BUT A MOVE THE APP ITSELF CALLED OFF (a cancel, a load handed to a download) LEAVES A BLANK PAGE, so it is said. */
+        guard !(e.domain == NSURLErrorDomain && e.code == NSURLErrorCancelled), !(e.domain == "WebKitErrorDomain" && e.code == 102) else { return }
         /* NOTHING REACHED THE SERVER AND NOTHING KEPT ANSWERED FOR IT: said by whoever draws the screen, with Try again. */
         offline = true
         uncover()
@@ -420,6 +425,8 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     /// The text size changed while the app was open: every live screen takes the new zoom.
     public func rescale() {
         webView.pageZoom = Self.textScale
+        /* AND THE ROOT BOX TAKES THE WINDOW'S NEW WIDTH (`ShellScript.js`). */
+        webView.evaluateJavaScript("var d=document.documentElement.style;d.inlineSize='calc(100% / \(Self.textScale))';d.setProperty('--shell-zoom','\(Self.textScale)')")
     }
     #endif
 }

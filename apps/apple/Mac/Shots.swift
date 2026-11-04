@@ -19,6 +19,7 @@ enum Shots {
     /// The main window at 1512 wide, as it is drawn now.
     static func window(_ name: String) async {
         let model = MacModel.shared
+        LaunchMark.say("shot \(name) signedIn \(Session.shared.signedIn) window \(model.desk.webView.window != nil) ready \(model.desk.ready)")
         guard let window = model.desk.webView.window else { return }
         let size = NSSize(width: 1512, height: 945)
         if window.frame.size != size {
@@ -27,7 +28,10 @@ enum Shots {
         }
         let config = WKSnapshotConfiguration()
         config.afterScreenUpdates = true
-        guard let page = try? await model.desk.webView.takeSnapshot(configuration: config) else { return }
+        guard let page = try? await model.desk.webView.takeSnapshot(configuration: config) else {
+            LaunchMark.say("shot \(name): no picture")
+            return
+        }
         let bounds = window.contentView?.bounds ?? NSRect(origin: .zero, size: size)
         let image = NSImage(size: bounds.size, flipped: false) { _ in
             page.draw(in: model.desk.webView.convert(model.desk.webView.bounds, to: nil))

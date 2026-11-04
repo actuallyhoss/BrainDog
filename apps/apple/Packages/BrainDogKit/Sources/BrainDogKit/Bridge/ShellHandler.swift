@@ -20,6 +20,8 @@ nonisolated public enum ShellAsk: Sendable, Equatable {
     case drag
     /// The Mac: a double press there, which does what the person set for a title bar (zoom, minimise or nothing).
     case titleBarDoubleClick
+    /// The iPhone: a sheet of the page's own opened or closed, which native's tab bar steps aside for.
+    case modal(Bool)
     /// The look the person chose in BrainDog (`data-scheme`): "light", "dark", or "" for the device's own.
     case scheme(String)
 }
@@ -97,6 +99,8 @@ public final class ShellBridge: NSObject, WKScriptMessageHandler {
                let value = try? JSONDecoder().decode(JSONValue.self, from: data) { hear(.places(value)) }
         case "visit":
             hear(.visit(path: text("path"), mode: text("mode")))
+        case "modal":
+            hear(.modal(a["open"] as? Bool ?? false))
         case "drag":
             hear(.drag)
         case "zoom":

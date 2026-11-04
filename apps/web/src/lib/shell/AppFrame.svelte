@@ -1949,7 +1949,7 @@
      does not run the page under its bar reports no top inset, so it is unchanged. */
   :global(html[data-shell='ios']) .body {
     overflow: visible;
-    padding-block: env(safe-area-inset-top, 0px) calc(var(--tabbar) + var(--sp-5));
+    padding-block: calc(env(safe-area-inset-top, 0px) / var(--shell-zoom, 1)) calc(var(--tabbar) + var(--sp-5));
   }
 
   /* NATIVE HAS NO KEYBOARD USER TO SKIP THE RAIL (there is no rail), and it took the page's focus when an alert closed. */
@@ -1961,7 +1961,7 @@
     block-size: auto;
     min-block-size: 100dvh;
     overflow: visible;
-    padding-block: env(safe-area-inset-top, 0px) calc(var(--tabbar) + var(--sp-5));
+    padding-block: calc(env(safe-area-inset-top, 0px) / var(--shell-zoom, 1)) calc(var(--tabbar) + var(--sp-5));
   }
 
   /* A SURFACE WITH NO SHELL SCROLLS ITSELF. Same architecture as `.body` below — one container, one

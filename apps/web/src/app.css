@@ -57,7 +57,8 @@
   /* AND NATIVE'S TAB BAR IS NOT THE WEB'S: what clears the web's bar (the toasts, a bulk bar, the work's foot) clears
      only what the safe area says is under native's, which native reports and the web never measures. */
   html[data-shell='ios'] {
-    --tabbar: env(safe-area-inset-bottom, 0px);
+    /* Over the page's zoom: the insets are points, and Dynamic Type zooms the page (`--shell-zoom`, `ShellScript.js`). */
+    --tabbar: calc(env(safe-area-inset-bottom, 0px) / var(--shell-zoom, 1));
     /* AND NATIVE'S NAV BAR: a heading kept in view, or a place scrolled to, stops under it. */
     scroll-padding-block-start: calc(env(safe-area-inset-top, 0px) + var(--sp-3));
   }

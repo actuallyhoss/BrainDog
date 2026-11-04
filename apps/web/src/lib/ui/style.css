@@ -359,8 +359,12 @@
   /* IN THE IPHONE APP THE DOCUMENT SCROLLS, so a ground on `body` ran the whole page's length and stopped at its ends: a
      pull past the top showed a flat band with a hard line under it. There the light is a fixed layer behind everything,
      as native's own ground is, and the same under a pull as at rest. */
-  html[data-shell='ios'] body {
+  html[data-shell='ios'] {
     background: var(--board);
+  }
+
+  html[data-shell='ios'] body {
+    background: transparent;
   }
 
   html[data-shell='ios'] body > div:first-of-type::before {

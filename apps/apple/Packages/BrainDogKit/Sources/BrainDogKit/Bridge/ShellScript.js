@@ -92,6 +92,25 @@
       true,
     );
   }
+  // THE IPHONE'S DYNAMIC TYPE IS THE WEB VIEW'S PAGE ZOOM, and WebKit keeps the root box at the unzoomed width while the
+  // window shrinks by the zoom: at 1.3 every card ran 90 points off the right of the screen. The root takes the window's.
+  if (shell.kind === 'ios' && shell.textScale !== 1 && document.documentElement) {
+    document.documentElement.style.inlineSize = 'calc(100% / ' + shell.textScale + ')';
+    document.documentElement.style.setProperty('--shell-zoom', String(shell.textScale));
+  }
+  // THE IPHONE: A SHEET OF THE PAGE'S OWN IS OPEN. Native's tab bar and its Tell line go while it is, so the sheet reaches
+  // the foot of the screen as a native sheet does, with no bar left floating over it.
+  if (shell.kind === 'ios') {
+    let modal = false;
+    const check = () => {
+      const open = document.querySelector('dialog:modal') !== null;
+      if (open !== modal) {
+        modal = open;
+        post('modal', { open });
+      }
+    };
+    new MutationObserver(check).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
+  }
   // Any link that leaves BrainDog opens outside, whatever the page did with it.
   addEventListener(
     'click',

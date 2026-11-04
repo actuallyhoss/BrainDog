@@ -260,7 +260,7 @@ struct NeedsRow: View {
             HStack(alignment: .center, spacing: Space.s3) {
                 IconWell(glyph, size: .l, tone: question.cost == "undo" ? .warn : .neutral)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(question.question).font(Typeface.row).foregroundStyle(Palette.ink).lineLimit(2).leading(.row)
+                    Text(question.question).font(Typeface.row).foregroundStyle(Palette.ink).lineLimit(4).leading(.row)
                     if let detail { Text(detail).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(1) }
                 }
                 Spacer(minLength: Space.s2)
@@ -347,8 +347,9 @@ struct LaterSheet: View {
         }
         .padding(Space.gutter)
         .padding(.top, Space.s2)
-        .presentationDetents([.height(340)])
+        .presentationDetents([.height(340), .large])
         .presentationDragIndicator(.visible)
+        .presentationBackground(Palette.tile)
         .onAppear { typing = true }
     }
 

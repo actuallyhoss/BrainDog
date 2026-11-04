@@ -166,6 +166,10 @@ public struct SignInView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
+        #if os(macOS)
+        /* A MAC'S WINDOW IS TALLER THAN THE FORM: it stands in the middle, not hung from the traffic lights. */
+        .defaultScrollAnchor(.center, for: .alignment)
+        #endif
         .background(Ground())
         .animation(.easeOut(duration: 0.18), value: flow.step)
         .task { await flow.offerAutofill() }

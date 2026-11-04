@@ -207,7 +207,7 @@ final class AppModel {
                 let given = await askPush()
                 screen?.emit("pushAnswer", given ? "yes" : "no")
             }
-        case .notify, .ready, .haptic, .signedOut, .title, .drag, .titleBarDoubleClick, .scheme:
+        case .notify, .ready, .haptic, .signedOut, .title, .drag, .titleBarDoubleClick, .scheme, .modal:
             /* A notification from the page would ring twice beside the record's push; the rest the screen answered. */
             break
         }
@@ -314,7 +314,11 @@ final class AppModel {
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.needs.read() }
             group.addTask {
-                guard let (boot, raw) = try? await Calls.boot() else { return }
+                /* OFFLINE TELL STILL READS WHAT IS TYPED, against what was kept, and only the press says it cannot send. */
+                guard let (boot, raw) = try? await Calls.boot() else {
+                    await self.tell.learnKeptThenFresh()
+                    return
+                }
                 await self.took(boot: boot, raw: raw)
             }
         }

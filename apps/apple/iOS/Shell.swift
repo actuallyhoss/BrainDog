@@ -26,7 +26,7 @@ struct Shell: View {
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
-        .modifier(TellAccessory(on: app.canTell) { app.openTell() })
+        .modifier(TellAccessory(on: app.canTell, stepsAside: app.current?.top?.modal == true) { app.openTell() })
         .sensoryFeedback(.selection, trigger: app.selected)
         .sheet(isPresented: $app.tellOpen) {
             TellSheet(model: app.tell)
@@ -68,11 +68,17 @@ struct Shell: View {
 /// Tell in the tab bar's accessory, only for somebody who may add: for anybody else the control is absent, not disabled.
 struct TellAccessory: ViewModifier {
     let on: Bool
+    /// A sheet of the page's own is open, and the bar and this line go with it (`isEnabled`, iOS 26.1).
+    var stepsAside = false
     let open: () -> Void
 
     func body(content: Content) -> some View {
         if on {
-            content.tabViewBottomAccessory { TellLine(open: open) }
+            if #available(iOS 26.1, *) {
+                content.tabViewBottomAccessory(isEnabled: !stepsAside) { TellLine(open: open) }
+            } else {
+                content.tabViewBottomAccessory { TellLine(open: open) }
+            }
         } else {
             content
         }
@@ -145,6 +151,7 @@ struct WebPage: View {
         WebView(screen)
             .ignoresSafeArea(.container, edges: [.top, .bottom])
             .background(ScrollEdge(scroll: screen.webView.scrollView))
+            .toolbarVisibility(screen.modal ? .hidden : .automatic, for: .tabBar)
             .overlay {
                 if screen.offline { Offline { screen.reload() } }
             }

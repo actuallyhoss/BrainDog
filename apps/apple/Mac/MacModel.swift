@@ -149,7 +149,8 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
 
     /// Today as it was last drawn, for the next launch to show until the page draws (as the iPhone app does).
     private func keepPicture() {
-        guard Session.shared.signedIn, desk.ready, !desk.offline, desk.here == "/" else { return }
+        /* A QUIET WALK'S WINDOW IS NOT ON SCREEN, and WebKit never answers a snapshot of it. */
+        guard !Self.quiet, Session.shared.signedIn, desk.ready, !desk.offline, desk.here == "/" else { return }
         Task {
             guard let picture = try? await desk.webView.takeSnapshot(configuration: nil) else { return }
             LaunchPicture.kept = picture
@@ -175,7 +176,7 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
             desk.emit("slash", prefill.isEmpty ? nil : prefill)
         case .visit(let path, _):
             desk.go(path)
-        case .ready, .haptic, .signedOut, .title, .places, .pushAsk, .drag, .titleBarDoubleClick, .scheme:
+        case .ready, .haptic, .signedOut, .title, .places, .pushAsk, .drag, .titleBarDoubleClick, .scheme, .modal:
             break
         }
     }

@@ -68,6 +68,9 @@ const WALKS = {
     ['share-photo', 'go:share:Paid $34 for lunch with June today|photo', 9],
     ['lock-cover', 'go:tab:/;;lock', 8],
     ['attach', 'go:attach', 9],
+    ['share-web', 'go:/p/tidepool;;click:.share-trigger', 14],
+    ['send-web', 'go:/p/tidepool;;click:.sb-more', 14],
+    ['refreshing', 'go:tab:/p/money;;refreshing', 12],
     ['bounce', 'go:tab:/;;offset:-260', 12],
   ],
   m2: [
