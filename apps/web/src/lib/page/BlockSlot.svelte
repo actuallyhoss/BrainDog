@@ -1319,14 +1319,20 @@
     }
 
     /* A DOOR THE KEYBOARD LANDS ON HAS A WIDTH. It shrinks first, down to nothing beside a long heading, so a keyboard
-       reader's focus landed on a link 0px wide. */
+       reader's focus landed on a link 0px wide. While it holds focus it stands over the end of the heading row, whole,
+       on the tile's own ground, and the heading underneath does not move. */
     .block-source:focus-visible {
-      flex-shrink: 0;
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline-end: 0;
+      z-index: 1;
+      overflow: visible;
+      padding-inline-start: var(--sp-2);
+      background: var(--tile);
     }
 
-    /* AND IN A NARROW WINDOW IT TAKES A LINE OF ITS OWN rather than being pushed off the tile's start. */
     :global(.block-bar:has(.block-source:focus-visible)) {
-      flex-wrap: wrap;
+      position: relative;
     }
   }
 

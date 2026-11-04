@@ -76,15 +76,19 @@
 
   :root:dir(rtl) {
     --open-turn: -90deg;
+    /* THE ONE PHYSICAL SIDE HERE, AND IT IS THE MEANING: this is only ever read under right to left (below). */
+    --shell-side: right;
   }
 
   /* A LINE HOLDS ITS OWN DIRECTION. With the shell mirrored, "64 days late" and "£9,190" came out as "days late 64" and
      "£9,190-": the bidi algorithm reads a run of Latin and digits against the block's direction. So each block takes its
      direction from its own first letter, and an Arabic line and an English line both read right beside each other.
-     `match-parent` keeps it where the shell's start is, so an English line in a mirrored shell still stands on the right. */
+     The side it stands on stays the shell's: `start` would follow each line's own direction and send English to the left
+     of a mirrored screen, and `match-parent` does not hold it there in Chromium, measured. A host that writes its own
+     alignment (a centred note, an end-aligned figure) still wins, since this is the a11y layer. */
   :root:dir(rtl) :where(p, li, a, button, label, span, h1, h2, h3, h4, h5, h6, dt, dd, td, th, summary, figcaption, legend, [role='cell'], [role='gridcell'], [role='columnheader']) {
     unicode-bidi: plaintext;
-    text-align: match-parent;
+    text-align: var(--shell-side);
   }
 
   /* A FIGURE OR A SHORTCUT IS LEFT TO RIGHT IN EVERY LANGUAGE, and stands apart from the words round it, so a minus stays
