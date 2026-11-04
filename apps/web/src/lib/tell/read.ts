@@ -341,6 +341,9 @@ function timeField(l: TellList, part: string): FieldDecl | undefined {
   );
 }
 
+/** The days from one day to another, later or the same. */
+const daysBetween = (from: string, to: string): number => (Date.parse(to) - Date.parse(from)) / 86_400_000;
+
 /** Whether the day a line names is a weekday said bare, "on Monday" or "Saturday morning", read as the one gone of a spend. */
 function weekdaySaid(text: string): boolean {
   const m = DAY.exec(text);
@@ -2154,7 +2157,11 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
        words that point ahead ("tomorrow", "next", "due", "in 3 days") are no spend: a bill, read after. */
     /* AND A DATE STILL TO COME IS NO SPEND EITHER (RQ2): "Netflix 180 on the 5th" read on 31 Oct is a bill due 5 Nov, never
        paid on 5 Oct, and "Hotel 3,000 on 20 Nov" is never paid a year back. Only a bare weekday is read as the one gone. */
-    if (dated.day !== null && (aheadSaid(c) || (dated.day > opts.today && !weekdaySaid(c)))) return false;
+    /* AND A DATE NEARER GONE THAN TO COME IS THE ONE GONE: "Coffee 45 on 6 Oct" read on 7 Oct is yesterday, never next October.
+       "the 5th" read on 7 Oct stays a bill, by RQ2: the month's next one is what it always meant. */
+    const lastYears = dated.day !== null && dated.gone !== null && dated.gone !== dated.day && dated.gone.slice(4) === dated.day.slice(4);
+    const nearerGone = lastYears && daysBetween(dated.gone!, opts.today) < daysBetween(opts.today, dated.day!);
+    if (dated.day !== null && (aheadSaid(c) || (dated.day > opts.today && !weekdaySaid(c) && !nearerGone))) return false;
     const [a, ...more] = amountsIn(dated.rest, opts.currency, held);
     if (!a || more.length > 0) return false;
     const lead = trimWords(dated.rest.slice(0, a.at));

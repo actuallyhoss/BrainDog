@@ -1071,6 +1071,9 @@ test('A DAY GONE ON A SPEND IS WHEN IT WAS SPENT, never the next one to come (RO
   assert.deepEqual(uber.map((r) => [r.register, r.fields.direction, r.fields.what, r.fields.due]), [['obligations', 'owed_by_me', 'Uber', '2026-10-05']]);
   assert.equal(tellRead('Coffee 45 on 6 Oct', founder).rows[0]!.fields.due, '2026-10-06');
   assert.equal(tellRead('Taxi 60 on 5/10', founder).rows[0]!.fields.due, '2026-10-05');
+  /* Nearer gone than to come decides it: 6 Oct is yesterday on 7 Oct, and 20 Nov is still a bill, not paid a year back. */
+  assert.deepEqual(tellRead('Coffee 45 on 6 Oct', founder).rows.map((r) => [r.register, r.fields.state]), [['obligations', 'paid']]);
+  assert.notEqual(tellRead('Hotel 3,000 on 20 Nov', founder).rows[0]!.fields.state, 'paid');
   /* A day to come is still a bill to pay. */
   const due = tellRead('Uber 200 due Friday', founder).rows;
   assert.deepEqual(due.map((r) => [r.register, r.fields.direction, r.fields.due]), [['obligations', 'owed_by_me', '2026-10-09']]);
