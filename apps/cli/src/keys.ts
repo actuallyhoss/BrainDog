@@ -545,7 +545,7 @@ export function variableOf(label: string): string {
     .replace(/^[0-9_]+/, '');
 }
 
-const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --everywhere, --keychain and --host, and reads the value from standard input, or asks for it at a terminal.';
+const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --everywhere, --file, --keychain and --host, and reads the value from standard input, or asks for it at a terminal.';
 const USAGE_EXEC = 'braindog keys exec takes one label or credentials#n, --as, --keychain and --host, then -- and the command to run.';
 const USAGE_HEADERS = 'braindog keys headers takes one label or credentials#n, --as with the header name, --keychain and --host, and nothing else.';
 const USAGE_HELPER = 'braindog keys helper takes one label or credentials#n, --keychain and --host, and nothing else.';
@@ -553,7 +553,7 @@ const USAGE_HELPER = 'braindog keys helper takes one label or credentials#n, --k
 /** `braindog keys list|put|scan|exec|headers|helper`, and the exit code: for `exec`, the command's own once it has run. */
 /**
  * How many lines a value has, when it holds several and is not one of the two shapes that are meant to: a private key's
- * armour, or a JSON service account. `null` for anything else.
+ * armour, or a JSON service account. `null` for anything else. An env file kept whole says so with `--file`.
  *
  * A WHOLE NOTES FILE WENT IN AS A KEY. The Sketchpad metrics key held 15 lines of explanation with the token on the last,
  * sealed with no word when the old PC's secrets were carried over. Every request it signed was wrong, and the first
@@ -594,6 +594,7 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
     opens?: string | undefined;
     kind?: string | undefined;
     everywhere?: boolean | undefined;
+    file?: boolean | undefined;
     vault?: string | undefined;
     keychain?: string | undefined;
     host?: string | undefined;
@@ -607,7 +608,7 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
             args: rest,
             allowPositionals: true,
             strict: true,
-            options: { opens: { type: 'string' }, kind: { type: 'string' }, everywhere: { type: 'boolean' }, vault: { type: 'string' }, keychain: { type: 'string' }, host: { type: 'string' } },
+            options: { opens: { type: 'string' }, kind: { type: 'string' }, everywhere: { type: 'boolean' }, file: { type: 'boolean' }, vault: { type: 'string' }, keychain: { type: 'string' }, host: { type: 'string' } },
           })
         : verb === 'helper'
           ? parseArgs({ args: rest, allowPositionals: true, strict: true, options: { vault: { type: 'string' }, keychain: { type: 'string' }, host: { type: 'string' } } })
@@ -678,9 +679,9 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
       io.say(typed ? 'Nothing was typed, so nothing was deposited.' : 'Standard input was empty, so nothing was deposited.');
       return REFUSED;
     }
-    const lines = manyLines(value);
+    const lines = values.file === true ? null : manyLines(value);
     if (lines !== null) {
-      io.say(`This value has ${String(lines)} lines, and a key is one line, so nothing was deposited. Pipe in the key alone, not the file it is written in.`);
+      io.say(`This value has ${String(lines)} lines, and a key is one line, so nothing was deposited. Pipe in the key alone, or add --file if the whole file is what you mean to keep.`);
       return REFUSED;
     }
   }

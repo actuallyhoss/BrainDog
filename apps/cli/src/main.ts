@@ -304,7 +304,7 @@ const fullUsage = () =>
     '  Open Settings > Agents at "Let your agents do everything without asking", for you to turn it on or off there. Only you, signed in to BrainDog, can change it, so an agent on this machine cannot turn it on for itself. Even on, keys, paying, your team, the owner and deleting or exporting all of BrainDog stay yours.',
     'braindog keys list [--project <name>] [--everywhere] [--json] [--host <host>]',
     '  The keys your BrainDog holds, one line each: what each opens, where it applies, whether it is sealed, and the day it expires. Never a value.',
-    'braindog keys put <label> [--opens <what>] [--kind <kind>] [--everywhere] [--keychain <project>] [--host <host>]',
+    'braindog keys put <label> [--opens <what>] [--kind <kind>] [--everywhere] [--file] [--keychain <project>] [--host <host>]',
     '  Deposit a key. Pipe its value in on standard input, or run it at a terminal and paste or type the value when asked: nothing you type is shown. The host seals it, and it is never an argument. It is kept for this session\'s project; --everywhere keeps it for every project, which a script needs.',
     'braindog keys put --from <file or folder> [--project <name>] [--opens <what>] [--kind <kind>] [--dry-run] [--host <host>]',
     '  Seal every key in a file of NAME=value lines, or a folder of one key a file, asking you about each on the terminal first. Names are printed, never a value.',
