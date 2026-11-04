@@ -62,7 +62,7 @@
     pressGroup: 'Buttons and choices',
     typeGroup: 'Fields and counts',
     sayGroup: 'Messages and states',
-    rowsGroup: 'Rows',
+    rowsGroup: 'Lists',
     buttons: 'Buttons',
     weight: { primary: 'Primary', quiet: 'Quiet', bare: 'Bare' },
     size: { m: 'regular', sm: 'small' },
