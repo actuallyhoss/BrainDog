@@ -290,7 +290,8 @@
   function fit() {
     const spot = at ?? point ?? kept;
     if (!list || !spot || sheet || !floating) return;
-    const height = list.offsetHeight;
+    /* ITS WHOLE HEIGHT, past any room it was held to last time, or a menu that had to scroll measures as one that fits. */
+    const height = Math.max(list.offsetHeight, list.scrollHeight);
     const width = list.offsetWidth;
     const room = roomOf();
     const left = Math.max(room.left, Math.min(spot.x, room.right - width)) - room.x;

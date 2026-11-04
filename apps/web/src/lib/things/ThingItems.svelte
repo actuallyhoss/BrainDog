@@ -16,6 +16,10 @@
     onagain,
     onclose,
   }: { items: readonly ThingItem[]; status?: 'ready' | 'reading' | 'failed'; onagain?: (() => void) | undefined; onclose?: (() => void) | undefined } = $props();
+
+  /** Whether the others are shown under the state it is in; a row in no state yet shows them all. */
+  let states = $state(false);
+  const folds = $derived(items.some((i) => i.state !== undefined && i.now));
 </script>
 
 {#each items as it, i (it.id)}
@@ -24,20 +28,29 @@
     <a role="menuitem" href={at(it.href)} target={it.newTab ? '_blank' : undefined} rel={it.newTab ? 'noopener' : undefined} data-link-verb={it.linkVerb ? '' : undefined} data-verb={it.id}>
       <Icon name={it.icon} size="s" /><span class="mi-name">{it.label}</span>
     </a>
-  {:else if it.state !== undefined}
-    <button
-      type="button"
-      role="menuitemradio"
-      aria-checked={it.now ? 'true' : 'false'}
-      data-verb={it.id}
-      onclick={() => {
-        it.run?.();
-        onclose?.();
-      }}
-    >
+  {:else if it.state !== undefined && it.now && folds}
+    <!-- ITS STATE, SAID, AND THE OTHERS ONE PRESS AWAY: a list with six states made a project's menu taller than a laptop's screen. A
+         checkable item, so the menu stays open as they unfold. -->
+    <button type="button" role="menuitemcheckbox" aria-checked={states} data-verb="states" onclick={() => (states = !states)}>
       <span class="mi-dot"><StateDot state={it.state as 'open' | 'part' | 'done'} /></span><span class="mi-name">{it.label}</span>
-      {#if it.now}<span class="mi-on"><Icon name="check" size="s" /></span>{/if}
+      <span class="mi-on" data-open={states ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
     </button>
+  {:else if it.state !== undefined}
+    {#if states || !folds}
+      <button
+        type="button"
+        role="menuitemradio"
+        aria-checked={it.now ? 'true' : 'false'}
+        data-verb={it.id}
+        onclick={() => {
+          it.run?.();
+          onclose?.();
+        }}
+      >
+        <span class="mi-dot"><StateDot state={it.state as 'open' | 'part' | 'done'} /></span><span class="mi-name">{it.label}</span>
+        {#if it.now}<span class="mi-on"><Icon name="check" size="s" /></span>{/if}
+      </button>
+    {/if}
   {:else}
     <button type="button" role="menuitem" data-tone={it.tone} data-link-verb={it.linkVerb ? '' : undefined} data-verb={it.id} onclick={() => it.run?.()}>
       <Icon name={it.icon} size="s" /><span class="mi-name">{it.label}</span>{#if it.from}<span class="mi-from">{it.from}</span>{/if}
@@ -63,6 +76,10 @@
   .mi-on {
     display: inline-flex;
     color: var(--ink);
+  }
+
+  .mi-on[data-open] {
+    transform: rotate(180deg);
   }
 
   .mi-from {
