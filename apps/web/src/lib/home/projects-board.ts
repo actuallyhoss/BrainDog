@@ -1,9 +1,9 @@
 /**
- * THE PROJECTS PAGE AS ONE BOARD: a headline that is a fact, what they earn a month, this week's four counts, one sorted
- * list in three groups, and the parked and finished folded into a strip. Worked out here from what the board reads
- * (`projects-board-read.ts`), and drawn by `ProjectsBoard.svelte`.
+ * THE PROJECTS PAGE: every project in play by what it needs, with this week's work, renewals and earnings beside them, and
+ * the parked and finished a press away. Worked out here from what the board reads (`projects-board-read.ts`), and drawn by
+ * `ProjectsBoard.svelte`.
  *
- * THE HEADLINE IS WHAT THE RECORD KNOWS, NEVER A GUESS: the work that is late, by project; what falls due in seven days;
+ * THE HEADLINE, A SCREEN READER'S FIRST LINE, IS WHAT THE RECORD KNOWS, NEVER A GUESS: the work that is late, by project; what falls due in seven days;
  * the projects whose numbers went quiet; the questions waiting about projects; what renews inside thirty days. It names
  * the projects, so "Nothing needs a push" is never said over two late projects. The same sentence on every width.
  *
@@ -138,11 +138,23 @@ export type BoardRow = {
   hue: number | null;
   href: string;
   lane: string;
+  /** Its lane in the record's own word ("Building", a person's "Active"). */
+  laneWord: string;
+  /** How it is going, as its row says it (`on_track`, `at_risk`, `off_track`), or nothing. */
+  health: string;
   next: string;
   chip: Chip;
+  /** The chip is a day work falls due, which the card says as "Due Thu 5 Nov". */
+  due: boolean;
+  /** Something of it waits on a person now: late work, a question, numbers gone quiet, work due today. */
+  needs: boolean;
+  /** Worked on, due or asked about this week. */
+  moving: boolean;
   number: NumberCell;
   work: WorkCell;
 };
+/** The page's three sections, by what a person does about them. */
+export type BoardSection = { id: 'needs' | 'moving' | 'quiet'; rows: BoardRow[] };
 export type BoardGroup = { id: 'earning' | 'moving' | 'quiet'; name: string; said: string; rows: BoardRow[] };
 export type WeekLine = { day: string | null; project: string; text: string; href: string };
 export type WeekTile = { count: number; said: string; lines: WeekLine[]; more: number };
@@ -161,6 +173,8 @@ export type Board = {
   groups: BoardGroup[];
   parked: Parked[];
   finished: { count: number; names: string[] };
+  /** The finished, each as the parked are, for the page's Finished view. */
+  closed: Parked[];
   /** The earning tile's title, the parked strip's title and the finished count's word, in the record's own lane words. */
   said: { earning: string; parked: string; finished: string };
 };
@@ -622,8 +636,13 @@ export function boardOf(input: BoardInput): Board {
     hue: f.p.hue,
     href: f.p.href,
     lane: f.p.lane,
+    laneWord: laneSaid(input.laneLabels, f.p.lane),
+    health: f.p.health,
     next: f.p.next,
     chip: chipOf(f, input.today),
+    due: f.late.length === 0 && f.due.length > 0,
+    needs: f.late.length > 0 || f.asks.length > 0 || f.quiet || f.due.some((d) => d.day === input.today),
+    moving: moving(f, input.now),
     number: numberOf(f),
     work: workOf(f, input.now),
   });
@@ -715,6 +734,7 @@ export function boardOf(input: BoardInput): Board {
       })
       .sort((a, b) => Number(b.due !== null) - Number(a.due !== null) || a.name.localeCompare(b.name)),
     finished: { count: finished.length, names: finished.map((f) => f.p.name).sort() },
+    closed: finished.map((f) => ({ name: f.p.name, mark: f.p.mark, hue: f.p.hue, href: f.p.href, due: null })).sort((a, b) => a.name.localeCompare(b.name)),
     said: { earning: earningSaid, parked: parkedSaid, finished: finishedSaid },
   };
 }
@@ -723,6 +743,21 @@ export function boardOf(input: BoardInput): Board {
  * A SMALL LINE OF A NUMBER'S READINGS in a box `w` by `h`, oldest left: its path, the area under it and its last point.
  * `null` under three readings, since a line of two says nothing a figure does not.
  */
+/**
+ * THE PROJECTS IN PLAY, BY WHAT A PERSON DOES ABOUT THEM (4 Nov): what needs them, with the late work first; what is moving;
+ * and what has gone quiet. Each keeps the board's own order inside it. A section with nothing in it is left out.
+ */
+export function sectionsOf(groups: readonly BoardGroup[]): BoardSection[] {
+  const rows = groups.flatMap((g) => g.rows);
+  const late = (r: BoardRow): number => (r.chip?.tone === 'late' ? 0 : 1);
+  const sections: BoardSection[] = [
+    { id: 'needs', rows: rows.filter((r) => r.needs).sort((a, b) => late(a) - late(b)) },
+    { id: 'moving', rows: rows.filter((r) => !r.needs && r.moving) },
+    { id: 'quiet', rows: rows.filter((r) => !r.needs && !r.moving) },
+  ];
+  return sections.filter((s) => s.rows.length > 0);
+}
+
 export function trailOf(points: readonly number[], w: number, h: number): { line: string; area: string; end: [number, number] } | null {
   const vs = points.filter((v) => Number.isFinite(v));
   if (vs.length < 3) return null;

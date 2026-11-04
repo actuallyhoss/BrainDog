@@ -897,11 +897,11 @@
   const roomy = new MediaQuery('(width >= 640px)', true);
 
   /* THE BUTTONS GO TO THE LEAD TILE where the head would hold nothing else (`page-buttons.svelte.ts`): a project's page
-     and Projects, from 900px, while the page is read and not arranged. */
+     from 900px, while the page is read and not arranged. Projects opens on its projects now and keeps them in the head (4 Nov). */
   const buttonsHost = hostButtons();
   /** How long the head waits for a lead tile to take the page's buttons before it draws them itself. */
   const LEND_WAIT_MS = 1_000;
-  const buttonsLent = $derived(mode === 'page' && wide.current && !arranging && !showSource && (projectPage || slug === 'portfolio'));
+  const buttonsLent = $derived(mode === 'page' && wide.current && !arranging && !showSource && projectPage);
   /* Attached beside the snippet, which is the template's and not this script's to name. */
   const lendButtons =
     (b: Snippet) =>
@@ -926,6 +926,8 @@
     return () => clearTimeout(wait);
   });
   const buttonsTaken = $derived(buttonsLent && (buttonsHost.held > 0 || !lentLate));
+  /* THE PROJECTS LIST THE PAGE'S BOARD IS OVER, where the page draws no box of its own to add one with. */
+  const boardAdd = $derived(mode === 'page' && !all.some((b) => b.kind === 'capture' && b.drawn) ? (all.find((b) => b.key === 'board' && b.drawn)?.register ?? null) : null);
   const headLine = $derived.by((): { at: number; block: LiveBlock } | null => {
     if (!hosting || !live) return null;
     const layout = layoutOf(live.page.page);
@@ -1173,6 +1175,11 @@
   <!-- THE PAGE'S OWN BUTTONS, drawn once: at the end of the name's row, or on the lead tile's first row. -->
   {#snippet pageButtons()}
       {#if headLine && wide.current && !tiled}{@render lineInHead()}{/if}
+      <!-- ADD A PROJECT IN THE HEAD, AS ADD A PERSON IS ON PEOPLE (4 Nov), wherever the board is drawn and the page's own
+           Add a project box is not. A page's own action comes first. -->
+      {#if boardAdd && !declared?.action && !arranging && !showSource}
+        <Button weight="primary" href={at(`/r/${boardAdd}?new=1`)}><Icon name="plus" size="s" />{words.addProject}</Button>
+      {/if}
       {#if declared?.action && !arranging && !showSource}
         <!-- AN ADD WEARS THE PLUS, so on a phone it is the 36px square the head draws for a glyph (`PageHead.svelte`). -->
         <Button weight="primary" onclick={pressHead}>{#if /^(add|new)\b/iu.test(declared.action.label)}<Icon name="plus" size="s" />{/if}{declared.action.label}</Button>

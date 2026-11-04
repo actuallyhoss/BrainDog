@@ -27,6 +27,7 @@ export const words = {
    */
   added: (what: string, list: string, read: readonly string[]) => `Added “${what}” to ${list}${read.length > 0 ? ` · ${read.join(' · ')}` : ''}.`,
   /* A PAGE ABOUT ONE ROW SPEAKS FIRST (things, not rows), and the row's own fields are one press under it. */
+  addProject: 'Add a project',
   showData: 'Show the data',
   /** A block with no heading and a kind with no name, said to a screen reader only: the region's name. */
   unnamed: 'Part of this page',

@@ -1,28 +1,29 @@
 <!--
-  THE PROJECTS PAGE AS ONE BOARD (`projects-board.ts` works it out, `projects-board-read.ts` reads it): drawn in the slot
-  of the page's block over every project (`key: board`, the Projects template).
+  THE PROJECTS PAGE (`projects-board.ts` works it out, `projects-board-read.ts` reads it): drawn in the slot of the page's
+  block over every project (`key: board`, the Projects template). Sam, 4 Nov: "projects page looks poor".
 
-  FROM THE TOP: the lead tile, the date line, a headline that is a fact naming the projects, what it counted, and the red
-  button to the late work; beside it what the earning projects bring in a month, each with its own warning. Then this
-  week's four tiles: late, due in seven days, numbers gone quiet, renewals. Then ONE LIST in three groups, earning, then
-  building that is moving or due, then building and quiet, each row the project, its next step whole, one chip, the
-  number it leads with and its line, and the last real work on it. Then the parked as a strip of chips that say only
-  what is due, and the finished as a count.
+  THE PROJECTS COME FIRST. In play, Parked and Finished as one switch (Add a project, Share and "⋯" are in the head, as on
+  People; `PageView.svelte` draws them). Then three sections by what a person does about them (`sectionsOf`): Needs you and Moving as
+  cards, each its mark, name and lane, its next step whole, what it is waiting on, the number it leads with and its line,
+  and the last work on it; Quiet as one tile of rows, since a project nobody touched has less to say. Beside them on a desk,
+  under them on a phone, what is late, what falls due this week, the numbers gone quiet, what renews and what earns.
 
-  ON A PHONE the same sentence leads, the four tiles go two by two, each its figure and first line, and a row is its name and chip, its next step in two
-  lines, and one small line of its number and its last work.
+  NO HEADLINE ON THE PAGE. The big sentence and the figures under it stood over the projects, which started below the fold
+  on a busy record, and it said in prose what the tiles say. A screen reader still has it as its first line.
 
-  While the reads are out the board draws the projects from the block's own rows, so the page never opens blank.
+  PIN TO SIDEBAR IS A WORD ON EVERY PROJECT, never a hover: this page is the way into the sidebar (3 Nov), and pinned reads
+  in the sidebar's own lit colour.
+
+  While the reads are out the page holds its place, so what stands under it does not jump (`BlockSlot.svelte`).
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { pageButtons, take } from '$lib/page/page-buttons.svelte.ts';
   import { flip } from 'svelte/animate';
   import { arrive, depart, springy } from '$lib/motion/index.ts';
   import { apiBase, at } from '$lib/at.ts';
   import { live } from '$lib/data/live.svelte.ts';
+  import { workingNow } from './waits.svelte.ts';
   import AgentFace from '$lib/ui/AgentFace.svelte';
-  import Button from '$lib/ui/Button.svelte';
   import ItemMenu from '$lib/ui/ItemMenu.svelte';
   import { ownMenu } from '$lib/ui/context-menu.ts';
   import Icon from '$lib/ui/Icon.svelte';
@@ -30,12 +31,32 @@
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { pinWords, togglePin } from '$lib/shell/pin-project.ts';
   import ProjectWell from '$lib/ui/ProjectWell.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
-  import { slotStyle } from './project-cards.ts';
-  import { trailOf, type Board, type BoardRow } from './projects-board.ts';
+  import { HEALTH, slotStyle } from './project-cards.ts';
+  import { sectionsOf, trailOf, type Board, type BoardRow, type BoardSection, type Parked } from './projects-board.ts';
   import { readBoard } from './projects-board-read.ts';
 
   let { list, entries }: { list: string; entries: readonly { seq?: unknown; id?: unknown; fields?: Record<string, unknown> }[] } = $props();
+
+  const words = {
+    inPlay: 'In play',
+    views: 'Which projects',
+    needs: 'Needs you',
+    moving: 'Moving',
+    quiet: 'Quiet',
+    quietNote: 'Nothing in 7 days',
+    pin: 'Pin',
+    pinned: 'Pinned',
+    noNext: 'No next step',
+    due: (day: string) => `Due ${day}`,
+    late: 'Late',
+    side: 'What is coming up',
+    week: 'This week',
+    numbers: 'Quiet numbers',
+    renewals: 'Renewals',
+    more: (n: number) => `and ${n} more`,
+  } as const;
 
   let board = $state.raw<Board | null>(null);
   let failed = $state(false);
@@ -54,155 +75,185 @@
     });
   });
 
-  const W = 80;
-  const H = 24;
+  const W = 88;
+  const H = 28;
   const trail = (r: BoardRow) => (r.number.kind === 'kpi' ? trailOf(r.number.points, W, H) : null);
   const share = (minor: number, total: number) => `${Math.max(2, Math.round((minor / Math.max(1, total)) * 100))}%`;
+  const sectionName = (s: BoardSection): string => (s.id === 'needs' ? words.needs : s.id === 'moving' ? words.moving : words.quiet);
 
-  /* A PROJECT'S VERBS AT THE POINTER: a right-click or a held thumb on its row, or `⇧F10` (`ownMenu`). */
+  const sections = $derived(board ? sectionsOf(board.groups) : []);
+  const inPlay = $derived(sections.reduce((n, s) => n + s.rows.length, 0));
+
+  /* WHICH PROJECTS: in play, and the parked and finished a press away. A record with none in play opens on what it has. */
+  type View = 'play' | 'parked' | 'finished';
+  let picked = $state<View | null>(null);
+  const views = $derived.by((): { id: View; label: string; n: number }[] => {
+    const b = board;
+    if (!b) return [];
+    return [
+      { id: 'play' as const, label: words.inPlay, n: inPlay },
+      { id: 'parked' as const, label: b.said.parked, n: b.parked.length },
+      { id: 'finished' as const, label: b.said.finished, n: b.closed.length },
+    ].filter((v) => v.n > 0);
+  });
+  const view = $derived(picked !== null && views.some((v) => v.id === picked) ? picked : (views[0]?.id ?? 'play'));
+
+  /* THE WAY INTO THE SIDEBAR, SAID WHILE NOTHING IS PINNED, beside the switch. */
+  const showHint = $derived(navPrefs.pins.length === 0 && views.length > 0);
+
+  /* WHO IS AT WORK ON IT NOW, by the project's name, as the sidebar's dot says it. */
+  const busy = $derived(new Set(workingNow().map((w) => w.project).filter((p): p is string => typeof p === 'string')));
+
+  /* A PROJECT'S VERBS AT THE POINTER: a right-click or a held thumb on it, or `⇧F10` (`ownMenu`). */
   let menuRow = $state<BoardRow | null>(null);
   let point = $state<{ x: number; y: number; height: number } | null>(null);
-
-  /* THE PAGE'S BUTTONS, lent to the lead tile's first row from 900px. */
-  const lent = pageButtons();
 </script>
+
+{#snippet pinButton(href: string, name: string, labelled: boolean)}
+  {@const on = navPrefs.isPinned(href)}
+  <button type="button" class="pin tap" data-bare={labelled ? undefined : ''} aria-pressed={on} aria-label={on ? pinWords.unpinName(name) : pinWords.pinName(name)} title={on ? pinWords.unpin : pinWords.pin} onclick={() => void togglePin(href, name)}>
+    <Icon name="pin" size="s" />{#if labelled}<span>{on ? words.pinned : words.pin}</span>{/if}
+  </button>
+{/snippet}
+
+{#snippet chipOf(r: BoardRow)}
+  {#if r.chip}
+    <p class="state" data-tone={r.chip.tone}>
+      {#if r.chip.tone === 'plain'}<Icon name="calendar" size="s" />{:else}<span class="dot" aria-hidden="true"></span>{/if}<span>{r.due ? words.due(r.chip.text) : r.chip.text}</span>
+    </p>
+  {/if}
+{/snippet}
+
+{#snippet card(r: BoardRow)}
+  {@const s = trail(r)}
+    <div class="c-head">
+      <ProjectWell mark={r.mark} name={r.name} hue={r.hue} />
+      <div class="c-id">
+        <a class="c-name own-dir" href={at(r.href)}>{r.name}</a>
+        {#if r.laneWord || HEALTH[r.health]}
+          <span class="small c-meta">{r.laneWord}{#if r.laneWord && HEALTH[r.health]}{' · '}{/if}{#if HEALTH[r.health]}<span class="c-health" data-tone={HEALTH[r.health]!.tone}><span class="dot" aria-hidden="true"></span>{HEALTH[r.health]!.word}</span>{/if}</span>
+        {/if}
+      </div>
+      {@render pinButton(r.href, r.name, true)}
+    </div>
+    <div class="c-next">
+      <p class="c-step own-dir" data-none={r.next === '' ? '' : undefined}>{r.next || words.noNext}</p>
+      {@render chipOf(r)}
+    </div>
+    {#if r.number.kind === 'kpi'}
+      <div class="c-num">
+        <div class="n-words"><span class="n-fig num" data-stale={r.number.stale ? '' : undefined}>{r.number.figure}</span><span class="small own-dir">{r.number.sub}</span></div>
+        {#if s}<svg class="trail" data-stale={r.number.stale ? '' : undefined} viewBox="0 0 {W} {H}" width={W} height={H} aria-hidden="true"><path d={s.area} class="sp-area" /><path d={s.line} class="sp-line" /><circle cx={s.end[0]} cy={s.end[1]} r="2.2" class="sp-end" /></svg>{/if}
+      </div>
+    {:else if r.number.kind === 'aim'}
+      <div class="c-num"><div class="n-words"><span class="muted">{r.number.said}</span><span class="small">{r.number.sub}</span></div></div>
+    {/if}
+    <div class="c-foot">
+      {#if r.work.agent}<AgentFace agent={r.work.agent} run="" live={busy.has(r.name) ? 'working' : 'stopped'} size="xs" />{/if}
+      <span class="small own-dir">{r.work.said}{#if r.work.sub}{' · '}{r.work.sub}{/if}</span>
+    </div>
+{/snippet}
+
+{#snippet quietRow(r: BoardRow)}
+    <ProjectWell mark={r.mark} name={r.name} hue={r.hue} />
+    <div class="l-words">
+      <a class="c-name own-dir" href={at(r.href)}>{r.name}</a>
+      <p class="small own-dir l-next">{r.next || words.noNext}</p>
+    </div>
+    {#if r.chip}<div class="l-state">{@render chipOf(r)}</div>{/if}
+    {#if r.number.kind === 'kpi'}<span class="l-num num">{r.number.figure}</span>{/if}
+    {@render pinButton(r.href, r.name, false)}
+{/snippet}
+
+{#snippet shelfRow(p: Parked)}
+    <ProjectWell mark={p.mark} name={p.name} hue={p.hue} />
+    <div class="l-words">
+      <a class="c-name own-dir" href={at(p.href)}>{p.name}</a>
+      {#if p.due}<p class="small l-next" data-warn="">{p.due}</p>{/if}
+    </div>
+    {@render pinButton(p.href, p.name, false)}
+{/snippet}
 
 {#if board}
   {@const b = board}
   <!-- THE BAR IS THE TOTAL'S: a month too old to be added (`left`) is said in the list and has no part of the bar. -->
   {@const earnTotal = b.earning.lines.filter((l) => !l.left).reduce((s, l) => s + l.minor, 0)}
-  {@const weekInLead = b.week.due.count + b.week.renewals.count > 0 && Boolean(b.earning.total || b.earning.count > 0)}
+  {@const hasSide = b.week.late.count + b.week.due.count + b.week.quiet.count + b.week.renewals.count > 0 || Boolean(b.earning.total)}
   <div class="projects-board">
-    <div class="b-top" data-solo={b.earning.total || b.earning.count > 0 ? undefined : ''}>
-      <section class="b-lead" aria-label="Where the projects are">
-        <!-- THE DAY, AND THE PAGE'S SHARE AND "⋯" AT ITS END from 900px, where the head held them on a row of their own
-             (`page-buttons.svelte.ts`). -->
-        <div class="b-date-row">
-          <p class="b-date">{b.date}</p>
-          {#if lent?.buttons}<div class="b-page-acts" {@attach take(lent)}>{@render lent.buttons()}</div>{/if}
-        </div>
-        <h2 class="b-head own-dir">{b.headline}</h2>
-        {#if b.lede}<p class="b-lede own-dir">{b.lede}</p>{/if}
-        {#if b.acts.late || b.acts.feed || b.acts.asks}
-          <div class="b-acts">
-            {#if b.acts.late}<Button weight="primary" href={b.acts.late.href}>{b.acts.late.said}</Button>{/if}
-            {#if b.acts.feed}<Button href={b.acts.feed.href}>{b.acts.feed.said}</Button>{/if}
-            {#if b.acts.asks}<a class="b-ask own-dir" href={at(b.acts.asks.href)}>{b.acts.asks.said}</a>{/if}
-          </div>
-        {/if}
-        <!-- THIS WEEK IN THE LEAD (the lists review, L30): beside the earning tile the lead stood 150px taller than its
-             sentence, and the week's due work and renewals were tiles of their own under it. Where the earning tile stands
-             beside it, the lead holds those two lists side by side, and the strip under it keeps late and quiet numbers. -->
-        {#if weekInLead}
-          <div class="b-lead-week">
-            {#each [{ title: 'This week', t: b.week.due }, { title: 'Renewals', t: b.week.renewals }].filter((x) => x.t.count > 0) as x (x.title)}
-              <div class="b-lead-list">
-                <p class="b-lead-week-head"><span class="strong">{x.title}</span> <span class="num">{x.t.count}</span> {x.t.said}</p>
-                <ul class="wk-lines">
-                  {#each x.t.lines as l, n (n)}
-                    <li>{#if l.day}<b class="num">{l.day}</b>{/if}<a class="own-dir" href={at(l.href)}><span class="strong">{l.project}</span> · {l.text}</a></li>
-                  {/each}
-                </ul>
-                {#if x.t.more > 0}<p class="small wk-more">and {x.t.more} more</p>{/if}
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </section>
-      <!-- NO EARNING TILE WHILE NOTHING EARNS AND NO PROJECT IS MARKED EARNING (AH17): "No project is earning yet" beside
-           a shop's one new project was a founder's tile with nothing in it. -->
-      {#if b.earning.total || b.earning.count > 0}
-      <section class="b-earn" aria-label={`${b.said.earning}, a month`}>
-        <header class="t-head"><IconWell name="coins" size="m" /><h2 class="t-title">{b.said.earning}, a month</h2>{#if b.earning.count > 0}<span class="t-meta">{b.earning.count} {b.earning.count === 1 ? 'project' : 'projects'}</span>{/if}</header>
-        {#if b.earning.total}
-          <p class="e-total num">{b.earning.total}</p>
-          {#if b.earning.year}<p class="small">{b.earning.year}</p>{/if}
-          <div class="e-stack" aria-hidden="true">
-            {#each b.earning.lines.filter((l) => !l.left) as l (l.name)}<i style={slotStyle(l.hue)} style:inline-size={share(l.minor, earnTotal)}></i>{/each}
-          </div>
-          <ul class="kv">
-            {#each b.earning.lines as l (l.name)}
-              <li>
-                <a class="kv-k" href={at(l.href)}><span class="sw" style={slotStyle(l.hue)}></span><span class="kv-name own-dir">{l.name}</span>{#if l.status}<span class="small kv-status" data-warn={l.warn ? '' : undefined}>{l.status}</span>{/if}</a>
-                <span class="kv-v num">{l.said}</span>
-              </li>
-            {/each}
-          </ul>
-          {#if b.earning.also}<p class="small">{b.earning.also}</p>{/if}
-        {:else}
-          <p class="e-empty">{b.earning.empty}</p>
-        {/if}
-      </section>
-      {/if}
-    </div>
+    <h2 class="sr-only own-dir">{b.headline}</h2>
 
-    <!-- A WEEK TILE WITH NOTHING IN IT IS LEFT OUT, and the row with them when all four are (AH17): a shop with one project
-         read Late 0, This week 0, Quiet numbers 0 and Renewals 0, a wall of noughts. -->
-    {#if b.week.late.count + b.week.quiet.count + (weekInLead ? 0 : b.week.due.count + b.week.renewals.count) > 0}
-      <div class="b-week" role="list" aria-label="This week" style:--wk-n={[b.week.late, weekInLead ? null : b.week.due, b.week.quiet, weekInLead ? null : b.week.renewals].filter((t) => t !== null && t.count > 0).length}>
-        {#if b.week.late.count > 0}{@render week('Late', 'clock', 'late', b.week.late)}{/if}
-        {#if b.week.due.count > 0 && !weekInLead}{@render week('This week', 'calendar', 'plain', b.week.due)}{/if}
-        {#if b.week.quiet.count > 0}{@render week('Quiet numbers', 'activity', 'warn', b.week.quiet)}{/if}
-        {#if b.week.renewals.count > 0 && !weekInLead}{@render week('Renewals', 'globe', 'plain', b.week.renewals)}{/if}
+    {#if views.length > 1 || showHint}
+      <div class="b-bar">
+        {#if views.length > 1}
+          <Segmented role="group" aria-label={words.views} full>
+            {#each views as v (v.id)}
+              <button type="button" class="segment" data-on={view === v.id ? '' : undefined} aria-pressed={view === v.id} onclick={() => (picked = v.id)}>{v.label} <span class="num seg-n">{v.n}</span></button>
+            {/each}
+          </Segmented>
+        {/if}
+        {#if showHint}<p class="b-pinhint small"><Icon name="pin" size="s" />{pinWords.hint}</p>{/if}
       </div>
     {/if}
 
-    {#if b.groups.length > 0}
-      <section class="b-list" aria-label="Projects in play">
-        {#if navPrefs.pins.length === 0}<p class="b-pinhint"><Icon name="pin" size="s" />{pinWords.hint}</p>{/if}
-        <div class="r-head" aria-hidden="true"><span>Project</span><span>Next step</span><span>Needs</span><span>Number</span><span>Last work</span></div>
-        {#each b.groups as g (g.id)}
-          <h3 class="g-head">{g.name} <span>{g.said}</span></h3>
-          <ul class="rows">
-            {#each g.rows as r (r.key)}
-              {@const s = trail(r)}
-              {@const on = navPrefs.isPinned(r.href)}
-              <li class="row" data-quiet={g.id === 'quiet' ? '' : undefined} {@attach ownMenu((p) => ((menuRow = r), (point = p)))} in:arrive out:depart animate:flip={springy()}>
-                <div class="r-nm">
-                  <a class="r-name" href={at(r.href)}><ProjectWell mark={r.mark} name={r.name} hue={r.hue} /><span class="r-title own-dir">{r.name}</span></a>
-                  <!-- PIN TO SIDEBAR (3 Nov): only pinned projects are listed in the sidebar, so the pin lives here, on every row. -->
-                  <button type="button" class="r-pin tap" aria-pressed={on} aria-label={on ? pinWords.unpinName(r.name) : pinWords.pinName(r.name)} title={on ? pinWords.unpin : pinWords.pin} onclick={() => void togglePin(r.href, r.name)}><Icon name="pin" size="s" /></button>
-                </div>
-                <p class="r-next own-dir" data-none={r.next === '' ? '' : undefined}>{r.next || 'No next step'}</p>
-                <div class="r-chip">{#if r.chip}<span class="chip" data-tone={r.chip.tone}>{#if r.chip.tone === 'late'}<span class="dot"></span>{/if}{r.chip.text}</span>{/if}</div>
-                <div class="r-num" style={slotStyle(r.hue)}>
-                  {#if r.number.kind === 'kpi'}
-                    <div class="n-words"><span class="n-fig num" data-stale={r.number.stale ? '' : undefined}>{r.number.figure}</span><span class="small own-dir">{r.number.sub}</span></div>
-                    {#if s}<svg class="trail" data-stale={r.number.stale ? '' : undefined} viewBox="0 0 {W} {H}" width={W} height={H} aria-hidden="true"><path d={s.area} class="sp-area" /><path d={s.line} class="sp-line" /><circle cx={s.end[0]} cy={s.end[1]} r="2.2" class="sp-end" /></svg>{/if}
-                  {:else if r.number.kind === 'aim'}
-                    <div class="n-words"><span class="muted">{r.number.said}</span><span class="small">{r.number.sub}</span></div>
-                  {:else}
-                    <span class="muted" title={r.number.said} aria-label={r.number.said}>–</span>
-                  {/if}
-                </div>
-                <div class="r-work">
-                  {#if r.work.none}<span class="muted" title={r.work.said} aria-label={r.work.said}>–</span>{:else}
-                    {#if r.work.agent}<AgentFace agent={r.work.agent} run="" live="stopped" size="xs" />{:else}<span class="face-none" aria-hidden="true">–</span>{/if}
-                    <span class="w-words"><span>{r.work.said}</span>{#if r.work.sub}<span class="small">{r.work.sub}</span>{/if}</span>
-                  {/if}
-                </div>
-              </li>
-            {/each}
-          </ul>
-        {/each}
-      </section>
-    {/if}
-
-    {#if b.parked.length > 0 || b.finished.count > 0}
-      <section class="b-parked" aria-label={`${b.said.parked} and ${b.said.finished.toLowerCase()}`}>
-        <header class="t-head">
-          <IconWell name="archive" size="m" /><h2 class="t-title">{b.said.parked} <span class="t-count num">{b.parked.length}</span></h2>
-          {#if b.finished.count > 0}<span class="t-meta" title={b.finished.names.join(', ')}>{b.said.finished} {b.finished.count} · {b.finished.names.slice(0, 3).join(', ')}{b.finished.count > 3 ? ` and ${b.finished.count - 3} more` : ''}</span>{/if}
-        </header>
-        {#if b.parked.length > 0}
-          <ul class="chips">
-            {#each b.parked as p (p.href)}
-              <li in:arrive out:depart animate:flip={springy()}><a class="pchip" href={at(p.href)}><ProjectWell mark={p.mark} name={p.name} hue={p.hue} /><span class="own-dir">{p.name}</span>{#if p.due}<span class="small" data-warn="">{p.due}</span>{/if}</a></li>
+    <div class="b-body" data-side={hasSide && view === 'play' ? '' : undefined}>
+      <div class="b-main">
+        {#if view === 'play'}
+          {#each sections as sec (sec.id)}
+            <section class="b-sec" aria-labelledby="sec-{sec.id}">
+              <h3 class="b-sec-head" id="sec-{sec.id}" data-tone={sec.id}>{sectionName(sec)} <span class="num">{sec.rows.length}</span>{#if sec.id === 'quiet'}<span class="small b-sec-note">{words.quietNote}</span>{/if}</h3>
+              {#if sec.id === 'quiet'}
+                <ul class="lines">
+                  {#each sec.rows as r (r.key)}
+                    <li class="line" style={slotStyle(r.hue)} {@attach ownMenu((p) => ((menuRow = r), (point = p)))} in:arrive out:depart animate:flip={springy()}>{@render quietRow(r)}</li>
+                  {/each}
+                </ul>
+              {:else}
+                <ul class="cards">
+                  {#each sec.rows as r (r.key)}
+                    <li class="card" style={slotStyle(r.hue)} {@attach ownMenu((p) => ((menuRow = r), (point = p)))} in:arrive out:depart animate:flip={springy()}>{@render card(r)}</li>
+                  {/each}
+                </ul>
+              {/if}
+            </section>
+          {/each}
+        {:else}
+          <ul class="lines">
+            {#each view === 'parked' ? b.parked : b.closed as p (p.href)}
+              <li class="line" style={slotStyle(p.hue)} in:arrive out:depart animate:flip={springy()}>{@render shelfRow(p)}</li>
             {/each}
           </ul>
         {/if}
-      </section>
-    {/if}
+      </div>
+
+      {#if view === 'play' && hasSide}
+        <aside class="b-side" aria-label={words.side}>
+          {#if b.week.late.count > 0}{@render tile(words.late, 'clock', 'late', b.week.late, b.acts.late?.href ?? null)}{/if}
+          {#if b.week.due.count > 0}{@render tile(words.week, 'calendar', 'plain', b.week.due, null)}{/if}
+          {#if b.week.quiet.count > 0}{@render tile(words.numbers, 'activity', 'warn', b.week.quiet, b.acts.feed?.href ?? null)}{/if}
+          {#if b.week.renewals.count > 0}{@render tile(words.renewals, 'globe', 'plain', b.week.renewals, null)}{/if}
+          {#if b.earning.total}
+            <section class="tile" aria-label={`${b.said.earning}, a month`}>
+              <header class="t-head"><IconWell name="coins" size="m" /><h3 class="t-title">{b.said.earning}, a month</h3></header>
+              <p class="e-total num">{b.earning.total}</p>
+              {#if b.earning.year}<p class="small">{b.earning.year}</p>{/if}
+              <div class="e-stack" aria-hidden="true">
+                {#each b.earning.lines.filter((l) => !l.left) as l (l.name)}<i style={slotStyle(l.hue)} style:inline-size={share(l.minor, earnTotal)}></i>{/each}
+              </div>
+              <ul class="kv">
+                {#each b.earning.lines as l (l.name)}
+                  <li>
+                    <a class="kv-k" href={at(l.href)}><span class="sw" style={slotStyle(l.hue)}></span><span class="kv-name own-dir">{l.name}</span></a>
+                    <span class="kv-v num">{l.said}</span>
+                    {#if l.status}<span class="small kv-status" data-warn={l.warn ? '' : undefined}>{l.status}</span>{/if}
+                  </li>
+                {/each}
+              </ul>
+              {#if b.earning.also}<p class="small">{b.earning.also}</p>{/if}
+            </section>
+          {/if}
+        </aside>
+      {/if}
+    </div>
   </div>
 {:else if !failed}
   <!-- `data-board-reading`: what stands under the board on the page waits unseen until it lands (`BlockSlot.svelte`). -->
@@ -217,20 +268,16 @@
   {/if}
 </ItemMenu>
 
-{#snippet week(title: string, icon: 'clock' | 'calendar' | 'activity' | 'globe', tone: 'late' | 'warn' | 'plain', t: Board['week']['late'])}
-  <!-- A DIV IN THE LIST'S ROLE, never a section, which axe refuses a listitem role on (Q60 of 29 October). -->
-  <div class="wk" role="listitem" aria-label={title} data-tone={t.count > 0 ? tone : undefined}>
-    <header class="t-head"><IconWell name={icon} size="m" /><h3 class="t-title">{title}</h3></header>
-    <p class="wk-fig num">{t.count} <span>{t.said}</span></p>
-    {#if t.lines.length > 0}
-      <ul class="wk-lines">
-        {#each t.lines as l, n (n)}
-          <li>{#if l.day}<b class="num">{l.day}</b>{/if}<a class="own-dir" href={at(l.href)}><span class="strong">{l.project}</span> · {l.text}</a></li>
-        {/each}
-      </ul>
-      {#if t.more > 0}<p class="small wk-more">and {t.more} more</p>{/if}
-    {/if}
-  </div>
+{#snippet tile(title: string, icon: 'clock' | 'calendar' | 'activity' | 'globe', tone: 'late' | 'warn' | 'plain', t: Board['week']['late'], moreHref: string | null)}
+  <section class="tile" aria-label={title} data-tone={tone}>
+    <header class="t-head"><IconWell name={icon} size="m" /><h3 class="t-title">{title} <span class="t-n num">{t.count}</span></h3></header>
+    <ul class="wk-lines">
+      {#each t.lines as l, n (n)}
+        <li>{#if l.day}<b class="num">{l.day}</b>{/if}<a class="own-dir" href={at(l.href)}><span class="strong">{l.project}</span> · {l.text}</a></li>
+      {/each}
+    </ul>
+    {#if t.more > 0}{#if moreHref}<a class="small wk-more" href={at(moreHref)}>{words.more(t.more)}</a>{:else}<p class="small wk-more">{words.more(t.more)}</p>{/if}{/if}
+  </section>
 {/snippet}
 
 <style>
@@ -240,643 +287,240 @@
 
   .projects-board {
     display: grid;
-    gap: var(--inset, 12px);
+    gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
-  .b-date-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    min-inline-size: 0;
+  .sr-only {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
-  .b-page-acts {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-block: calc(-1 * var(--sp-1));
-  }
-
-  .b-page-acts :global(:is(.btn[data-weight='quiet'], .share-trigger)) {
-    background: var(--tile-2);
-  }
-
-  .b-lead,
-  .b-earn,
-  .wk,
-  .b-list,
-  .b-parked {
-    min-inline-size: 0;
-    padding: var(--tile-pad, 20px);
-    border-radius: var(--r-tile, 16px);
-    background: var(--tile);
-    color: var(--ink);
-  }
-
-  .b-top {
-    display: grid;
-    gap: var(--inset, 12px);
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  @media (width >= 1000px) {
-    .b-top {
-      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    }
-
-    .b-top[data-solo] {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .b-lead,
-    .b-earn {
-      padding: var(--sp-5, 24px);
-    }
-  }
-
-  .b-date {
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: 18px;
-  }
-
-  .b-head {
-    margin: 10px 0 0;
-    color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--fs-page);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 30px;
-    text-wrap: pretty;
-  }
-
-  @media (width >= 640px) {
-    .b-head {
-      font-size: var(--fs-hero);
-      line-height: 40px;
-    }
-  }
-
-  .b-lede {
-    max-inline-size: 64ch;
-    margin: 12px 0 0;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: 22px;
-  }
-
-  .b-acts {
+  /* ── the line of controls ── */
+  .b-bar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
-    margin-block-start: 18px;
+    gap: var(--sp-2) var(--sp-3);
+    min-inline-size: 0;
   }
 
-  .b-lead-week {
+  .seg-n {
+    margin-inline-start: 2px;
+    color: var(--ink-3);
+    font-weight: var(--fw-regular);
+  }
+
+  /* ── the page's two columns: the projects, and beside them on a desk what falls due ── */
+  .b-body,
+  .b-main,
+  .b-side {
     display: grid;
-    gap: 16px 24px;
-    margin-block-start: 20px;
-    padding-block-start: 14px;
-    border-block-start: 1px solid var(--rule);
-  }
-
-  @media (width >= 640px) {
-    .b-lead-week {
-      grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    }
-  }
-
-  .b-lead-list {
-    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--tile-gap);
     align-content: start;
-    gap: 8px;
     min-inline-size: 0;
   }
 
-  .b-lead-week-head {
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: 18px;
+  .b-main {
+    gap: var(--sp-5);
   }
 
-  .b-lead-week .wk-lines a {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .b-ask {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    text-decoration: none;
-  }
-
-  .b-ask:hover {
-    color: var(--ink);
-    text-decoration: underline;
-  }
-
-  /* ── a tile's head, as `Tile` draws it ── */
-  .t-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2, 8px) var(--sp-3, 12px);
-    min-block-size: var(--well, 28px);
-  }
-
-  /* A WEEK TILE'S NAME STAYS BY ITS WELL AND WRAPS THERE: two to a row on a phone, "Quiet numbers" dropped under it. */
-  .wk .t-head {
-    flex-wrap: nowrap;
-  }
-
-  .t-title {
-    min-inline-size: 0;
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: var(--fw-semi, 600);
-    line-height: 22px;
-  }
-
-  .t-count {
-    margin-inline-start: 4px;
-    color: var(--ink-3);
-    font-weight: 500;
-  }
-
-  .t-meta {
-    margin-inline-start: auto;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
-  .small {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: 18px;
-  }
-
-  .small[data-warn] {
-    color: var(--warn);
-  }
-
-  .muted {
-    color: var(--ink-3);
-  }
-
-  .num {
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* ── earning ── */
-  .e-total {
-    margin: 12px 0 0;
-    font-family: var(--font-display);
-    font-size: var(--fs-hero);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 44px;
-  }
-
-  .e-stack {
-    display: flex;
-    gap: 2px;
-    block-size: 10px;
-    margin-block: 12px;
-    overflow: hidden;
-    border-radius: 5px;
-  }
-
-  .e-stack i,
-  .sw {
-    background: var(--ph-fill, var(--ph));
-  }
-
-  .e-stack i {
-    display: block;
-  }
-
-  .e-empty {
-    margin: 12px 0 0;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: 22px;
-  }
-
-  .kv {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .kv li {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding-block: 9px;
-    border-block-start: 1px solid var(--rule);
-  }
-
-  .kv li:first-child {
-    border-block-start: 0;
-  }
-
-  /* THE STATUS HANGS ITS DOT IN THE GAP (skills pass 2 Nov): where it fits beside the name the dot sits between them, and
-     where it wraps under the name the dot falls outside the row's edge and is clipped, so no line starts "· repeats". */
-  .kv-k {
-    display: flex;
-    flex: 1;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0 12px;
-    min-inline-size: 0;
-    overflow-x: clip;
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .kv-status::before {
-    content: '·';
-    display: inline-block;
-    inline-size: 6px;
-    margin-inline: -9px 3px;
-    text-align: center;
-  }
-
-  .kv-k:hover .kv-name {
-    text-decoration: underline;
-  }
-
-  .sw {
-    display: inline-block;
-    inline-size: 8px;
-    block-size: 8px;
-    border-radius: 2px;
-  }
-
-  .kv-v {
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  /* ── this week ── */
-  .b-week {
-    display: grid;
-    gap: var(--inset, 12px);
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  @media (width >= 1000px) {
-    .b-week {
-      grid-template-columns: repeat(var(--wk-n, 4), minmax(0, 1fr));
-    }
-  }
-
-  .wk {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .wk-fig {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0 8px;
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: var(--fs-page);
-    font-weight: 600;
-    line-height: 32px;
-  }
-
-  .wk-fig span {
-    color: var(--ink-3);
-    font-family: var(--font-ui);
-    font-size: var(--fs-meta);
-    font-weight: 500;
-    line-height: 18px;
-  }
-
-  .wk[data-tone='late'] .wk-fig {
-    color: var(--red);
-  }
-
-  .wk-lines {
-    display: grid;
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    font-size: var(--fs-meta);
-    line-height: 18px;
-  }
-
-  .wk-lines li {
-    display: flex;
-    gap: 8px;
-    min-inline-size: 0;
-  }
-
-  .wk-lines b {
-    flex: none;
-    inline-size: 50px;
-    color: var(--ink-3);
-    font-weight: 500;
-  }
-
-  .wk-lines a {
-    min-inline-size: 0;
-    color: var(--ink-2);
-    text-decoration: none;
-  }
-
-  .wk-lines a:hover {
-    color: var(--ink);
-    text-decoration: underline;
-  }
-
-  .strong {
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  /* UNDER A THUMB EACH LINE IS A 44 ROW (mobile pass, 2 Nov). The brief's lines were links 18 tall, 24 apart, so a thumb
-     meant for Tuesday's task opened Wednesday's. The whole row is the target, day and all, and the words stay one line.
-     The earning lines and a project's name in the list grow the same way, inside their own rows. */
-  @media (pointer: coarse) {
-    .wk-lines {
-      gap: 0;
-    }
-
-    .wk-lines li {
-      position: relative;
-      align-items: center;
-      min-block-size: var(--tap);
-    }
-
-    .wk-lines a::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-    }
-
-    .kv li {
-      position: relative;
-      align-items: center;
-      min-block-size: var(--tap);
-      padding-block: var(--sp-1);
-    }
-
-    .kv-k::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-    }
-
-    .r-name {
-      min-block-size: var(--tap);
-    }
-  }
-
-  /* ON A PHONE A TILE IS ITS FIGURE AND ITS FIRST LINE, the day over the words in two lines at most; the figure says how
-     many, so "and N more" is left to the desk. */
-  @media (width < 640px) {
-    .wk .wk-lines li:nth-child(n + 2),
-    .wk .wk-more {
-      display: none;
-    }
-
-    .wk .wk-lines li {
-      flex-direction: column;
-      gap: 0;
-    }
-
-    .wk .wk-lines b {
-      inline-size: auto;
-    }
-
-    .wk .wk-lines a {
-      display: -webkit-box;
-      overflow: hidden;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-      line-clamp: 2;
-    }
-  }
-
-  /* ── the list ── */
-  .r-head,
-  .row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px 16px;
-  }
-
-  .r-head {
-    display: none;
-    padding-block-end: 8px;
-    color: var(--ink-3);
-    font-size: var(--fs-cap, 12px);
-    line-height: 16px;
-  }
-
-  @media (width >= 1000px) {
-    .r-head,
-    .row {
-      /* NEXT STEP LESS, THE NUMBER AND THE LAST WORK MORE (the lists review, L31): "Up 19% since 25 Oct" broke over three
-         lines in 190px and "Tasks changed 5 min ago" over two, beside a next step with room to spare. */
-      grid-template-columns: 200px minmax(0, 1.2fr) 112px minmax(0, 1fr) minmax(0, 0.8fr);
+  @container (width >= 940px) {
+    .b-body[data-side] {
+      grid-template-columns: minmax(0, 1fr) 320px;
       align-items: start;
-    }
-
-    .r-head {
-      display: grid;
-    }
-  }
-
-  .g-head {
-    display: flex;
-    gap: 8px;
-    align-items: baseline;
-    margin: 18px 0 4px;
-    font-size: var(--fs-meta);
-    font-weight: 600;
-    line-height: 18px;
-  }
-
-  .g-head:first-of-type {
-    margin-block-start: 4px;
-  }
-
-  .g-head span {
-    color: var(--ink-3);
-    font-weight: 500;
-  }
-
-  .rows {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* THE COLUMN HEADS AND THE GROUP NAMES STAND ON THE CARD'S EDGE, so the rows do too: the skin's 12 put every row's
-     words 12 right of the head over them ("Next step" over a next step). */
-  .rows > .row {
-    padding-inline: 0;
-  }
-
-  /* AND THE LAST ROW'S AIR IS THE CARD'S PADDING, not 12 more on it. */
-  .b-list > .rows:last-child > .row:last-child {
-    padding-block-end: 0;
-  }
-
-  .row {
-    padding-block: 12px;
-    border-block-start: 1px solid var(--rule);
-  }
-
-  .row[data-quiet] {
-    padding-block: 9px;
-  }
-
-  /* THE NAME AND ITS PIN: the pin at the name's end, shown on the row under the pointer, and always once it is pinned. */
-  .r-nm {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    min-inline-size: 0;
-  }
-
-  .r-nm .r-name {
-    flex: 1;
-  }
-
-  .r-pin {
-    display: grid;
-    flex: none;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    padding: 0;
-    background: none;
-    border: 0;
-    border-radius: var(--r-ctl);
-    color: var(--ink-3);
-    cursor: pointer;
-    transition:
-      background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out),
-      opacity var(--d-state) var(--ease-out);
-  }
-
-  .r-pin[aria-pressed='true'] {
-    background: var(--soft-fill);
-    color: var(--ink);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .r-pin[aria-pressed='false'] {
-      opacity: 0;
-    }
-
-    .row:hover .r-pin,
-    .r-pin:focus-visible {
-      opacity: 1;
-    }
-
-    .r-pin:hover {
-      background: var(--hover);
-      color: var(--ink);
     }
   }
 
   .b-pinhint {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 0 0 12px;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: 18px;
+    gap: var(--sp-2);
   }
 
-  .r-name {
+  .b-sec {
+    display: grid;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .b-sec-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-row);
+    font-weight: var(--fw-semi);
+    line-height: var(--lead-row);
+  }
+
+  .b-sec-head .num {
+    color: var(--ink-3);
+    font-weight: var(--fw-regular);
+  }
+
+  .b-sec-head[data-tone='needs'] .num {
+    color: var(--red);
+    font-weight: var(--fw-medium);
+  }
+
+  .b-sec-note {
+    font-weight: var(--fw-regular);
+  }
+
+  /* ── a project as a card: the whole card opens it, the pin keeps its own press ── */
+  .cards,
+  .lines,
+  .kv,
+  .wk-lines {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: var(--tile-gap);
+  }
+
+  .card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    box-sizing: border-box;
+    padding: var(--tile-pad);
+    border-radius: var(--r-tile);
+    background: var(--tile);
+    box-shadow: var(--shadow-card);
+    color: var(--ink);
+    transition:
+      background-color var(--d-state) var(--ease-standard),
+      box-shadow var(--d-state) var(--ease-standard);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .card:hover {
+      background: color-mix(in oklab, var(--ph) var(--wash-hover), var(--tile));
+      box-shadow: var(--shadow-card-hover);
+    }
+  }
+
+  .card:has(.c-name:focus-visible) {
+    outline: 2px solid var(--focus, var(--ink));
+    outline-offset: 2px;
+  }
+
+  .c-head {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--sp-3);
     min-inline-size: 0;
-    color: var(--ink);
-    font-weight: 600;
-    text-decoration: none;
   }
 
-  .r-name:hover .r-title {
-    text-decoration: underline;
+  .c-id {
+    display: grid;
+    flex: 1;
+    min-inline-size: 0;
   }
 
-  .r-title {
-    min-inline-size: 0;
+  .c-name {
     overflow: hidden;
+    color: var(--ink);
+    font-size: var(--fs-row);
+    font-weight: var(--fw-semi);
+    line-height: var(--lead-row);
+    text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
+    outline: none;
   }
 
-  .r-next {
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: 20px;
-    overflow-wrap: anywhere;
+  /* THE NAME IS THE LINK, AND IT REACHES THE WHOLE CARD OR ROW. The pin stands over it. */
+  .c-name::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
   }
 
-  .r-next[data-none] {
-    color: var(--ink-3);
-  }
-
-  .chip {
+  /* HOW IT IS GOING, ONLY WHEN IT IS NOT ON TRACK: a dot and the word (as `ProjectCard` says it). */
+  .c-health {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    block-size: 22px;
-    padding: 0 8px;
-    border-radius: var(--r-ctl);
-    background: var(--tile-2, var(--hover));
-    color: var(--ink-2);
-    font-size: var(--fs-cap, 12px);
-    font-weight: 500;
-    white-space: nowrap;
+    gap: 4px;
+    color: var(--warn);
+    font-weight: var(--fw-medium);
   }
 
-  .chip[data-tone='late'] {
-    background: var(--red-tint);
+  .c-health[data-tone='off'] {
     color: var(--red);
   }
 
-  .chip[data-tone='warn'] {
-    background: var(--warn-tint, var(--cat-yellow-tint));
+  .c-next {
+    display: grid;
+    gap: var(--sp-1);
+  }
+
+  .c-step {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 20px;
+    text-wrap: pretty;
+  }
+
+  .c-step[data-none] {
+    color: var(--ink-3);
+  }
+
+  /* WHAT IT IS WAITING ON: a dot and the words, never a pill (as `ProjectCard`'s "3 late"). */
+  .state {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+  }
+
+  .state :global(.icon) {
+    flex: none;
+    color: var(--ink-3);
+  }
+
+  .state[data-tone='late'] {
+    color: var(--red);
+    font-weight: var(--fw-medium);
+  }
+
+  .state[data-tone='warn'] {
     color: var(--warn);
   }
 
   .dot {
+    flex: none;
     inline-size: 7px;
     block-size: 7px;
-    border-radius: 50%;
+    border-radius: var(--r-round);
     background: currentColor;
   }
 
-  .r-num {
+  .c-num {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--sp-3);
     min-inline-size: 0;
   }
 
@@ -886,14 +530,15 @@
   }
 
   .n-fig {
-    font-family: var(--font-display);
+    color: var(--ink);
     font-size: var(--fs-figure);
-    font-weight: 600;
-    line-height: 26px;
+    font-weight: var(--fw-semi);
+    letter-spacing: -0.01em;
+    line-height: var(--lead-figure);
   }
 
   .n-fig[data-stale] {
-    color: var(--ink-2);
+    color: var(--ink-3);
   }
 
   .trail {
@@ -928,125 +573,326 @@
     fill: color-mix(in oklab, var(--ink-3) 10%, transparent);
   }
 
-  .r-work {
+  /* THE FOOT HOLDS ITS OWN AIR, 12 over its rule and 12 under (`ProjectCard`'s `pc-foot`), pinned to the card's end. */
+  .c-foot {
     display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    min-inline-size: 0;
-    font-size: var(--fs-body);
-    line-height: 20px;
-  }
-
-  .face-none {
-    display: inline-grid;
-    flex: none;
-    place-items: center;
-    inline-size: 20px;
-    block-size: 20px;
-    border-radius: 50%;
-    background: var(--tile-2, var(--hover));
-    color: var(--ink-3);
-    font-size: var(--fs-cap);
-  }
-
-  .w-words {
-    display: grid;
-    min-inline-size: 0;
-  }
-
-  /* ON A PHONE: name and chip on one line, the next step in two, and one small line for the number and the work. */
-  @media (width < 1000px) {
-    /* THREE COLUMNS SO THE NAME IS SIZED BY THE CHIP ALONE: with two, the last work's line ("Tasks changed 5 min ago")
-       set the second column and cut the name and its pin to "North…". */
-    .row {
-      grid-template-columns: minmax(0, 1fr) auto auto;
-      grid-template-areas: 'name name chip' 'next next next' 'num work work';
-      align-items: center;
-    }
-
-    .r-nm {
-      grid-area: name;
-    }
-
-    .r-chip {
-      grid-area: chip;
-    }
-
-    .r-next {
-      grid-area: next;
-      display: -webkit-box;
-      overflow: hidden;
-      padding-inline-start: 34px;
-      font-size: var(--fs-meta);
-      line-height: 18px;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-      line-clamp: 2;
-    }
-
-    .r-num {
-      grid-area: num;
-      padding-inline-start: 34px;
-    }
-
-    .r-work {
-      grid-area: work;
-      justify-self: end;
-      font-size: var(--fs-meta);
-      line-height: 18px;
-    }
-
-    .n-fig {
-      font-size: var(--fs-body);
-      line-height: 20px;
-    }
-
-    .r-num .small,
-    .r-work .small,
-    .r-num .muted,
-    .face-none,
-    .r-work :global(.agent-face) {
-      display: none;
-    }
-
-    .r-num .n-words .small {
-      display: none;
-    }
-  }
-
-  /* ── parked and finished ── */
-  .b-parked {
-    display: grid;
-    gap: 14px;
-  }
-
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .pchip {
-    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    min-block-size: 36px;
-    padding: 0 12px 0 4px;
-    border-radius: 10px;
-    background: var(--tile-2, var(--hover));
-    color: var(--ink);
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    margin-block-start: auto;
+    padding-block-start: var(--sp-3);
+    border-block-start: 1px solid var(--sep);
+  }
+
+  /* ── the pin ── */
+  .pin {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--sp-1);
+    min-block-size: 28px;
+    padding: 0 var(--sp-2);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: none;
+    color: var(--ink-2);
+    font: inherit;
     font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+  }
+
+  .pin[data-bare] {
+    justify-content: center;
+    inline-size: 28px;
+    padding: 0;
+  }
+
+  .pin[aria-pressed='true'] {
+    background: var(--chosen);
+    color: var(--ink);
+  }
+
+  .pin[aria-pressed='true'] :global(svg) {
+    fill: currentColor;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .pin:not([aria-pressed='true']):hover {
+      background: var(--row-wash);
+      color: var(--ink);
+    }
+  }
+
+  /* ── a project as a row: Quiet, Parked and Finished, one tile, a wash under the pointer and no rules ── */
+  .lines {
+    display: grid;
+    gap: var(--sp-0);
+    padding: var(--sp-2);
+    border-radius: var(--r-tile);
+    background: var(--tile);
+    box-shadow: var(--shadow-card);
+  }
+
+  .line {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-ctl);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .line:hover {
+      background: var(--row-wash);
+    }
+  }
+
+  .line:has(.c-name:focus-visible) {
+    outline: 2px solid var(--focus, var(--ink));
+    outline-offset: -2px;
+  }
+
+  .l-words {
+    display: grid;
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .l-next {
+    overflow: hidden;
+    margin: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .l-state {
+    flex: none;
+  }
+
+  .l-num {
+    flex: none;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+  }
+
+  @media (width < 640px) {
+    .l-state {
+      display: none;
+    }
+  }
+
+  /* ── the tiles beside them ── */
+  .tile {
+    display: grid;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    padding: var(--tile-pad);
+    border-radius: var(--r-tile);
+    background: var(--tile);
+    box-shadow: var(--shadow-card);
+    color: var(--ink);
+  }
+
+  .t-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: var(--well, 28px);
+  }
+
+  .t-title {
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    line-height: 22px;
+  }
+
+  .t-n {
+    margin-inline-start: 2px;
+    color: var(--ink-3);
+    font-weight: var(--fw-regular);
+  }
+
+  .tile[data-tone='late'] .t-n {
+    color: var(--red);
+    font-weight: var(--fw-medium);
+  }
+
+  .tile[data-tone='warn'] .t-n {
+    color: var(--warn);
+    font-weight: var(--fw-medium);
+  }
+
+  .small {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+  }
+
+  .small[data-warn] {
+    color: var(--warn);
+  }
+
+  .muted {
+    color: var(--ink-3);
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .wk-lines {
+    display: grid;
+    gap: var(--sp-2);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+  }
+
+  .wk-lines li {
+    display: flex;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .wk-lines b {
+    flex: none;
+    inline-size: 50px;
+    color: var(--ink-3);
+    font-weight: var(--fw-medium);
+  }
+
+  .wk-lines a {
+    display: -webkit-box;
+    overflow: hidden;
+    min-inline-size: 0;
+    color: var(--ink-2);
+    text-decoration: none;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .wk-lines a:hover {
+    color: var(--ink);
+    text-decoration: underline;
+  }
+
+  a.wk-more {
     text-decoration: none;
   }
 
-  .pchip:hover {
-    background: var(--hover);
+  a.wk-more:hover {
+    color: var(--ink);
+    text-decoration: underline;
   }
 
-  .pchip :global(.icon-well) {
-    transform: scale(0.85);
+  .strong {
+    color: var(--ink);
+    font-weight: var(--fw-semi);
+  }
+
+  /* ── earning ── */
+  .e-total {
+    margin: 0;
+    font-size: var(--fs-page);
+    font-weight: var(--fw-semi);
+    letter-spacing: -0.02em;
+    line-height: var(--lead-page);
+  }
+
+  .e-total + .small {
+    margin-block-start: calc(-1 * var(--sp-2));
+  }
+
+  .e-stack {
+    display: flex;
+    gap: 2px;
+    block-size: 8px;
+    overflow: hidden;
+    border-radius: 4px;
+  }
+
+  .e-stack i,
+  .sw {
+    background: var(--ph-fill, var(--ph));
+  }
+
+  .e-stack i {
+    display: block;
+  }
+
+  .kv {
+    display: grid;
+    gap: var(--sp-3);
+  }
+
+  .kv li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 var(--sp-2);
+    align-items: baseline;
+  }
+
+  .kv-k {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .kv-k:hover .kv-name {
+    text-decoration: underline;
+  }
+
+  .kv-status {
+    grid-column: 1 / -1;
+    padding-inline-start: calc(8px + var(--sp-2));
+  }
+
+  .sw {
+    display: inline-block;
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 2px;
+  }
+
+  .kv-v {
+    font-weight: var(--fw-semi);
+    white-space: nowrap;
+  }
+
+  /* UNDER A THUMB EACH LINE IS A 44 ROW (mobile pass, 2 Nov): the whole row is the target, day and all. */
+  @media (pointer: coarse) {
+    .wk-lines {
+      gap: 0;
+    }
+
+    .wk-lines li {
+      position: relative;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+
+    .wk-lines a::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+    }
+
+    .kv-k {
+      min-block-size: var(--tap);
+      align-items: center;
+    }
   }
 </style>
