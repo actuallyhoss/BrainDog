@@ -149,6 +149,26 @@ test(`PAST ${SETTINGS_MOST} SETTINGS THE WHOLE PACK IS REFUSED, in one sentence`
   assert.equal(over.refusal.fix, scrubWords.tooMany(SETTINGS_MOST + 1));
 });
 
+test('A DOOR\'S CONNECT RECIPE KEEPS ITS SCRIPT AND ITS HOSTS, a key in the script is still taken out, and its prose is held as prose', () => {
+  const door = (text: string, steps: string[] = ['Open it.']): unknown[] => [
+    { ingest: 'in', channel: 'webhook', connect: { title: 'Connect', names: ['https://script.google.com'], steps, files: [{ name: 'Code.gs', text }] } },
+  ];
+  const code = "const seen = 'mailer@example.com'; UrlFetchApp.fetch('https://www.googleapis.com/x');";
+  const kept = scrubbed(door(code));
+  assert.deepEqual(kept.dropped, []);
+  assert.deepEqual(kept.settings, []);
+  assert.deepEqual(kept.declarations, door(code));
+
+  const key = scrubbed(door(`const k = '${'sk_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2'}';`));
+  assert.deepEqual(key.dropped.map((d) => [d.at, d.why]), [['ingest.in.connect.files.0.text', scrubWords.key]]);
+
+  /* ONLY THE RECIPE'S CODE. A step is words a person wrote, and a `text` anywhere else is too. */
+  const prose = scrubbed(door(code, ['Mail me at leo@example.com', 'See https://leo.example.com/notes']));
+  assert.deepEqual(prose.dropped.map((d) => d.why), [scrubWords.address, scrubWords.link]);
+  const elsewhere = scrubbed([{ ingest: 'in', channel: 'webhook', note: { files: [{ text: 'See https://leo.example.com/notes' }] } }]);
+  assert.deepEqual(elsewhere.dropped.map((d) => d.why), [scrubWords.link]);
+});
+
 test('A SHIPPED ADD-ON IS LEFT AS IT IS, but for a door address and a row its page points at', () => {
   const root = new URL('../../../packs/', import.meta.url);
   for (const id of readdirSync(root)) {

@@ -15,7 +15,8 @@
  * key, an object's key included; a `token`, `secret` or `password` under any name and any case; a door's address; a
  * skill's text; text holding an email address or a link where no setting can stand for it; and a row, unless
  * `options.rows` names it by list and number. A ticked row still leaves out an address, a link and a person's id.
- * A script's `source` is code: it is kept, and only checked for a key.
+ * A script's `source` is code: it is kept, and only checked for a key. So is the text of a door's `connect.files`, the
+ * script a person pastes into their own account, and `connect.names` are the hosts that recipe opens, as `address.ts` reads them.
  *
  * PAST `SETTINGS_MOST` THE WHOLE PACK IS REFUSED, because the kernel refuses a manifest over its own ceiling
  * (`CONFIG_CEILING` in `packages/kernel/src/declare.ts`) and a literal left as written would be one of the author's.
@@ -101,6 +102,8 @@ const secretKey = (k: string): boolean => SECRET_KEYS.test(k.toLowerCase().repla
 const DOOR_KEYS = new Set(['address', 'url', 'inbox', 'webhook', 'endpoint']);
 /** Keys whose links are hosts the code calls out to, which a reviewer reads and a person approves, not anybody's link. */
 const HOST_KEYS = new Set(['egress', 'host', 'hosts', 'origin']);
+/** The key a door's `connect.files` is walked under, so a file's `text` is told from any other `text`. */
+const CONNECT_FILES = 'connect.files';
 /** A skill's own words. */
 const SKILL_TEXT = new Set(['text', 'body', 'instructions', 'prompt', 'content']);
 
@@ -233,7 +236,11 @@ export function scrubPack(declarations: readonly unknown[], options: ScrubOption
       /* A leaf of a filter tree reads its value against its field; a list's field reads its default against its own id. */
       const filter = leaf !== null && LEAF_OPS.has(k);
       const fieldDefault = !filter && own !== null && k === 'default';
-      const one = walk(v, filter ? leaf : fieldDefault ? own : k, here, kind, filter || fieldDefault);
+      /* A DOOR'S CONNECT RECIPE WAS READ AS PROSE, so Gmail's script was taken out of the panel it is pasted from and its
+         hosts became blank settings. `names` read as hosts, a file's `text` as a script's `source`. */
+      const recipe = kind === 'ingest' && key === 'connect' ? (k === 'names' ? 'hosts' : k === 'files' ? CONNECT_FILES : null) : null;
+      const code = kind === 'ingest' && key === CONNECT_FILES && k === 'text' ? 'source' : null;
+      const one = walk(v, filter ? leaf : fieldDefault ? own : (recipe ?? code ?? k), here, kind, filter || fieldDefault);
       if (one !== undefined) out[k] = one;
     }
     return out;
