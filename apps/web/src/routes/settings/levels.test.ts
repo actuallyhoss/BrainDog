@@ -57,7 +57,8 @@ function slice(area: string): string {
 
 /** One control per owner's area that a colleague was offered and cannot use. */
 const OFFERED: Record<string, string[]> = {
-  people: ['id="invite-email"', 'id="erase-person"'],
+  /* THE INVITE FORM LEFT THIS LIST ON 2 NOV (183e1a019): `decide` invites too, so it has its own check below. */
+  people: ['id="erase-person"'],
   /* THE KEY FORM (id="agent-label") IS THE CONNECT SHEET'S NOW, so the guard is that the sheet is drawn in the arm. */
   agents: ['id="user-code"', '<ConnectSheet'],
   ingest: ['mailWords.mint'],
@@ -101,7 +102,7 @@ test('an owner is an owner by either half of what the record said', () => {
  * its body sat inside `{#if anOwner}`. One that is ever rendered some other way is left as the walk found it,
  * which is `other`, same as before this existed, so nothing here can turn an ungated control gated by accident.
  */
-function ownedAt(markup: string): (at: number) => boolean {
+function ownedAt(markup: string, gate = 'anOwner'): (at: number) => boolean {
   type Arm = 'yes' | 'no' | 'other';
   /** `owner` is this arm; `known` is what the arms already ruled out say about a later one. */
   type Frame = { owner: Arm; known: Arm };
@@ -111,7 +112,7 @@ function ownedAt(markup: string): (at: number) => boolean {
   const snippets: { name: string; start: number; end: number }[] = [];
   /* THE NEGATION IS NOT ALWAYS AT THE FRONT: `{:else if mintsHere === true && !anOwner}` is the arm
      for somebody who is not an owner, and reading only the first token called it the owner's. */
-  const armOf = (cond: string): Arm => (/!\s*anOwner\b/u.test(cond) ? 'no' : /\banOwner\b/u.test(cond) ? 'yes' : 'other');
+  const armOf = (cond: string): Arm => (new RegExp(`!\\s*${gate}\\b`, 'u').test(cond) ? 'no' : new RegExp(`\\b${gate}\\b`, 'u').test(cond) ? 'yes' : 'other');
   const other = (arm: Arm): Arm => (arm === 'yes' ? 'no' : arm === 'no' ? 'yes' : 'other');
   const block = /\{#(if|each|await|key|snippet)\b([^}]*)\}|\{:else(\s+if\b([^}]*))?\}|\{\/(if|each|await|key|snippet)\}/gu;
   for (let m = block.exec(markup); m !== null; m = block.exec(markup)) {
@@ -184,11 +185,25 @@ test('every area with an owner-only control gates it inside the arm only an owne
   }
 });
 
+test('the invite form is an owner\'s and a decider\'s (183e1a019), never a lower level\'s, and only an owner may offer Owner', () => {
+  const script = source('people');
+  assert.match(script, /const anAdmin = \$derived\(!anOwner && me\.level === 'decide'\);/u);
+  assert.match(script, /const mayInvite = \$derived\(anOwner \|\| anAdmin\);/u);
+  assert.match(script, /const inviteRoles = \$derived\(ROLE_ORDER\.filter\(\(l\) => anOwner \|\| l !== 'owner'\)\);/u);
+  const markup = slice('people');
+  const at = markup.indexOf('id="invite-email"');
+  assert.ok(at >= 0, '/settings/people no longer draws the invite form, so this guard is about nothing');
+  assert.ok(ownedAt(markup, 'mayInvite')(at), '/settings/people draws the invite form outside the arm that asks mayInvite');
+});
+
 test('and no other area asks, because there is nothing on it to refuse', () => {
   for (const area of AREAS) {
     if (OWNER_CONTROLS.has(area)) continue;
+    /* ONE WORD ON RECOVERY ASKS, AND IT IS NO CONTROL (50294479a): on a self-host only an owner holds the server key, so
+       only an owner is told a lost passkey comes back through it. */
+    const markup = slice(area).replace("shell.host === 'self-host' && s.anOwner ? copy.passkeyLostSelfHost", '');
     assert.doesNotMatch(
-      slice(area),
+      markup,
       /\banOwner\b/u,
       `/settings/${area} is about the device or the person, so a level has nothing to say there`,
     );

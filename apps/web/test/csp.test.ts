@@ -14,7 +14,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { EMBED_PROVIDERS } from 'braindog-render';
 
@@ -40,12 +42,32 @@ function directives(policy: string): Map<string, string[]> {
 test('THE POLICY FRAMES EXACTLY ITS OWN DRAWN FRAME, THE EMBED PROVIDERS AND TURNSTILE, AND ITS ONE INLINE EXCEPTION IS A STYLE ATTRIBUTE', async () => {
   const { default: config } = (await import(CONFIG)) as { default: { kit?: { csp?: Csp } } };
   const d = config.kit?.csp?.directives ?? {};
-  /* `'self'` FOR THE DRAWN BLOCK'S FRAME ALONE, which both hosts serve under its own policy (`@braindog/host/drawn-frame`). */
-  assert.deepEqual(d['frame-src'], ['self', ...EMBED_PROVIDERS.map((p) => p.origin), TURNSTILE], "frame-src is not 'self', EMBED_PROVIDERS and Turnstile");
+  /* `'self'` FOR THE DRAWN BLOCK'S FRAME ALONE, which both hosts serve under its own policy (`@braindog/host/drawn-frame`).
+     `blob:` FOR AN ATTACHED PDF ALONE (07d611b46), and the two checks under this one are what keep it that. */
+  assert.deepEqual(d['frame-src'], ['self', 'blob:', ...EMBED_PROVIDERS.map((p) => p.origin), TURNSTILE], "frame-src is not 'self', blob:, EMBED_PROVIDERS and Turnstile");
   assert.equal(config.kit?.csp?.mode, 'hash');
   assert.deepEqual(d['style-src-attr'], ['unsafe-inline']);
   for (const name of ['default-src', 'script-src', 'style-src-elem'] as const)
     assert.ok(!(d[name] ?? []).some((s) => s === 'unsafe-inline' || s === 'unsafe-eval'), `${name} allows inline or eval`);
+});
+
+test('A BLOB IN A FRAME IS ONLY EVER A PDF: the one file that frames a blob types it as one, and no other file that makes a blob draws a frame', () => {
+  const src = fileURLToPath(new URL('../src/', import.meta.url));
+  const viewer = 'lib/attach/AttachmentViewer.svelte';
+  const makes = (readdirSync(src, { recursive: true }) as string[])
+    .filter((f) => f.endsWith('.svelte') || f.endsWith('.ts'))
+    .filter((f) => !f.endsWith('.test.ts') && readFileSync(join(src, f), 'utf8').includes('createObjectURL'));
+  assert.ok(makes.includes(viewer), 'the viewer no longer makes a blob, so frame-src no longer needs blob:');
+  for (const file of makes) {
+    if (file === viewer) continue;
+    assert.doesNotMatch(readFileSync(join(src, file), 'utf8'), /<iframe\b/u, `${file} makes a blob and draws a frame, and frame-src lets a blob in`);
+  }
+  const text = readFileSync(join(src, viewer), 'utf8').replace(/<!--[\s\S]*?-->/gu, '');
+  assert.deepEqual(
+    [...text.matchAll(/createObjectURL\((.*)\)/gu)].map((m) => m[1]),
+    ["new Blob([bytes], { type: 'application/pdf' })"],
+    'a blob the viewer frames can carry another type, and a blob typed as a page runs in this origin',
+  );
 });
 
 test(
