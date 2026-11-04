@@ -27,7 +27,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "governance.open",
+                "writes": false
+              },
+              {
+                "id": "activity",
+                "writes": false
+              },
+              {
+                "id": "handoffs.open",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version. Now draws its own icon."
         },
@@ -46,7 +60,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "governance.open",
+                "writes": false
+              },
+              {
+                "id": "activity",
+                "writes": false
+              },
+              {
+                "id": "handoffs.open",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version."
         }
@@ -87,7 +115,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              }
+            ]
           },
           "notes": "Nothing it reads or writes changed. It is left out of every listing, as an add-on for one bank is, and still installs by its name. Now draws its own icon."
         },
@@ -106,7 +148,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              }
+            ]
           },
           "notes": "Nothing it reads or writes changed. It is left out of every listing, as an add-on for one bank is, and still installs by its name."
         },
@@ -125,7 +181,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              }
+            ]
           },
           "notes": "Nothing it reads or writes changed. Two like movements a day apart stay two when each prints its own balance or its own InstaPay reference, and the mail and the text of one movement stay one. A balance can come back to a figure it printed before, as when one sum is withdrawn, paid back in and withdrawn again on the same day: the second withdrawal is then held as a repeat that names the one it looks like, and “It is a second one” files it."
         },
@@ -144,7 +214,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              }
+            ]
           },
           "notes": "Each amount a message prints without a currency is read in its account's own currency, never in pounds sterling. Two like movements a day apart stay two when each prints its own balance or its own InstaPay reference, and the mail and the text of one movement stay one. A question about digits no account holds now says whether it is a card or an account."
         },
@@ -163,7 +247,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              }
+            ]
           },
           "notes": "A card charge and an InstaPay transfer keep the shop or the person as the bank wrote it, in a new Paid to or from field, so the same payee is recognised however it is spelled."
         },
@@ -182,7 +280,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              }
+            ]
           },
           "notes": "Nothing it reads or writes changed. The add-on has a title of its own now, and each version says what it changed in a line like this one."
         },
@@ -201,7 +313,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              }
+            ]
           }
         },
         {
@@ -219,7 +345,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           }
         },
         {
@@ -237,7 +373,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           }
         }
       ],
@@ -601,7 +747,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "An alert that prints no currency is read in its card's own currency. A card alert is only ever matched to a card, never to an account whose digits end alike, and a question about digits no card holds says it is a card. Now draws its own icon."
         },
@@ -620,7 +776,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "An alert that prints no currency is read in its card's own currency. A card alert is only ever matched to a card, never to an account whose digits end alike, and a question about digits no card holds says it is a card."
         },
@@ -639,7 +805,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "Each alert keeps the shop or the sender as the alert names it, in a new Paid to or from field, so the same payee is recognised however it is spelled."
         },
@@ -658,7 +834,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "Nothing it reads or writes changed. Each version says what it changed in a line like this one."
         },
@@ -677,7 +863,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           }
         }
       ],
@@ -799,7 +995,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
           },
           "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
           "preview": true
@@ -826,7 +1032,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
           },
           "notes": "Says its dates as words, labels its columns, and no longer gives a certificate that compounds a next payout.",
           "preview": true
@@ -853,7 +1069,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
           },
           "notes": "Renames four fields: principal is amount, payout is pays, direction is flow, compound is roll, issuer is bank. Shows what each certificate will be worth when it matures, and Cash ahead walks that value as the money coming back.",
           "preview": true
@@ -880,7 +1106,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
           },
           "notes": "Shows what each certificate will be worth when it matures, and Cash ahead walks that value as the money coming back.",
           "preview": true
@@ -907,7 +1143,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
           },
           "notes": "Shows what each certificate will be worth when it matures, and Cash ahead walks that value as the money coming back.",
           "preview": true
@@ -934,7 +1180,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
           },
           "notes": "First version.",
           "preview": true
@@ -984,7 +1240,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              },
+              {
+                "id": "page.money-account",
+                "writes": true
+              }
+            ]
           },
           "notes": "Its description is in plainer words. Nothing it does has changed.",
           "preview": true
@@ -1010,7 +1292,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              },
+              {
+                "id": "page.money-account",
+                "writes": true
+              }
+            ]
           },
           "notes": "Shorter words on its page. A count can now be made by note and coin, each currency with its own set, and the difference is filed as you say.",
           "preview": true
@@ -1036,7 +1344,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              },
+              {
+                "id": "page.money-account",
+                "writes": true
+              }
+            ]
           },
           "notes": "Reconcile is now filed. A count can now be made by note and coin: each currency has its own set (EGP, USD, EUR, GBP, SAR and AED), the total is worked out for you, and the count keeps what was counted. When the cash is out, you choose how the difference is recorded: as the lines you describe, with whatever is left filed as Discrepancy, or all of it as Discrepancy. The Cash counts page now opens with a line saying what a count is.",
           "preview": true
@@ -1062,7 +1396,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              },
+              {
+                "id": "page.money-account",
+                "writes": true
+              }
+            ]
           },
           "notes": "Reconcile is now filed. A count can now be made by note and coin: each currency has its own set (EGP, USD, EUR, GBP, SAR and AED), the total is worked out for you, and the count keeps what was counted. When the cash is out, you choose how the difference is recorded: as the lines you describe, with whatever is left filed as Discrepancy, or all of it as Discrepancy. A count that says neither is filed as one entry, as before, and every older count reads as it did.",
           "preview": true
@@ -1088,7 +1448,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              },
+              {
+                "id": "page.money-account",
+                "writes": true
+              }
+            ]
           },
           "notes": "Reconcile is now filed. A count can now be made by note and coin: each currency has its own set (EGP, USD, EUR, GBP, SAR and AED), the total is worked out for you, and the count keeps what was counted. When the cash is out, you choose how the difference is recorded: as the lines you describe, with whatever is left filed as Discrepancy, or all of it as Discrepancy. A count that says neither is filed as one entry, as before, and every older count reads as it did.",
           "preview": true
@@ -1114,7 +1500,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              },
+              {
+                "id": "page.money-account",
+                "writes": true
+              }
+            ]
           },
           "notes": "A count can now be made by note and coin: each currency has its own set (EGP, USD, EUR, GBP, SAR and AED), the total is worked out for you, and the count keeps what was counted. When the cash is out, you choose how the difference is recorded: as the lines you describe, with whatever is left filed as Discrepancy, or all of it as Discrepancy. A count that says neither is filed as one entry, as before, and every older count reads as it did.",
           "preview": true
@@ -1140,7 +1552,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              },
+              {
+                "id": "page.money-account",
+                "writes": true
+              }
+            ]
           },
           "notes": "A count can now be made by note and coin: each currency has its own set (EGP, USD, EUR, GBP, SAR and AED), the total is worked out for you, and the count keeps what was counted. When the cash is out, you choose how the difference is recorded: as the lines you describe, with whatever is left filed as Discrepancy, or all of it as Discrepancy. A count that says neither is filed as one entry, as before, and every older count reads as it did.",
           "preview": true
@@ -1166,7 +1604,25 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              }
+            ]
           },
           "notes": "The box to count the cash in and the last count now go with Heads up on Money, and no longer after What it holds today, which Money no longer has. Where Heads up stands in the side column, the two stand in the main column beside it, under the Ledger the difference goes into. Nothing else changed. Now draws its own icon.",
           "preview": true
@@ -1192,7 +1648,25 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              }
+            ]
           },
           "notes": "The box to count the cash in and the last count now go with Heads up on Money, and no longer after What it holds today, which Money no longer has. Where Heads up stands in the side column, the two stand in the main column beside it, under the Ledger the difference goes into. Nothing else changed.",
           "preview": true
@@ -1218,7 +1692,25 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              }
+            ]
           },
           "notes": "Money now has a box to count the cash in, under What it holds today, while a balance there is old, and for a week after a count it shows that count: how far out it was and what happened. A count whose difference went into the Ledger now says so under What happened. Nothing is taken away, and taking the pack out takes both off Money.",
           "preview": true
@@ -1244,7 +1736,21 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "A count in another currency than its account now says so on the count, under What happened: which two currencies, and to count in the account's currency. Before, the reason went to the run's log alone, so the count stood with no difference and no word. Nothing else changed: still no balance check and no difference are written for such a count.",
           "preview": true
@@ -1270,7 +1776,21 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "A count that was not compared because its account holds an entry in another currency now says which balance to type: the balance its bank or statement shows, not the cash in the box, then count again. Before, it said to type the account's balance, which read as the cash just counted, and a box typed that way agrees with the next count and never shows the gap. Nothing else changed: still no balance check and no difference are written for such a count.",
           "preview": true
@@ -1296,7 +1816,21 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "A count that was not compared because its account holds an entry in another currency now says the way out under What happened: type the account's balance, then count again. Before, it said only that it was not compared, and the account went on reading as uncounted. Nothing else changed: still no balance check and no difference are written for such a count.",
           "preview": true
@@ -1322,7 +1856,21 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "An account that holds a cleared entry in another currency since it was last stated is no longer compared. The count is kept and says so under What happened, and no balance check and no difference are written, where before the entry was left out and a difference equal to it could be filed. An account whose entries are all in one currency is counted as before.",
           "preview": true
@@ -1348,7 +1896,21 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "Nothing it writes changed. The script opens with a comment that says what it does and nothing else, and each version says what it changed in a line like this one.",
           "preview": true
@@ -1374,7 +1936,21 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "preview": true
         },
@@ -1399,7 +1975,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "preview": true
         },
@@ -1424,7 +2010,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           }
         }
       ],
@@ -1508,7 +2104,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
           },
           "notes": "What is left on your debts is one figure, so net worth takes it away; a debt on an account that counts as cash is already in that account's balance, so it is left out of it.",
           "preview": true
@@ -1536,7 +2138,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
           },
           "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
           "preview": true
@@ -1564,7 +2172,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
           },
           "notes": "Renames fields: balance is left, method is how, months is mos. The first version: a list of debts, two plans worked out from it, and a page that shows them side by side.",
           "preview": true
@@ -1592,7 +2206,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version: a list of debts, two plans worked out from it, and a page that shows them side by side.",
           "preview": true
@@ -1639,6 +2259,12 @@
                 "host": "stats.example.com",
                 "line": "CALLS OUT stats.example.com · every 1h · grant \"Example stats (read only)\"",
                 "key": "Example stats (read only)"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.datapoints",
+                "writes": true
               }
             ]
           },
@@ -2368,6 +2994,12 @@
             "calls_out": [],
             "widgets": [
               "Savings goals"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
             ]
           },
           "notes": "Brings its Savings goals widget for Today, which was BrainDog’s own until now.",
@@ -2395,7 +3027,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
           },
           "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
           "preview": true
@@ -2422,7 +3060,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
           },
           "notes": "Labels the columns of the goals table.",
           "preview": true
@@ -2449,7 +3093,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
           },
           "notes": "Renames the parent field to under. The monthly pace reads every goal and every account, however many there are.",
           "preview": true
@@ -2476,7 +3126,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
           },
           "notes": "The monthly pace reads every goal and every account, however many there are.",
           "preview": true
@@ -2503,7 +3159,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
           },
           "notes": "First version.",
           "preview": true
@@ -3049,6 +3711,16 @@
             ],
             "widgets": [
               "Gold price"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.fx",
+                "writes": false
+              }
             ]
           },
           "notes": "Brings its Gold price widget for Today, which was BrainDog’s own until now, and its gold rates say they restate the night’s net worth in grams of 24k gold, which BrainDog worked out by their names until now.",
@@ -3087,6 +3759,16 @@
                 "host": "latest.currency-api.pages.dev",
                 "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
                 "key": null
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.fx",
+                "writes": false
               }
             ]
           },
@@ -3127,6 +3809,16 @@
                 "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
                 "key": null
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.fx",
+                "writes": false
+              }
             ]
           },
           "notes": "Can set today's gold rate for you once a day from the world gold price, when you choose a source on this page. Off until you do, and a rate you typed yourself is never written over. Says what a holding is when nothing is held yet, and asks for a gold rate only once there is gold.",
@@ -3166,6 +3858,16 @@
                 "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
                 "key": null
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.fx",
+                "writes": false
+              }
             ]
           },
           "notes": "Can set today's gold rate for you once a day from the world gold price, when you choose a source on this page. Off until you do, and a rate you typed yourself is never written over.",
@@ -3199,7 +3901,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
+            ]
           },
           "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
           "preview": true
@@ -3232,7 +3940,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
+            ]
           },
           "notes": "Says once when a holding's price is over 30 days old, and when a gold rate in use is over 7 days old.",
           "preview": true
@@ -3263,7 +3977,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
+            ]
           },
           "notes": "Words the gain figure as a percent of cost.",
           "preview": true
@@ -3294,7 +4014,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
+            ]
           },
           "notes": "Renames fields: a gold rate's current is live, symbol is code, and a buy's holding is item. Every buy, gold rate and holding is read, however many there are, where the page and the figures stopped at fifty.",
           "preview": true
@@ -3325,7 +4051,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
+            ]
           },
           "notes": "Every buy, gold rate and holding is read, however many there are, where the page and the figures stopped at fifty.",
           "preview": true
@@ -3356,7 +4088,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
+            ]
           },
           "notes": "Now Investments and gold. A holding can be gold with a karat, a fund or shares, and keeps its buys: the day, how many, the price and the fees. Gold is worth its grams at the gold rate you set for its karat, or 24k by purity. Each holding says its gain and its percent, and the page shows how everything splits by kind. Holdings you already had keep every number.",
           "preview": true
@@ -3382,7 +4120,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
+            ]
           },
           "notes": "Its two scripts have short names: Count what each holding cost and is worth, and Ask once about an account counted twice. What each does is unchanged. Now draws its own icon.",
           "preview": true
@@ -3408,7 +4152,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
+            ]
           },
           "notes": "Its two scripts have short names: Count what each holding cost and is worth, and Ask once about an account counted twice. What each does is unchanged.",
           "preview": true
@@ -3434,7 +4184,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
+            ]
           },
           "notes": "A holding can have a price, \"Worth each now\", and the day it was priced. Holdings value adds up what each is worth at its price, or what it cost with none, and says how many stand at what they cost. A price with no day is dated the day it was written, and the page warns once the oldest price is over 30 days old. The value reads in your home currency, or the one your holdings are in. An account that counts as cash and a holding with the same name are asked about once.",
           "preview": true
@@ -3699,7 +4455,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": false
+              }
+            ]
           },
           "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
           "preview": true
@@ -3727,7 +4489,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": false
+              }
+            ]
           },
           "notes": "Says its dates as words and labels the illustration columns.",
           "preview": true
@@ -3755,7 +4523,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": false
+              }
+            ]
           },
           "notes": "Renames fields: premium is cost, payments is times, and an illustration year's policy is of. Draws the insurer's year-by-year illustration as a table and a three-line chart on each policy, with the age for each year.",
           "preview": true
@@ -3783,7 +4557,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": false
+              }
+            ]
           },
           "notes": "Draws the insurer's year-by-year illustration as a table and a three-line chart on each policy, with the age for each year.",
           "preview": true
@@ -3810,7 +4590,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": false
+              }
+            ]
           },
           "notes": "First version: a list of policies, a page with the fund value and its age, and one page for each policy with the premiums paid so far.",
           "preview": true
@@ -4002,7 +4788,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
           "preview": true
@@ -4030,7 +4822,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
           "preview": true
@@ -4058,7 +4856,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
           "preview": true
@@ -4086,7 +4890,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version.",
           "preview": true
@@ -4181,7 +4991,17 @@
             "rules": [],
             "examples": 1,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
+            ]
           },
           "notes": "The price check works its sums out itself: costs together, the least price that holds (that times Times cost, 2.5 at first and yours to change) and the room, the price less that least price, all drawn beside what you type. The rule and script that added them up are gone, so the add-on carries no code. The line saying whether the price passes and the tiles of costs and share are gone too: a room below nought is too thin. Now draws its own icon.",
           "preview": true
@@ -4212,7 +5032,17 @@
             "rules": [],
             "examples": 1,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
+            ]
           },
           "notes": "The price check works its sums out itself: costs together, the least price that holds (that times Times cost, 2.5 at first and yours to change) and the room, the price less that least price, all drawn beside what you type. The rule and script that added them up are gone, so the add-on carries no code. The line saying whether the price passes and the tiles of costs and share are gone too: a room below nought is too thin.",
           "preview": true
@@ -4245,7 +5075,17 @@
             ],
             "examples": 1,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
+            ]
           },
           "notes": "Tiles sit in even rows: on the desk the next move and what is already done stack in one box, the calls waiting on you come straight under the line and are shown once, and a part's own card sits at the top of the column beside its path."
         },
@@ -4277,7 +5117,17 @@
             ],
             "examples": 1,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
+            ]
           },
           "notes": "The desk opens on its one line, how many essential steps are done, before anything else, and the calls waiting on you are drawn only while one is asked, so a desk with nothing to decide shows no empty box saying so."
         },
@@ -4309,7 +5159,17 @@
             ],
             "examples": 1,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
+            ]
           }
         },
         {
@@ -4340,7 +5200,17 @@
             ],
             "examples": 1,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
+            ]
           }
         },
         {
@@ -4371,7 +5241,17 @@
             ],
             "examples": 1,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
+            ]
           }
         },
         {
@@ -4402,7 +5282,17 @@
             ],
             "examples": 1,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
+            ]
           }
         }
       ],
@@ -4447,6 +5337,12 @@
                 "line": "CALLS OUT stats.example.com · every 1h · grant \"Example stats (read only)\"",
                 "key": "Example stats (read only)"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.datapoints",
+                "writes": true
+              }
             ]
           },
           "notes": "The add-on is now live-feed, the one every feed is filled from. A number can be money, written as an amount and its currency. A number can be dated from the answer, a day or an instant, rather than when the answer arrived. A feed asked in whole days can say the time of day and the zone. An id too long for its poll is refused in a sentence rather than cut short, and past twenty numbers a second poll of the same address is made. Now draws its own icon.",
@@ -4473,6 +5369,12 @@
                 "host": "stats.example.com",
                 "line": "CALLS OUT stats.example.com · every 1h · grant \"Example stats (read only)\"",
                 "key": "Example stats (read only)"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.datapoints",
+                "writes": true
               }
             ]
           },
@@ -4565,6 +5467,20 @@
                 "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
                 "key": "Mercury (read only)"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              }
             ]
           },
           "notes": "Each Mercury account says it is fed by the bank in Money's own No bank feed, so Money never posts a repeating line to it itself."
@@ -4590,6 +5506,20 @@
                 "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
                 "key": "Mercury (read only)"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              }
             ]
           },
           "notes": "Mercury money counts once. Each Mercury account is kept on the account you already typed for it when the names match, keeping your name for it, and one it cannot match waits for you to say which it is instead of counting as cash a second time. Now draws its own icon."
@@ -4614,6 +5544,20 @@
                 "host": "api.mercury.com",
                 "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
                 "key": "Mercury (read only)"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
               }
             ]
           },
@@ -4645,6 +5589,20 @@
                 "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
                 "key": "Mercury (read only)"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              }
             ]
           },
           "notes": "Each transaction keeps the payee as Mercury names it, in a new Paid to or from field, so the same shop or person is recognised however it is spelled."
@@ -4675,6 +5633,20 @@
                 "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
                 "key": "Mercury (read only)"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              }
             ]
           },
           "notes": "Nothing a person sees changed: two comments in the ledger script are reworded."
@@ -4704,6 +5676,20 @@
                 "host": "api.mercury.com",
                 "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
                 "key": "Mercury (read only)"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
               }
             ]
           },
@@ -4758,6 +5744,20 @@
                 "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
                 "key": "Mercury (read only)"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              }
             ]
           },
           "yanked": {
@@ -4790,6 +5790,20 @@
                 "host": "api.mercury.com",
                 "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
                 "key": "Mercury (read only)"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
               }
             ]
           },
@@ -4824,6 +5838,20 @@
                 "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
                 "key": "Mercury (read only)"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              }
             ]
           },
           "yanked": {
@@ -4857,6 +5885,20 @@
                 "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
                 "key": "Mercury (read only)"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              }
             ]
           },
           "yanked": {
@@ -4884,6 +5926,12 @@
                 "host": "api.mercury.com",
                 "line": "CALLS OUT api.mercury.com · every 1h · grant \"Mercury (read only)\"",
                 "key": "Mercury (read only)"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
               }
             ]
           },
@@ -4940,7 +5988,29 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
+            ]
           },
           "notes": "The notes in Charged twice and Looks like it repeats use an invented card number in their examples. Nothing they do has changed.",
           "preview": true
@@ -4971,7 +6041,29 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
+            ]
           },
           "notes": "Charged twice and Looks like it repeats keep a short number that is part of a shop's name. Studio 54 Cafe was read as Studio, so two shops that start alike were one payee. A number of one or two digits now stays in the name unless it is the day of a date, so SPOTIFY 12 OCT, SPOTIFY 12OCT and SPOTIFY OCT 12 are all Spotify. A card number in groups, as in CARD 1234 5678 NETFLIX, is cut whole. Now draws its own icon.",
           "preview": true
@@ -5002,7 +6094,29 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
+            ]
           },
           "notes": "Charged twice and Looks like it repeats keep a short number that is part of a shop's name. Studio 54 Cafe was read as Studio, so two shops that start alike were one payee. A number of one or two digits now stays in the name unless it is the day of a date, so SPOTIFY 12 OCT, SPOTIFY 12OCT and SPOTIFY OCT 12 are all Spotify. A card number in groups, as in CARD 1234 5678 NETFLIX, is cut whole.",
           "preview": true
@@ -5033,7 +6147,29 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
+            ]
           },
           "notes": "Charged twice and Looks like it repeats read the shop, not the card. A bank line that leads with the card and the terminal, such as HSBC CARD 7731 POS 55 KFC, named the card, so every shop paid with it was one payee, and KFC and Carrefour at the same amount were asked about as one charge made twice. Each shop is its own payee now. Both real, said before about a card by name, quiets no shop.",
           "preview": true
@@ -5064,7 +6200,29 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
+            ]
           },
           "notes": "\"One is a mistake\" marks the newer charge void even when that entry was edited after the question was asked. A payee added to Repeating is next due a month after its newest payment on the day you answer. The line that says Charged twice switched itself off says why: both charges were real three times in a row. Both real is remembered for about ninety days, then asked once more. And three of Both real in a row switch Charged twice off for that payee only, not for everyone.",
           "preview": true
@@ -5095,7 +6253,29 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
+            ]
           },
           "notes": "The first version: Charged twice and Looks like it repeats, each with its own switch.",
           "preview": true
@@ -5438,7 +6618,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              }
+            ]
           },
           "notes": "Its description is in plainer words. Nothing it does has changed."
         },
@@ -5459,7 +6645,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version: the second opinion the pad used to write itself, now an add-on of its own. Now draws its own icon."
         },
@@ -5480,7 +6672,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version: the second opinion the pad used to write itself, now an add-on of its own."
         }
@@ -5564,7 +6762,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
           "preview": true
@@ -5592,7 +6796,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
           "preview": true
@@ -5620,7 +6830,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
           "preview": true
@@ -5648,7 +6864,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version.",
           "preview": true
@@ -5695,7 +6917,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": false
+              },
+              {
+                "id": "page.portfolio",
+                "writes": true
+              }
+            ]
           },
           "notes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own. The month now finds the cards on the new Projects board.",
           "preview": true
@@ -5719,7 +6955,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": false
+              },
+              {
+                "id": "page.portfolio",
+                "writes": true
+              }
+            ]
           },
           "notes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own. Now draws its own icon.",
           "preview": true
@@ -5743,7 +6993,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": false
+              },
+              {
+                "id": "page.portfolio",
+                "writes": true
+              }
+            ]
           },
           "notes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own.",
           "preview": true
@@ -5767,7 +7031,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": false
+              }
+            ]
           },
           "notes": "A project's numbers may now arrive as money, an amount and its currency, and the bands count it as it is, beside the older numbers that carry a currency as their unit."
         },
@@ -5790,7 +7064,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": false
+              }
+            ]
           },
           "notes": "The two reading names are settings now, set on this pack's page, where the file used to be filled in with them before it was installed."
         },
@@ -5813,7 +7097,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": false
+              }
+            ]
           }
         }
       ],
@@ -5914,7 +7208,29 @@
             ],
             "examples": 2,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.credentials",
+                "writes": true
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.tools",
+                "writes": true
+              },
+              {
+                "id": "register.skills",
+                "writes": true
+              },
+              {
+                "id": "page.agents",
+                "writes": true
+              }
+            ]
           },
           "notes": "An empty Profiles page says what a profile is and offers Add your first setup, where it said Nothing here yet over an empty At a glance.",
           "preview": true
@@ -5943,7 +7259,29 @@
             ],
             "examples": 2,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.credentials",
+                "writes": true
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.tools",
+                "writes": true
+              },
+              {
+                "id": "register.skills",
+                "writes": true
+              },
+              {
+                "id": "page.agents",
+                "writes": true
+              }
+            ]
           },
           "notes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed."
         },
@@ -5971,7 +7309,29 @@
             ],
             "examples": 2,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.credentials",
+                "writes": true
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.tools",
+                "writes": true
+              },
+              {
+                "id": "register.skills",
+                "writes": true
+              },
+              {
+                "id": "page.agents",
+                "writes": true
+              }
+            ]
           },
           "notes": "Listed in the store, under Agents, beside Setup sync. Nothing in it changed."
         },
@@ -5999,7 +7359,29 @@
             ],
             "examples": 2,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.credentials",
+                "writes": true
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.tools",
+                "writes": true
+              },
+              {
+                "id": "register.skills",
+                "writes": true
+              },
+              {
+                "id": "page.agents",
+                "writes": true
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon."
         },
@@ -6027,7 +7409,29 @@
             ],
             "examples": 2,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.credentials",
+                "writes": true
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.tools",
+                "writes": true
+              },
+              {
+                "id": "register.skills",
+                "writes": true
+              },
+              {
+                "id": "page.agents",
+                "writes": true
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed."
         },
@@ -6055,7 +7459,29 @@
             ],
             "examples": 2,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.credentials",
+                "writes": true
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.tools",
+                "writes": true
+              },
+              {
+                "id": "register.skills",
+                "writes": true
+              },
+              {
+                "id": "page.agents",
+                "writes": true
+              }
+            ]
           },
           "notes": "Each profile’s runs from the last day, the working ones first, on the Profiles page. The Agents page says when a machine is out of step with a profile, and keeps your profiles folded at its foot. Tools and Keys gain Belongs to, for an account that is someone else’s. Each profile shows how much of its 5 hour and 7 day limits it has used and when they reset, sent by the status line command; shown only, nothing switches or stops a profile."
         },
@@ -6083,7 +7509,29 @@
             ],
             "examples": 2,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.credentials",
+                "writes": true
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.tools",
+                "writes": true
+              },
+              {
+                "id": "register.skills",
+                "writes": true
+              },
+              {
+                "id": "page.agents",
+                "writes": true
+              }
+            ]
           },
           "notes": "Each profile’s runs from the last day, the working ones first, on the Profiles page. The Agents page says when a machine is out of step with a profile, and keeps your profiles folded at its foot. Tools and Keys gain Belongs to, for an account that is someone else’s."
         },
@@ -6110,7 +7558,25 @@
             ],
             "examples": 2,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.credentials",
+                "writes": false
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.tools",
+                "writes": true
+              },
+              {
+                "id": "register.skills",
+                "writes": true
+              }
+            ]
           },
           "notes": "The first version."
         }
@@ -6161,7 +7627,29 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": true
+              },
+              {
+                "id": "register.tasks",
+                "writes": false
+              },
+              {
+                "id": "register.tracks",
+                "writes": false
+              },
+              {
+                "id": "page.project",
+                "writes": true
+              },
+              {
+                "id": "actions.blocking",
+                "writes": false
+              }
+            ]
           },
           "notes": "A project's page now says which of the things that run by itself for it have stopped working, and why, under what is in its way. It shows only when one has. Now draws its own icon.",
           "preview": true
@@ -6190,7 +7678,29 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": true
+              },
+              {
+                "id": "register.tasks",
+                "writes": false
+              },
+              {
+                "id": "register.tracks",
+                "writes": false
+              },
+              {
+                "id": "page.project",
+                "writes": true
+              },
+              {
+                "id": "actions.blocking",
+                "writes": false
+              }
+            ]
           },
           "notes": "A project's page now says which of the things that run by itself for it have stopped working, and why, under what is in its way. It shows only when one has."
         },
@@ -6218,7 +7728,25 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": true
+              },
+              {
+                "id": "register.tasks",
+                "writes": false
+              },
+              {
+                "id": "register.tracks",
+                "writes": false
+              },
+              {
+                "id": "page.project",
+                "writes": true
+              }
+            ]
           },
           "notes": "The plan is steps now, each with what it gains, ticked by hand or when the task or thread it links to is done. A project has a stage. The one line is About, the one Portfolio already has. A brief written before keeps its words: run Bring briefs over once to move them."
         },
@@ -6239,7 +7767,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": true
+              },
+              {
+                "id": "page.project",
+                "writes": true
+              }
+            ]
           },
           "notes": "Nothing a person sees changed: the note on the block it adds to a project's page is reworded."
         },
@@ -6260,7 +7798,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": true
+              },
+              {
+                "id": "page.project",
+                "writes": true
+              }
+            ]
           },
           "notes": "Nothing a person sees changed. Each version says what it changed in a line like this one."
         },
@@ -6281,7 +7829,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": true
+              },
+              {
+                "id": "page.project",
+                "writes": true
+              }
+            ]
           }
         },
         {
@@ -6301,7 +7859,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": true
+              }
+            ]
           },
           "preview": true
         }
@@ -6390,7 +7954,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.plans",
+                "writes": true
+              },
+              {
+                "id": "register.installments",
+                "writes": true
+              }
+            ]
           },
           "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
           "preview": true
@@ -6418,7 +7992,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.plans",
+                "writes": true
+              },
+              {
+                "id": "register.installments",
+                "writes": true
+              }
+            ]
           },
           "notes": "Shows the next six parts on a plan and folds the rest.",
           "preview": true
@@ -6446,7 +8030,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.plans",
+                "writes": true
+              },
+              {
+                "id": "register.installments",
+                "writes": true
+              }
+            ]
           },
           "notes": "First version.",
           "preview": true
@@ -6493,6 +8087,12 @@
                 "line": "CALLS OUT open.er-api.com · every 1d · grant \"none\"",
                 "key": null
               }
+            ],
+            "uses": [
+              {
+                "id": "register.fx",
+                "writes": true
+              }
             ]
           },
           "notes": "Has a plain title, Daily exchange rates. Nothing else in it changed.",
@@ -6519,6 +8119,12 @@
                 "host": "open.er-api.com",
                 "line": "CALLS OUT open.er-api.com · every 1d · grant \"none\"",
                 "key": null
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.fx",
+                "writes": true
               }
             ]
           },
@@ -6547,6 +8153,12 @@
                 "line": "CALLS OUT open.er-api.com · every 1d · grant \"none\"",
                 "key": null
               }
+            ],
+            "uses": [
+              {
+                "id": "register.fx",
+                "writes": true
+              }
             ]
           },
           "yanked": {
@@ -6572,6 +8184,12 @@
                 "host": "open.er-api.com",
                 "line": "CALLS OUT open.er-api.com · every 1d · grant \"none\"",
                 "key": null
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.fx",
+                "writes": true
               }
             ]
           },
@@ -6759,6 +8377,20 @@
             "calls_out": [],
             "widgets": [
               "Receipts"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": true
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
             ]
           },
           "notes": "Says how to start first, and shows its counts once a category keeps receipts.",
@@ -6789,6 +8421,20 @@
             "calls_out": [],
             "widgets": [
               "Receipts"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": true
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
             ]
           },
           "notes": "Brings its Receipts widget for Today, which was BrainDog’s own until now.",
@@ -6816,7 +8462,21 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": true
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
+            ]
           },
           "notes": "First version: a receipt on each Ledger line, receipts matched to their line by amount and day (and looked for again each night), categories that keep receipts, and the lines still missing one.",
           "preview": true
@@ -6870,6 +8530,20 @@
             "calls_out": [],
             "waits": [
               "things"
+            ],
+            "uses": [
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.people",
+                "writes": false
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              }
             ]
           },
           "notes": "Timesheets is a place of its own in the sidebar, where it sat under Clients and the sidebar's Clients opened Timesheets. Nothing you hold changes.",
@@ -6900,6 +8574,20 @@
             "calls_out": [],
             "waits": [
               "things"
+            ],
+            "uses": [
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.people",
+                "writes": false
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              }
             ]
           },
           "notes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
@@ -6930,6 +8618,20 @@
             "calls_out": [],
             "waits": [
               "things"
+            ],
+            "uses": [
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.people",
+                "writes": false
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              }
             ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
@@ -6960,6 +8662,20 @@
             "calls_out": [],
             "waits": [
               "things"
+            ],
+            "uses": [
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.people",
+                "writes": false
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              }
             ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
@@ -6990,6 +8706,20 @@
             "calls_out": [],
             "waits": [
               "things"
+            ],
+            "uses": [
+              {
+                "id": "register.organisations",
+                "writes": false
+              },
+              {
+                "id": "register.people",
+                "writes": false
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              }
             ]
           },
           "notes": "The first version.",
@@ -7054,7 +8784,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": false
+              }
+            ]
           },
           "notes": "Nothing a person sees changed. Each version says what it changed in a line like this one. Now draws its own icon.",
           "preview": true
@@ -7076,7 +8812,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": false
+              }
+            ]
           },
           "notes": "Nothing a person sees changed. Each version says what it changed in a line like this one.",
           "preview": true
@@ -7098,7 +8840,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": false
+              }
+            ]
           },
           "preview": true
         }
@@ -7156,7 +8904,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": false
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
           "yanked": {
@@ -7197,7 +8955,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": false
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
           "yanked": {
@@ -7238,7 +9006,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": false
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              }
+            ]
           },
           "notes": "A project's page now reads that project's own next step, how many domains and repositories it holds and the day it aims for, and Values shows one day as it reads in two zones.",
           "yanked": {
@@ -7279,7 +9057,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": false
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version: Values, Blocks, Counts, Layout and ten short pages, in one section drawn as tabs.",
           "yanked": {
@@ -7370,6 +9158,16 @@
             "calls_out": [],
             "widgets": [
               "Savings circle"
+            ],
+            "uses": [
+              {
+                "id": "register.plans",
+                "writes": true
+              },
+              {
+                "id": "register.installments",
+                "writes": true
+              }
             ]
           },
           "notes": "A circle already under way marks the months before today paid, and says its days as 1 Oct. Its page says one circle as one.",
@@ -7397,6 +9195,16 @@
             "calls_out": [],
             "widgets": [
               "Savings circle"
+            ],
+            "uses": [
+              {
+                "id": "register.plans",
+                "writes": true
+              },
+              {
+                "id": "register.installments",
+                "writes": true
+              }
             ]
           },
           "notes": "Brings its Savings circle widget for Today, which was BrainDog’s own until now.",
@@ -7421,7 +9229,17 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.plans",
+                "writes": true
+              },
+              {
+                "id": "register.installments",
+                "writes": true
+              }
+            ]
           },
           "notes": "First version: a circle on a plan, its monthly parts and your payout written for you, and a page of every circle with what goes in each month and the payouts to come.",
           "preview": true
@@ -7914,7 +9732,13 @@
             ],
             "examples": 8,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
           "preview": true
@@ -7944,7 +9768,13 @@
             ],
             "examples": 8,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Listed in the store, under Agents, beside Profiles. Nothing it keeps changed."
         },
@@ -7973,7 +9803,13 @@
             ],
             "examples": 8,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Says locked for what each machine locks with your sync key, and gives a bundle's size as Size. Nothing it keeps changed. Now draws its own icon."
         },
@@ -8002,7 +9838,13 @@
             ],
             "examples": 8,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Says locked for what each machine locks with your sync key, and gives a bundle's size as Size. Nothing it keeps changed."
         },
@@ -8031,7 +9873,13 @@
             ],
             "examples": 8,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed."
         },
@@ -8060,7 +9908,13 @@
             ],
             "examples": 8,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version."
         }
@@ -8326,6 +10180,12 @@
             "calls_out": [],
             "widgets": [
               "Splits"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
             ]
           },
           "notes": "Its description is in plainer words. Nothing it does has changed.",
@@ -8358,6 +10218,12 @@
             "calls_out": [],
             "widgets": [
               "Splits"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
             ]
           },
           "notes": "Says who owes whom in plain words: owes you, you owe them, square. A person’s page says where they stand as a card, where it printed the stored words.",
@@ -8390,6 +10256,12 @@
             "calls_out": [],
             "widgets": [
               "Splits"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
             ]
           },
           "notes": "Brings its Splits widget for Today, which was BrainDog’s own until now.",
@@ -8419,7 +10291,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "First version: shared costs and settle-ups, where each person stands in each currency, square marked by itself, and a Shared with field on the Ledger that writes the split.",
           "preview": true
@@ -8463,7 +10341,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version. Now draws its own icon."
         },
@@ -8482,7 +10366,13 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version."
         }
@@ -8599,6 +10489,16 @@
                 "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its keychain entry opens",
                 "key": "stripe"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.books",
+                "writes": false
+              }
             ]
           },
           "notes": "Each Stripe account says it is fed by the bank in Money's own No bank feed, so Money never posts a repeating line to it itself."
@@ -8623,6 +10523,16 @@
                 "host": "api.stripe.com",
                 "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its keychain entry opens",
                 "key": "stripe"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.books",
+                "writes": false
               }
             ]
           },
@@ -8649,6 +10559,16 @@
                 "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its keychain entry opens",
                 "key": "stripe"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.books",
+                "writes": false
+              }
             ]
           },
           "notes": "Stripe money counts once. A Stripe balance you typed in yourself is taken over instead of counted a second time, the Stripe accounts keep their place when you rename them, the key and the book can be changed on this page, and currencies Stripe counts differently, such as ISK, read right."
@@ -8673,6 +10593,12 @@
                 "host": "api.stripe.com",
                 "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its keychain entry opens",
                 "key": "stripe"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
               }
             ]
           },
@@ -8699,6 +10625,12 @@
                 "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its keychain entry opens",
                 "key": "stripe"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
             ]
           }
         },
@@ -8722,6 +10654,12 @@
                 "host": "api.stripe.com",
                 "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its keychain entry opens",
                 "key": "stripe"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
               }
             ]
           }
@@ -8747,6 +10685,12 @@
                 "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its keychain entry opens",
                 "key": "stripe"
               }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              }
             ]
           }
         },
@@ -8770,6 +10714,12 @@
                 "host": "api.stripe.com",
                 "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its keychain entry opens",
                 "key": "stripe"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
               }
             ]
           }
@@ -9043,6 +10993,12 @@
             "calls_out": [],
             "widgets": [
               "Subscriptions"
+            ],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
             ]
           },
           "notes": "A month, by category says the ones with no category as No category, so its parts add up to the whole. With nothing marked yet, its page lists your repeating payments, each with Mark as a subscription, and the ones not marked stay under Other repeating payments once one is. It no longer points to Money watch.",
@@ -9070,6 +11026,12 @@
             "calls_out": [],
             "widgets": [
               "Subscriptions"
+            ],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
             ]
           },
           "notes": "Its page says one subscription as one, and says what you hardly use as a sentence.",
@@ -9097,6 +11059,12 @@
             "calls_out": [],
             "widgets": [
               "Subscriptions"
+            ],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
             ]
           },
           "notes": "Brings its Subscriptions widget for Today, which was BrainDog’s own until now.",
@@ -9121,7 +11089,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
+            ]
           },
           "notes": "First version: mark a Repeating line as a subscription, with a trial end, a cancel-by day, how to cancel and how much you use it; a page with the month and year cost, renewals, trials and price rises.",
           "preview": true
@@ -9166,7 +11140,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": true
+              }
+            ]
           },
           "notes": "Its description is in plainer words. Nothing it does has changed."
         },
@@ -9187,7 +11167,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": true
+              }
+            ]
           },
           "notes": "The first version. Now draws its own icon."
         },
@@ -9208,7 +11194,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.tasks",
+                "writes": true
+              }
+            ]
           },
           "notes": "The first version."
         }
@@ -9308,6 +11300,28 @@
             "calls_out": [],
             "widgets": [
               "Tax set aside"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": true
+              },
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
             ]
           },
           "notes": "Says how to give a category its rate, and shows the tax account only once you have one. It says what an account named for tax holds against the tax bills, before one is marked as holding the tax money.",
@@ -9336,6 +11350,28 @@
             "calls_out": [],
             "widgets": [
               "Tax set aside"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": true
+              },
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
             ]
           },
           "notes": "Brings its Tax set aside widget for Today, which was BrainDog’s own until now.",
@@ -9361,7 +11397,29 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": true
+              },
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
+            ]
           },
           "notes": "Set aside each month draws its bars again; it was refused before.",
           "preview": true
@@ -9386,7 +11444,29 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": true
+              },
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
+            ]
           },
           "notes": "First version: a tax rate on categories of money in, the part to set aside on each payment, tax paid from a tax-payments category, a tax account, and the tax bills due.",
           "preview": true
@@ -9471,7 +11551,17 @@
             ],
             "examples": 7,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "sessions.working",
+                "writes": false
+              },
+              {
+                "id": "activity",
+                "writes": false
+              }
+            ]
           },
           "notes": "Now part of Team board, which holds what this brought. A record that holds this keeps it, and it still installs by its name. Nothing in it changed.",
           "preview": true
@@ -9497,7 +11587,17 @@
             ],
             "examples": 7,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "sessions.working",
+                "writes": false
+              },
+              {
+                "id": "activity",
+                "writes": false
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
           "preview": true
@@ -9523,7 +11623,17 @@
             ],
             "examples": 7,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "sessions.working",
+                "writes": false
+              },
+              {
+                "id": "activity",
+                "writes": false
+              }
+            ]
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
           "preview": true
@@ -9549,7 +11659,17 @@
             ],
             "examples": 7,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "sessions.working",
+                "writes": false
+              },
+              {
+                "id": "activity",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version.",
           "preview": true
@@ -9638,6 +11758,12 @@
             "calls_out": [],
             "widgets": [
               "Trip countdown"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
             ]
           },
           "notes": "Brings its Trip countdown widget for Today, which was BrainDog’s own until now.",
@@ -9665,7 +11791,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
           "preview": true
@@ -9692,7 +11824,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "Says a trip's days as words.",
           "preview": true
@@ -9719,7 +11857,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "Renames the colour field to hue. When a trip's dates change, the lines it filed that now fall outside them are taken out again.",
           "preview": true
@@ -9746,7 +11890,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "When a trip's dates change, the lines it filed that now fall outside them are taken out again.",
           "preview": true
@@ -9773,7 +11923,13 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
           },
           "notes": "The first version.",
           "preview": true
@@ -10001,7 +12157,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "metric.cash-now",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version. Now draws its own icon."
         },
@@ -10020,7 +12190,21 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "metric.cash-now",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
           },
           "notes": "The first version."
         }
@@ -10065,7 +12249,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": true
+              }
+            ]
           },
           "notes": "The first version: say what a number is called, which measures it reads and how they are put together, and it is worked out once a day. Now draws its own icon.",
           "preview": true
@@ -10089,7 +12283,17 @@
             "rules": [],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": true
+              }
+            ]
           },
           "notes": "The first version: say what a number is called, which measures it reads and how they are put together, and it is worked out once a day.",
           "preview": true
@@ -10200,7 +12404,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.gold_rates",
+                "writes": false
+              },
+              {
+                "id": "register.holdings",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
+            ]
           },
           "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
           "preview": true
@@ -10231,7 +12461,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.gold_rates",
+                "writes": false
+              },
+              {
+                "id": "register.holdings",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
+            ]
           },
           "notes": "Says the year's dates as words and words the note about other currencies.",
           "preview": true
@@ -10262,7 +12518,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.gold_rates",
+                "writes": false
+              },
+              {
+                "id": "register.holdings",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
+            ]
           },
           "notes": "Renames fields: measure is mode, owed_to_you is lent, left_out is left, lowest is low, counts is taken, paid_on is paid. First version. Needs Investments and gold. Shows the nisab, the year, the lowest each cash account stood at, the metals, the bills due and what 2.5% comes to, and keeps what you give.",
           "preview": true
@@ -10293,7 +12575,33 @@
             ],
             "examples": 0,
             "skills": [],
-            "calls_out": []
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.gold_rates",
+                "writes": false
+              },
+              {
+                "id": "register.holdings",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
+            ]
           },
           "notes": "First version. Needs Investments and gold. Shows the nisab, the year, the lowest each cash account stood at, the metals, the bills due and what 2.5% comes to, and keeps what you give.",
           "preview": true

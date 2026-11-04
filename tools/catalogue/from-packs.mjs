@@ -81,6 +81,7 @@ import {
   BRAINDOG_PUBLISHER,
   CATALOGUE_INDEX,
   catalogueFile,
+  reachOf,
   categoriesOf,
   emptyCatalogue,
   fileChecksum,
@@ -303,7 +304,16 @@ for (const entry of index.entries) {
     described.push(entry);
     continue;
   }
-  const { categories: _c, publisher: _p, unlisted: _u, signals: _s, modules: _m, icon: _i, shelf: _sh, example: _e, private: _pr, ...rest } = entry;
+  /* WHAT A VERSION REACHES IS READ FROM ITS FILE, EVERY BUILD. The file never changes; the reading can learn more. `uses`
+     came after most versions were published (f80d52187), so 202 of them said nothing about the lists of yours they read or
+     change, in the lines `reachLines` shows before an install. */
+  const versions = [];
+  for (const v of entry.versions) {
+    const was = read(catalogueFile(entry.id, v.version, entry.kind));
+    const opened = was === null ? null : await readCatalogueFile(was, { kind: 'local' });
+    versions.push(opened?.ok ? { ...v, reach: reachOf(opened.value) } : v);
+  }
+  const { categories: _c, publisher: _p, unlisted: _u, signals: _s, modules: _m, icon: _i, shelf: _sh, example: _e, private: _pr, ...rest } = { ...entry, versions };
   const says = entry.kind === 'pack' && JSON.parse(text).unlisted === true;
   if (says && marked.has(entry.id)) fail(`packs/${LISTED_FILE} names ${entry.id}, whose latest file says unlisted: true. Take one of the two out.`);
   const own = entry.kind === 'pack' && privates.has(entry.id);
