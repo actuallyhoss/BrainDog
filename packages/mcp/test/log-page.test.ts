@@ -38,7 +38,7 @@ test('A PAGE ON log HANGS ON THE TASK, ITS RECEIPT NAMES IT, AND undo TAKES IT B
   assert.ok(!drawn.error, drawn.text);
   /* AN AGENT'S PAGE IS A DRAFT WHETHER IT SAYS SO OR NOT (owner's call, 24 Oct): a person keeps it or throws it away. */
   assert.match(drawn.text, /^Version 1 of "Payroll calendar" waits on "Draw the payroll calendar" in Tasks as a draft/u);
-  const batch = /call undo with batch "([^"]+)"/u.exec(drawn.text)?.[1];
+  const batch = /call act with call "undoOwn" and args \{"batch": "([^"]+)"\}/u.exec(drawn.text)?.[1];
   assert.ok(batch, drawn.text);
   assert.equal(pages.size, 1);
 

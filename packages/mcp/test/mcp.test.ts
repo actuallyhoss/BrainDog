@@ -82,8 +82,8 @@ test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
      token reaches that rung: a tool that could only ever refuse is a tool an agent spends its turns
      discovering. `activity` is the fifteenth, a record-wide log, the one thing agents coming from
      other records reach for and nowhere here: see `activity.test.ts` for the rest of that comparison.
-     `triage` is the sixteenth, the one tool the ceiling was raised for. `undo` is the seventeenth: it takes back one of the
-     caller's own writes by the batch its receipt gave, which is what lets an agent put right what it just wrote. `understand` was a seventeenth
+     `triage` is the sixteenth, the one tool the ceiling was raised for. `act` took `undo`'s place on 1 Nov: one tool for
+     every call the app makes, with `undo` folded into it as `act undoOwn`, so an agent still puts right what it just wrote. `understand` was a seventeenth
      and is the resource `braindog:understand` now ("keep the 16"): it takes nothing and writes
      nothing, and its words paid for `op_id` on `create` and `update`.
 
@@ -96,7 +96,7 @@ test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
      other pack's (`figures.test.ts`). */
   assert.deepEqual(
     TOOLS.map((t) => t.name),
-    ['record_index', 'context', 'instructions', 'get', 'list', 'search', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage', 'undo'],
+    ['record_index', 'context', 'instructions', 'get', 'list', 'search', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage', 'act'],
   );
   for (const t of TOOLS) assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
 });
@@ -110,7 +110,7 @@ test('AND NO TOOL READS A CREDENTIAL, because there is no keychain tool', () => 
 test('a tool says whether it writes, so a client can tell its user before it runs', () => {
   assert.deepEqual(
     TOOLS.filter((t) => t.writes).map((t) => t.name),
-    ['instructions', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage', 'undo'],
+    ['instructions', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage', 'act'],
   );
 });
 
@@ -341,14 +341,21 @@ test('A REFUSAL NAMES WHAT TO SEND INSTEAD, because the caller will try again im
 
 test('an address that is not one says what an address looks like', async () => {
   const { mcp, sql } = await agent();
-  for (const spoken of ['41', 'obligations', 'Obligations#41', 'obligations#0', 's42', 'S0', 'S42x', undefined, 42])
-    assert.match(refusal(await mcp.call('get', { spoken }, owner)).fix, /register#number.*S42/, String(spoken));
+  /* WHAT COULD BE A NAME IS LOOKED FOR AS ONE, and said so, with what a handle looks like. */
+  for (const spoken of ['41', 'Obligations#41', 'obligations#0', 'S0', 'S42x']) {
+    const fix = refusal(await mcp.call('get', { spoken }, owner)).fix;
+    assert.ok(fix.startsWith(`Nothing you can read is called ${spoken}.`), fix);
+    assert.match(fix, /name it as tasks#41/u, String(spoken));
+  }
+  /* WHAT CANNOT BE, A LIST'S OWN ID AND WHAT IS NO TEXT, IS TOLD THE TWO SHAPES. */
+  for (const spoken of ['obligations', 's42', undefined, 42])
+    assert.match(refusal(await mcp.call('get', { spoken }, owner)).fix, /by list and number, like tasks#41, or its id, like S42/u, String(spoken));
   /* The tools that change a row, or read its history, take a prefixed id too, and one that names no row says so. Each is
      sent only what it takes, since an argument a tool does not take is refused before the address is read. */
   const own: Record<string, Record<string, unknown>> = { history: {}, update: { patch: {} }, log: { note: 'x' } };
   for (const [name, rest] of Object.entries(own)) {
     const bare = refusal(await mcp.call(name, { spoken: 'obligations', ...rest }, owner));
-    assert.match(bare.fix, /register#number/, name);
+    assert.match(bare.fix, /tasks#41/u, name);
     /* AND THE CORRECTED CALL: a list's id said with no number is a list to read. */
     assert.equal((bare as { try?: string }).try, 'list {"register":"obligations"}', name);
     const missing = refusal(await mcp.call(name, { spoken: 'S42', ...rest }, owner));
@@ -654,7 +661,11 @@ test('search finds a row by any of its searchable fields, and the words are pref
 
 test('and a query of punctuation finds nothing rather than erroring', async () => {
   const { sql, mcp } = await agent();
-  for (const q of ['"', '-', '   ', 'NEAR(a b)']) {
+  /* WHITESPACE IS NOTHING TO LOOK FOR, which is not "nothing found": refused, with the call that says what there is. */
+  const blank = refusal(await mcp.call('search', { q: '   ' }, owner));
+  assert.equal(blank.code, 'REQUIRED_MISSING');
+  assert.equal((blank as { at?: string }).at, 'q');
+  for (const q of ['"', '-', 'NEAR(a b)']) {
     const answer = value<{ rows: unknown[]; matched: number }>(await mcp.call('search', { q }, owner));
     assert.ok(Array.isArray(answer.rows), `${q} threw`);
     assert.equal(answer.rows.length, 0, `${q} found something`);

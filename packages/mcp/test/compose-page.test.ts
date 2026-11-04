@@ -266,8 +266,21 @@ test('AN AGENT TRIES THE DESK WHOLE IN ONE CALL, OVER SAMPLE ROWS AND ONE PART, 
   );
   assert.equal(desked.proposed, false);
   assert.deepEqual(desked.change_preview.pages.map((p) => p.id), ['page.desk', 'page.part']);
+  /* A TOKEN THAT ONLY ASKS CANNOT ADD, so a capture box is held from it, as it is once installed (`heldBlock`): it reads
+     nothing, so that is the only thing it says. Every other block answers. */
   for (const page of desked.change_preview.pages)
-    page.blocks.forEach((b, i) => assert.deepEqual(b.refusals, [], `${page.id}.blocks[${i}] (${b.kind}) was refused`));
+    page.blocks.forEach((b, i) => {
+      if (b.kind === 'capture') assert.deepEqual(b.refusals?.map((r) => r.code), ['FORBIDDEN'], `${page.id}.blocks[${i}] (capture)`);
+      else assert.deepEqual(b.refusals, [], `${page.id}.blocks[${i}] (${b.kind}) was refused`);
+    });
+  /* AND TRIED BY A TOKEN THAT MAY ADD, THE SAME DESK ANSWERS WHOLE, the box included. */
+  const writer: CallContext = { principal: { kind: 'token', id: 'tok_2', scope: 'write', person: 'p_1', level: 'owner' } };
+  const wrote = said<{ change_preview: { pages: Previewed[] } }>(
+    await mcp.call('propose', triedBundle('Add the launch desk?', DESK_WHOLE(), 'metric.essentials', { rows: SAMPLES, about: 'parts#2' }), writer),
+  );
+  assert.ok(wrote.change_preview.pages.some((p) => p.blocks.some((b) => b.kind === 'capture')), 'the desk drew no capture box, so this proves nothing');
+  for (const page of wrote.change_preview.pages)
+    page.blocks.forEach((b, i) => assert.deepEqual(b.refusals, [], `${page.id}.blocks[${i}] (${b.kind}) was refused a token that may add`));
   const [deskDrawn, boxDrawn] = desked.change_preview.pages as [Previewed, Previewed];
   assert.equal(deskDrawn.blocks.length, (DESK.blocks as unknown[]).length);
 
@@ -366,8 +379,12 @@ test('AN AGENT TRIES THE DESK WHOLE IN ONE CALL, OVER SAMPLE ROWS AND ONE PART, 
   for (const slug of ['desk', 'numbers', 'product', 'box']) {
     assert.ok(listed.includes(`braindog:page/${slug}`), `braindog:page/${slug} is not among ${JSON.stringify(listed)}`);
     const page = said<{ blocks: Drawn[] }>(await mcp.read(`braindog:page/${slug}`, agent));
-    /* A BLOCK NOTHING REFUSED CARRIES NO `refusals` IN A READ, which leaves out every empty list it can. */
-    page.blocks.forEach((b, i) => assert.deepEqual(b.refusals ?? [], [], `${slug}.blocks[${i}] (${b.kind}) was refused installed`));
+    /* A BLOCK NOTHING REFUSED CARRIES NO `refusals` IN A READ, which leaves out every empty list it can. And this token only
+       asks, so a capture box is held from it installed, as it was in the try. */
+    page.blocks.forEach((b, i) => {
+      if (b.kind === 'capture') assert.deepEqual(b.refusals?.map((r) => r.code), ['FORBIDDEN'], `${slug}.blocks[${i}] (capture)`);
+      else assert.deepEqual(b.refusals ?? [], [], `${slug}.blocks[${i}] (${b.kind}) was refused installed`);
+    });
   }
   const installed = said<{ layout?: unknown; nav?: unknown }>(await mcp.read('braindog:page/desk', agent));
   assert.deepEqual(installed.layout, { rail: 4, sticky: true });

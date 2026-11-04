@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '@braindog/record';
 
-import { TOOLS } from '../src/index.ts';
+import { TOOLS, withCalls } from '../src/index.ts';
 import { handle, type Reply } from '../src/rpc.ts';
 import { installSeed } from '../../seed/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
@@ -54,11 +54,13 @@ test('NO BRIEF ANSWER CARRIES A ROW ID, A PERSON OR TOKEN ID, OR A NULL, over ev
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   await installSeed(api.kernel);
+  /* AS A HOST HANDS THE RECORD TO THE DOOR, so `act` answers; `undoOwn`, the row a receipt names, is enough to sweep it. */
+  const door = withCalls(api, async () => ({ ok: true, value: [] }) as never, () => [{ name: 'undoOwn', group: 'DATA', writes: true, what: 'Take back one of your own writes.' }]);
   const found: string[] = [];
   const answered = new Set<string>();
 
   const call = async (name: string, args: Record<string, unknown>) => {
-    const reply = (await handle({ jsonrpc: '2.0', id: ++n, method: 'tools/call', params: { name, arguments: args } }, api, { ...agent })) as Reply;
+    const reply = (await handle({ jsonrpc: '2.0', id: ++n, method: 'tools/call', params: { name, arguments: args } }, door, { ...agent })) as Reply;
     assert.ok('result' in reply, `${name}: ${JSON.stringify(reply)}`);
     const result = reply.result as { isError?: boolean; content: { text: string }[]; structuredContent: Record<string, unknown> };
     const text = result.content.map((c) => c.text).join('\n');
@@ -118,10 +120,12 @@ test('NO BRIEF ANSWER CARRIES A ROW ID, A PERSON OR TOKEN ID, OR A NULL, over ev
   await call('update', { spoken, patch: { state: 'done' }, version });
   const noted = await call('log', { spoken, note: 'Every answer was read.' });
   /* AND THE WAY BACK: the batch the receipt gave is looked at, then taken, and one that is not a batch is refused in a sentence. */
-  const batch = /undo with batch "([^"]+)"/u.exec(noted.text)?.[1];
+  const batch = /call act with call "undoOwn" and args \{"batch": "([^"]+)"\}/u.exec(noted.text)?.[1];
   assert.ok(batch !== undefined, `the note's receipt gave no batch: ${noted.text}`);
-  await call('undo', { batch, dry: true });
-  await call('undo', { batch });
+  await call('act', { call: 'undoOwn', args: { batch, dry: true } });
+  await call('act', { call: 'undoOwn', args: { batch } });
+  await call('act', { call: 'undoOwn', args: { batch: 'no-such-batch' } });
+  /* AND BY ITS OLD NAME, which a session that cached the older list still sends. */
   await call('undo', { batch: 'no-such-batch' });
   /* WHAT THE RECORD WOULD LINK, A RESOURCE NOW: its `said` is read with the same eyes as a tool's text. */
   const understood = (await handle({ jsonrpc: '2.0', id: ++n, method: 'resources/read', params: { uri: 'braindog:understand' } }, api, { ...agent })) as Reply;

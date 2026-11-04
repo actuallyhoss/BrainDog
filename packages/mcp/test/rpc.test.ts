@@ -238,8 +238,9 @@ test('tools/list is the sixteen, each with its title and every hint said, and no
   }
   /* AND `update` OVERWRITES A VALUE, which undo does not make safe (OpenAI's review rule). */
   assert.equal(hints.update?.destructiveHint, true);
-  /* AND `undo` TAKES A WRITE AWAY: undoing a create deletes the row (door audit D35). */
-  assert.equal(hints.undo?.destructiveHint, true);
+  /* AND `act` CAN TAKE A WRITE AWAY: it is how a write is undone, and undoing a create deletes the row (door audit D35). */
+  assert.equal(hints.act?.destructiveHint, true);
+  assert.equal(hints.act?.idempotentHint, false);
   /* A DIRECTORY READS A MISSING readOnlyHint AS A WRITE IT CANNOT VOUCH FOR, so every listed tool says it, true or false. */
   for (const t of r.tools) assert.equal(typeof t.annotations.readOnlyHint, 'boolean', `${t.name} leaves readOnlyHint unsaid`);
   assert.equal(hints.update?.idempotentHint, true);
@@ -256,6 +257,11 @@ test('tools/list is the sixteen, each with its title and every hint said, and no
  * nothing more, and is said by the list's id, so one `list` is one request to a host (`apps/cli/test/hooks.test.ts`
  * counts them).
  */
+const TABLE = [
+  { name: 'undoOwn', group: 'DATA', writes: true, what: 'Take back your own write.' },
+  { name: 'setZone', group: 'ADMIN', writes: true, what: 'Set the time zone.' },
+];
+
 const EACH: [tool: string, args: Record<string, unknown>, methods: string[], first?: unknown, agents?: boolean][] = [
   ['record_index', {}, ['boot', 'version']],
   ['context', {}, ['context', 'boot'], {}],
@@ -276,13 +282,14 @@ const EACH: [tool: string, args: Record<string, unknown>, methods: string[], fir
   ['handoff', { next: 'Wire the self-host.', tried: 'Reading the cookie.' }, ['handoff'], { next: 'Wire the self-host.', tried: 'Reading the cookie.' }],
   ['meet', { name: 'Ada', where: 'commit 4464966 in braindog' }, ['meet'], { name: 'Ada', where: 'commit 4464966 in braindog' }],
   ['triage', { arrival: 'a1', ignore: true }, ['triage'], { arrival: 'a1', ignore: true }],
-  ['undo', { batch: 'b1' }, ['undoOwn'], { batch: 'b1' }],
+  /* `act` RUNS THE CALL IT NAMES, with its arguments as sent; `undoOwn`, in `undo`'s words, is the one it is sent most. */
+  ['act', { call: 'undoOwn', args: { batch: 'b1' } }, ['undoOwn'], { batch: 'b1' }],
 ];
 
 test('EVERY TOOL REACHES THE RIGHT METHOD, with the context the transport handed over', async () => {
   assert.deepEqual(EACH.map(([name]) => name), TOOLS.map((t) => t.name), 'a tool has no golden case');
   for (const [name, args, methods, first, agents] of EACH) {
-    const { surface, calls } = stub({}, { agents: agents === true });
+    const { surface, calls } = stub(name === 'act' ? { calls: () => TABLE, call: async () => assert.fail('undoOwn is answered by the tool, not sent on') } : {}, { agents: agents === true });
     const reply = await handle(req('tools/call', { name, arguments: args }), surface, ctx);
     const r = result<ToolResult>(reply);
     assert.notEqual(r.isError, true, `${name}: ${r.content[0]?.text}`);
@@ -291,6 +298,29 @@ test('EVERY TOOL REACHES THE RIGHT METHOD, with the context the transport handed
     /* THE SETTINGS READ (`whoami`) IS THE DOOR'S, before the tool's own method. */
     if (first !== undefined) assert.deepEqual(calls.find((c) => c.method !== 'whoami')?.args, first, name);
   }
+});
+
+test('act RUNS ANY OTHER CALL THE TABLE HOLDS THROUGH THE HOST, with the arguments as sent and the context handed over', async () => {
+  const { surface, calls } = stub({ calls: () => TABLE });
+  surface.call = async (name, args, c) => {
+    calls.push({ method: name, args, ctx: c });
+    return { ok: true, value: { say: 'Done.' } };
+  };
+  const reply = await handle(req('tools/call', { name: 'act', arguments: { call: 'setZone', args: { zone: 'UTC' } } }), surface, ctx);
+  assert.notEqual(result<ToolResult>(reply).isError, true, textOf(reply));
+  assert.deepEqual(calls, [{ method: 'setZone', args: { zone: 'UTC' }, ctx }]);
+});
+
+test('AND A CALL THE DOOR NEVER MAKES IS REFUSED BEFORE THE HOST HEARS OF IT, and undo still answers by its old name', async () => {
+  const { surface, calls } = stub({ calls: () => [...TABLE, { name: 'erase', group: 'ADMIN', writes: true, what: 'Erase a person.' }] });
+  surface.call = async () => assert.fail('the host was asked');
+  const never = await handle(req('tools/call', { name: 'act', arguments: { call: 'erase', args: { person: 'p_1' } } }), surface, ctx);
+  assert.equal(said(never).code, 'FORBIDDEN');
+  assert.equal(calls.length, 0);
+  /* FOLDED, NOT GONE, until `FOLDED_UNTIL`: a session that cached the older list keeps working. */
+  const old = await handle(req('tools/call', { name: 'undo', arguments: { batch: 'b1' } }), surface, ctx);
+  assert.notEqual(result<ToolResult>(old).isError, true, textOf(old));
+  assert.deepEqual(calls.map((c) => c.method), ['undoOwn']);
 });
 
 const OBLIGATIONS = { id: 'obligations', name: 'Obligations', title: 'what', state: 'state', fields: [{ id: 'what', type: 'text' }, { id: 'amount', type: 'money' }, { id: 'state', type: 'enum', values: ['open', 'paid'] }] };

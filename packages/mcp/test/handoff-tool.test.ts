@@ -72,9 +72,9 @@ test('TAKE: the step is yours, said with who left it; a second session racing fo
   const took = await call({ take: left }, taker);
   assert.equal(took.refused, false, took.text);
   const tookSaid = `You took the step Claude Code (${left}) left: Kern the lowercase pairs. It is yours now; call handoff with your own next step before you stop.`;
-  /* A WRITE ENDS IN A RECEIPT, which says whether a handle came back; the line above it is not said twice. */
+  /* A WRITE ENDS IN A RECEIPT; a step has no batch to undo, so it says the call that changes it. The line above it is not said twice. */
   assert.equal(took.text.split('\n')[0], tookSaid);
-  assert.match(took.text.split('\n')[1] ?? '', /^Receipt: (?:To undo|No undo)/u);
+  assert.equal(took.text.split('\n')[1], 'Receipt: To change it, call handoff again.');
   assert.equal(took.value.left, left);
 
   const late = await agent('late');
@@ -99,7 +99,7 @@ test('DROP: a step no longer true is closed with a reason, and one with none is 
   const dropped = await call({ drop: gone, why: 'The page shipped yesterday.' }, closer);
   assert.equal(dropped.refused, false, dropped.text);
   assert.equal(dropped.text.split('\n')[0], `Dropped the step ${gone} left: Ship the specimen page. Nobody is handed it now.`);
-  assert.match(dropped.text.split('\n')[1] ?? '', /^Receipt: (?:To undo|No undo)/u);
+  assert.equal(dropped.text.split('\n')[1], 'Receipt: To change it, call handoff again.');
   assert.doesNotMatch(dropped.text, /—/u, 'an em dash in what an agent reads');
   const row = sql.one<{ state: string; closed_as: string }>(
     "SELECT state, json_extract(fields, '$.closed_as') AS closed_as FROM entry WHERE register = 'session' AND seq = ?",

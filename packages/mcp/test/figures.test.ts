@@ -89,11 +89,15 @@ test('record_index NAMES THE FIGURES IT CAN, and each one it names is one get an
      below: a books row named Kiln, so `book-cash:Kiln` is one `get` answers rather than REF_UNKNOWN. */
   assert.ok(api.kernel.create('books', { name: 'Kiln', currency: 'GBP' }, { actor: 'p_1' }).ok);
   /* AND `budget-passed-on` (money-core 3.17.0) is one over `category is {{it}}`, so a category named Kiln too. */
-  assert.ok(api.kernel.create('categories', { name: 'Kiln', direction: 'out' }, { actor: 'p_1' }).ok);
+  const category = api.kernel.create('categories', { name: 'Kiln', direction: 'out' }, { actor: 'p_1' });
+  assert.ok(category.ok);
   /* AND money-core 3.29.0'S FIVE OF ONE ACCOUNT are over `name is {{it}}` on accounts, so an account named Kiln as well. */
   assert.ok(api.kernel.create('accounts', { name: 'Kiln', kind: 'bank', balance: { amount: 0, currency: 'GBP' }, as_of: '2026-09-23' }, { actor: 'p_1' }).ok);
   /* AND money-core 3.32.0'S WEEKS PAID TO ONE PAYEE are over `party is {{it}}`, so an organisation named Kiln too. */
   assert.ok(api.kernel.create('organisations', { name: 'Kiln' }, { actor: 'p_1' }).ok);
+  /* AND money-core 3.33.0'S `filing-rule-filed` is over `filed_by is {{it}}`, so a filing rule named Kiln too. */
+  const ruled = api.kernel.create('filing_rules', { match: 'Kiln', match_by: 'exact', reads: 'payee', direction: 'either', category: category.value.id, state: 'on' }, { actor: 'p_1' });
+  assert.ok(ruled.ok, JSON.stringify(ruled));
   const index = await called(api, 'record_index', {});
   assert.equal(index.isError, false, index.text);
   const figures = (index.structured as { figures?: unknown }).figures;
@@ -133,8 +137,9 @@ test('record_index names every figure money-core declares, and resources/list ev
      `book-lasts-until`, the day one book's money runs out, a walk that opens from `book-cash:{{it}}` (book-lasts-until-76). And portfolio 1.19.0's `kpi-stale`, the days since one
      measure was read, its name in a tree. And portfolio 1.23.0's three of one project: how many stages it keeps, and
      whether its plan is kept as its road or its roadmap. And money-core 3.29.0's five of one account, and the plan page's
-     eight more of one plan. And money-core 3.32.0's weeks of one payee and of one category. */
-  const templates = ['project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash', 'book-spent-month', 'project-in-month', 'project-out-month', 'project-kept-month', 'project-said', 'budget-passed-on', 'plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-next-due', 'plan-last-due', 'plan-parts-open', 'book-in-month', 'book-out-month', 'book-net-month', 'book-owed-to', 'book-owed-by', 'book-in-by-month', 'book-out-by-month', 'book-net-by-month', 'book-lasts-until', 'kpi-stale', 'project-staged', 'project-plan-path', 'project-plan-roadmap', 'account-now', 'account-lines', 'account-gap', 'account-in-by-month', 'account-out-by-month', 'plan-late', 'plan-parts-cancelled', 'plan-paid-by-quarter', 'plan-left-by-plan', 'plan-next-due-by-plan', 'plan-after-next-by-plan', 'plan-parts-by-plan', 'plan-parts-paid-by-plan', 'paid-to-by-week', 'spent-in-category-by-week'];
+     eight more of one plan. And money-core 3.32.0's weeks of one payee and of one category. And `filing-rule-filed`, what
+     one filing rule filed, and `book-accounts`, the accounts of one book. */
+  const templates = ['filing-rule-filed', 'book-accounts', 'project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash', 'book-spent-month', 'project-in-month', 'project-out-month', 'project-kept-month', 'project-said', 'budget-passed-on', 'plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-next-due', 'plan-last-due', 'plan-parts-open', 'book-in-month', 'book-out-month', 'book-net-month', 'book-owed-to', 'book-owed-by', 'book-in-by-month', 'book-out-by-month', 'book-net-by-month', 'book-lasts-until', 'kpi-stale', 'project-staged', 'project-plan-path', 'project-plan-roadmap', 'account-now', 'account-lines', 'account-gap', 'account-in-by-month', 'account-out-by-month', 'plan-late', 'plan-parts-cancelled', 'plan-paid-by-quarter', 'plan-left-by-plan', 'plan-next-due-by-plan', 'plan-after-next-by-plan', 'plan-parts-by-plan', 'plan-parts-paid-by-plan', 'paid-to-by-week', 'spent-in-category-by-week'];
   assert.deepEqual(offered.map((u) => u.slice('braindog:metric/'.length)).sort(), declared.filter((id) => !templates.includes(id)).sort());
   for (const uri of offered) assert.ok((await tools(api as never).read(uri, owner)).ok, `${uri} is offered and refuses`);
   sql.close();

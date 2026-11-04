@@ -110,7 +110,7 @@ test('NOTHING TO LINK IS SAID AS SUCH, whether or not the walk read to the end',
 /* ── what a proposal moves and changes ────────────────────────────────────── */
 
 test('MOVES IS SAID ONE CURRENCY AT A TIME, and two currencies are never added', () => {
-  assert.equal(movesSaid({ amount: -1798, currency: 'GBP' }), 'Moves GBP -17.98');
+  assert.equal(movesSaid({ amount: -1798, currency: 'GBP' }), 'Moves -£17.98');
   assert.equal(
     movesSaid([
       { amount: -1000, currency: 'GBP' },
@@ -121,9 +121,9 @@ test('MOVES IS SAID ONE CURRENCY AT A TIME, and two currencies are never added',
   );
   /* A PAYMENT OUT AND A REFUND IN ARE TWO MOVEMENTS, never netted to less. */
   assert.equal(movesSaid([{ amount: -1000, currency: 'GBP' }, { amount: 400, currency: 'GBP' }]), 'Moves £14');
-  assert.equal(movesSaid({ amount: 1500, currency: 'JPY' }), 'Moves JPY 1,500');
+  assert.equal(movesSaid({ amount: 1500, currency: 'JPY' }), 'Moves ¥1,500');
   /* AN AMOUNT ON A ROW ACCEPTING ADDS IS RECORDED: a bank text added to the Ledger moves no money (20 Oct). */
-  assert.equal(movesSaid({ amount: 3462000, currency: 'EGP' }, true), 'Records EGP 34,620.00');
+  assert.equal(movesSaid({ amount: 3462000, currency: 'EGP' }, true), 'Records EGP 34,620');
   /* NOTHING MOVES: no money, zero, or an amount that is not whole minor units. */
   assert.equal(movesSaid(undefined), null);
   assert.equal(movesSaid({ amount: 0, currency: 'GBP' }), null);

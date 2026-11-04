@@ -77,7 +77,7 @@ test('A LONG TEXT SAYS HOW LONG IT WAS AND IS: "changed Note (1,200 characters b
 test('A SHORT VALUE SAYS BOTH, each as its field says it', () => {
   assert.equal(eventSaid(edit('note', 'Call the baker', 'Call the miller'), decl, look), 'changed Note from Call the baker to Call the miller');
   assert.equal(eventSaid(edit('size', 's', 'm'), decl, look), 'changed Size from Small to Medium');
-  assert.equal(eventSaid(edit('cost', { amount: 120_000, currency: 'GBP' }, { amount: 145_000, currency: 'GBP' }), decl, look), 'changed Cost from GBP 1,200.00 to GBP 1,450.00');
+  assert.equal(eventSaid(edit('cost', { amount: 120_000, currency: 'GBP' }, { amount: 145_000, currency: 'GBP' }), decl, look), 'changed Cost from £1,200 to £1,450');
   /* WHAT A LINE SAID BEFORE IT KNEW THE OLD VALUE, kept where the log has none. */
   assert.equal(eventSaid(edit('note', null, 'Call the miller'), decl, look), 'changed Note to Call the miller');
   assert.equal(eventSaid({ kind: 'edit', field: 'note', to: 'Call the miller' }, decl, look), 'changed Note to Call the miller');

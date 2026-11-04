@@ -64,7 +64,8 @@ test('ONLY A POST: every other method is 405 with Allow: POST, and nothing is as
     const res = await serveMcp(new Request(AT, { method }), surface, ctx);
     assert.equal(res.status, 405, method);
     assert.equal(res.headers.get('allow'), 'POST');
-    assert.equal(await res.text(), '');
+    /* WITH THE CODE AND THE SENTENCE EVERY OTHER DOOR ANSWERS A METHOD WITH, for a person who opened the address. */
+    assert.deepEqual(await res.json(), { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/mcp takes a POST of one JSON-RPC message, with a bearer.' } });
   }
   assert.equal(calls.length, 0);
 });

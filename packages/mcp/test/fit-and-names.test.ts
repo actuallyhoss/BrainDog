@@ -193,12 +193,14 @@ test('AN UNTITLED ROW IS ITS LIST\'S WORD FOR ONE, beside its handle, on a line 
   assert.equal(rowLine({ spoken: 'tasks#3', state: 'open', fields: {} }, 'tasks', look), 'Untitled task (tasks#3) · open');
 });
 
-test('A LOG LINE ABOUT A QUESTION SAYS IT IS ONE, and a list by its name', () => {
+test('A LOG LINE ABOUT A QUESTION SAYS ITS WORDS, OR THAT IT IS ONE WHERE THE ANSWER DID NOT READ THEM, and a list by its name', () => {
   const said = activityBrief({}, { rows: [
     { ts: '2026-10-06T08:00:00Z', actor: 'p_ada', kind: 'decide', target: 'suggestion:SG7' },
+    { ts: '2026-10-06T08:15:00Z', actor: 'p_ada', kind: 'decide', target: 'suggestion:SG8' },
     { ts: '2026-10-06T08:30:00Z', actor: 'p_ada', kind: 'edit', target: 'declaration:register.tasks' },
   ] }, look);
-  assert.match(said, /decided · a question \(SG7\)/u);
+  assert.match(said, /decided · "Are people#3 and people#9 the same person, Ann Lee\? Accepting folds people#9 into people#3\." \(SG7\)/u);
+  assert.match(said, /decided · a question \(SG8\)/u);
   assert.match(said, /the Tasks list/u);
 });
 

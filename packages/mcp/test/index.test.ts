@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '@braindog/record';
 
-import { TEMPLATES, TOOLS, type McpSurface } from '../src/index.ts';
+import { TEMPLATES, TOOLS, withCalls, type McpSurface } from '../src/index.ts';
 import { handle, type Reply } from '../src/rpc.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -76,7 +76,7 @@ const CALLS: Record<string, Record<string, unknown>> = {
   handoff: { doing: 'Checking the tool list', next: 'Report what answered' },
   meet: { name: 'Ada', where: 'commit 4464966 in braindog' },
   triage: { arrival: 'arr_1', ignore: true },
-  undo: { batch: 'no-such-batch', dry: true },
+  act: { call: 'undoOwn', args: { batch: 'no-such-batch', dry: true } },
 };
 
 type ToolResult = { isError?: boolean; content: { text: string }[]; structuredContent: Record<string, unknown> };
@@ -93,8 +93,10 @@ async function called<C>(name: string, surface: McpSurface<C>, ctx: C): Promise<
 test('EVERY ADVERTISED TOOL REACHES A METHOD, asked over the wire rather than read off the array', async (t) => {
   const { sql, api } = await record();
   assert.deepEqual(Object.keys(CALLS).sort(), TOOLS.map((x) => x.name).sort(), 'a tool has no call here, or a call names no tool');
+  /* `act` IS HANDED ITS CALLS BY THE HOST (`withCalls`), so the record alone goes dark on it, as below. Here one row of the table is enough to reach it. */
+  const hosted = withCalls(api, async () => ({ ok: true, value: {} }) as never, () => [{ name: 'undoOwn', group: 'DATA', writes: true, what: 'Take back your own write.' }]);
   for (const tool of TOOLS) {
-    const code = await called(tool.name, api, owner);
+    const code = await called(tool.name, hosted, owner);
     t.diagnostic(`${tool.name}: ${code === '' ? 'answered' : code}`);
     assert.notEqual(code, 'ROUTE_UNKNOWN', `${tool.name} is advertised and no method answers it`);
     assert.notEqual(code, 'NOT_IN_THIS_BUILD', `${tool.name} is advertised and refuses for ever on this build`);
@@ -133,7 +135,7 @@ test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS SEVEN OF THEM, which is 
 
   const dark: string[] = [];
   for (const tool of TOOLS) if ((await called(tool.name, narrow, owner)) === 'NOT_IN_THIS_BUILD') dark.push(tool.name);
-  assert.deepEqual(dark, ['context', 'instructions', 'activity', 'handoff', 'meet', 'triage', 'undo']);
+  assert.deepEqual(dark, ['context', 'instructions', 'activity', 'handoff', 'meet', 'triage', 'act']);
   sql.close();
 });
 

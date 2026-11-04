@@ -134,7 +134,25 @@ test('TWENTY-SEVEN PROJECTS WITH THEIR ONE LINE COST UNDER 800 TOKENS, in one re
   sql.close();
 });
 
-for (const word of ['title', 'name']) {
+/* `title` IS THE LIST'S TITLE FIELD, WRITTEN TO IT (the obvious spelling, `plainFields` in the record). `name` is a word any list may use for a field of its own, so it is still corrected. */
+test('create WITH title writes the list\'s title field', async () => {
+  const { sql, api } = await record(1);
+  const out = await call(api, 'create', { register: 'errands', fields: { title: 'Buy stamps' } });
+  assert.notEqual(out.isError, true, textOf(out));
+  assert.equal((out.structuredContent.fields as Record<string, unknown>).what, 'Buy stamps');
+  assert.equal((out.structuredContent.fields as Record<string, unknown>).title, undefined);
+  sql.close();
+});
+
+test('update WITH title changes the list\'s title field on the row', async () => {
+  const { sql, api } = await record(1);
+  const out = await call(api, 'update', { spoken: 'errands#1', patch: { title: 'Post the letter' } });
+  assert.notEqual(out.isError, true, textOf(out));
+  assert.equal((out.structuredContent.fields as Record<string, unknown>).what, 'Post the letter');
+  sql.close();
+});
+
+for (const word of ['name']) {
   test(`create WITH ${word}: the try is the call with the list's title field, and the sentence says which field it is`, async () => {
     const { sql, api } = await record(1);
     const out = await call(api, 'create', { register: 'errands', fields: { [word]: 'Buy stamps' } });
@@ -163,7 +181,7 @@ for (const word of ['title', 'name']) {
 
 test('A TITLE FIELD WITH NO LABEL IS SAID BY ITS ID AS WORDS', async () => {
   const { sql, api } = await record(0, 1);
-  const out = await call(api, 'create', { register: 'ventures', fields: { title: 'Kiln', stage: 'idea' } });
+  const out = await call(api, 'create', { register: 'ventures', fields: { name: 'Kiln', stage: 'idea' } });
   assert.equal(out.structuredContent.code, 'FIELD_UNKNOWN');
   assert.ok(String(out.structuredContent.fix).endsWith("This list's title is its Venture field."), String(out.structuredContent.fix));
   assert.match(String(out.structuredContent.try), /"venture":"Kiln"/u);

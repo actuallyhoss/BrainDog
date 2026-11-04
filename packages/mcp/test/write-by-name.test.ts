@@ -61,14 +61,21 @@ test('a write to a row that is not there is ROW_UNKNOWN at spoken, as get says i
   assert.equal(noted.refusal.code, 'ROW_UNKNOWN');
 });
 
-test('a ref field given a name is told the row and handed the call with its handle', async () => {
+test('a ref field given the name of the one row called that is taken as that row', async () => {
   const mcp = await seeded();
-  const out = (await mcp.call('create', { register: 'tasks', fields: { what: 'Fire the test tiles', thing: 'Kiln' } }, agent)) as unknown as Refused;
+  const out = (await mcp.call('create', { register: 'tasks', fields: { what: 'Fire the test tiles', thing: 'Kiln' } }, agent)) as { ok: boolean; value: { spoken: string; fields: { thing: string } } };
+  assert.ok(out.ok, JSON.stringify(out));
+  /* THE ROW HOLDS THE LINK, NOT THE WORD: it reads back the handle of the same row `get` finds by that name. */
+  const kiln = (await mcp.call('get', { spoken: 'Kiln' }, agent)) as { value: { spoken: string } };
+  assert.equal(out.value.fields.thing, kiln.value.spoken);
+  assert.match(out.value.fields.thing, /^things#\d+$/u);
+});
+
+test('a name nothing is called is refused at the field and writes nothing', async () => {
+  const mcp = await seeded();
+  const out = (await mcp.call('create', { register: 'tasks', fields: { what: 'Fire the test tiles', thing: 'No Such Project' } }, agent)) as unknown as Refused;
   assert.equal(out.ok, false);
   assert.equal(out.refusal.at, 'thing');
-  assert.match(out.refusal.fix, /Kiln is things#\d+\./u);
-  const sent = JSON.parse(out.refusal.try!.replace(/^create /u, '')) as { fields: { thing: string } };
-  assert.match(sent.fields.thing, /^things#\d+$/u);
-  const again = await mcp.call('create', sent as never, agent);
-  assert.ok(again.ok, JSON.stringify(again));
+  const found = (await mcp.call('search', { q: 'Fire the test tiles' }, agent)) as { value: { matched: number } };
+  assert.equal(found.value.matched, 0);
 });
