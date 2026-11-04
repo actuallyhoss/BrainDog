@@ -151,6 +151,12 @@
     padding-block: 3px;
   }
 
+  @media (pointer: coarse) {
+    .toc a {
+      min-inline-size: 44px;
+    }
+  }
+
   .toc a {
     /* 24 TALL UNDER A MOUSE, and the line does not grow. */
     padding-block: 3px;
