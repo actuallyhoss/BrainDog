@@ -332,24 +332,42 @@ async function listThing(t: Extract<Thing, { kind: 'list' }>, shell: Shell): Pro
   return out;
 }
 
-/** The sidebar's own, on a row of it: the person's arrangement, as Settings › Navigation and the palette change it. */
-function sidebarItems(href: string): ThingItem[] {
-  const path = href.split('?')[0]!;
-  if (path === '/settings') return [item('customise', 'settings', thingWords.customise, G.sidebar, { href: '/settings/navigation' })];
+/**
+ * THE SIDEBAR'S OWN, ON A ROW OF IT: the person's arrangement, as Settings › Navigation and the palette change it, and only what
+ * that row can take: a page of the rail may be hidden, Today and Needs you may not (the palette's own rule), a project goes out
+ * by its pin, and every row can reach Customise.
+ */
+function sidebarItems(t: Thing, shell: Shell): ThingItem[] {
+  const path = t.href.split('?')[0]!;
+  const customise = item('customise', 'settings', thingWords.customise, G.sidebar, { href: '/settings/navigation' });
+  if (t.kind === 'place' && t.href.includes('?')) return [customise];
+  const inRail = ((shell as unknown as { nav?: readonly { href?: string }[] }).nav ?? []).some((n) => n.href === path);
+  const homes = inRail || path === '/' || path === '/decide';
+  if (!homes) return [customise];
   const home = navPrefs.home === path;
   return [
-    item('hide', 'hide', thingWords.hide, G.sidebar, {
-      run: () => {
-        const name = navPrefs.labelOf(path, path);
-        void navPrefs.hide(path).then((out) => {
-          if (out.from === 'refused') return void toasts.push(out.fix, { intent: 'warn' });
-          toasts.push(thingWords.hidden(name), { undo: () => void navPrefs.show(path) });
-        });
-      },
-    }),
+    ...(inRail && path !== '/' && path !== '/decide'
+      ? [
+          item('hide', 'hide', thingWords.hide, G.sidebar, {
+            run: () => {
+              const name = navPrefs.labelOf(path, path);
+              void navPrefs.hide(path).then((out) => {
+                if (out.from === 'refused') return void toasts.push(out.fix, { intent: 'warn' });
+                toasts.push(thingWords.hidden(name), { undo: () => void navPrefs.show(path) });
+              });
+            },
+          }),
+        ]
+      : []),
     item('home', 'open', home ? thingWords.startHereOff : thingWords.startHere, G.sidebar, { icon: 'home', run: () => void navPrefs.setHome(home ? null : path) }),
-    item('customise', 'settings', thingWords.customise, G.sidebar, { href: '/settings/navigation' }),
+    customise,
   ];
+}
+
+/** Whether an address is a project's: a project goes out of the sidebar by its pin, and is arranged by nothing else. */
+function isProjectThing(t: Thing): boolean {
+  const about = t.kind === 'page' ? aboutOf(t.slug) : t.kind === 'row' ? { list: t.list } : null;
+  return about !== null && isProject(REGISTERS[about.list]);
 }
 
 /** Whether a thing needs a read before its menu can be drawn. */
@@ -414,7 +432,7 @@ export async function itemsOf(address: string, shell: Shell, from: ThingFrom, na
     default:
       break;
   }
-  if (from.sidebar) out = [...out, ...sidebarItems(t.href)];
+  if (from.sidebar) out = [...out, ...(isProjectThing(t) ? [] : sidebarItems(t, shell))];
   return out;
 }
 

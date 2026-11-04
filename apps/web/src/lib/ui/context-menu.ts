@@ -63,6 +63,9 @@ export function takePressedLink(): string | null {
 let pressedIn: Element | null = null;
 export const pressedDialog = (): Element | null => (pressedIn?.isConnected && (pressedIn as HTMLDialogElement).open ? pressedIn : null);
 
+/** A page's own "…", wherever its head draws it: what its title's right-click opens. */
+export const PAGE_MENU = '.menu-trigger:has(.head-more, .change-more, .tool-more, .more-trigger)';
+
 /** A press held this long, without moving, is a long press. */
 const HOLD_MS = 500;
 /** A thumb that moves this far is scrolling, not holding. */

@@ -65,6 +65,7 @@
   import Define from './Define.svelte';
   import { at, here } from '../at.ts';
   import { page as pageState } from '$app/state';
+  import { PAGE_MENU } from './context-menu.ts';
   import { copy } from '../copy.ts';
   import { openPalette } from '../palette/open.svelte.ts';
   import { inIosApp } from '../shell.ts';
@@ -82,7 +83,6 @@
 
   /* THE TITLE STANDS FOR THE PAGE: a right-click on it opens the page's own "…" (the first of the head's, the list's or the
      page's menu), and where the page has none, the link's verbs for its address. */
-  const PAGE_MENU = '.menu-trigger:has(.head-more, .change-more, .tool-more, .more-trigger)';
   const pageAddress = $derived(pageState.url.pathname + pageState.url.search);
 
   let {

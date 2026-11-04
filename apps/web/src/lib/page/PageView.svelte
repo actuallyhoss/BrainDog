@@ -34,6 +34,7 @@
 </script>
 
 <script lang="ts">
+  import { PAGE_MENU } from '$lib/ui/context-menu.ts';
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
   import type { ComponentProps, Snippet } from 'svelte';
   import { apiBase } from '../at.ts';
@@ -1273,7 +1274,7 @@
     <!-- WHERE A BAR SAYS THE NAME (`barTitled`), its glyph, name, count and parent are the bar's, and the `h1` is unseen. -->
     <div class="lead-head" data-barred={barTitled() ? '' : undefined}>
       <span class="lead-glyph" aria-hidden="true"><Icon name={iconFor(live.page.page.icon, 'doc')} size="m" /></span>
-      <h1 class="lead-name" tabindex="-1" dir="auto">{live.page.page.title}</h1>
+      <h1 class="lead-name" tabindex="-1" dir="auto" data-thing={route.url.pathname + route.url.search} data-menu-host={PAGE_MENU}>{live.page.page.title}</h1>
       {#if declared?.count?.value}<span class="lead-count num">{declared.count.value.toLocaleString('en')}</span>{/if}
       {#if crumb}
         {#if backTo}<a class="lead-crumb" href={at(backTo)}>{crumb}</a>{:else}<span class="lead-crumb">{crumb}</span>{/if}
