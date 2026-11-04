@@ -50,7 +50,7 @@ import { decideLink } from './links.ts';
 import { hostCatalogueFor, hostKeys } from './catalogue.ts';
 import { keysOfRow, meeter, metOf, sameName, type Meeting } from './people.ts';
 import type { AgentIo } from './skills.ts';
-import { readSource } from './usecase.ts';
+import { CATALOGUE_READ_MOST_BYTES, readSource } from './usecase.ts';
 import { cliBuild } from './position.ts';
 
 import { createClient } from '@braindog/client';
@@ -2359,7 +2359,7 @@ async function resolveOffers(offers: readonly Offer[], catalogue: CatalogueRead,
 const addressCatalogue = (base: string, io: AgentIo, ms: number): CatalogueRead => ({
   where: base,
   read: async (path) => {
-    const got = await readSource(new URL(path, base.endsWith('/') ? base : `${base}/`).href, io, ms);
+    const got = await readSource(new URL(path, base.endsWith('/') ? base : `${base}/`).href, io, ms, CATALOGUE_READ_MOST_BYTES);
     return got.ok ? got.text : null;
   },
 });

@@ -200,12 +200,24 @@ export const USECASE_READ_TIMEOUT_MS = 10_000;
 
 const TOO_LARGE = (where: string) => `The file at ${where} is larger than a shared starter may be, so it was not read.`;
 
+/**
+ * The most a catalogue's own file is read to. ITS INDEX LISTS EVERY PLUGIN AT EVERY VERSION, so it grows with each release and
+ * is no starter: held to a starter's 300 KB, the index the hosts serve passed it on 31 Oct (416 KB on 3 Nov), and every
+ * `pack install <id>` with no `--from`, and an import's adapter by its id, answered that the host had no catalogue at all.
+ */
+export const CATALOGUE_READ_MOST_BYTES = 4 * 1024 * 1024;
+
 /** The text of a use-case file, from a path or an address, or the sentence saying why it could not be read. */
-export async function readSource(given: string, io: AgentIo, timeoutMs = USECASE_READ_TIMEOUT_MS): Promise<{ ok: true; text: string } | { ok: false; fix: string }> {
+export async function readSource(
+  given: string,
+  io: AgentIo,
+  timeoutMs = USECASE_READ_TIMEOUT_MS,
+  mostBytes = USECASE_READ_MOST_BYTES,
+): Promise<{ ok: true; text: string } | { ok: false; fix: string }> {
   if (!/^[a-z][a-z0-9+.-]*:\/\//iu.test(given)) {
     try {
       const path = resolve(io.cwd, given);
-      if (statSync(path).size > USECASE_READ_MOST_BYTES) return { ok: false, fix: TOO_LARGE(given) };
+      if (statSync(path).size > mostBytes) return { ok: false, fix: TOO_LARGE(given) };
       return { ok: true, text: readFileSync(path, 'utf8') };
     } catch {
       return { ok: false, fix: `${given} could not be read.` };
@@ -221,7 +233,7 @@ export async function readSource(given: string, io: AgentIo, timeoutMs = USECASE
       return { ok: false, fix: `${url.host} answered ${String(got.status)} for that file.` };
     }
     /* COUNTED AS IT ARRIVES, so a length that lies, or none, reads no further than the cap. */
-    if (Number(got.headers.get('content-length') ?? '0') > USECASE_READ_MOST_BYTES) {
+    if (Number(got.headers.get('content-length') ?? '0') > mostBytes) {
       await got.body?.cancel().catch(() => undefined);
       return { ok: false, fix: TOO_LARGE(url.host) };
     }
@@ -233,7 +245,7 @@ export async function readSource(given: string, io: AgentIo, timeoutMs = USECASE
         const { done, value } = await reader.read();
         if (done) break;
         total += value.length;
-        if (total > USECASE_READ_MOST_BYTES) {
+        if (total > mostBytes) {
           await reader.cancel().catch(() => undefined);
           return { ok: false, fix: TOO_LARGE(url.host) };
         }

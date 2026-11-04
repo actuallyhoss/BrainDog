@@ -109,7 +109,7 @@ import { firstPartyFor, packFromWidget } from './pack-from-widget.ts';
 import { readPackTest, runPackTest, testFileName } from './pack-test.ts';
 import { checkInScratch } from './scratch.ts';
 import type { AgentIo } from './skills.ts';
-import { proposeFile, readSource } from './usecase.ts';
+import { CATALOGUE_READ_MOST_BYTES, proposeFile, readSource, USECASE_READ_TIMEOUT_MS } from './usecase.ts';
 
 /* ONE CLEAN LINE, because a refusal of a catalogue's file is free to name what the file holds, and the file is a stranger's. */
 const saidWithCode = (r: Result<unknown>): string => (refused(r) ? oneLine(`${r.refusal.fix} (${r.refusal.code})`) : 'That was not read.');
@@ -820,7 +820,7 @@ async function catalogueAt(given: string, io: AgentIo, forWriting = false): Prom
     if (forWriting) return 'A catalogue is published into a folder on this machine; copy the folder to a host to share it.';
     const base = given.endsWith('/') ? given : `${given}/`;
     const read = async (path: string) => {
-      const got = await readSource(new URL(path, base).href, io);
+      const got = await readSource(new URL(path, base).href, io, USECASE_READ_TIMEOUT_MS, CATALOGUE_READ_MOST_BYTES);
       return got.ok ? got.text : null;
     };
     const text = await read(CATALOGUE_INDEX);
