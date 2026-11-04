@@ -21,7 +21,8 @@ test('EACH CURRENCY APART IS SAID AS A SENTENCE SAYS IT, and about the sum with 
     'cash-now.rate_on': '2026-09-28',
     'cash-now': [{ amount: 1, currency: 'EGP' }, { amount: 2, currency: 'USD' }],
   });
-  assert.equal(said('cash-now.apart'), `${money(4_000_000, 'EGP')} and ${money(1_000_050, 'USD')}`);
+  /* FROM A THOUSAND UP A SENTENCE SAYS WHOLE UNITS, half a unit rounding up (dd6b3b9bf, the one rule for cents d9bab2403). */
+  assert.equal(said('cash-now.apart'), 'EGP 40,000 and USD 10,001');
   assert.equal(said('cash-now.converted'), money(54_502_500, 'EGP').replace(/\.00$/u, ''));
   assert.doesNotMatch(said('cash-now.converted') ?? '', /\.\d\d$/u);
   assert.match(said('cash-now.rate_on') ?? '', /28 Sep/u);

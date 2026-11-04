@@ -20,7 +20,7 @@ import { MISSING } from 'braindog-render';
 import { METRICS } from './declared.ts';
 import { mixedFix } from './money.ts';
 import { BARE, currenciesRead, diffRead, format, fxNote, hrefFor, isTemplate, markOf, meetsTarget, spokenWindow, targetLine, unreadable, windowMs, type MetricDecl } from './metrics.ts';
-import { metric } from './fixtures/readers.ts';
+import { metric, readingOf } from './fixtures/readers.ts';
 import { REGISTERS } from './held.ts';
 /* THE SAMPLE'S LISTS, which a live tab learns from the record and the refusal test below asks the mirror about. */
 import './fixtures/fill.ts';
@@ -50,21 +50,33 @@ test('THE FIGURES ARE THE ONES THE SWITCH PRODUCED', () => {
   // Ported, not rewritten: if a number here changes, a page changed and somebody has to say why.
   /* MOVED BY money-core 3.0.0: repeating money lives in `recurring` alone, so the Kiln storefront payout
      (GBP 930.00 owed to you, on Kiln) and the studio rent (GBP 1,650.00 due inside thirty days) are no longer bills. */
+  /* A TILE SAYS MONEY IN WHOLE UNITS (dd6b3b9bf); the reading under it keeps its pennies, and that is held below. */
   for (const [id, want] of [
-    ['owed-to-you', 'GBP 28,320.00'],
-    ['due-30d', 'GBP 26,690.00'],
-    ['overdue', 'GBP 10,540.00'],
+    ['owed-to-you', 'GBP 28,320'],
+    ['due-30d', 'GBP 26,690'],
+    ['overdue', 'GBP 10,540'],
     ['renews-30d', '6'],
     ['lapsing', '1'],
-    ['estate-year', 'GBP 2,906.80'],
+    ['estate-year', 'GBP 2,907'],
     /* The three project figures, now read through the parameter rather than through three documents
        with the name typed into each. Same numbers as the `kiln-*` documents they replace. */
     /* Seven since Work split the specimen page into steps, two of them Kiln's. */
     ['project-open:Kiln', '7'],
-    ['project-owed:Kiln', 'GBP 4,050.00'],
-    ['project-cost:Kiln', 'GBP 1,036.00'],
+    ['project-owed:Kiln', 'GBP 4,050'],
+    ['project-cost:Kiln', 'GBP 1,036'],
   ] as const) {
     assert.equal(metric(id).value, want, `${id} moved`);
+  }
+  for (const [id, minor] of [
+    ['owed-to-you', 2_832_000],
+    ['due-30d', 2_669_000],
+    ['overdue', 1_054_000],
+    ['estate-year', 290_680],
+    ['project-owed:Kiln', 405_000],
+    ['project-cost:Kiln', 103_600],
+  ] as const) {
+    const read = readingOf(id);
+    assert.equal(read?.ok ? read.value.value : null, minor, `${id}'s reading moved`);
   }
 });
 
@@ -250,11 +262,14 @@ test('an aggregation or a format this build does not say is NAMED before it woul
   assert.deepEqual(unreadable(METRICS.overdue!), [], 'a figure the record ships was named as unreadable');
 });
 
-test('A FRACTIONAL FACTOR ROUNDS PER ROW, as the record does, and the tile says the record’s penny', () => {
+test('A FRACTIONAL FACTOR ROUNDS PER ROW, as the record does, and the tile says the record’s figure whole', () => {
   /* `every-month-out` takes a third of a quarterly bill and a twelfth of a yearly one. It reads `recurring` since
      money-core 3.0.0, where the VAT is a third of GBP 7,420.00 and the accountant a twelfth of GBP 1,450.00, each a third
      of a penny over. Summed then rounded it reads £10,692.17, and the record rounds each row and reads £10,692.16. */
-  assert.equal(metric('every-month-out').value, 'GBP 10,692.16');
+  const read = readingOf('every-month-out');
+  assert.equal(read?.ok ? read.value.value : null, 1_069_216, 'the record reads the penny the rows round to');
+  /* A TILE SAYS MONEY IN WHOLE UNITS (dd6b3b9bf), so the penny is the reading's and the tile rounds that. */
+  assert.equal(metric('every-month-out').value, 'GBP 10,692');
 });
 
 test('A NOTE THAT ONLY SAYS NOUGHT IS NOT SAID: a clause whose figures are all 0 goes', async () => {

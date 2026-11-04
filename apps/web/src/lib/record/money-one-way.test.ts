@@ -27,6 +27,13 @@ function asMoney(minor: number, currency: string, home: string | null): string {
   return `${parts.lead}${parts.whole}${parts.fraction}${parts.iso ? `${AMOUNT_SPACE}${parts.iso}` : ''}`;
 }
 
+/** The same amount in a sentence: the parts of `drawn` over `money()`, where a whole amount leaves off its `.00` (5dcc1456c). The cents stay when they are not nought. */
+function asSaid(minor: number, currency: string, home: string | null): string {
+  const parts = drawn(money(minor, currency), home);
+  assert.ok(parts, `${currency} ${minor} is money`);
+  return `${parts.lead}${parts.whole}${/^\.0+$/u.test(parts.fraction) ? '' : parts.fraction}${parts.iso ? `${AMOUNT_SPACE}${parts.iso}` : ''}`;
+}
+
 const HOMES = ['USD', 'EGP', 'JPY', null] as const;
 
 test("a job's smallest coin reads as Money reads one minor unit, in dollars, pounds and yen, at home and away", () => {
@@ -75,7 +82,7 @@ test("the Tell screen's payment reads as Money reads it, in dollars, pounds and 
       const opts = { lists: LISTS, today: TODAY, currency: home, home, accounts: [{ seq: 1, name: 'Card wallet' }] };
       const row = tellRead(`Omar paid me ${typed} by card`, opts).rows.find((r) => r.register === 'transactions');
       assert.deepEqual(row?.fields.amount, { amount: minor, currency }, `${typed} on ${home}`);
-      assert.equal(row?.said, `${asMoney(minor, currency, home)} from Omar, by card`, `${typed} on ${home}`);
+      assert.equal(row?.said, `${asSaid(minor, currency, home)} from Omar, by card`, `${typed} on ${home}`);
     }
 });
 
@@ -85,7 +92,7 @@ test("the Tell screen's order total reads as Money reads it", () => {
     const order = tellRead('Salma wants 6 amber jars, 1,350 not paid yet', opts).rows.find((r) => r.register === 'orders');
     const minor = currency === 'JPY' ? 1350 : 135000;
     assert.deepEqual(order?.fields.total, { amount: minor, currency }, `${currency} on ${home}`);
-    assert.ok(order?.detail.endsWith(`, ${asMoney(minor, currency, home)} not paid yet`), `${order?.detail}`);
+    assert.ok(order?.detail.endsWith(`, ${asSaid(minor, currency, home)} not paid yet`), `${order?.detail}`);
   }
 });
 

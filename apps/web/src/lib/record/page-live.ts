@@ -2541,7 +2541,7 @@ function sayOf(values: Record<string, unknown> | undefined, path: string, all: b
     }
     if (typeof v === 'boolean') return v ? 'yes' : 'no';
     /* A FIGURE IN SEVERAL CURRENCIES, one amount a currency, written as a tile writes its parts. `<figure>.apart` IS A
-       LINE'S, so its amounts are said as a sentence says them: "EGP 40,000.00 and $10,000.50". */
+       LINE'S, so its amounts are said as a sentence says them: "EGP 40,000 and $10,001". */
     if (Array.isArray(v)) {
       const parts = v.filter((p): p is { amount: number; currency: string } => isObject(p) && typeof p.amount === 'number' && typeof p.currency === 'string');
       if (!parts.length || parts.length !== v.length) return null;

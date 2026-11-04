@@ -244,7 +244,8 @@ test('THROUGH THE RECORD: the typed price is the row\'s, and the sentence over i
   assert.equal(again.cells[3]?.trim(), 'GBP 1,250.00');
   assert.equal(again.ref?.version, 2);
   /* AND THE SENTENCE OVER THE SAME LIST READS THE NEW FIGURE, which is the whole of what the inputs are for. */
-  assert.equal(resolverOf(blocks[1]!.values)('price-now'), 'GBP 1,250.00');
+  /* A sentence says money whole, a table cell to the penny (dd6b3b9bf); the figure is the row's new one either way. */
+  assert.equal(resolverOf(blocks[1]!.values)('price-now'), 'GBP 1,250');
 });
 
 /* ── money boxes: decimal commas, currencies and conflicts ─────────────────────────────────────────────────── */

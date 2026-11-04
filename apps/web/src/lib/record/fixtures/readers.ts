@@ -196,7 +196,7 @@ const entryFrom = (register: string, row: Row): Entry => entryOf(register, row, 
 
 /** One figure's reading as the record answers it, by the figure's id and its parameter, kept once asked. */
 const READINGS = new Map<string, ReturnType<Kernel['metric']> | null>();
-function readingOf(id: string): ReturnType<Kernel['metric']> | null {
+export function readingOf(id: string): ReturnType<Kernel['metric']> | null {
   if (READINGS.has(id)) return READINGS.get(id) ?? null;
   const at = id.indexOf(':');
   const template = RECORD.metricDecl(at === -1 ? id : id.slice(0, at));

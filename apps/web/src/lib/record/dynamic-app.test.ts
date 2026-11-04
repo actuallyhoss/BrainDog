@@ -288,17 +288,17 @@ test('A RANGE IS WRITTEN label, spent, low and high, each figure the record\'s o
   assert.equal(b.form, 'range');
   /* THE FIGURES ARE THE RECORD'S MINOR UNITS SAID ONCE: 12050 pence is £120.50, and a line with nothing spent says
      nothing rather than nought, which the drawer reads as "Not spent". The page says money as every other cell on it
-     does (`symbolText`), and this record names no home currency, so each figure keeps its code after a no-break space.
+     does (`symbolText`), and a currency that is not the home's is said by its own sign and no code (b77e6330c).
      A RANGE IS NOT A LEDGER, so a round figure is said without its ".00", as a sentence says it: only a table keeps its
      pence (`exactness` in `blocks.ts`). */
-  const gbp = (figure: string) => `£${figure}${String.fromCharCode(0xa0)}GBP`;
+  const gbp = (figure: string) => `£${figure}`;
   assert.deepEqual(cells(b), [
     ['Fabric', gbp('120.50'), gbp('100'), gbp('300')],
     ['Print', '', gbp('40'), gbp('80')],
   ]);
   const html = toHTML([b]);
-  assert.match(html, /£120\.50.GBP spent/u);
-  assert.match(html, /£140\.00.GBP to £380\.00.GBP/u, 'the total line adds the lows and the highs of the rows as written');
+  assert.match(html, /£120\.50 spent/u);
+  assert.match(html, /£140\.00 to £380\.00/u, 'the total line adds the lows and the highs of the rows as written');
   /* ONE SCALE, THE LARGEST FIGURE, £300: the fabric's band runs from a third of it to the end, and its spend sits at 0.40. */
   assert.match(html, /--from:0\.33;--to:1\.00"><span class="progress-band"><\/span><span class="progress-at" style="--at:0\.40">/u);
 });

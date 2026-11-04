@@ -502,7 +502,9 @@ test('A MONEY BOX ON A ROW WITH NO CURRENCY TYPES IN ONE SOMEBODY CHOSE, and wit
 
 test('A NOTE QUOTING A FIGURE THE RECORD SENT IN PARTS writes each amount', () => {
   const said = resolverOf({ 'late-in': [{ amount: 123_400, currency: 'EUR' }, { amount: 5_000, currency: 'GBP' }], odd: [{ amount: 1 }] });
-  assert.equal(said('late-in')?.replace(/\s/gu, ' '), 'EUR 1,234.00 · GBP 50.00');
+  /* ONE RULE A SENTENCE (aa560291b): one amount a thousand or more, and so whole, makes every amount in it whole. */
+  assert.equal(said('late-in')?.replace(/\s/gu, ' '), 'EUR 1,234 · GBP 50');
+  assert.equal(resolverOf({ small: [{ amount: 12_345, currency: 'EUR' }, { amount: 5_000, currency: 'GBP' }] })('small')?.replace(/\s/gu, ' '), 'EUR 123.45 · GBP 50', 'under a thousand the cents stay where they are not nought');
   assert.equal(said('odd'), null, 'what is not money is not written as money');
 });
 
