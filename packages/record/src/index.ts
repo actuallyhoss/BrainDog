@@ -9785,9 +9785,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const text = said.trim();
     if (text === '' || !kernel.register(READINGS)) return said;
     const held = (name: string): boolean =>
-      sql.one<{ n: number }>("SELECT 1 AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.name') = ? LIMIT 1", READINGS, name) !== null;
-    const asRow = isHandle(text) ? (spokenAs(text) ?? text) : /^[0-9A-HJKMNP-TV-Z]{26}$/u.test(text) ? text : null;
-    const row = asRow === null || (ctx !== undefined && readable(ctx, KPIS) !== null) ? null : kernel.get(asRow);
+      sql.one<{ n: number }>("SELECT 1 AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.name') = ? LIMIT 1", READINGS, name) !== undefined;
+    const asRow = isHandle(text) ? (spokenAs(text) ?? text) : text;
+    const row = ctx !== undefined && readable(ctx, KPIS) !== null ? null : kernel.get(asRow);
     const kpi = row !== null && row !== undefined && row.register === KPIS ? row : null;
     if (kpi === null && held(text)) return said;
     const measure = kpi === null ? text : [kpi.fields.measure, kpi.fields.name].find((v): v is string => typeof v === 'string' && v.trim() !== '')?.trim() ?? '';
