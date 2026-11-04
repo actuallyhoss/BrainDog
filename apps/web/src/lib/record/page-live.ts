@@ -1022,11 +1022,11 @@ export function tileOf(
     note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), lowest, across]
       .filter((part): part is string => Boolean(part))
       .map((part, i, all) => (i < all.length - 1 ? part.replace(/\.\s*$/u, '') : part))
-      /* THE DOT GOES WITH THE FACT AFTER IT (moneyseed, 3 Nov): held to the fact before (T1), Today's "Lasts to 30 Oct ·
-         Lowest −£16,213 on 7 Nov" wrapped at 1280 to "Lasts to 30 Oct ·" over "Lowest …", a dot hanging off the end of
-         a line. Now a wrap breaks before the dot, and the second line opens "· Lowest". A line break of its own is not
-         an option here: a stat's row is one line of the page dialect, which folds a newline to a space (`escapeCell`). */
-      .join(' ·\u00a0'),
+      /* A FULL STOP BETWEEN THE FACTS, NOT A DOT (4 Nov): a middle dot wraps badly on either side. Held to the fact before,
+         a line ended "Lasts to 30 Oct ·"; held to the fact after, the next line opened "· Lowest". A stop reads right
+         wherever the line breaks. A line break of its own is not an option here: a stat's row is one line of the page
+         dialect, which folds a newline to a space (`escapeCell`). */
+      .join('. '),
     /* A MISSED TARGET IS AMBER, and red only on a tile its page declared `bad`: the day the cash runs out. AND CASH NOW
        UNDER NOTHING, the one figure that is red wherever it is drawn: money below nought is the thing that needs the person. */
     tone: met === null ? undefined : met ? 'good' : cell.metric === 'cash-now' && r.value < 0 ? 'bad' : missed,
