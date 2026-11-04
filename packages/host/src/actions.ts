@@ -88,7 +88,7 @@ const literally = (text: string): string => text.replace(/[.*+?^${}()|[\]\\/]/g,
  * was used for threw, and the error quoted the pattern, the key's base64 inside it, into the Worker's log and the run's.
  * Under this length the pattern is whole, as it always was. Over it what is struck is the same text, a few words longer.
  */
-const PATTERN_TOKENS = 128;
+const PATTERN_TOKENS = 32;
 
 /**
  * The tokens, each a pattern source, in order with `gap` allowed, and not required, between any two: a spelling a wrap
