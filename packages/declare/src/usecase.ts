@@ -138,7 +138,7 @@ export const MODULE_LISTS: Readonly<Record<ModuleId, { name: string; lists: read
   people: { name: 'People', lists: ['people', 'organisations'] },
   'money-core': {
     name: 'Money',
-    lists: ['accounts', 'balances', 'books', 'categories', 'filing_rules', 'fx', 'installments', 'obligations', 'plans', 'recurring', 'snapshots', 'transactions'],
+    lists: ['accounts', 'balances', 'books', 'categories', 'filing_rules', 'fx', 'installments', 'obligations', 'payee_names', 'plans', 'recurring', 'snapshots', 'transactions'],
   },
   estate: { name: 'Estate', lists: ['services'] },
   work: { name: 'Work', lists: ['tasks', 'tracks', 'updates'] },
