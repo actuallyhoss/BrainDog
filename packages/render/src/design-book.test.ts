@@ -4,6 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { designBook } from './design-book.ts';
 import { KINDS } from './kinds.ts';
@@ -50,4 +51,12 @@ test('the book opens on Look B, the design system the app is drawn in', () => {
   assert.ok(book.look.some((l) => /pills/u.test(l)), 'says no pills');
   assert.ok(book.look.some((l) => /Plus Jakarta Sans/u.test(l)), 'names the face');
   assert.ok(book.check.some((l) => /Look B/u.test(l)), 'the check holds a design to it');
+});
+
+test('THE DESIGN BOOK NAMES NONE OF THE PRIVATE WORDS, since Slash and every agent are handed its lines, so public-clean holds it at nothing', () => {
+  /* PUT TOGETHER HERE, AS THE GATE PUTS THEM, so this file is no hit of its own. The account the repository lives under is the one spelling that holds the first. */
+  const words = ['ho' + 'ss', 'en' + 'core', 'tam' + 'sin'];
+  const text = readFileSync(new URL('./design-book.ts', import.meta.url), 'utf8').toLowerCase().replaceAll('actually' + words[0], '');
+  for (const w of words) assert.equal(text.includes(w), false, `design-book.ts names a private word (${String(w.length)} letters)`);
+  for (const w of words) assert.equal(book.look.join(' ').toLowerCase().includes(w), false, `a design line names a private word (${String(w.length)} letters)`);
 });
