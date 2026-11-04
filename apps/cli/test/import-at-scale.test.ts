@@ -185,7 +185,7 @@ test('A LIST THE IMPORT COULD NOT READ TO THE END IS A REFUSAL, and nothing is w
   const { door, lists } = doorOf(kernel, { refuseListAfter: 1 });
   await assert.rejects(
     () => applyPlan(plan(rows), door, { dryRun: false }),
-    /This record does not know that credential/u,
+    /This BrainDog does not know that credential/u,
     'a page the import never read came back as no rows at all',
   );
   assert.equal(lists(), 2, 'the read stopped at the page that was refused');

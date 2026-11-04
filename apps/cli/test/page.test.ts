@@ -152,14 +152,15 @@ test('page pull: writes the stored declaration whole, the bytes dogText prints, 
   assert.deepEqual(h.seen.find((s) => s.method === 'arrangement')?.args, { page: 'invoicing' });
 });
 
-test('page pull: --out names the file, and an unknown slug prints the record’s own sentence', async (t) => {
+test('page pull: --out names the file, and an unknown slug says so in words and names the pages pull takes', async (t) => {
   const h = await setup(t);
   const file = join(h.dir, 'renamed.dog');
   assert.equal(await page(['pull', 'invoicing', '--out', 'renamed.dog'], h.io), 0);
   assert.equal(readFileSync(file, 'utf8'), dogText(BODY));
 
   assert.equal(await page(['pull', 'nowhere'], h.io), 1);
-  assert.deepEqual(h.said, ['There is no page declaration page.nowhere that you can read. The pages are: invoicing.']);
+  /* SAID FOR A PERSON, with what `pull` takes, from the record's sentence for an agent (`noPage`). */
+  assert.deepEqual(h.said, ['There is no page nowhere here that you can read. braindog page pull takes one of: invoicing.']);
 });
 
 test('page pull: a page made from a template writes the template, and says so', async (t) => {

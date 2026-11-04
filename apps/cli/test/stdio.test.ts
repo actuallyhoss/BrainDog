@@ -18,6 +18,7 @@ import { PassThrough, Writable } from 'node:stream';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { CALL_TABLE } from '@braindog/client';
 import { TOOLS, tools, type McpSurface } from '@braindog/mcp';
 import { ALWAYS_LOADED, INSTRUCTIONS, SEARCH_HINTS, VERSIONS } from '@braindog/mcp/rpc';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
@@ -367,7 +368,11 @@ test('initialize and tools/list answer without touching the host, and the list i
 
   const { code, err } = await s.end();
   assert.equal(code, 0, err);
-  assert.equal(host.seen.length, 0, 'the handshake reached the host, and it must answer when the host is down');
+  /* BEFORE THE HELLO, AT MOST ONE `createToken`: the agent's own token tried from BRAINDOG_TOKEN (D4, `agentTokenFromKey`),
+     under five seconds and caught, so the hello is answered with the host down. Nothing the handshake itself asked. */
+  const asked = host.seen.map((x) => x.method);
+  assert.ok(asked.filter((m) => m === 'createToken').length <= 1, asked.join(' '));
+  assert.deepEqual(asked.filter((m) => m !== 'createToken'), [], 'the handshake reached the host, and it must answer when the host is down');
   for (const line of s.lines) assert.equal(JSON.parse(line).jsonrpc, '2.0', `stdout carried something other than the protocol: ${line}`);
 });
 
@@ -394,7 +399,8 @@ const CALLS: Record<string, Record<string, unknown>> = {
   handoff: { doing: 'Driving the tool list', next: 'Report what answered' },
   meet: { name: 'Ada', where: 'commit 4464966 in braindog' },
   triage: { arrival: 'a1', ignore: true },
-  undo: { batch: 'b1' },
+  /* `act` IS `undo`'S NOW, and each of its calls goes as the app sends it: `undoOwn` is one of them. */
+  act: { call: 'undoOwn', args: { batch: 'b1' } },
 };
 
 /** What the stub record answers each method, shaped only where a tool or a resource reads a field off it. */
@@ -461,6 +467,8 @@ test('EVERY TOOL THE SERVER SERVES ANSWERS OVER STDIO, none of them advertised a
     if (code === 'ROUTE_UNKNOWN' || code === 'NOT_IN_THIS_BUILD') dead.push(`${tool.name} (${code})`);
   }
   assert.deepEqual(dead, [], 'a tool is advertised over stdio and no method behind it answers');
+  /* AND `act` REACHED THE CALL IT NAMED, through the client's own table, not a refusal of its own. */
+  assert.ok(host.seen.some((x) => x.method === 'undoOwn'), 'act never asked the host for undoOwn');
 
   /* AND A NAME THAT IS NOT A TOOL IS STILL REFUSED BY NAME. `credentials` was surveyed as advertised
      and dead; it is neither, because the vault needs a person in a browser and no tool was ever
@@ -494,7 +502,8 @@ test('EVERY TOOL THE SERVER SERVES ANSWERS OVER STDIO, none of them advertised a
  */
 async function everyAddress(): Promise<string[]> {
   const answer = (name: string) => async () => ({ ok: true, value: Object.hasOwn(ANSWERS, name) ? ANSWERS[name] : { rows: [] } });
-  const complete = new Proxy({}, { get: (_target, name) => (typeof name === 'string' ? answer(name) : undefined) });
+  /* `calls` ANSWERS AT ONCE, as `surfaceOver` hands it: the table `act` is held to, read off the client's own. */
+  const complete = new Proxy({}, { get: (_target, name) => (name === 'calls' ? () => CALL_TABLE : typeof name === 'string' ? answer(name) : undefined) });
   const listing = await tools(complete as McpSurface<undefined>).resources(undefined);
   return listing.map((r) => r.uri);
 }
@@ -729,7 +738,7 @@ test('nothing is listed as coming later, and an unknown command is not echoed un
   for (const row of rows.filter((l) => l.startsWith('  '))) assert.ok(row.length <= 90, row);
   assert.match(help.stdout, /^  login <host> +\S/m);
   assert.match(help.stdout, /^  keys put <label> +\S/m);
-  assert.match(help.stdout, /^  addon new\|check\|test\|preview +\S.*\(also: pack\)$/m);
+  assert.match(help.stdout, /^  addon new\|check\|test\|preview\|dev +\S.*\(also: pack\)$/m);
   assert.doesNotMatch(help.stdout, /^braindog (?:login|keys|addon|pack) /m);
 
   /* A COMMAND'S OWN HELP KEEPS ITS LONG TEXT, and `pack` answers as `addon` does. */

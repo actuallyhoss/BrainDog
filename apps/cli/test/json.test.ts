@@ -142,8 +142,8 @@ test('a refusal IS AS MACHINE-READABLE AS A SUCCESS: the code, the fix and the a
     ok: false,
     refusals: [{ code: 'PAGE_UNKNOWN', fix: 'There is no page at nowhere.', at: 'page' }],
   });
-  /* The sentence is still said, on the stream a person reads. */
-  assert.equal(out.stderr.trim(), 'There is no page at nowhere.');
+  /* The document keeps the record's own sentence; the stream a person reads has it in plain words (`noPage`). */
+  assert.equal(out.stderr.trim(), 'There is no page nowhere here that you can read.');
 });
 
 test('a success WITH A REPLY TYPE OF ITS OWN carries it rather than the lines', async (t) => {

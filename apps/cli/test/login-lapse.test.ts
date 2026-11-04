@@ -51,7 +51,9 @@ test('the warning comes inside fourteen days of the stored expiry, and not a mil
 
   const soon = lapseWarning({}, at(10 * DAY), NOW);
   assert.ok(soon !== null, 'ten days out said nothing');
-  assert.ok(soon.includes('2026-12-20'), soon);
+  /* THE DAY AS THE APP SAYS IT, and the long form never: every date this command prints reads the same. */
+  assert.ok(soon.includes('lapses on 20 Dec,'), soon);
+  assert.ok(!soon.includes('2026-12-20'), soon);
   assert.ok(soon.includes('in 10 days'), soon);
   assert.ok(soon.includes(`${SIGN_IN} ${host}`), soon);
   assert.ok(!soon.includes(TOKEN), 'the token was printed');
