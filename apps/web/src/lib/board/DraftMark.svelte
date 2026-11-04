@@ -91,9 +91,9 @@
     z-index: calc(var(--z-raise) + 5);
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 12px;
+    gap: var(--sp-2) var(--sp-3);
     align-items: center;
-    padding: 10px 16px 12px;
+    padding: var(--sp-3) var(--sp-4);
     border-block-start: 1px dashed var(--rule);
     border-end-start-radius: inherit;
     border-end-end-radius: inherit;
@@ -133,6 +133,6 @@
   .acts {
     display: flex;
     flex: none;
-    gap: 6px;
+    gap: var(--sp-2);
   }
 </style>

@@ -370,9 +370,16 @@
      drawer is, and grows to the drawer's own height at most, so a sheet that gains a step (the template's facts) still
      scrolls inside the same box. */
   .sheet[data-fit] {
-    inset-block-end: auto;
     block-size: auto;
     max-block-size: calc(100dvh - 2 * var(--inset) - var(--kb));
+  }
+
+  /* ONLY ON A DESK: on a phone this took the bottom edge away from the phone's bottom sheet too, and with its top already
+     auto, Share landed against the top of the screen with its grabber on the status bar. */
+  @media (width >= 900px) {
+    .sheet[data-fit] {
+      inset-block-end: auto;
+    }
   }
 
   /* A GALLERY'S DRAWER IS WIDER, so a widget is laid out at the size it will take. The phone's sheet is the phone's. */

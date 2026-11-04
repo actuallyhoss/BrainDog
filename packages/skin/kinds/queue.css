@@ -39,6 +39,12 @@
     grid-column: 1 / -1;
   }
 
+  /* IN A TILE THE LAST QUESTION ENDS ON THE TILE'S PADDING when no door follows it: "Waiting on you" stood 36 under its
+     buttons where it stands 20 over them. */
+  .block-slot .queue:not(:has(> a.queue-more)) > .qa:last-of-type .queue-card {
+    padding-block-end: 0;
+  }
+
   .queue-card:first-child {
     padding-block-start: 0;
     border-block-start: 0;

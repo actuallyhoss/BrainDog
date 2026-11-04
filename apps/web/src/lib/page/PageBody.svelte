@@ -2031,12 +2031,20 @@
      $3,200 to come in. $149 to pay on the card") was two lines 33px apart at 360, and the link could not wrap. Where the
      line holds words as well as links, the target grows by a `::before`, as `.tap` grows one, and the words stay put. */
   @media (pointer: coarse) {
+    /* TALL BY ITS BOX AND WIDE BY A `::before`: a 44 minimum width centred "Skills", "Tools" and "Keys" in air the longer
+       links had none of, so the dots between them stood unevenly. */
     .block-slot :global(.block[data-kind='note'] p:not(:has(> :not(a))) > a) {
+      position: relative;
       display: inline-flex;
       align-items: center;
-      justify-content: center;
       min-block-size: var(--tap);
-      min-inline-size: var(--tap);
+    }
+
+    .block-slot :global(.block[data-kind='note'] p:not(:has(> :not(a))) > a::before) {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      inset-inline: -4px;
     }
 
     .block-slot :global(.block[data-kind='note'] p:has(> :not(a)) > a) {

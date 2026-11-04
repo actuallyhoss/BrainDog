@@ -632,6 +632,23 @@
         align-self: center;
       }
     }
+
+    /* ON A PHONE THE TWO BUTTONS TAKE A LINE OF THEIR OWN: in a column beside the words they left the words 60 wide, three
+       lines for "Today 19:03, nightly" and the date broken in two. */
+    @media (width < 640px) {
+      .ledger-glyph :global(.line-main) {
+        grid-column: 2 / -1;
+      }
+
+      .ledger-glyph :global(.line-when) {
+        grid-column: 2 / -1;
+        grid-row: 3;
+        justify-self: start;
+        justify-content: flex-start;
+        text-align: start;
+        margin-inline-start: calc(-1 * var(--ctl-pad-sm));
+      }
+    }
   }
 
   /* THE NIGHT'S COPY, the first line in the tile over the copies, at body size. */

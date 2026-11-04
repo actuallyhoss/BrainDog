@@ -563,8 +563,8 @@
     .card-b .card-dot {
       position: absolute;
       inset-inline-start: 1px;
-      /* The line is one line, so the middle of the box is the middle of the line. */
-      inset-block-start: 50%;
+      /* ON THE FIRST LINE'S MIDDLE: a line that wraps kept the dot between its two lines. */
+      inset-block-start: calc(var(--lead-meta, 18px) / 2);
       translate: 0 -50%;
     }
 

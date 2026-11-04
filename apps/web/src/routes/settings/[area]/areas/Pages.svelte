@@ -690,8 +690,9 @@
 {/if}
 
 <style>
+  /* THE TILE'S OWN 16 IS THE STEP: a margin of 12 on top stood the hint 28 over its field and the field 28 over its rows. */
   .hint {
-    margin: 0 0 var(--sp-3);
+    margin: 0;
     max-inline-size: 75ch;
     color: var(--ink-3);
     font-size: var(--fs-meta);
@@ -699,7 +700,7 @@
   }
 
   .find {
-    margin-block-end: var(--sp-3);
+    margin-block-end: 0;
   }
 
   .find input {

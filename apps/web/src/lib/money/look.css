@@ -1695,9 +1695,11 @@
 
 /* A PAGE WITH NO SENTENCE AND NOTHING UNDER ITS HEAD (a bill's, an account's on a phone-wide desk) drew Show the data,
    Share and More on a row of their own above its first tile (coordinator's live check, 1 Nov). On a desk the first tile
-   rises into that row and the buttons sit at its top end, where a sentence would have stood beside them. */
+   rises into that row and the buttons sit at its top end, where a sentence would have stood beside them. Only while
+   the buttons are still in the head: once they went up to the top bar, this pulled Accounts' and Coming up's first card
+   44 under the bar. */
 @media (width >= 900px) {
-  .hosted[data-money] > .page-head[data-titled]:has(.name-unseen):not(:has(.page-said)):not(:has(~ .page-filters, ~ .head-below)) {
+  .hosted[data-money] > .page-head[data-titled]:has(.name-unseen):has(.head-actions > :not(dialog)):not(:has(.page-said)):not(:has(~ .page-filters, ~ .head-below)) {
     position: relative;
     z-index: 1;
     margin-block-end: -44px;

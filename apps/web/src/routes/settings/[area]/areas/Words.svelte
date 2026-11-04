@@ -657,7 +657,6 @@
   .lists {
     display: grid;
     gap: var(--sp-2);
-    max-inline-size: calc(var(--measure) + var(--sp-9));
   }
 
   /* A LIST IS ITS WELL AND ITS NAME, typed over in place; a list named only by its singular shows its name before it. */

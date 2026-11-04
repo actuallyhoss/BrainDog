@@ -508,14 +508,21 @@
     align-items: center;
     gap: 8px;
     margin-block-start: auto;
-    padding-block-start: 12px;
-    border-block-start: 1px solid var(--rule);
+    /* THE FOOT HOLDS ITS OWN AIR, 12 over its rule and 12 under, never closer than that to the row above. The air was the
+       row above's margin, so where a page hides the foot (Today's project cards) the card ended 14 taller at the bottom
+       than the top. */
+    position: relative;
+    padding-block-start: 25px;
     min-inline-size: 0;
   }
 
-  /* The foot sits at the card's foot, and never closer than 12 under the row above it. */
-  .pcard > :has(+ .pc-foot) {
-    margin-block-end: 12px;
+  .pc-foot::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 12px;
+    inset-inline: 0;
+    block-size: 1px;
+    background: var(--rule);
   }
 
   .faces {
@@ -626,8 +633,11 @@
 
     /* THE LIVE LINE STAYS ON A PHONE, under no rule: it is the one thing an empty card says. */
     .pc-foot {
-      padding-block-start: 0;
-      border-block-start: 0;
+      padding-block-start: 12px;
+    }
+
+    .pc-foot::before {
+      display: none;
     }
 
     .pc-worked {

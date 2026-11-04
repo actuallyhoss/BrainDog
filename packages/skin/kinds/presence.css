@@ -336,6 +336,14 @@
     line-height: var(--lead-ui, 20px);
   }
 
+  /* BUT UNDER A THUMB ITS 44 BOX IS STILL A 44 LINE: at 20 the words rode 12 above their row, so a phone's name stood 24
+     over its own line and 4 under the row before. */
+  @media (pointer: coarse) {
+    .pres[data-line] a.pres-what {
+      line-height: var(--tap, 44px);
+    }
+  }
+
   .pres[data-line] .pres-face {
     inline-size: 24px;
     block-size: 24px;

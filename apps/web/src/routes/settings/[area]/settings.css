@@ -516,3 +516,9 @@
     transition: none;
   }
 }
+
+/* A CARD THAT ENDS ON ITS LIST GIVES THE LAST ROW'S 8 BACK, so its foot is the card's padding, the top's equal: Your agents
+   stood 29 under Defaults for new agents with 16 over its head. */
+.settings-place :is(.tile, .section-body) > .ledger:last-child {
+  margin-block-end: calc(-1 * var(--sp-2));
+}

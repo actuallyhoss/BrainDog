@@ -728,6 +728,17 @@
     list-style: none;
   }
 
+  /* THE COLUMN HEADS AND THE GROUP NAMES STAND ON THE CARD'S EDGE, so the rows do too: the skin's 12 put every row's
+     words 12 right of the head over them ("Next step" over a next step). */
+  .rows > .row {
+    padding-inline: 0;
+  }
+
+  /* AND THE LAST ROW'S AIR IS THE CARD'S PADDING, not 12 more on it. */
+  .b-list > .rows:last-child > .row:last-child {
+    padding-block-end: 0;
+  }
+
   .row {
     padding-block: 12px;
     border-block-start: 1px solid var(--rule);
