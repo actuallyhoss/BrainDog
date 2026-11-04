@@ -24,6 +24,7 @@ const CARRIED = [
   'FIRST_PARTY',
   'FIRST_PARTY_VERSIONS',
   'METRICS',
+  'SEED_WIDGETS',
   'agentsPackDocument',
   'firstPartyDocument',
   'firstPartyManifest',

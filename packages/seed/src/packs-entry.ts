@@ -23,4 +23,4 @@
 
 export { AGENTS_PACK, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
-export { METRICS } from './index.ts';
+export { METRICS, SEED_WIDGETS } from './index.ts';

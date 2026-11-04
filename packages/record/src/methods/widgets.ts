@@ -55,7 +55,7 @@ import {
 } from 'braindog-render';
 import { previewerOf, type SlashDeclined, type SlashDrafted, type SlashPreviewer } from '../slash.ts';
 import { packIdOf } from '@braindog/declare';
-import { SEED_WIDGETS } from '@braindog/seed';
+import { SEED_WIDGETS } from '@braindog/seed/packs';
 import type { CatalogueShelf } from '../arrange.ts';
 
 import { widgetOffers, type WidgetHeld, type WidgetSignal } from '../design-agent.ts';
