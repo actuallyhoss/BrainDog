@@ -204,6 +204,7 @@ const CONTROL_RING = /^inset 0 0 0 0\.5px var\(--g-line(?:, .+)?\)$/u;
  * Not listed: a glass control's own 0.5px ring (`CONTROL_RING`, SPEC 1 rule 9), which is the same one everywhere.
  */
 const SHADOWS: Record<string, readonly string[]> = {
+  'apps/web/src/routes/admin/+page.svelte': ['.field[data-bad]'], // a refused address, drawn inside its field
   'apps/web/src/lib/mention/MentionField.svelte': ['.mf-token'], // a mention's fill past its letters, where padding would move them off the textarea's
   'apps/web/src/lib/agents/NewKind.svelte': ['.field[data-wrong], .lines[data-wrong]', '.lines'], // edge, edge
   'apps/web/src/lib/board/WidgetSheet.svelte': ['.ws-search', '.ws-search:focus-within', '.ws-card .ws-frame', '.ws-open:focus-visible .ws-frame', '.ws-plus', '.ws-stage .ws-frame', '.ws-on'], // line over the sticky search, edge, ring, ring

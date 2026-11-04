@@ -42,7 +42,7 @@
     return `polygon(0 ${t}, 45% ${t}, 100% ${tn}, 100% ${bn}, 45% ${b}, 0 ${b})`;
   }
 
-  const sparkSaid = (s: Step): string => `${s.label} by week: ${s.weeks.map((w) => n(w.n)).join(', ')}`;
+  const trendSaid = (s: Step): string => `${s.label} by week: ${s.weeks.map((w) => n(w.n)).join(', ')}`;
 
   const notes = $derived.by(() => {
     if (funnel === null) return [];
@@ -62,13 +62,13 @@
       <span class="rate num">{#if s.rate}{s.rate}<span class="of">{` of ${s.of ?? ''}`}</span>{/if}</span>
       <span class="band" aria-hidden="true"></span>
       {#if s.weeks.length > 0}
-        <span class="spark" role="img" aria-label={sparkSaid(s)}>
+        <span class="trend" role="img" aria-label={trendSaid(s)}>
           {#each s.weeks as w, i (w.week)}
             <span class="week" title={`${weekSaid(w.week, i === s.weeks.length - 1)}: ${n(w.n)}`}><i style:block-size={`${s.peak > 0 ? Math.max(8, (w.n / s.peak) * 100) : 8}%`} data-none={w.n === 0 ? '' : undefined}></i></span>
           {/each}
         </span>
       {:else}
-        <span class="spark" aria-hidden="true">{#each { length: 8 } as _, i (i)}<span class="week"><i data-none="" style:block-size="8%"></i></span>{/each}</span>
+        <span class="trend" aria-hidden="true">{#each { length: 8 } as _, i (i)}<span class="week"><i data-none="" style:block-size="8%"></i></span>{/each}</span>
       {/if}
     </li>
   {/each}
@@ -170,7 +170,7 @@
     background: var(--tile-2);
   }
 
-  .spark {
+  .trend {
     display: flex;
     gap: 2px;
     block-size: 24px;
@@ -271,7 +271,7 @@
 
     .name,
     .rate,
-    .spark,
+    .trend,
     .figure {
       position: relative;
       grid-row: 1;
@@ -291,7 +291,7 @@
       display: none;
     }
 
-    .spark {
+    .trend {
       grid-column: 3;
       block-size: 20px;
       margin: 0;
