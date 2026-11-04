@@ -33,13 +33,24 @@ const THREE_ASKS = '696';
 type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string } };
 type Filed = { by: string; dropped: string[] };
 
-/** Workers AI's `run` in the chat shape, answering an empty draft every time, and counted. */
+/**
+ * Workers AI's `run` in the chat shape, answering an empty draft every time, and counted. AN EMBEDDING IS NO ASK: the
+ * alarm's hourly pass sends the record's new words to the embedding model, on the background allowance and outside the
+ * ceiling (`slash.ts` `callsMade`), so it gets the shape that model answers in and a count of its own. Answered in the chat
+ * shape it failed, and left a row that read as a call the ledger could not explain.
+ */
 const fakeAi = () => {
   let runs = 0;
+  let embeds = 0;
   return {
     runs: () => runs,
+    embeds: () => embeds,
     AI: {
-      run: async () => {
+      run: async (_model: string, inputs: { text?: string[] }) => {
+        if (inputs.text !== undefined) {
+          embeds++;
+          return { shape: [inputs.text.length, 4], data: inputs.text.map(() => [0.1, 0.2, 0.3, 0.4]) };
+        }
         runs++;
         return { choices: [{ message: { role: 'assistant', content: '{"drafts":[]}' }, finish_reason: 'stop' }], usage: { prompt_tokens: 700, completion_tokens: 60 } };
       },
@@ -109,8 +120,11 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
   /* AND EACH ASK TURNED AWAY PAST THE CEILING LEAVES ITS ROW UNDER `-` (model-sign-49), never an included call. */
   const turned = rows.filter((r) => r.model === '-');
   assert.ok(turned.length > 0 && turned.every((r) => r.status === 'refused' && r.code === 'SLASH_BUDGET_SPENT' && r.neurons === 0), JSON.stringify(turned));
-  const calls = rows.filter((r) => r.model !== '-');
+  const calls = rows.filter((r) => r.model !== '-' && r.kind !== 'embed');
   assert.equal(calls.length, 4, JSON.stringify(rows));
+  /* THE EMBEDDING THE ALARM SENT HAS ITS OWN ROW, and it is what the ceiling leaves out and not a fifth ask. */
+  assert.equal(ai.embeds(), 1, JSON.stringify(rows));
+  assert.deepEqual(rows.filter((r) => r.kind === 'embed').map((r) => [r.status, r.code]), [['ok', null]], JSON.stringify(rows));
   /* THE THREE ARE HIS PRESSES, AND THE DAILY LOOK IS BESIDE THEM AND NOT ONE OF THEM (ceiling-split-55-56). The look asks
      a model on the first press of the day (cloud-background-54) and was counted as one of the three the ceiling lets
      through, so a person got two. It is a background ask, held to the ceiling over the background's own count. */

@@ -63,13 +63,24 @@ const T0 = Date.UTC(2026, 8, 1, 9);
 
 type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string } };
 
-/** Workers AI's `run` in the chat shape, answering an empty draft, and keeping each call's worst case as `aiInference` reckons it. */
+/**
+ * Workers AI's `run` in the chat shape, answering an empty draft, and keeping each call's worst case as `aiInference`
+ * reckons it. AN EMBEDDING IS COUNTED APART (`embeds`), in the shape that model answers in: the alarm's hourly pass sends
+ * the record's new words to it, on the background allowance and outside the ceiling (`callsMade`). This fake used to read
+ * `messages` off it and throw, so the call was never counted here, and it left a failed row in the ledger.
+ */
 const fakeAi = () => {
   const worst: number[] = [];
+  const embeds: string[][] = [];
   return {
     worst,
+    embeds,
     AI: {
-      run: async (_model: string, inputs: { messages: { content: string }[]; max_tokens: number }) => {
+      run: async (_model: string, inputs: { messages: { content: string }[]; max_tokens: number; text?: string[] }) => {
+        if (inputs.text !== undefined) {
+          embeds.push(inputs.text);
+          return { shape: [inputs.text.length, 4], data: inputs.text.map(() => [0.1, 0.2, 0.3, 0.4]) };
+        }
         const tokens = inputs.messages.reduce((n, m) => n + Math.ceil(new TextEncoder().encode(m.content).length / 4), 0);
         worst.push(Math.ceil((tokens * 13_636 + inputs.max_tokens * 45_455) / 1_000_000));
         return { choices: [{ message: { role: 'assistant', content: '{"drafts":[]}' }, finish_reason: 'stop' }], usage: { prompt_tokens: 700, completion_tokens: 60 } };
@@ -148,7 +159,7 @@ async function ledger(c: Awaited<ReturnType<typeof cloud>>, ready: (rows: Call[]
   return rows;
 }
 
-test('AT A CEILING OF 0 NOTHING REACHES THE BINDING: five presses, the daily look, a first plan, a read and a propose at the palette', async (t) => {
+test('AT A CEILING OF 0 NO ASK REACHES THE BINDING, only the hourly embedding: five presses, the daily look, a first plan, a read and a propose at the palette', async (t) => {
   const { ai, c, cookie, post } = await recordOver(t, '0', 1, true);
   const presses: Out[] = [];
   for (let i = 0; i < 5; i++) presses.push(await post('slashPropose', {}));
@@ -161,6 +172,9 @@ test('AT A CEILING OF 0 NOTHING REACHES THE BINDING: five presses, the daily loo
 
   /* THE COUNT FIRST, so a red run says how many calls got through before it says which door let them. */
   assert.equal(ai.worst.length, 0, `the operator turned every ask away and the Worker made ${ai.worst.length} Workers AI calls`);
+  /* AND THE EMBEDDING IS NOT AN ASK: the hourly pass still sends the record's new words on the background allowance, at
+     any ceiling, as this file's header says. It went unseen here while the fake threw on it, so it is counted now. */
+  assert.deepEqual(ai.embeds, [['row 0']], 'the embedding the alarm sends is held by the background allowance, not this ceiling');
   /* EVERY DOOR STILL ANSWERS IN ITS OWN WORDS: the press is drafted by the rules, the plan is the use case's own, and
      the palette is refused with the ceiling's code. */
   for (const out of presses) assert.equal((out.value as { by?: string } | undefined)?.by, 'rules', JSON.stringify(out));
@@ -178,7 +192,7 @@ test('A PRESS NEVER SPENDS MORE THAN THE ASK THE CEILING COUNTS IT AS: on 300 li
   for (const w of ai.worst) assert.ok(w <= 232, `a press may spend ${w} neurons and the ceiling counts every call at 232`);
   assert.equal(ai.worst.length, 0, 'the press and the daily look on 300 lists are both past 232, so neither is sent');
   /* AND NOTHING LEFT BEHIND IN THE LEDGER: a call never sent is released, so it spends none of the month's asks. */
-  const rows = await ledger(c);
+  const rows = (await ledger(c)).filter((r) => r.purpose !== 'embed');
   assert.equal(rows.length, 0, JSON.stringify(rows));
   assert.equal(ai.worst.length, 0, 'the look finished after the press and was sent past 232');
   t.mock.timers.reset();
@@ -202,8 +216,11 @@ test("UNDER THE CEILING THE DAILY LOOK ASKS THE BINDING ONCE, and its row spends
   const rows = await ledger(c, (now) => now.some((r) => r.question === "Slash's daily look"));
   const looks = rows.filter((r) => r.question === "Slash's daily look");
   assert.deepEqual(looks, [{ question: "Slash's daily look", purpose: 'look', spends: 'background', status: 'ok', model: 'glm-5.3-flash', code: null }], JSON.stringify(rows));
-  /* ONE BINDING CALL FOR EACH ROW THAT NAMES A MODEL, so nothing reached Workers AI beside the ledger. */
-  assert.equal(ai.worst.length, rows.length, `${ai.worst.length} Workers AI calls and ${rows.length} rows: ${JSON.stringify(rows)}`);
+  /* ONE BINDING CALL FOR EACH ROW THAT NAMES A MODEL, so nothing reached Workers AI beside the ledger: the asks and the
+     embeddings each to their own rows. */
+  const named = rows.filter((r) => r.model !== '-');
+  assert.equal(ai.worst.length + ai.embeds.length, named.length, `${ai.worst.length} Workers AI calls, ${ai.embeds.length} embeddings and ${named.length} rows that name a model: ${JSON.stringify(rows)}`);
+  assert.equal(ai.worst.length, named.filter((r) => r.purpose !== 'embed').length, JSON.stringify(rows));
   assert.equal(rows.filter((r) => r.spends === 'person').length, 0, `the look spent one of his asks: ${JSON.stringify(rows)}`);
   for (const w of ai.worst) assert.ok(w <= 232, `a background ask may spend ${w} neurons and the ceiling counts every call at 232`);
 });
