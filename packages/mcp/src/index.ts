@@ -4166,9 +4166,10 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     /* EVERY WRITE ENDS WITH ITS RECEIPT: what changed in names, and the one call that takes it back. */
     const receipted = (s: Said, line: string | null, short: string | null): Said =>
       line === null ? s : { ...s, ...(short !== null ? { text: `${s.text}\n${short}` } : {}), structured: { ...s.structured, receipt: line } };
-    /* `act` IS RECEIPTED WHEN ITS CALL WROTE: a batch came back, or the call is a write in the record's table. */
+    /* `act` IS RECEIPTED WHEN ITS CALL WROTE: a batch came back, or the call is a write in the record's table. AND NOT ITS
+       `undoOwn`, which is `undo` and the way back itself: every undo ended by saying no handle came back and to ask the owner. */
     const receiptOn = (line: string): string | null =>
-      RECEIPTED.has(name) || (name === 'act' && (turn.batch !== undefined || turn.asks !== undefined || surface.calls?.().find((r) => r.name === sent.call)?.writes === true)) ? line : null;
+      RECEIPTED.has(name) || (name === 'act' && sent.call !== 'undoOwn' && (turn.batch !== undefined || turn.asks !== undefined || surface.calls?.().find((r) => r.name === sent.call)?.writes === true)) ? line : null;
     if (full || walled || !done.say) return receipted(said(result), receiptOn(receiptOf(name, '', turn, value)), null);
     const body = done.say(await lookOf(ctx, turn, done.names));
     return receipted(said(result, body), receiptOn(receiptOf(name, body, turn, value)), receiptOf(name, body, turn, value, true));
