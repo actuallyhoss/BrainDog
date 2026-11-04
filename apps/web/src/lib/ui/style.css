@@ -394,6 +394,10 @@
   html[data-density='roomy'] {
     --fit: max(1, calc(var(--type) * (0.5 + var(--dense) * 0.5)));
   }
+  /* THE LARGEST WORDS AND THE MOST ROOM GET A WIDER SIDEBAR: a short pinned name ("Ferment & Co") ended in an ellipsis there. */
+  html[data-text='md'][data-density='roomy'] {
+    --rail: 236px;
+  }
   html[data-density='compact'] {
     --dense: 0.75;
     --row-h-2: 48px;
@@ -537,7 +541,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     flex-shrink: 0;
     inline-size: var(--ctl-page);
     block-size: var(--ctl-page);
@@ -652,10 +656,10 @@
     isolation: isolate;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-2);
     inline-size: 100%;
     min-block-size: var(--menu-row-h);
-    padding: 0 10px;
+    padding: 0 calc(10px * var(--dense, 1));
     border: 0;
     border-radius: var(--r-menu-row);
     background: none;

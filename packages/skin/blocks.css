@@ -938,6 +938,17 @@
     }
   }
 
+  /* AT LARGE THE COLUMNS KEEP THEIR WIDTHS, AND THE WORDS GROW IN THEM. Tracks are written in `em` of the row, so the larger
+     text pushed Tasks past its region at 1440 and its last column stood under the edge's fade with nothing to scroll for
+     but the size. A long value ends in an ellipsis, as it does at any size. */
+  html[data-text='md'] .table-region .tr {
+    font-size: calc(var(--fs-body) / var(--type, 1));
+  }
+
+  html[data-text='md'] .table-region .tr > .td {
+    font-size: var(--fs-body);
+  }
+
   /* AS WIDE AS ITS COLUMNS, AND NEVER NARROWER THAN ITS SPACE. It was only as wide as the region, so
      a grid whose tracks came to 1002px in a 736px region at 768 laid its rows out past the row box,
      and each `.rowgroup`, whose `content-visibility` contains paint, clipped them at 736: scrolling
@@ -1354,7 +1365,7 @@
      already reads larger than a proportional one at the same size, so `0.9em` of whatever the
      surrounding text is doing is the relationship that actually wants keeping. */
   .document code {
-    padding: 1px 5px;
+    padding: 1px calc(5px * var(--dense, 1));
     background: var(--tile-2);
     border-radius: 3px;
     font-family: var(--font-mono);
