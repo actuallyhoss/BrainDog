@@ -27,7 +27,7 @@ function asMoney(minor: number, currency: string, home: string | null): string {
   return `${parts.lead}${parts.whole}${parts.fraction}${parts.iso ? `${AMOUNT_SPACE}${parts.iso}` : ''}`;
 }
 
-/** The same amount in a sentence: the parts of `drawn` over `money()`, where a whole amount leaves off its `.00` (5dcc1456c). The cents stay when they are not nought. */
+/** The same amount in a sentence: the parts of `drawn` over `money()`, where a whole amount leaves off its `.00` (2263d2ff8). The cents stay when they are not nought. */
 function asSaid(minor: number, currency: string, home: string | null): string {
   const parts = drawn(money(minor, currency), home);
   assert.ok(parts, `${currency} ${minor} is money`);

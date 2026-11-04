@@ -404,7 +404,9 @@ async function bandProbes(view: Page, band: { from: number; to: number }): Promi
 }
 
 async function measured(view: Page, body: string, css = CASCADE): Promise<Verdict> {
-  await view.setContent(chain(body, css));
+  /* THE LONGEST SWEEP GROWS WITH EVERY STAT A DECLARED PAGE ADDS, and now takes longer than Playwright's own 30 seconds to
+     lay out. That is a clock, not a finding: what is measured below is untouched. */
+  await view.setContent(chain(body, css), { timeout: 240_000 });
   await view.evaluate(() => document.fonts.ready);
   assert.ok(await view.evaluate(() => document.fonts.check('500 24px Geist')), 'Geist did not load, so this would be a fallback face rather than the face the app ships');
   return verdict(await view.evaluate(reading));
