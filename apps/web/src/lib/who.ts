@@ -171,7 +171,7 @@ export function roleNote(bio: string): string {
   if (first === '') return '';
   if (/^(?:i|we)\s+(?:want|need|would|['’]d|hope|wish|try|am trying|keep|have|just|really|also|like|love|plan)\b/iu.test(first)) return '';
   const am = /^(?:i['’]?m|i am)\s+(.+)$/iu.exec(first);
-  const does = /^i\s+(\p{Ll}+)\b(.*)$/u.exec(first);
+  const does = /^[Ii]\s+(\p{Ll}+)\b(.*)$/u.exec(first);
   let said = first;
   if (am) said = am[1]!;
   else if (does) {
