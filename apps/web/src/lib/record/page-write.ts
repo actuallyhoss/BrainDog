@@ -14,6 +14,7 @@
  * is the first terminal state, and not done is the first state that is not terminal.
  */
 
+import { noteWrite } from './wrote-mark.ts';
 import { createClient, wroteOutside } from '@braindog/client';
 import type { Row, RowRef } from 'braindog-render';
 
@@ -110,6 +111,8 @@ export function schemaOf(base: string, register: string, io?: ClientFetch): Prom
 export async function updateRow(base: string, ref: RowRef, patch: Record<string, unknown>, title: string, io: Fetch = fetched): Promise<Updated> {
   let res: Response;
   try {
+    /* NOTED BEFORE IT GOES (`wrote-mark.ts`): what Today kept of this row is old from now on. */
+    noteWrite('update');
     res = await io(`${base}/api/update`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },

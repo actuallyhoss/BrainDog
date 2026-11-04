@@ -17,8 +17,8 @@
  * over a copy (`words.updating`) is laid in where Today draws it, with the time it was taken, so a figure is never shown
  * old without saying so. The words are made here, from the copy's own, because `app.html` holds no words.
  *
- * IT NEVER DRAWS BACK WHAT THIS BROWSER JUST CLOSED. An answer since it was taken is taken out of it as it is painted
- * (`record/answers-out.ts`, `app.html`).
+ * IT NEVER DRAWS BACK WHAT THIS BROWSER JUST CLOSED. An answer since it was taken is taken out of it as it is painted, and a
+ * row moved since it was taken leaves it unpainted that once (`record/answers-out.ts`, `record/wrote-mark.ts`, `app.html`).
  *
  * NOTHING IN IT RUNS OR LOADS: scripts, frames and media are left out, every `id` is renamed so nothing finds the
  * picture for the screen, and `data-screen` is dropped so nothing reads it as drawn.

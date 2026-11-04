@@ -1718,6 +1718,12 @@ if (typeof WINDOW.addEventListener === 'function' && WINDOW.document !== undefin
   WINDOW.addEventListener('pagehide', leave);
   WINDOW.addEventListener('pageshow', () => (LEAVING = false));
 }
+/** WHO IS TOLD A WRITE IS GOING OUT, before it goes: the app notes it where a reload cannot lose it (`wrote-mark.ts`). */
+const WRITING = new Set<(name: string) => void>();
+export function onWriteOut(fn: (name: string) => void): () => void {
+  WRITING.add(fn);
+  return () => void WRITING.delete(fn);
+}
 /**
  * The record's version as this tab last heard it, by host and token, whichever client asked: the poll asks through one
  * client and the screens read through many, some with a fetch of their own, so the version a kept read is checked
@@ -2199,6 +2205,7 @@ export function createClient(options: ClientOptions) {
     if (WRITES.has(name) && !POST_READS.has(name)) {
       FLYING.get(doFetch)?.clear();
       OUT.clear();
+      for (const fn of WRITING) fn(name);
     }
     return send<T>(name, url, writes, sent, outlives, args);
   }

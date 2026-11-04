@@ -55,6 +55,7 @@
   import { apiBase, at as inApp, slugOf } from '$lib/at.ts';
   import { closedNow } from '$lib/record/answers-closed.svelte.ts';
   import { pageWithout } from '$lib/record/answers-out.ts';
+  import { movedSinceToday, noteToday } from '$lib/record/wrote-mark.ts';
   import { madeOf } from '$lib/home/made-counts.ts';
   import { stillShown, type WidgetSize } from 'braindog-render';
   import { recordToday, recordZone } from '$lib/record/zone.ts';
@@ -566,6 +567,8 @@
   type CopyBody = KeptBody & { handled?: HandledFound | null };
   async function drawCopy(slug: string | null, near: Near<CopyBody>): Promise<void> {
     if (got !== null || declares !== slug || near.value.got.from !== 'live') return;
+    /* OLDER THAN A ROW THIS BROWSER MOVED (`wrote-mark.ts`): it would draw the row back as it was. */
+    if (movedSinceToday()) return;
     if (near.value.handled !== undefined && handled === null) handled = near.value.handled;
     got = near.value.got;
     news = near.value.news;
@@ -758,8 +761,13 @@
     };
   }
 
+  /** When the read now out was asked, which is what its answer is as new as (`noteToday`). */
+  let readAsked = 0;
   /** Home's page, from whichever of the three sources the record holds. */
-  async function readBody(slug: string | null, spoken: HomeVoice, held: Holds, fresh = false, onPage?: (o: Opened) => void): Promise<Opened | null> {
+  async function readBody(slug: string | null, spoken: HomeVoice, held: Holds, askedFresh = false, onPage?: (o: Opened) => void): Promise<Opened | null> {
+    /* A ROW MOVED HERE SINCE TODAY WAS LAST READ (`wrote-mark.ts`): the record's last drawing of it has the row as it was. */
+    readAsked = Date.now();
+    const fresh = askedFresh || movedSinceToday();
     if (slug !== null) {
       /* A KEPT TODAY IS ONE READ: the record's `today`, by its slug, draws the kept page with every tile's part beside it,
          as it draws the body. A kept page that is not a board (arranged before boards), or a host without it, is read as
@@ -874,7 +882,7 @@
     readFailed = false;
     /* DRAWN FROM WHAT TODAY LAST DREW, the screen is settled at once, and the read is not bracketed: it lands over it. */
     /* NOT A PHONE'S COPY ON A BOARD WIDER THAN A PHONE: the key holds no width, and the copy holds four widgets empty. */
-    const kept = untrack(() => got) === null ? keptPart<KeptBody>('body', key) : null;
+    const kept = untrack(() => got) === null && !movedSinceToday() ? keptPart<KeptBody>('body', key) : null;
     const was = kept !== null && isPhoneOnly(kept.got) && !untrack(() => narrow.current) ? null : kept;
     if (was) {
       got = was.got;
@@ -940,6 +948,7 @@
         if (ok) keepNews(before, mine, key);
         if (ok && out) {
           drewAt = Date.now();
+          if (!untrack(() => answerBehind)) noteToday(readAsked);
           painted('Today', 'network');
           void Promise.all([before, mark]).then(([said, at]) => keepCopy(slug, out, said, at, stamp));
         }
@@ -998,6 +1007,7 @@
         got = settle(got, out);
         fromCopy = false;
         drewAt = Date.now();
+        if (!untrack(() => answerBehind)) noteToday(readAsked);
         void Promise.all([before, mark]).then(([said, at]) => keepCopy(slug, out, said ?? untrack(() => news), at, stamp));
         const key = bodyKey(slug, spoken, held);
         keepPart('body', key, { got: out, news: untrack(() => news) } satisfies KeptBody);

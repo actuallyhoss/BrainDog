@@ -44,7 +44,8 @@
   import { copy } from '$lib/copy/frame.ts';
   import { callsOut, leaving, quiet, rested, settled } from '$lib/ui/screen.svelte.ts';
   import { copyMark } from '$lib/data/copy-mark.svelte.ts';
-  import { onCallsOut } from '@braindog/client';
+  import { onCallsOut, onWriteOut } from '@braindog/client';
+  import { noteWrite } from '$lib/record/wrote-mark.ts';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { inField, notTheShells } from '$lib/a11y/typed.ts';
   import { watchKeyboard } from '$lib/a11y/keyboard.ts';
@@ -296,6 +297,8 @@
   });
   /* WHAT THE LAST PAGE PRESSED AND NEVER HEARD BACK ABOUT GOES AGAIN NOW (`answers-out.ts`), and only a refusal is said: its
      question is open again, so it is drawn again and the reader is told why. Asks nothing where nothing waits. */
+  /* A ROW MOVED HERE, NOTED BEFORE THE WRITE GOES (`wrote-mark.ts`), so what Today kept is doubted on the next open. */
+  $effect(() => onWriteOut((name) => noteWrite(name)));
   let replayed = false;
   $effect(() => {
     const base = apiBase();
