@@ -8,7 +8,7 @@
  * Even on, it reads nothing without the included model (`includedInference`), a reader (`readSetup`, handed in), a bot
  * check keyed by both Turnstile keys (`turnstile.ts`) and a place to count in (`MeterStore`); any one missing is the same answer.
  *
- * THE COUNT IS THE DIRECTORY'S. Six readings a day for one address and the ceiling for all are counted by key and UTC
+ * THE COUNT IS THE DIRECTORY'S. Eighteen readings a day for one address and the ceiling for all are counted by key and UTC
  * day over `MeterStore`, which the Cloud hands as the Directory's `firstReadHit`; `store: null` keeps the door off.
  *
  * WHAT IS ON OFFER IS THE CATALOGUE'S: the use cases bundled with the shell, read once from the static assets
@@ -68,7 +68,7 @@ export function dailyOf(value: string | undefined): number {
   return Number(s);
 }
 
-/** Six for one address, then the day's ceiling: the address first, so one address spends nobody else's readings. */
+/** Eighteen for one address, then the day's ceiling: the address first, so one address spends nobody else's readings. */
 export function meterOver(store: MeterStore, daily: number): FirstReadDoor['meter'] {
   return {
     take: async (ip, day) => {

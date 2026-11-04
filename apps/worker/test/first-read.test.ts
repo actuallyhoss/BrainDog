@@ -120,12 +120,12 @@ test('A FAILED BOT CHECK IS REFUSED BEFORE ANY COUNT OR MODEL', async () => {
   assert.equal(ai.runs.length, 0);
 });
 
-test('SIX FOR ONE ADDRESS: the seventh reading from one address that day is refused, and another address still reads', async () => {
+test('EIGHTEEN FOR ONE ADDRESS, three conversations: the nineteenth reading from one address that day is refused, and another address still reads', async () => {
   const d = door(allOn());
-  for (let i = 0; i < 6; i += 1) assert.equal((await serveFirstRead(ask('203.0.113.7'), d, NOW)).status, 200);
-  const seventh = await serveFirstRead(ask('203.0.113.7'), d, NOW);
-  assert.equal(seventh.status, 429);
-  assert.equal((await refusal(seventh)).fix, FIRST_READ_ADDRESS_SPENT);
+  for (let i = 0; i < 18; i += 1) assert.equal((await serveFirstRead(ask('203.0.113.7'), d, NOW)).status, 200);
+  const nineteenth = await serveFirstRead(ask('203.0.113.7'), d, NOW);
+  assert.equal(nineteenth.status, 429);
+  assert.equal((await refusal(nineteenth)).fix, FIRST_READ_ADDRESS_SPENT);
   assert.equal((await serveFirstRead(ask('198.51.100.4'), d, NOW)).status, 200);
   assert.equal((await serveFirstRead(ask('203.0.113.7'), d, NOW + 86_400_000)).status, 200, 'the next day did not start over');
 });
