@@ -291,12 +291,16 @@ export function methods(deps: RecordDeps) {
    * A share as an agent can name it, read back to the ids the grammar keeps (`resolved` in the file's head): a project
    * by its handle or its exact name, rows by their handles, a person by their People row. An id that is already one is
    * left as it is. Nothing found, or more than one, is refused plainly.
+   *
+   * A CALLER WHO HOLDS ONLY HER OWN SHARE (`asked`, `shareOnward`) IS TOLD ONLY OF ROWS SHE READS. "No project is called
+   * X" beside "reaches past what you manage" told a manager of Tasks which projects exist, a guess at a time, and "is
+   * not in Tasks" which rows do. A row out of her sight is answered as one that is not there.
    */
-  const resolved = (s: Share, catalog: LensCatalog): Share | Refusal => {
+  const resolved = (s: Share, catalog: LensCatalog, asked?: CallContext): Share | Refusal => {
     const what = s.what as unknown as Record<string, unknown>;
     let target: Record<string, unknown> = what;
     if (typeof what.project === 'string') {
-      const id = projectId(what.project, catalog);
+      const id = projectId(what.project, catalog, asked);
       if (typeof id !== 'string') return id;
       target = { ...what, project: id };
     } else if (typeof what.list === 'string' && Array.isArray(what.rows)) {
@@ -305,7 +309,7 @@ export function methods(deps: RecordDeps) {
       for (const r of what.rows as unknown[]) {
         if (typeof r !== 'string' || r.trim() === '') return { code: 'VALUE_MALFORMED', fix: 'rows is a list of rows, each by its handle such as tasks#9.', at: 'what.rows' };
         const row = kernel.get(r.trim());
-        if (row === null) return { code: 'REF_UNKNOWN', fix: `Nothing here is called ${r.trim()}.`, at: 'what.rows' };
+        if (row === null || (asked !== undefined && (deps.readable(asked, row.register) !== null || !deps.sight.admits(asked, row)))) return { code: 'REF_UNKNOWN', fix: `Nothing here is called ${r.trim()}.`, at: 'what.rows' };
         if (row.register !== list) return { code: 'REF_REGISTER_MISMATCH', fix: `${r.trim()} is not in ${catalog.lists.find((l) => l.id === list)?.name ?? list}.`, at: 'what.rows' };
         if (!ids.includes(row.id)) ids.push(row.id);
       }
@@ -321,18 +325,22 @@ export function methods(deps: RecordDeps) {
   };
 
   /** A project's row id from its id, its handle (`things#9`) or its exact name. */
-  const projectId = (said: string, catalog: LensCatalog): string | Refusal => {
+  const projectId = (said: string, catalog: LensCatalog, asked?: CallContext): string | Refusal => {
     const projects = catalog.lists.find((l) => l.role === 'projects');
     const text = said.trim();
     if (projects === undefined || text === '') return said;
+    const seen = (ids: readonly string[]): Set<string> => (asked === undefined ? new Set(ids) : deps.readable(asked, projects.id) !== null ? new Set() : deps.sight.admitted(asked, projects.id, ids));
     const row = kernel.get(text);
-    if (row !== null) return row.register === projects.id ? row.id : { code: 'REF_REGISTER_MISMATCH', fix: `${text} is not a project. Name a project by its handle or its name.`, at: 'what.project' };
+    if (row !== null && (asked === undefined || (deps.readable(asked, row.register) === null && deps.sight.admits(asked, row))))
+      return row.register === projects.id ? row.id : { code: 'REF_REGISTER_MISMATCH', fix: `${text} is not a project. Name a project by its handle or its name.`, at: 'what.project' };
     const title = projects.fields.find((f) => f.title)?.id;
     if (title === undefined) return { code: 'REF_UNKNOWN', fix: `No project is called ${text}.`, at: 'what.project' };
     const wanted = text.toLowerCase();
-    const hits = sql
+    const called = sql
       .all<{ id: string; t: unknown }>("SELECT id, json_extract(fields, '$.' || ?) AS t FROM entry WHERE register = ? AND deleted_at IS NULL", title, projects.id)
       .filter((r) => typeof r.t === 'string' && r.t.trim().toLowerCase() === wanted);
+    const shown = seen(called.map((h) => h.id));
+    const hits = called.filter((h) => shown.has(h.id));
     if (hits.length === 0) return { code: 'REF_UNKNOWN', fix: `No project is called ${text}. Name it by its handle, such as ${projects.id}#1, or by its exact name.`, at: 'what.project' };
     if (hits.length > 1) return { code: 'NAME_AMBIGUOUS', fix: `${String(hits.length)} projects are called ${text}. Name the one you mean by its handle.`, at: 'what.project' };
     return hits[0]!.id;
@@ -1021,10 +1029,7 @@ export function methods(deps: RecordDeps) {
       const catalog = kernel.catalog();
       let target: ShareTarget | undefined = isObj(args?.what) ? (args.what as ShareTarget) : undefined;
       if (target !== undefined) {
-        const named = resolved({ effect: 'allow', who: { kind: 'person', id: who }, what: target, can }, catalog);
-        /* ONE ANSWER FOR A NAME THAT IS NOT THERE AND ONE THAT IS OUT OF HER REACH: she may not read the rest of the record,
-           and "No project is called X" against "reaches past" told her which projects exist, a guess at a time. */
-        if ('code' in named && ['REF_UNKNOWN', 'REF_REGISTER_MISMATCH', 'NAME_AMBIGUOUS'].includes(named.code)) return refuse('OUT_OF_BOUNDS', 'That reaches past what you manage. Pick something inside it.', 'what');
+        const named = resolved({ effect: 'allow', who: { kind: 'person', id: who }, what: target, can }, catalog, ctx);
         if ('code' in named) return { ok: false, refusal: named };
         target = named.what;
       }

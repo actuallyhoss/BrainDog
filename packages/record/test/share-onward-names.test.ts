@@ -71,12 +71,16 @@ test('A PEOPLE ROW SHE DOES NOT READ IS NOT NAMED TO A MANAGER OF ANOTHER LIST',
 test('A PROJECT SHE CANNOT SEE ANSWERS AS ONE THAT IS NOT THERE', async () => {
   const { api, lee, from } = await record();
   assert.ok(((await api.create({ register: 'things', fields: { name: 'Hidden Project' } }, owner)) as R).ok);
+  const said = (r: R, name: string) => ({ ...r.refusal, fix: r.refusal?.fix.replace(name, 'X') });
   const there = (await api.shareOnward({ from, who: 'p_sam', can: 'view', what: { project: 'Hidden Project' } }, lee)) as R;
   const notThere = (await api.shareOnward({ from, who: 'p_sam', can: 'view', what: { project: 'No Such Project' } }, lee)) as R;
-  assert.deepEqual(there.refusal, notThere.refusal);
+  assert.deepEqual(said(there, 'Hidden Project'), said(notThere, 'No Such Project'));
+  const byHandle = (await api.shareOnward({ from, who: 'p_sam', can: 'view', what: { project: 'things#1' } }, lee)) as R;
+  const noHandle = (await api.shareOnward({ from, who: 'p_sam', can: 'view', what: { project: 'things#99' } }, lee)) as R;
+  assert.deepEqual(said(byHandle, 'things#1'), said(noHandle, 'things#99'));
   const rowThere = (await api.shareOnward({ from, who: 'p_sam', can: 'view', what: { list: 'tasks', rows: ['things#1'] } }, lee)) as R;
   const rowNot = (await api.shareOnward({ from, who: 'p_sam', can: 'view', what: { list: 'tasks', rows: ['things#99'] } }, lee)) as R;
-  assert.deepEqual(rowThere.refusal, rowNot.refusal);
+  assert.deepEqual(said(rowThere, 'things#1'), said(rowNot, 'things#99'));
 });
 
 test('THE OWNER IS STILL TOLD THE ROW HAS NO ADDRESS', async () => {
