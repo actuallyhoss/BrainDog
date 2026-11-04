@@ -24,7 +24,7 @@ export const home = {
        relay between sessions, and he called the first one shitty. HEADLINES.md has the seven tried. */
     title: 'Your agents keep track. You make the calls.',
     /* No mechanism in the promise: no event, log, row or ledger (`test/content.test.ts`). */
-    /* No product names anywhere on the home page (3 and 4 November, Sam: "just say agents"), so no makers' row. */
+    /* No product names anywhere on the home page (3 and 4 November, the owner: "just say agents"), so no makers' row. */
     sub: 'One place for your projects, decisions and money. Every agent reads it before it starts and writes down what it did. Money, keys and deletes wait for your yes.',
     secondary: 'Connect your agents',
   },

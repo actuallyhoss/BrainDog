@@ -6,7 +6,7 @@
    *
    * ONE PRODUCT PICTURE, THEN BANDS THAT EACH SAY ONE NEW THING, AND THE ASK (plan F12, 1 Nov; the order is the site
    * story's, 3 Nov: the band that sells the product comes right after how it works). The dark hero with the headline,
-   * two buttons and the early access line (no row of makers' names: "just say agents", Sam), then Maya's desk across the hero's edge
+   * two buttons and the early access line (no row of makers' names: "just say agents", the owner), then Maya's desk across the hero's edge
    * (`lib/desk/Desk.svelte`), drawn as the app's own Today. Under it, full-bleed bands, each on its own ground in both
    * schemes so two neighbours never share one (`--band-*` in Look B):
    *
