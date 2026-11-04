@@ -411,5 +411,10 @@ export default defineConfig({
      sign-in, the account and OAuth are the host's doors at the root, and so is the record for a tab with no slug. */
   server: { port: 5183, strictPort: true, proxy: PROXY },
   preview: { port: 5183, strictPort: true, proxy: PROXY },
+  /* `:dir(rtl)` STAYS `:dir(rtl)`. With no targets Lightning CSS rewrites it to `:lang(ar, he, ...)`, so forty rules written
+     for a right-to-left screen fired only for a document in one of those languages, and never for English words read
+     right to left. 4 is its `Features.DirSelector`; it is not a dependency of this app to import the name from, and every
+     browser this app supports has had the selector since 2023. */
+  css: { lightningcss: { exclude: 4 } },
   build: { target: 'es2022', cssMinify: 'lightningcss', modulePreload: { resolveDependencies } },
 });

@@ -16,5 +16,7 @@ export default defineConfig({
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
   server: { port: 5184, strictPort: true },
   preview: { port: 5184, strictPort: true },
+  /* `:dir(rtl)` stays `:dir(rtl)`: see `apps/web/vite.config.ts`. */
+  css: { lightningcss: { exclude: 4 } },
   build: { target: 'es2022', cssMinify: 'lightningcss' },
 });

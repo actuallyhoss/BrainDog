@@ -92,15 +92,20 @@
   }
 
   /* A FIGURE OR A SHORTCUT IS LEFT TO RIGHT IN EVERY LANGUAGE, and stands apart from the words round it, so a minus stays
-     in front of its amount and "cmd K" does not turn round. */
+     in front of its amount and "cmd K" does not turn round. `plaintext` and not `direction: ltr`: a line with no letter in
+     it reads left to right either way, and a set direction would flip the figure's own logical margins, which pressed
+     "38" against "Bills and invoices". */
   :where(.num, .money, kbd) {
-    direction: ltr;
-    unicode-bidi: isolate;
+    unicode-bidi: plaintext;
   }
 
   /* WHAT SOMEBODY TYPES TAKES ITS DIRECTION FROM WHAT THEY TYPE, in either shell: an Arabic name in a field starts at
      the right and its punctuation lands where they put it. */
   :where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='date'], [type='time'], [type='number']), textarea) {
+    unicode-bidi: plaintext;
+  }
+
+  :where(input, textarea)::placeholder {
     unicode-bidi: plaintext;
   }
 

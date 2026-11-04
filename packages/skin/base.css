@@ -151,7 +151,7 @@
      baseline, and diacritics need room. letter-spacing is EXACTLY 0, always — it is a joined script
      and tracking breaks the joins. The multiplier and the leading are practitioner numbers, marked
      low confidence in 13 §3.3 and owed a measurement. */
-  :root:dir(rtl) body {
+  :root:is(:lang(ar), :lang(fa), :lang(ur), :lang(ps)) body {
     font-size: calc(var(--fs-body) * 1.12);
     line-height: calc(var(--lh-body) + 0.18);
     letter-spacing: 0;
