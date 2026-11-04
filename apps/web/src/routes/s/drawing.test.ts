@@ -198,7 +198,7 @@ test('a table says a close deadline as the app does, and writes a whole column o
   });
   const d = drawingOf(shown(b), where);
   assert.deepEqual(d.table?.rows.map((r) => r.cells), [
-    ['Three candles', 'EGP 1,350', 'Due in 2 days'],
-    ['Gift box', 'EGP 1,200', '4 Sep'],
+    ['Three candles', 'EGP\u00a01,350', 'Due in 2 days'],
+    ['Gift box', 'EGP\u00a01,200', '4 Sep'],
   ]);
 });

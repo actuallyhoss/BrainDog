@@ -317,8 +317,9 @@ export function shownBlocks(blocks: readonly SharedBlock[], where: Where): { lea
     const all = columnsOf(b);
     const columns = all.filter((c) => b.rows.some((r) => !blank(cellSaid(r, c, where))));
     /* THE ROW'S NAME IS ITS FIRST COLUMN THAT IS NOT ANOTHER ROW'S: an order nobody is named on is still an order, where
-       a Who first left it out. */
-    const title = columns.find((c) => c.ref !== true) ?? columns[0];
+       a Who first left it out. READ FROM THE COLUMNS AS DECLARED, not the ones something fills: with its Name kept back from
+       every row, a list of keys took its next column for the name and drew a tile of "All", "All". */
+    const title = all.find((c) => c.ref !== true) ?? all[0];
     const rows = title === undefined ? [] : b.rows.filter((r) => !blank(cellSaid(r, title, where)));
     const matched = Math.max(rows.length, b.matched - (b.rows.length - rows.length));
     const says = rows.length > 0 || b.readings.length > 0 || (b.measures?.length ?? 0) > 0 || b.authored.some((cells) => cells.some((c) => plainSaid(c, where) !== '')) || Boolean(b.body) || Boolean(b.refused);

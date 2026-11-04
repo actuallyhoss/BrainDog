@@ -95,7 +95,7 @@ test('a trend is drawn from three points, a gap left out, and each point said as
   assert.ok(Number.isNaN(line?.[1]));
   assert.equal(trendLine({ ...cash, trend: [1, null, 2] }), null);
   assert.equal(trendLine({ metric: 'cash', value: 1, unit: null }), null);
-  assert.equal(pointSaid(cash, 7_500_00, where), 'EGP 7,500');
+  assert.equal(pointSaid(cash, 7_500_00, where), 'EGP\u00a07,500');
 });
 
 test('an amount in the home currency is its sign alone, any other its own sign, and noughts of pence go', () => {
