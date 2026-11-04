@@ -162,8 +162,9 @@ export function best(q: string, value: SearchResult, lead: string | null = null)
   const leads = (h: SearchHit): number => (lead !== null && h.kind === lead ? 0 : 1);
   const sort = (hits: readonly SearchHit[]): SearchHit[] =>
     hits
-      .map((h, i) => ({ h, i, t: tierHit(h), l: leads(h) }))
-      .sort((a, b) => a.t - b.t || a.l - b.l || a.i - b.i)
+      /* AND THE SHORTER NAME FIRST: "Fenwick Cloud" is nearer "fenwick" than "fenwick draft podcast 117" is. */
+      .map((h, i) => ({ h, i, t: tierHit(h), l: leads(h), n: tokensOf(h.title).length }))
+      .sort((a, b) => a.t - b.t || a.l - b.l || a.n - b.n || a.i - b.i)
       .map((x) => x.h);
   const groups = value.groups.map((g) => ({ ...g, hits: sort(g.hits) }));
   const groupBest = (g: { hits: readonly SearchHit[] }): [number, number] => [Math.min(...g.hits.map(tierHit)), Math.min(...g.hits.map(leads))];

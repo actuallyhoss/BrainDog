@@ -1963,7 +1963,7 @@
       <button type="button" class="p-mode tap" aria-label={threadWords.findLabel} onclick={toFind}><Icon name="search" size="s" /><span>{threadWords.find}</span></button>
     {:else if slashHere}
       <!-- ASK, ONE PRESS FROM FIND (or ⌘J), as Find is one press from Ask. What is typed goes with it, not yet sent. -->
-      <button type="button" class="p-mode tap" aria-label={threadWords.askLabel} title={threadWords.askLabel} onclick={moveToAsk}><Icon name="ask" size="s" /><span>{threadWords.askMode}</span></button>
+      <button type="button" class="p-mode tap" aria-label={threadWords.askLabel} title={threadWords.askLabel} onclick={moveToAsk}><Icon name="slash" size="s" /><span>{threadWords.askMode}</span></button>
     {/if}
     <!--
       A WAY OUT A THUMB CAN REACH.

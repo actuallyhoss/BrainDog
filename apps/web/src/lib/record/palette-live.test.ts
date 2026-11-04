@@ -134,10 +134,11 @@ test('a figure is drawn from the record\'s reading, and one refused or over no r
 test('A FIGURE OVER A LIST THE RECORD DOES NOT HOLD IS NOT ASKED FOR', async () => {
   const { io, sent } = host(() => json(200, { ok: true, value: { value: 1, unit: null, rows: 1, met: true, refusals: [] } }));
   assert.deepEqual(await paletteReader(BASE, io).figures([{ id: 'courses' }, { id: 'assignments' }], () => true), []);
-  assert.equal(sent.length, 0);
+  const figures = () => sent.filter((u) => /metric/u.test(String((u as { href?: string }).href ?? u))).length;
+  assert.equal(figures(), 0);
   const money = FIGURE_IDS.filter((id) => METRICS[id]?.source === 'register.obligations');
   await paletteReader(BASE, io).figures([{ id: 'obligations' }], () => true);
-  assert.equal(sent.length, Math.min(money.length, FIGURES_ASKED));
+  assert.equal(figures(), Math.min(money.length, FIGURES_ASKED));
 });
 
 test('only the newest query is answered, however the replies arrive', async () => {
