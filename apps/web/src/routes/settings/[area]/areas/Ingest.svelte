@@ -697,7 +697,7 @@
   .door-state {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: var(--lead-meta);

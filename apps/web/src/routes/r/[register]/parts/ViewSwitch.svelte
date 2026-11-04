@@ -78,7 +78,7 @@
   .view-seg {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   @media (width < 900px) {

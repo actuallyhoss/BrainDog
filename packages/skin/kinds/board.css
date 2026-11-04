@@ -134,7 +134,7 @@
   .board-col .card-mark {
     align-self: start;
     margin-block-start: var(--sp-1);
-    padding: 1px 6px;
+    padding: 1px calc(6px * var(--dense, 1));
     background: var(--tile-2);
     border-radius: var(--r-xs);
     color: var(--ink-2);

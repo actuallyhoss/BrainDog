@@ -328,7 +328,7 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
-    padding: 0 14px;
+    padding: 0 calc(14px * var(--dense, 1));
     background: var(--soft-fill, var(--tile-2));
     border-radius: var(--r-pill, var(--r-ctl));
     color: var(--ink);

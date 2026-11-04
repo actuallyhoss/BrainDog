@@ -459,7 +459,7 @@
   .typing {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: calc(5px * var(--dense, 1));
     block-size: 28px;
     padding: 0 var(--sp-3);
     border-radius: var(--r-pop);

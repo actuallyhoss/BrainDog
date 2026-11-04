@@ -689,7 +689,7 @@
   .board :global(a[data-fit-more]) {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
   }
 
   .board :global(a[data-fit-more]::after) {
@@ -743,7 +743,7 @@
   /* AND WHERE THE WIDGET HAS A QUIET FOOT, the count sits just above it, in the room `fit.ts` kept for it. */
   .board:not([data-fit-measure]) :global([data-board-key] [data-more-before]) {
     position: relative;
-    margin-block-start: 24px !important;
+    margin-block-start: var(--sp-5) !important;
   }
 
   .board:not([data-fit-measure]) :global([data-board-key] [data-more-before]::before) {
@@ -763,9 +763,9 @@
   .board :global(:is(.late-more, .queue-more, .tile-link, .block-more, .kb-all, .p-more)) {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     min-block-size: 44px;
-    margin-block: -12px;
+    margin-block: calc(-1 * var(--sp-3));
     color: var(--ink-2);
     font-size: var(--fs-meta);
     text-decoration: none;
@@ -831,7 +831,7 @@
     }
 
     .board :global([data-board-key] > .block-bar .block-count) {
-      margin-inline-start: 6px;
+      margin-inline-start: calc(6px * var(--dense, 1));
     }
   }
 
@@ -888,7 +888,7 @@
 
   /* THE BAR FLOATS OVER THE BOARD'S FOOT, so the board keeps room under its last row and the tray for it. */
   .board-root[data-editing] {
-    padding-block-end: 96px;
+    padding-block-end: var(--sp-9);
   }
 
   .board-root[data-editing] .board :global([data-board-key]) {
@@ -1077,7 +1077,7 @@
   .tray-name {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     color: var(--ink);
     font-weight: var(--fw-medium);
   }

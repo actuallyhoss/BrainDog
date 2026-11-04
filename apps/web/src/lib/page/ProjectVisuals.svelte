@@ -268,9 +268,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-2);
     min-inline-size: 0;
-    padding-inline: 6px;
+    padding-inline: calc(6px * var(--dense, 1));
     text-align: center;
   }
 
@@ -396,7 +396,7 @@
       display: grid;
       grid-template-columns: 24px minmax(0, 1fr);
       align-items: center;
-      gap: 12px;
+      gap: var(--sp-3);
       min-block-size: 44px;
       padding: 0;
       text-align: start;
@@ -406,7 +406,7 @@
       flex-direction: row;
       align-items: baseline;
       justify-content: space-between;
-      gap: 12px;
+      gap: var(--sp-3);
     }
 
     .t {
@@ -432,7 +432,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 4px 8px;
+    gap: var(--sp-1) var(--sp-2);
     margin: 0;
   }
 
@@ -451,7 +451,7 @@
   }
 
   .change {
-    margin: 4px 0 0;
+    margin: var(--sp-1) 0 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
   }
@@ -470,8 +470,8 @@
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
-    gap: 6px 10px;
-    margin-block-start: 12px;
+    gap: calc(6px * var(--dense, 1)) calc(10px * var(--dense, 1));
+    margin-block-start: var(--sp-3);
   }
 
   .p-name {
@@ -501,8 +501,8 @@
 
   .m-lines {
     display: grid;
-    gap: 4px;
-    margin: 14px 0 0;
+    gap: var(--sp-1);
+    margin: calc(14px * var(--dense, 1)) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -511,7 +511,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--sp-3);
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: calc(22px * var(--type, 1));
@@ -523,13 +523,13 @@
   }
 
   .since {
-    margin: 12px 0 0;
+    margin: var(--sp-3) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
   .bars-name {
-    margin: 16px 0 8px;
+    margin: var(--sp-4) 0 var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-cap);
   }
@@ -537,10 +537,10 @@
   .months {
     display: flex;
     align-items: stretch;
-    gap: 4px;
+    gap: var(--sp-1);
     block-size: 96px;
     margin: 0;
-    padding: 18px 0 0;
+    padding: calc(18px * var(--dense, 1)) 0 0;
     border-block-end: 1px solid var(--rule-strong);
     list-style: none;
   }
@@ -609,16 +609,16 @@
 
   .months + .show-data,
   .months ~ .show-data {
-    margin-block-start: 26px;
+    margin-block-start: calc(26px * var(--dense, 1));
   }
 
   .show-data {
     align-self: start;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     min-block-size: 32px;
-    margin-block-start: 8px;
+    margin-block-start: var(--sp-2);
     padding: 0;
     border: 0;
     background: none;
@@ -662,7 +662,7 @@
   .data-items {
     display: flex;
     flex-direction: column;
-    margin: 4px 0 0;
+    margin: var(--sp-1) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -671,9 +671,9 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--sp-3);
     min-block-size: 36px;
-    padding-block: 6px;
+    padding-block: calc(6px * var(--dense, 1));
     border-block-start: 1px solid var(--sep, var(--rule));
     font-size: var(--fs-ctl);
   }

@@ -526,8 +526,8 @@
 
   .draft-needs {
     display: grid;
-    gap: 4px;
-    margin-block: 4px;
+    gap: var(--sp-1);
+    margin-block: var(--sp-1);
     max-inline-size: 16rem;
   }
 

@@ -477,11 +477,11 @@
     flex-direction: column;
     gap: var(--sp-1);
     min-inline-size: 0;
-    padding-block-start: 6px;
+    padding-block-start: calc(6px * var(--dense, 1));
   }
 
   .step-at {
-    padding-block-start: 7px;
+    padding-block-start: calc(7px * var(--dense, 1));
     color: var(--ink-3);
     font-family: var(--font-mono);
     font-size: var(--fs-cap);

@@ -645,7 +645,7 @@
     -webkit-backdrop-filter: var(--glass-filter, none);
     backdrop-filter: var(--glass-filter, none);
     box-shadow: var(--glass-edge, inset 0 0 0 1px var(--rule)), var(--elev-popover, none);
-    padding: 4px;
+    padding: var(--sp-1);
   }
 
   .qa-opt {
@@ -684,7 +684,7 @@
   }
 
   .qa-kbd {
-    padding-inline: 4px;
+    padding-inline: var(--sp-1);
     border: 1px solid var(--rule);
     border-radius: var(--r-xs);
     color: var(--ink-3);

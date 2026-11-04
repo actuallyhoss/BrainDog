@@ -8,7 +8,7 @@
 .ov-cap { display: flex; justify-content: space-between; gap: var(--sp-3); }
 .ov-line { position: relative; display: block; block-size: 12px; }
 .ov-line::before { content: ''; position: absolute; inset-inline: 0; inset-block-start: 5px; block-size: 2px; background: color-mix(in srgb, var(--ink) 14%, var(--tile)); }
-.ov-dot { position: absolute; inset-block-start: 1px; inline-size: 10px; block-size: 10px; margin-inline-start: -5px; box-sizing: border-box; border-radius: var(--r-round); background: var(--ink); }
+.ov-dot { position: absolute; inset-block-start: 1px; inline-size: 10px; block-size: 10px; margin-inline-start: calc(-5px * var(--dense, 1)); box-sizing: border-box; border-radius: var(--r-round); background: var(--ink); }
 .ov-dot[data-today] { background: var(--tile); border: 2px solid var(--ink); }
 .ov-dot[data-was] { background: var(--tile); border: 1px dashed var(--ink-3); }
 .ov-dot[data-late] { background: var(--chart-late, var(--ink)); }

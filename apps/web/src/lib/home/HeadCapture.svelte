@@ -77,7 +77,7 @@
 
   .head-capture :global(.capture-field) {
     min-block-size: 36px;
-    padding-inline-start: 10px;
+    padding-inline-start: calc(10px * var(--dense, 1));
     background: var(--tile);
   }
 

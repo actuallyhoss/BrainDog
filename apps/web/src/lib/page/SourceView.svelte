@@ -554,7 +554,7 @@
     display: grid;
     gap: var(--sp-3);
     min-inline-size: 0;
-    padding: 20px;
+    padding: calc(20px * var(--dense, 1));
     background: var(--tile);
     border-radius: var(--r-tile);
   }

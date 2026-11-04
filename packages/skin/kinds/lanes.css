@@ -221,7 +221,7 @@
     place-items: center;
     inline-size: 24px;
     block-size: 24px;
-    padding: 5px;
+    padding: calc(5px * var(--dense, 1));
     box-sizing: border-box;
     border-radius: var(--r-round);
     background: var(--tile-2);

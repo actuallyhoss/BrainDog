@@ -424,7 +424,7 @@
   }
 
   .event > .when {
-    padding-block-start: 4px;
+    padding-block-start: var(--sp-1);
   }
 
   /* A COMMENT: the face, then who and when over the words at the body size. */

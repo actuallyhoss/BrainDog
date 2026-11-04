@@ -771,7 +771,7 @@
 
   .anchor-acts {
     display: flex;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .bar {
@@ -791,7 +791,7 @@
       position: sticky;
       inset-block-end: calc(var(--tabbar) + var(--sp-3));
       z-index: var(--z-raise);
-      padding: 6px;
+      padding: calc(6px * var(--dense, 1));
       background: var(--tile);
       border-radius: var(--r-tile);
       border: 1px solid var(--rule-strong);

@@ -962,7 +962,7 @@
     min-block-size: var(--side-row, 34px);
     /* 2 apart, so a row's pitch is 36 (rhythm, 3 Nov: it was 35, the margins collapsing to 1). */
     margin-block: var(--sp-0);
-    padding-inline: 10px;
+    padding-inline: calc(10px * var(--dense, 1));
     border: 0;
     background: none;
     border-radius: var(--r-ctl);
@@ -1152,7 +1152,7 @@
      project is the page's one lit row. */
   .s-parts {
     margin-block: 2px var(--sp-1);
-    margin-inline-start: 18px;
+    margin-inline-start: calc(18px * var(--dense, 1));
     padding-inline-start: var(--sp-2);
     border-inline-start: 1px solid var(--rule);
   }

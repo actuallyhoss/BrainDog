@@ -2537,7 +2537,7 @@
     }
 
     .body[data-board] :global(.block-slot[data-board-key='projects'][data-size='full'] .pcard) {
-      padding-block: 13px;
+      padding-block: calc(13px * var(--dense, 1));
     }
   }
 
@@ -2991,11 +2991,11 @@
   }
 
   .body[data-board] :global(.tile-head .tile-title) {
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .body[data-board] :global(.block-bar .block-count) {
-    margin-inline-start: 6px;
+    margin-inline-start: calc(6px * var(--dense, 1));
   }
 
   .body[data-board] :global(:is(.block-bar .block-count, .tile-head .tile-count)) {

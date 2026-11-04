@@ -448,7 +448,7 @@
     box-sizing: border-box;
     min-inline-size: 16px;
     block-size: 16px;
-    padding-inline: 4px;
+    padding-inline: var(--sp-1);
     background: var(--ink);
     border-radius: var(--r-round);
     box-shadow: 0 0 0 2px var(--nav);
@@ -801,13 +801,13 @@
   }
 
   .bell-in-sheet .bell-row {
-    padding-block: 10px;
+    padding-block: calc(10px * var(--dense, 1));
     font-size: var(--fs-body);
     line-height: calc(22px * var(--type, 1));
   }
 
   .bell-in-sheet .bell-new {
-    margin-block-start: 8px;
+    margin-block-start: var(--sp-2);
   }
 
   .bell-in-sheet .bell-foot {

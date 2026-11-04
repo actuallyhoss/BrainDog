@@ -176,7 +176,7 @@
   /* WHY THE LINE WAS REFUSED, under the field, in the warning ink, inside the sheet where the press was made. */
   .capture-fault {
     flex-basis: 100%;
-    margin: 4px 0 0;
+    margin: var(--sp-1) 0 0;
     color: var(--red);
     font-size: var(--fs-cap);
   }

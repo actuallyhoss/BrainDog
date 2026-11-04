@@ -210,7 +210,7 @@
 <style>
   .projects {
     display: grid;
-    gap: 12px;
+    gap: var(--sp-3);
     min-inline-size: 0;
   }
 
@@ -219,14 +219,14 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 16px;
+    gap: var(--sp-2) var(--sp-4);
     min-block-size: 32px;
   }
 
   .p-title-row {
     display: inline-flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--sp-3);
   }
 
   .p-title {
@@ -238,7 +238,7 @@
   }
 
   .p-count {
-    margin-inline-start: -4px;
+    margin-inline-start: calc(-1 * var(--sp-1));
     color: var(--ink-3);
     font-size: var(--fs-body);
     font-weight: 500;
@@ -247,7 +247,7 @@
   .p-more {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     margin-inline-start: auto;
     color: var(--ink-2);
     font-size: var(--fs-meta);
@@ -275,7 +275,7 @@
   .cards {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    gap: var(--sp-3);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -319,15 +319,15 @@
   .draft {
     display: grid;
     align-content: start;
-    gap: 12px;
-    padding: 20px;
+    gap: var(--sp-3);
+    padding: calc(20px * var(--dense, 1));
     border-radius: var(--r-tile);
     background: var(--tile);
   }
 
   .d-open {
     display: grid;
-    gap: 8px;
+    gap: var(--sp-2);
     color: inherit;
     text-decoration: none;
   }
@@ -335,7 +335,7 @@
   .d-top {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--sp-3);
     min-inline-size: 0;
   }
 
@@ -368,7 +368,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
+    gap: var(--sp-3);
   }
 
   .d-quiet {

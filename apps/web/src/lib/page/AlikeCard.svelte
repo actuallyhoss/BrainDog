@@ -97,8 +97,8 @@
   .alike {
     container-type: inline-size;
     display: grid;
-    gap: 8px;
-    padding: 16px;
+    gap: var(--sp-2);
+    padding: var(--sp-4);
     border-radius: var(--r-pop);
     background: var(--tile-2);
   }
@@ -115,15 +115,15 @@
   .ways {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--sp-2);
   }
   .members-open {
     display: grid;
-    gap: 8px;
+    gap: var(--sp-2);
   }
   .members ul {
-    margin: 8px 0 0;
-    padding-inline-start: 18px;
+    margin: var(--sp-2) 0 0;
+    padding-inline-start: calc(18px * var(--dense, 1));
     color: var(--ink-2);
   }
 </style>

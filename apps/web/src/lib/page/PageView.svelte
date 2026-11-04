@@ -1990,7 +1990,7 @@
     margin-inline: auto;
     inline-size: max-content;
     z-index: var(--z-raise);
-    padding: 4px 12px;
+    padding: var(--sp-1) var(--sp-3);
     border-radius: var(--r-pill, var(--r-ctl));
     background: var(--glass-regular, var(--tile));
     -webkit-backdrop-filter: var(--glass-filter, none);

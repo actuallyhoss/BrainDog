@@ -66,7 +66,7 @@
 
   .rs-stack {
     display: grid;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .rs-bar {

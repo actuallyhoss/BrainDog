@@ -116,7 +116,7 @@
   }
 
   .sum-icon {
-    margin-block-start: -4px;
+    margin-block-start: calc(-1 * var(--sp-1));
   }
 
   .sum-words {

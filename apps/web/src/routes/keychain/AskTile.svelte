@@ -177,7 +177,7 @@
   .ask-verbs {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   /* On a phone the answers take a line of their own under the words. */

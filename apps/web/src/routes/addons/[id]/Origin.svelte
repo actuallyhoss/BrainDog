@@ -259,7 +259,7 @@
     flex-direction: column;
     gap: 2px;
     min-inline-size: 0;
-    padding-block-start: 4px;
+    padding-block-start: var(--sp-1);
   }
 
   .may-title {

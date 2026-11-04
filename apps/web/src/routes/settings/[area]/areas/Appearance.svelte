@@ -761,7 +761,7 @@
   }
 
   .spacing[data-density='roomy'] {
-    row-gap: 5px;
+    row-gap: calc(5px * var(--dense, 1));
   }
 
   /* ── the record's colour ── */

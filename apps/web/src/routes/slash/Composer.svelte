@@ -373,7 +373,7 @@
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     margin: 0;
     padding: 0;
     list-style: none;
@@ -474,7 +474,7 @@
     place-items: center;
     inline-size: 32px;
     block-size: 32px;
-    margin-inline-start: -4px;
+    margin-inline-start: calc(-1 * var(--sp-1));
     padding: 0;
     border: 0;
     border-radius: var(--r-pill);
@@ -514,9 +514,9 @@
   .needs {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     block-size: 32px;
-    padding-inline: 14px;
+    padding-inline: calc(14px * var(--dense, 1));
     border-radius: var(--r-pill);
     background: var(--red-fill);
     color: var(--on-red, #fff);
@@ -528,7 +528,7 @@
   .keys {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     color: var(--ink-3);
     font-size: var(--fs-cap);
     white-space: nowrap;
@@ -614,7 +614,7 @@
     inset-block-start: calc(100% + 6px);
     z-index: 20;
     max-inline-size: 440px;
-    padding: 4px;
+    padding: var(--sp-1);
     background: var(--glass-regular, var(--tile));
     backdrop-filter: var(--glass-filter, none);
     border-radius: var(--r-pop, 12px);
@@ -627,7 +627,7 @@
 
   .pick-head {
     margin: 0;
-    padding: 6px 8px 4px;
+    padding: calc(6px * var(--dense, 1)) var(--sp-2) var(--sp-1);
     color: var(--ink-3);
   }
 
@@ -643,7 +643,7 @@
     gap: var(--sp-2);
     inline-size: 100%;
     min-block-size: 36px;
-    padding-inline: 8px;
+    padding-inline: var(--sp-2);
     border: 0;
     border-radius: var(--r-menu-row, 8px);
     background: none;
@@ -685,7 +685,7 @@
 
   .pick-none {
     margin: 0;
-    padding: 8px;
+    padding: var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
   }

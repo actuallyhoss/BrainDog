@@ -252,7 +252,7 @@
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .chip {

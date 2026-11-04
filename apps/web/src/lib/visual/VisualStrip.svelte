@@ -131,7 +131,7 @@
 
   .vs-part {
     display: grid;
-    gap: 8px;
+    gap: var(--sp-2);
   }
 
   .vs-h {
@@ -144,7 +144,7 @@
   .vs-cards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-    gap: 8px;
+    gap: var(--sp-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -169,18 +169,18 @@
   }
 
   .vs-draft {
-    padding: 4px 8px 8px;
+    padding: var(--sp-1) var(--sp-2) var(--sp-2);
   }
 
   /* A QUIET CARD: a small well, its title and who made it, on one line. */
   .vs-card {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--sp-3);
     inline-size: 100%;
     block-size: 100%;
     min-block-size: 56px;
-    padding: 8px;
+    padding: var(--sp-2);
     text-align: start;
     background: var(--tile-2);
     border: 0;
@@ -217,7 +217,7 @@
   .vs-card[data-still] {
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
+    gap: var(--sp-2);
   }
 
   .vs-card[data-still] .vs-still {
@@ -227,7 +227,7 @@
   }
 
   .vs-card[data-still] .vs-words {
-    padding: 0 4px 4px;
+    padding: 0 var(--sp-1) var(--sp-1);
   }
 
   .vs-words {

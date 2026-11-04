@@ -459,7 +459,7 @@
   .c-health {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     color: var(--warn);
     font-weight: var(--fw-medium);
   }
@@ -489,7 +489,7 @@
   .state {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);

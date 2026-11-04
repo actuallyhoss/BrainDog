@@ -268,7 +268,7 @@
   .you-said {
     max-inline-size: min(80%, 36rem);
     margin: 0;
-    padding: 10px 14px;
+    padding: calc(10px * var(--dense, 1)) calc(14px * var(--dense, 1));
     background: var(--soft-fill);
     border-radius: 18px 18px 6px 18px;
     color: var(--ink);
@@ -354,8 +354,8 @@
   .skeleton {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding-block: 5px;
+    gap: calc(10px * var(--dense, 1));
+    padding-block: calc(5px * var(--dense, 1));
   }
 
   .skeleton span {
@@ -398,7 +398,7 @@
   .rows {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     margin: 0;
     padding: 0;
     list-style: none;
@@ -407,10 +407,10 @@
   .row-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     max-inline-size: 100%;
     min-block-size: var(--ctl-panel, 28px);
-    padding-inline: 10px 12px;
+    padding-inline: calc(10px * var(--dense, 1)) var(--sp-3);
     background: var(--soft-fill);
     border-radius: var(--r-pill);
     color: var(--ink);
@@ -491,7 +491,7 @@
     flex: 1;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
@@ -500,7 +500,7 @@
   }
 
   .act-field {
-    padding: 1px 8px;
+    padding: 1px var(--sp-2);
     border-radius: var(--r-pill);
     background: var(--soft-fill);
     color: var(--ink-2);
@@ -518,12 +518,12 @@
   }
 
   .act-row {
-    margin-inline-start: 32px;
+    margin-inline-start: var(--sp-6);
   }
 
   .act-why,
   .act-note {
-    margin: 0 0 0 32px;
+    margin: 0 0 0 var(--sp-6);
     color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: var(--lead-meta, 18px);
@@ -537,7 +537,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
-    margin-inline-start: 32px;
+    margin-inline-start: var(--sp-6);
   }
 
   .btn,
@@ -655,8 +655,8 @@
   .quiet {
     background: none;
     color: var(--ink-2);
-    padding-inline: 8px;
-    margin-inline-start: -8px;
+    padding-inline: var(--sp-2);
+    margin-inline-start: calc(-1 * var(--sp-2));
   }
 
   @media (pointer: coarse) {

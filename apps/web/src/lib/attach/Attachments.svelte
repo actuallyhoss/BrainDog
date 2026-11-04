@@ -280,12 +280,12 @@
 <style>
   .at-part {
     display: grid;
-    gap: 8px;
+    gap: var(--sp-2);
   }
 
   .at-h {
     display: flex;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
@@ -334,7 +334,7 @@
   .at-going,
   .at-list {
     display: grid;
-    gap: 4px;
+    gap: var(--sp-1);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -343,9 +343,9 @@
   .at-go {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-2);
     min-block-size: 32px;
-    padding: 0 8px;
+    padding: 0 var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-meta);
   }
@@ -384,7 +384,7 @@
   .at-row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
   }
 
   .at-file {
@@ -392,9 +392,9 @@
     min-inline-size: 0;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--sp-3);
     min-block-size: 52px;
-    padding: 6px 8px;
+    padding: calc(6px * var(--dense, 1)) var(--sp-2);
     text-align: start;
     background: transparent;
     border: 0;
@@ -464,23 +464,23 @@
   .at-do {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    padding: 0 0 6px 56px;
+    gap: var(--sp-1);
+    padding: 0 0 calc(6px * var(--dense, 1)) 56px;
   }
 
   .at-rename {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
+    gap: var(--sp-2);
+    padding: calc(6px * var(--dense, 1)) var(--sp-2);
   }
 
   .at-input {
     flex: 1 1 200px;
     min-inline-size: 0;
     block-size: var(--ctl-h);
-    padding: 0 10px;
+    padding: 0 calc(10px * var(--dense, 1));
     background: var(--tile-2);
     border: 1px solid var(--rule);
     border-radius: var(--r-ctl);
@@ -499,7 +499,7 @@
 
   @media (width < 640px) {
     .at-do {
-      padding-inline-start: 8px;
+      padding-inline-start: var(--sp-2);
     }
   }
 </style>

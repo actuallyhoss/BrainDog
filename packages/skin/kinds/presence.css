@@ -168,7 +168,7 @@
   .pres-proj {
     display: inline-flex;
     align-items: baseline;
-    gap: 4px;
+    gap: var(--sp-1);
     color: var(--ink-2);
   }
 
@@ -416,7 +416,7 @@
 
   .pres-proj[data-chip] {
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     padding: 1px var(--sp-2);
     border-radius: var(--r-pill, 999px);
     background: var(--row-wash-press, var(--tile-2));

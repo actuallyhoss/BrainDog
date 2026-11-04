@@ -594,8 +594,8 @@
     flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 8px 16px;
-    padding-block: 12px;
+    gap: var(--sp-2) var(--sp-4);
+    padding-block: var(--sp-3);
     border-block-start: 1px solid var(--rule);
     min-inline-size: 0;
   }
@@ -619,7 +619,7 @@
   .a-main {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--sp-1);
     flex: 1 1 320px;
     min-inline-size: 0;
   }
@@ -627,7 +627,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 2px 8px;
+    gap: 2px var(--sp-2);
     min-inline-size: 0;
   }
   .a-name {
@@ -648,7 +648,7 @@
     overflow-wrap: anywhere;
   }
   .a-line.a-meta {
-    gap: 2px 12px;
+    gap: 2px var(--sp-3);
   }
   .a-use {
     margin: 0;
@@ -664,7 +664,7 @@
   .a-out {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     color: var(--ink-2);
     text-decoration: none;
     overflow-wrap: anywhere;
@@ -678,7 +678,7 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
+    gap: var(--sp-2);
   }
   .a-ask {
     font-size: var(--fs-meta);
@@ -688,9 +688,9 @@
   .a-fold {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-block-start: 12px;
-    padding: 6px 0;
+    gap: calc(6px * var(--dense, 1));
+    margin-block-start: var(--sp-3);
+    padding: calc(6px * var(--dense, 1)) 0;
     border: 0;
     background: none;
     color: var(--ink-3);
@@ -713,7 +713,7 @@
   }
 
   .a-sub {
-    margin: 20px 0 8px;
+    margin: calc(20px * var(--dense, 1)) 0 var(--sp-2);
     font-size: var(--fs-meta);
     font-weight: 600;
     color: var(--ink-2);
@@ -722,15 +722,15 @@
   .a-facts {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 4px 16px;
-    margin: 8px 0 0;
+    gap: var(--sp-1) var(--sp-4);
+    margin: var(--sp-2) 0 0;
   }
   .a-facts dt {
     font-size: var(--fs-meta);
     color: var(--ink-3);
   }
   .a-facts dd {
-    margin: 0 0 6px;
+    margin: 0 0 calc(6px * var(--dense, 1));
     min-inline-size: 0;
   }
   @container (inline-size >= 600px) {
@@ -745,15 +745,15 @@
 
   .a-notes {
     list-style: none;
-    margin: 8px 0 0;
+    margin: var(--sp-2) 0 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
   .a-note {
     display: flex;
-    gap: 8px;
+    gap: var(--sp-2);
     align-items: flex-start;
     font-size: var(--fs-meta);
     color: var(--ink-2);
@@ -777,8 +777,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 12px 16px;
-    margin-block-start: 12px;
+    gap: var(--sp-3) var(--sp-4);
+    margin-block-start: var(--sp-3);
   }
   .a-why {
     flex: 1 1 280px;
@@ -791,7 +791,7 @@
   .a-form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--sp-3);
   }
   .a-form .a-acts {
     justify-content: flex-start;
@@ -800,9 +800,9 @@
   .a-unsent {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-block-start: 8px;
-    padding: 12px;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
+    padding: var(--sp-3);
     border-radius: var(--r-field, 10px);
     background: var(--warn-tint);
   }
@@ -813,7 +813,7 @@
   }
   .a-copy {
     display: flex;
-    gap: 8px;
+    gap: var(--sp-2);
     min-inline-size: 0;
   }
   .a-link {
@@ -826,7 +826,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
+    gap: var(--sp-2) var(--sp-3);
     color: var(--ink-2);
     font-size: var(--fs-body);
   }
@@ -839,11 +839,11 @@
 
   .a-figures {
     list-style: none;
-    margin: 0 0 16px;
+    margin: 0 0 var(--sp-4);
     padding: 0;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
+    gap: var(--sp-4);
   }
   @container (inline-size >= 760px) {
     .a-figures {
@@ -881,7 +881,7 @@
   }
   .a-weeks th,
   .a-weeks td {
-    padding: 8px 0 8px 12px;
+    padding: var(--sp-2) 0 var(--sp-2) var(--sp-3);
     text-align: end;
     white-space: nowrap;
     font-weight: 400;
@@ -906,6 +906,6 @@
     color: var(--ink-3);
   }
   .a-foot {
-    margin: 8px 0 0;
+    margin: var(--sp-2) 0 0;
   }
 </style>

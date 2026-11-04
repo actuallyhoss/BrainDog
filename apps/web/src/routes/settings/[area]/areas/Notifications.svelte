@@ -362,7 +362,7 @@
 
   /* ITS WORDS STAND 8 UNDER THE TIME PICKERS, not 2 on their edge. */
   .quiet-line {
-    margin-block-start: 6px;
+    margin-block-start: calc(6px * var(--dense, 1));
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: var(--lead-meta);

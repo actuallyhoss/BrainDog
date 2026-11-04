@@ -348,8 +348,8 @@
   .v-head {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 12px 12px 20px;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) calc(20px * var(--dense, 1));
     border-block-end: 1px solid var(--rule);
   }
 
@@ -394,7 +394,7 @@
   .v-step {
     flex: none;
     display: flex;
-    gap: 4px;
+    gap: var(--sp-1);
   }
 
   .v-arrow {
@@ -422,14 +422,14 @@
   }
 
   .v-draft {
-    padding: 10px 20px;
+    padding: calc(10px * var(--dense, 1)) calc(20px * var(--dense, 1));
     border-block-end: 1px solid var(--rule);
   }
 
   .v-ask,
   .v-said {
     margin: 0;
-    padding: 10px 20px;
+    padding: calc(10px * var(--dense, 1)) calc(20px * var(--dense, 1));
     border-block-end: 1px solid var(--rule);
     font-size: var(--fs-meta);
     color: var(--ink-2);
@@ -439,7 +439,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 16px;
+    gap: var(--sp-2) var(--sp-4);
   }
 
   .v-ask p {
@@ -449,7 +449,7 @@
 
   .v-ask-do {
     display: flex;
-    gap: 8px;
+    gap: var(--sp-2);
   }
 
   .v-body {
@@ -482,14 +482,14 @@
 
   .v-note {
     margin: 0;
-    padding: 24px 20px;
+    padding: var(--sp-5) calc(20px * var(--dense, 1));
     color: var(--ink-3);
     font-size: var(--fs-body);
   }
 
   .v-missing {
     margin: 0;
-    padding: 8px 20px;
+    padding: var(--sp-2) calc(20px * var(--dense, 1));
     color: var(--ink-3);
     font-size: var(--fs-meta);
     border-block-start: 1px solid var(--rule);
@@ -499,7 +499,7 @@
     min-block-size: 0;
     overflow-y: auto;
     border-inline-start: 1px solid var(--rule);
-    padding: 8px;
+    padding: var(--sp-2);
   }
 
   .v-versions ol {
@@ -514,7 +514,7 @@
     display: grid;
     gap: 2px;
     inline-size: 100%;
-    padding: 8px 12px;
+    padding: var(--sp-2) var(--sp-3);
     text-align: start;
     background: transparent;
     border: 0;
@@ -536,7 +536,7 @@
   .v-version-n {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-2);
     font-size: var(--fs-body);
   }
 
@@ -562,7 +562,7 @@
     }
 
     .v-head {
-      padding: 8px 12px 8px 16px;
+      padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-4);
     }
 
     .v-close {
@@ -594,7 +594,7 @@
     .v-draft,
     .v-note,
     .v-missing {
-      padding-inline: 16px;
+      padding-inline: var(--sp-4);
     }
 
     .v-arrow {

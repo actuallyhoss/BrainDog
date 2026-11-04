@@ -196,7 +196,7 @@
   }
   .row-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--sp-2);
     flex-wrap: wrap;
   }
 </style>

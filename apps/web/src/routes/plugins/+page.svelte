@@ -491,7 +491,7 @@
     flex: 1 1 16rem;
     max-inline-size: 24rem;
     min-block-size: var(--ctl-page, 36px);
-    padding-inline: 14px;
+    padding-inline: calc(14px * var(--dense, 1));
     background: var(--tile);
     border-radius: var(--r-pill, 999px);
     box-shadow: inset 0 0 0 0.5px var(--g-line, var(--rule)), var(--shadow-raised, none);

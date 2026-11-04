@@ -95,7 +95,7 @@
     box-sizing: border-box;
     inline-size: var(--well-l);
     block-size: var(--well-l);
-    padding: 7px;
+    padding: calc(7px * var(--dense, 1));
     translate: 0 -50%;
     border-radius: var(--r-ctl);
     background: var(--tile-2);

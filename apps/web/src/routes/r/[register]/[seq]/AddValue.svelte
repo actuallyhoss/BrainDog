@@ -114,7 +114,7 @@
   .add-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   /* WHETHER IT LANDS AT ONCE OR WAITS ON DECIDE, in the meta size: 12 is for a chart's axis and nothing else. */

@@ -522,7 +522,7 @@
     min-block-size: 32px;
     margin: 0;
     padding-block: 0;
-    padding-inline: 10px;
+    padding-inline: calc(10px * var(--dense, 1));
     appearance: none;
     background: none;
     border: 0;

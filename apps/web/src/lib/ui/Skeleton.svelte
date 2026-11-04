@@ -129,7 +129,7 @@
   .sk-stack {
     display: grid;
     flex: 1;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     min-inline-size: 0;
   }
 

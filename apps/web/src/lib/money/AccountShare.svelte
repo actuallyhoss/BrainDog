@@ -311,13 +311,13 @@
   }
   .acct-acts {
     display: flex;
-    gap: 8px;
+    gap: var(--sp-2);
     flex-wrap: wrap;
   }
   .acct-who {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-2);
   }
   .acct-who-name {
     flex: 1;

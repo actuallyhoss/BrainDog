@@ -111,7 +111,7 @@
     }
 
     .hub-tab {
-      padding-inline: 10px;
+      padding-inline: calc(10px * var(--dense, 1));
       font-size: var(--fs-meta);
       line-height: var(--lead-meta);
     }

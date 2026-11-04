@@ -1463,7 +1463,7 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   /* WHAT A VERSION CHANGED, UNDER ITS ROW AND LINED UP WITH ITS WORDS, in a tile of its own. */

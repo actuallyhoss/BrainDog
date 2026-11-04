@@ -51,7 +51,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    column-gap: 6px;
+    column-gap: calc(6px * var(--dense, 1));
     margin-block-start: var(--sp-1);
     color: var(--ink);
     font-family: var(--font-display);
@@ -92,7 +92,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    column-gap: 6px;
+    column-gap: calc(6px * var(--dense, 1));
     margin-block-start: var(--sp-1);
     color: var(--ink-3);
     font-size: var(--fs-meta);
@@ -102,7 +102,7 @@
   .kpi-change {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     color: var(--ink-2);
     font-weight: var(--fw-semi);
     font-variant-numeric: tabular-nums;
@@ -140,7 +140,7 @@
   .kpi-left {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     margin-block-start: var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
@@ -177,7 +177,7 @@
   .kpi-stale-said {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     color: var(--warn);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
@@ -387,7 +387,7 @@
   .kpi-bar-said {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
@@ -544,7 +544,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     min-inline-size: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
@@ -580,7 +580,7 @@
   }
 
   :is(.kpi-who, .kpi-open):has(> .kpi-name) > .kpi-swatch {
-    margin-block-start: 5px;
+    margin-block-start: calc(5px * var(--dense, 1));
   }
 
   :is(.kpi-who, .kpi-open) > .kpi-project {
@@ -634,7 +634,7 @@
   .kpi-open {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     min-inline-size: 0;
     color: inherit;
     text-decoration: none;

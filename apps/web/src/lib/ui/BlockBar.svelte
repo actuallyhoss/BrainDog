@@ -189,7 +189,7 @@
   .edit-btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     min-block-size: 26px;
     padding: 0 var(--sp-2);
     background: none;

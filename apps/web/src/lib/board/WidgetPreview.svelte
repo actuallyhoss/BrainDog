@@ -159,10 +159,10 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     inline-size: 100%;
     block-size: 100%;
-    padding: 12px 14px;
+    padding: var(--sp-3) calc(14px * var(--dense, 1));
     overflow: hidden;
     background: var(--tile);
     border-radius: 18px;
@@ -173,13 +173,13 @@
 
   .wp[data-size='small'],
   .wp[data-size='tall'] {
-    padding: 12px;
+    padding: var(--sp-3);
   }
 
   .wp-head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     min-inline-size: 0;
     color: var(--ink-2);
   }
@@ -208,7 +208,7 @@
 
   .wp-tag {
     flex: none;
-    padding: 1px 6px;
+    padding: 1px calc(6px * var(--dense, 1));
     border: 1px solid var(--rule-strong);
     border-radius: var(--r-xs);
     color: var(--ink-3);
@@ -227,7 +227,7 @@
 
   .wp-figs {
     display: grid;
-    gap: 8px;
+    gap: var(--sp-2);
     min-block-size: 0;
   }
 
@@ -347,7 +347,7 @@
     flex: 1 1 0;
     align-content: start;
     overflow: hidden;
-    gap: 7px;
+    gap: calc(7px * var(--dense, 1));
     min-block-size: 0;
     margin: 0;
     padding: 0;
@@ -356,14 +356,14 @@
 
   .wp-rows[data-two] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 16px;
+    column-gap: var(--sp-4);
   }
 
   .wp-r {
     display: grid;
     gap: 1px;
     min-inline-size: 0;
-    padding-block-end: 6px;
+    padding-block-end: calc(6px * var(--dense, 1));
     border-block-end: 1px solid var(--rule);
   }
 
@@ -425,7 +425,7 @@
     display: grid;
     flex: 1;
     align-content: end;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .wp-wait span {

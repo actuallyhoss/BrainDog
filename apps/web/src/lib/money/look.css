@@ -1129,7 +1129,7 @@
 }
 
 [data-money] .filters-group {
-  gap: 6px;
+  gap: calc(6px * var(--dense, 1));
 }
 
 /* THE FIELD'S NAME IN FRONT OF ITS CHOICES, where the hairline between fields stood. */
@@ -1197,7 +1197,7 @@
   }
 
   [data-money] .filters-group {
-    padding-inline-end: 24px;
+    padding-inline-end: var(--sp-5);
     mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
   }
 
@@ -1470,7 +1470,7 @@
    ONLY WHILE THE ROW SAYS NOTHING (empty states, 2 Nov): an empty Ledger says what will be there in that row, and the
    search rose over the sentence and hid it ("nds here."). With a sentence the search keeps its own row under it. */
 .hosted[data-money] > .page-head[data-titled]:has(.name-unseen):not(:has(.head-said)):has(+ .head-below) + .head-below {
-  margin-block-start: -48px;
+  margin-block-start: calc(-1 * var(--sp-7));
   pointer-events: none;
 }
 
@@ -1971,7 +1971,7 @@
 [data-money] .list > .item-day {
   min-block-size: 32px;
   align-items: end;
-  padding-block-end: 4px;
+  padding-block-end: var(--sp-1);
   font-size: var(--fs-cap);
 }
 
@@ -2032,7 +2032,7 @@
 }
 
 [data-money] .prop > .prop-row {
-  padding-block: 10px;
+  padding-block: calc(10px * var(--dense, 1));
 }
 
 [data-money] .prop-row > :is(.prop-label, .prop-value) {
@@ -2056,7 +2056,7 @@
 [data-money] .filters-group .filters-choice,
 [data-money] .filters-group[data-control='segmented'] .filters-choice {
   min-block-size: 28px;
-  padding-inline: 12px;
+  padding-inline: var(--sp-3);
   border: 0;
   border-radius: var(--mo-pill);
   background: var(--mo-soft);

@@ -282,7 +282,7 @@
   .tried-paste {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .tried-label {

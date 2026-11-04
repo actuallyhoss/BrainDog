@@ -492,9 +492,9 @@
     box-shadow: 0 -16px 0 8px var(--tile);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-2);
     block-size: 40px;
-    padding-inline: 12px;
+    padding-inline: var(--sp-3);
     background: var(--tile-2, var(--page));
     border-radius: 12px;
     color: var(--ink-3);
@@ -519,7 +519,7 @@
 
   .ws-group {
     display: grid;
-    gap: 10px;
+    gap: calc(10px * var(--dense, 1));
   }
 
   .ws-gh {
@@ -565,7 +565,7 @@
 
   .ws-open {
     display: grid;
-    gap: 8px;
+    gap: var(--sp-2);
     inline-size: 100%;
     padding: 0;
     border: 0;
@@ -691,9 +691,9 @@
   .ws-back {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     justify-self: start;
-    padding: 4px 8px 4px 2px;
+    padding: var(--sp-1) var(--sp-2) var(--sp-1) 2px;
     border: 0;
     border-radius: 8px;
     background: none;
@@ -727,7 +727,7 @@
     display: grid;
     place-items: center;
     min-block-size: calc(2 * 150px + var(--ws-gap) + 48px);
-    padding: 24px 16px;
+    padding: var(--sp-5) var(--sp-4);
     background: var(--page);
     border-radius: 20px;
   }
@@ -770,16 +770,16 @@
 
   .ws-about {
     display: grid;
-    gap: 12px;
+    gap: var(--sp-3);
     align-content: start;
   }
 
   .ws-why {
     display: flex;
-    gap: 8px;
+    gap: var(--sp-2);
     align-items: start;
     margin: 0;
-    padding: 10px 12px;
+    padding: calc(10px * var(--dense, 1)) var(--sp-3);
     background: var(--tile-2, var(--page));
     border-radius: 12px;
     font-size: var(--fs-meta);
@@ -805,7 +805,7 @@
   }
 
   .ws-sizes legend {
-    margin-block-end: 8px;
+    margin-block-end: var(--sp-2);
     padding: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
@@ -815,14 +815,14 @@
   .ws-size-row {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .ws-size {
     display: grid;
     justify-items: center;
-    gap: 6px;
-    padding: 10px 2px 8px;
+    gap: calc(6px * var(--dense, 1));
+    padding: calc(10px * var(--dense, 1)) 2px var(--sp-2);
     border: 0;
     border-radius: 10px;
     background: var(--tile-2, var(--page));
@@ -882,7 +882,7 @@
 
   .ws-choice {
     display: grid;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-semi);
@@ -901,21 +901,21 @@
 
   .ws-go {
     display: grid;
-    padding-block-start: 4px;
+    padding-block-start: var(--sp-1);
   }
 
   /* ── made by you, make your own ── */
   .ws-kept {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-    gap: 8px;
+    gap: var(--sp-2);
   }
 
   .ws-kept-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
+    gap: calc(10px * var(--dense, 1));
+    padding: calc(10px * var(--dense, 1)) var(--sp-3);
     border: 0;
     border-radius: 12px;
     background: var(--page);
@@ -928,13 +928,13 @@
 
   .ws-kept-one {
     display: grid;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .ws-kept-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 4px;
+    gap: var(--sp-1);
   }
 
   .ws-kept-more {
@@ -956,7 +956,7 @@
   .ws-kept-acts {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .ws-kept-pic {
@@ -978,8 +978,8 @@
 
   .ws-make {
     display: grid;
-    gap: 6px;
-    padding: 14px;
+    gap: calc(6px * var(--dense, 1));
+    padding: calc(14px * var(--dense, 1));
     border: 1.5px dashed var(--rule-strong);
     border-radius: 16px;
   }
@@ -992,7 +992,7 @@
   .ws-make-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 8px;
+    gap: var(--sp-2);
     align-items: center;
   }
 
@@ -1006,22 +1006,22 @@
   .ws-made {
     display: flex;
     flex-wrap: wrap;
-    gap: 14px;
+    gap: calc(14px * var(--dense, 1));
     align-items: center;
-    padding-block-start: 6px;
+    padding-block-start: calc(6px * var(--dense, 1));
   }
 
 
   .ws-made-say {
     display: grid;
     flex: 1 1 200px;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .ws-made-acts {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .ws-make input {

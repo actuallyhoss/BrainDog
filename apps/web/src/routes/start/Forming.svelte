@@ -289,7 +289,7 @@
   }
 
   .row[data-ghost] .main {
-    padding-block-start: 6px;
+    padding-block-start: calc(6px * var(--dense, 1));
   }
 
   .why {
@@ -381,7 +381,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .back {

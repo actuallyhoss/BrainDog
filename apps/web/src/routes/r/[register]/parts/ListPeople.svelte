@@ -281,7 +281,7 @@
   .fold {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     margin-inline-start: calc(var(--well-l) + var(--sp-3));
     min-block-size: var(--btn-h-sm, 28px);
     padding: 0 var(--ctl-pad-sm, 12px);

@@ -57,9 +57,9 @@
     display: inline-flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
-    margin-block-start: 8px;
-    padding: 6px 10px;
+    gap: calc(6px * var(--dense, 1));
+    margin-block-start: var(--sp-2);
+    padding: calc(6px * var(--dense, 1)) calc(10px * var(--dense, 1));
     border: 1px dashed var(--rule-strong);
     border-radius: 10px;
     color: var(--ink);

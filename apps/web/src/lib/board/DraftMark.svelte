@@ -103,7 +103,7 @@
   .who {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-cap);

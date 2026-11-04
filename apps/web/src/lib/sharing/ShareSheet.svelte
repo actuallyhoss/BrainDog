@@ -624,7 +624,7 @@
   }
 
   .share-label {
-    padding-block-start: 10px;
+    padding-block-start: calc(10px * var(--dense, 1));
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
@@ -743,7 +743,7 @@
   .share-none,
   .share-fixed {
     margin: 0;
-    padding-block: 10px;
+    padding-block: calc(10px * var(--dense, 1));
     color: var(--ink-2);
     font-size: var(--fs-ctl);
   }

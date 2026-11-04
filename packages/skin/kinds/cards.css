@@ -146,7 +146,7 @@
 
   /* A MARK THAT IS A PICTURE sits at 16px inside its 28px tile: both drawers draw it at 100%, edge to edge without this. */
   .cards-mark[data-glyph] {
-    padding: 6px;
+    padding: calc(6px * var(--dense, 1));
   }
 
   /* A FACE IS A DISC WITH A HAIRLINE RING (ops 4.25): the initial at 600 on the step-under fill. */

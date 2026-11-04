@@ -49,7 +49,7 @@
 
   /* A ROW IN THE SENTENCE: its glyph and name in a soft capsule, inline, padded on the line and not around it. */
   .mention {
-    padding: 2px 7px 2px 5px;
+    padding: 2px calc(7px * var(--dense, 1)) 2px calc(5px * var(--dense, 1));
     border-radius: 7px;
     background: var(--soft-fill);
     color: var(--ink);
@@ -62,7 +62,7 @@
 
   .mention :global(svg) {
     display: inline;
-    margin-inline-end: 4px;
+    margin-inline-end: var(--sp-1);
     color: var(--ink-3);
     vertical-align: -3px;
   }
@@ -103,7 +103,7 @@
   .sum-rows {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     margin-block: var(--sp-2);
   }
 

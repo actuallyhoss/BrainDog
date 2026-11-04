@@ -419,7 +419,7 @@
     .kb-mark {
       inline-size: 44px;
       block-size: 44px;
-      margin-block: -10px;
+      margin-block: calc(-10px * var(--dense, 1));
     }
   }
 

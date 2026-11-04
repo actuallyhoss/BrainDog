@@ -507,20 +507,20 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   /* THE PACKS, a small heading and the buttons beside one another while they fit, under the record's own lines. */
   .bill-packs {
     display: grid;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     margin-block-start: var(--sp-2);
   }
 
   .bill-pack-buttons {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   /* THE INVOICES, one row each: the day, the amount, a word when it is not simply paid, and Stripe's two pages. */

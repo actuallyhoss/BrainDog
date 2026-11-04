@@ -354,7 +354,7 @@
 
   @media (width < 640px) {
     .made-tile {
-      padding: 20px;
+      padding: calc(20px * var(--dense, 1));
     }
   }
 

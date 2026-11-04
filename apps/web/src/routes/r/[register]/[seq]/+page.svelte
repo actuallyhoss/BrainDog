@@ -2255,14 +2255,14 @@
   .found {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
   .found-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     min-block-size: 28px;
-    padding-inline: 10px;
+    padding-inline: calc(10px * var(--dense, 1));
     border-radius: 999px;
     background: var(--soft-fill);
     color: var(--ink);

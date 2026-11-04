@@ -63,13 +63,13 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
+    gap: var(--sp-2) var(--sp-3);
     min-inline-size: 0;
   }
 
   .db-mark {
     flex: none;
-    padding: 2px 8px;
+    padding: 2px var(--sp-2);
     border-radius: var(--r-xs);
     background: color-mix(in srgb, var(--link) 14%, transparent);
     color: var(--link);
@@ -80,7 +80,7 @@
   .db-do {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--sp-2);
     min-inline-size: 0;
   }
 

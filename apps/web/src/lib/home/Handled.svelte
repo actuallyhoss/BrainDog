@@ -270,7 +270,7 @@
     display: inline-flex;
     align-items: center;
     min-block-size: var(--tap);
-    margin-block: -11px;
+    margin-block: calc(-11px * var(--dense, 1));
     padding: 0 var(--sp-2);
     border: 0;
     border-radius: var(--r-ctl);

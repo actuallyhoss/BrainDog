@@ -390,7 +390,7 @@
     justify-content: center;
     min-inline-size: 18px;
     block-size: 18px;
-    padding: 0 4px;
+    padding: 0 var(--sp-1);
     border: 1px solid var(--rule-strong);
     border-radius: 4px;
     color: var(--ink-3);

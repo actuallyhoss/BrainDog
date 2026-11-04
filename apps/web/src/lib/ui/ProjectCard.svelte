@@ -220,7 +220,7 @@
     block-size: 100%;
     min-inline-size: 0;
     box-sizing: border-box;
-    padding: 20px;
+    padding: calc(20px * var(--dense, 1));
     border-radius: var(--r-tile);
     background: var(--tile);
     color: var(--ink);
@@ -266,7 +266,7 @@
   .pc-a {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--sp-3);
     min-block-size: 40px;
     min-inline-size: 0;
   }
@@ -301,7 +301,7 @@
   .pc-health {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
   }
 
   /* AT RISK IS A WAITING DOT AND DIM WORDS; OFF TRACK THE WARNING DOT AND WORD AT 600 (VERIFY H5). Red on a card is
@@ -328,7 +328,7 @@
     flex: none;
     align-items: center;
     align-self: start;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     color: var(--red);
     font-size: var(--fs-meta);
     font-weight: 600;
@@ -343,10 +343,10 @@
   .pc-b {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--sp-2);
     min-block-size: 34px;
     min-inline-size: 0;
-    margin-block-start: 16px;
+    margin-block-start: var(--sp-4);
   }
 
   .pc-num {
@@ -450,8 +450,8 @@
   /* ── row C: how far along ── */
   .pc-c {
     display: grid;
-    gap: 6px;
-    margin-block-start: 12px;
+    gap: calc(6px * var(--dense, 1));
+    margin-block-start: var(--sp-3);
   }
 
   .meter {
@@ -480,8 +480,8 @@
   .pc-next {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
-    margin-block-start: 12px;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-3);
     color: var(--ink-2);
     font-size: var(--fs-ctl);
     line-height: calc(20px * var(--type, 1));
@@ -506,13 +506,13 @@
   .pc-foot {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-2);
     margin-block-start: auto;
     /* THE FOOT HOLDS ITS OWN AIR, 12 over its rule and 12 under, never closer than that to the row above. The air was the
        row above's margin, so where a page hides the foot (Today's project cards) the card ended 14 taller at the bottom
        than the top. */
     position: relative;
-    padding-block-start: 25px;
+    padding-block-start: calc(25px * var(--dense, 1));
     min-inline-size: 0;
   }
 
@@ -531,7 +531,7 @@
   }
 
   .faces > :global(* + *) {
-    margin-inline-start: -6px;
+    margin-inline-start: calc(-6px * var(--dense, 1));
   }
 
   .pc-who {
@@ -561,7 +561,7 @@
     flex: none;
     inline-size: 8px;
     block-size: 8px;
-    margin-inline: 4px;
+    margin-inline: var(--sp-1);
     border-radius: var(--r-round);
     background: var(--ph-fill, var(--ph));
   }
@@ -600,7 +600,7 @@
   /* ── a phone: 16 round, the figure at 24, one line of next step, the live line without its rule ── */
   @media (width < 640px) {
     .pcard {
-      padding: 16px;
+      padding: var(--sp-4);
     }
 
     .pc-a {
@@ -614,7 +614,7 @@
 
     .pc-b {
       min-block-size: 30px;
-      margin-block-start: 12px;
+      margin-block-start: var(--sp-3);
     }
 
     .pc-num {
@@ -633,7 +633,7 @@
 
     /* THE LIVE LINE STAYS ON A PHONE, under no rule: it is the one thing an empty card says. */
     .pc-foot {
-      padding-block-start: 12px;
+      padding-block-start: var(--sp-3);
     }
 
     .pc-foot::before {

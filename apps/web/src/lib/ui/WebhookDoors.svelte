@@ -331,7 +331,7 @@
   /* THE NAME AS A ROW TITLE, 15 at 500, level with the middle of its well. */
   .door-name {
     margin: 0 0 2px;
-    padding-block-start: 6px;
+    padding-block-start: calc(6px * var(--dense, 1));
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;

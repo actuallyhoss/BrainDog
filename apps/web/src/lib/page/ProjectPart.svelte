@@ -624,8 +624,8 @@
 
   .h-steps {
     display: grid;
-    gap: 4px;
-    margin-block-start: 4px;
+    gap: var(--sp-1);
+    margin-block-start: var(--sp-1);
   }
 
   .h-lbl {
@@ -762,7 +762,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--sp-2);
   }
 
   .s-big {
@@ -786,7 +786,7 @@
   .s-aim,
   .s-empty,
   .s-said {
-    margin: 8px 0 0;
+    margin: var(--sp-2) 0 0;
   }
 
   /* WHERE THE PATH LEADS STANDS AT THE TILE'S FOOT (3 Nov): Path grows to the hero's height beside it (the row ends
@@ -796,7 +796,7 @@
   }
 
   .s-year {
-    margin: 8px 0 0;
+    margin: var(--sp-2) 0 0;
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
@@ -806,7 +806,7 @@
     display: block;
     inline-size: 100%;
     block-size: 72px;
-    margin-block-start: 12px;
+    margin-block-start: var(--sp-3);
   }
 
   .s-bars rect {
@@ -819,13 +819,13 @@
 
   .kv {
     display: grid;
-    margin: 12px 0 0;
+    margin: var(--sp-3) 0 0;
   }
 
   .kv-row {
     display: flex;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--sp-3);
     padding-block: var(--sp-2);
     border-block-start: 1px solid var(--sep, var(--rule));
     font-size: var(--fs-body);
@@ -854,8 +854,8 @@
   .s-acts {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-block-start: 12px;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-3);
   }
 
   /* THE DATED PATH, a line down the left, a dot a stop: done filled, late in red, the reader's in amber. */
@@ -890,7 +890,7 @@
     box-sizing: border-box;
     inline-size: 12px;
     block-size: 12px;
-    margin-block-start: 4px;
+    margin-block-start: var(--sp-1);
     border: 2px solid var(--rule-strong);
     border-radius: 50%;
     background: var(--tile);
@@ -998,7 +998,7 @@
     display: grid;
     align-content: start;
     justify-items: start;
-    gap: 4px;
+    gap: var(--sp-1);
     min-inline-size: 0;
   }
 

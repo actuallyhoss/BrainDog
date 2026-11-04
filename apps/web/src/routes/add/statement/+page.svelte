@@ -448,7 +448,7 @@
   }
   .st-file-list {
     display: grid;
-    gap: 4px;
+    gap: var(--sp-1);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -459,7 +459,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--sp-3);
   }
   .st-quiet {
     color: var(--ink-3);

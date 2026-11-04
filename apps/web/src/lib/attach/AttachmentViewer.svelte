@@ -256,8 +256,8 @@
   .a-head {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 12px 12px 20px;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) calc(20px * var(--dense, 1));
     border-block-end: 1px solid var(--rule);
   }
 
@@ -288,14 +288,14 @@
     flex: none;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-2);
   }
 
   .a-versions {
     flex: none;
     block-size: var(--ctl-h);
     max-inline-size: 200px;
-    padding: 0 8px;
+    padding: 0 var(--sp-2);
     background: var(--tile-2);
     border: 1px solid var(--rule);
     border-radius: var(--r-field, 12px);
@@ -325,9 +325,9 @@
   .a-note-line {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-2);
     margin: 0;
-    padding: 8px 20px;
+    padding: var(--sp-2) calc(20px * var(--dense, 1));
     border-block-end: 1px solid var(--rule);
     color: var(--ink-2);
     font-size: var(--fs-meta);
@@ -351,7 +351,7 @@
 
   .a-foot {
     margin: 0;
-    padding: 8px 20px;
+    padding: var(--sp-2) calc(20px * var(--dense, 1));
     border-block-start: 1px solid var(--rule);
     font-size: var(--fs-meta);
   }
@@ -366,7 +366,7 @@
     min-block-size: 0;
     display: grid;
     place-items: center;
-    padding: 16px;
+    padding: var(--sp-4);
     overflow: auto;
     background: var(--board);
   }
@@ -381,7 +381,7 @@
     flex: 1;
     min-block-size: 0;
     margin: 0;
-    padding: 16px 20px;
+    padding: var(--sp-4) calc(20px * var(--dense, 1));
     overflow: auto;
     font-family: var(--font-mono, ui-monospace, monospace);
     font-size: var(--fs-meta);
@@ -393,13 +393,13 @@
   .a-none {
     display: grid;
     justify-items: start;
-    gap: 12px;
-    padding: 24px 20px;
+    gap: var(--sp-3);
+    padding: var(--sp-5) calc(20px * var(--dense, 1));
   }
 
   .a-note {
     margin: 0;
-    padding: 24px 20px;
+    padding: var(--sp-5) calc(20px * var(--dense, 1));
     color: var(--ink-3);
     font-size: var(--fs-body);
   }
@@ -427,7 +427,7 @@
 
     .a-head {
       flex-wrap: wrap;
-      padding: 8px 12px 8px 16px;
+      padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-4);
     }
 
     .a-name {
@@ -445,7 +445,7 @@
     }
 
     .a-note-line {
-      padding-inline: 16px;
+      padding-inline: var(--sp-4);
     }
   }
 </style>

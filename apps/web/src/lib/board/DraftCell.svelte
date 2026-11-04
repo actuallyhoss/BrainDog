@@ -94,7 +94,7 @@
     flex-wrap: wrap;
     gap: var(--sp-4, 16px);
     align-items: center;
-    padding: 12px;
+    padding: var(--sp-3);
     border: 1.5px dashed var(--rule-strong);
     border-radius: 22px;
   }
@@ -103,14 +103,14 @@
   .dc-say {
     display: grid;
     flex: 1 1 220px;
-    gap: 4px;
+    gap: var(--sp-1);
     min-inline-size: 0;
   }
 
   .dc-who {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-cap);
@@ -134,8 +134,8 @@
   .dc-acts {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-block-start: 6px;
+    gap: calc(6px * var(--dense, 1));
+    margin-block-start: calc(6px * var(--dense, 1));
   }
 
 </style>

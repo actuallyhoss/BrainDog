@@ -31,7 +31,7 @@
   .new-action {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    padding-block: 4px;
+    gap: var(--sp-2);
+    padding-block: var(--sp-1);
   }
 </style>

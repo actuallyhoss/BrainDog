@@ -190,7 +190,7 @@
     color: var(--ink-2);
   }
   .rv-raw p {
-    margin: 4px 0 0;
+    margin: var(--sp-1) 0 0;
     overflow-wrap: anywhere;
   }
   .rv-say {

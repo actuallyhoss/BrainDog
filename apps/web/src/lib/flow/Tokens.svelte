@@ -226,7 +226,7 @@
   .tok-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   /* A CHIP TO PUT IN IS A QUIET PILL: the tile's inner fill, no border, the second ink, and a step

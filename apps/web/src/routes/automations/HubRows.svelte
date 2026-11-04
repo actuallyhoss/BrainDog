@@ -291,7 +291,7 @@
     box-sizing: border-box;
     inline-size: var(--dot);
     block-size: var(--dot);
-    margin-inline-end: 6px;
+    margin-inline-end: calc(6px * var(--dense, 1));
     border-radius: var(--r-ctl);
     vertical-align: 0.1em;
   }

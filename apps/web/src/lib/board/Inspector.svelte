@@ -315,8 +315,8 @@
     --u: 132px;
     display: grid;
     place-items: center;
-    gap: 8px;
-    padding: 20px 12px;
+    gap: var(--sp-2);
+    padding: calc(20px * var(--dense, 1)) var(--sp-3);
     background: var(--page);
     border-radius: 20px;
   }
@@ -335,7 +335,7 @@
   }
 
   .in-sizes legend {
-    margin-block-end: 8px;
+    margin-block-end: var(--sp-2);
     padding: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
@@ -345,14 +345,14 @@
   .in-size-row {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .in-size {
     display: grid;
     justify-items: center;
-    gap: 6px;
-    padding: 10px 2px 8px;
+    gap: calc(6px * var(--dense, 1));
+    padding: calc(10px * var(--dense, 1)) 2px var(--sp-2);
     border: 0;
     border-radius: 10px;
     background: var(--tile-2, var(--page));
@@ -406,7 +406,7 @@
 
   .in-what {
     display: grid;
-    gap: 10px;
+    gap: calc(10px * var(--dense, 1));
   }
 
   /* THE SENTENCE READS AS ONE: its words plain, its parts underlined in the accent's ink, each a button. */
@@ -427,7 +427,7 @@
   }
 
   .in-part {
-    padding: 1px 6px;
+    padding: 1px calc(6px * var(--dense, 1));
     border: 0;
     border-radius: 7px;
     background: var(--tile-2, var(--page));
@@ -454,15 +454,15 @@
   .in-menu {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    padding: 8px;
+    gap: calc(6px * var(--dense, 1));
+    padding: var(--sp-2);
     border-radius: 12px;
     background: var(--page);
   }
 
   .in-opt,
   .in-chip {
-    padding: 6px 10px;
+    padding: calc(6px * var(--dense, 1)) calc(10px * var(--dense, 1));
     border: 1px solid var(--rule);
     border-radius: var(--r-ctl);
     background: var(--tile);
@@ -482,16 +482,16 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .in-as .in-h {
-    margin-inline-end: 4px;
+    margin-inline-end: var(--sp-1);
   }
 
   .in-field {
     display: grid;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .in-field input,
@@ -509,14 +509,14 @@
   .in-say {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
+    gap: var(--sp-2);
     align-items: center;
   }
 
   .in-check {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-2);
     font-size: var(--fs-meta);
   }
 
@@ -535,7 +535,7 @@
   .in-foot {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    padding-block-start: 4px;
+    gap: var(--sp-2);
+    padding-block-start: var(--sp-1);
   }
 </style>

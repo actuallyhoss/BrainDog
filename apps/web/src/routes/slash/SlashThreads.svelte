@@ -541,7 +541,7 @@
   .ghost {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--sp-3);
   }
 
   .ghost span {

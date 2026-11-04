@@ -139,7 +139,7 @@
   }
 
   .code-inline {
-    padding: 2px 6px;
+    padding: 2px calc(6px * var(--dense, 1));
     background: var(--tile-2);
     border-radius: var(--r-xs);
     color: var(--ink);

@@ -133,7 +133,7 @@
   /* 4px of room at each side, taken back by the margin, so a focus ring inside is not cut by the clip. */
   .dis-inner {
     min-block-size: 0;
-    margin-inline: -4px;
+    margin-inline: calc(-1 * var(--sp-1));
     padding: var(--sp-2) 4px 4px;
   }
 

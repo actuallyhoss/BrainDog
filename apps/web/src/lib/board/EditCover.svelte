@@ -194,7 +194,7 @@
   .size {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     min-block-size: 32px;
     padding: 0 var(--sp-2);
     border: 0;

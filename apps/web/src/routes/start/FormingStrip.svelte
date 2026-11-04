@@ -223,9 +223,9 @@
 
   .chips {
     display: flex;
-    gap: 6px;
-    margin: -8px 0;
-    padding: 8px 0;
+    gap: calc(6px * var(--dense, 1));
+    margin: calc(-1 * var(--sp-2)) 0;
+    padding: var(--sp-2) 0;
     overflow: hidden;
     white-space: nowrap;
   }

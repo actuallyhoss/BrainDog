@@ -230,7 +230,7 @@
   .r-project {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     color: var(--ink-2);
     font-size: var(--fs-meta);
   }
@@ -266,7 +266,7 @@
     justify-self: end;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     color: var(--ink-3);
     font-size: var(--fs-meta);
     white-space: nowrap;
