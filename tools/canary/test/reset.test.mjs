@@ -60,6 +60,6 @@ test('a canary that cannot be read is refused before anything is sent to it', as
     methods.push(url.split('/api/')[1]);
     return new Response(JSON.stringify({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This credential does not reach this BrainDog.' } }), { status: 403 });
   };
-  await assert.rejects(reset(at(), { lived, io: { send } }), /would not export: This credential does not reach this record\./u);
+  await assert.rejects(reset(at(), { lived, io: { send } }), /would not export: This credential does not reach this BrainDog\./u);
   assert.deepEqual(methods, ['export']);
 });

@@ -80,7 +80,7 @@ test('Dina signs up with no plan, keeps what was proposed, is aged a week and th
   assert.deepEqual(verdict.steps.filter((s) => !s.ok), []);
   assert.equal(verdict.colour, 'green');
   assert.equal(failed(verdict), false);
-  assert.deepEqual(verdict.record, { name: 'Dina', made: true, deleted: true });
+  assert.deepEqual(verdict.record, { name: "Dina's BrainDog", made: true, deleted: true });
   const week = plan(dina, 'week').length;
   assert.deepEqual(seen(seer), [0, week, week + plan(dina, 'quarter').length]);
   /* The record asked about the key's first changes, and she said yes to each on Decide: the walk says how many. */

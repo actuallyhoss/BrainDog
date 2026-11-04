@@ -87,7 +87,8 @@ test('security.txt names its Canonical address', () => {
 });
 
 test('security.txt names its Policy', { todo: todoIf('policy', txt.policy?.[0]) }, () => {
-  assert.match(txt.policy?.[0] ?? '', /^https:\/\/.+SECURITY\.md$/);
+  /* THE SITE'S SECURITY PAGE, NOT SECURITY.md IN A PRIVATE REPOSITORY, which answers a stranger 404 (36d2257c6). */
+  assert.equal(txt.policy?.[0], 'https://brain.dog/security');
 });
 
 test('the field reader skips comments and keeps every value', () => {

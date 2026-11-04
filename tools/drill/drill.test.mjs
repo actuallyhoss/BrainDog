@@ -70,14 +70,14 @@ test('THE WHOLE DRILL IS GREEN ON THE HARNESS, every step run, and no line holds
     const said = lines.join('\n');
     for (const v of [ADDRESS, SECOND, code, d.cookie, d.bearer, d.link?.token, OPERATOR]) assert.ok(typeof v === 'string' && !said.includes(v), 'a line holds a value');
     assert.doesNotMatch(said, /@/u, 'a line holds an address');
-    assert.match(said, /the letter “Finish making your BrainDog record” came in [\d.]+ seconds/u);
+    assert.match(said, /the letter “Finish making your BrainDog” came in [\d.]+ seconds/u);
     /* UNTIL THE RECORD'S DELETE PASSES `destroyRecord`'s ANSWER ON, the step says it cannot read it; then it says it. */
     assert.match(said, /the delete does not yet say what it kept|it kept one final copy, named final-, and removed \d+ other/u);
     assert.match(said, /erase: a second person was let in by invitation and attached a file; once the owner erased them/u);
     assert.match(said, /close: while it alone owned its record, a close was refused \(“Delete drill-[a-z0-9-]+, or make somebody else its owner, first\.”\)/u);
     /* THE LETTERS A STRANGER GETS: the link, the welcome, the notice of the close; and no sign-in link after it. */
     const theirs = c.letters.filter((l) => String(l.to).toLowerCase() === ADDRESS);
-    assert.deepEqual(theirs.map((l) => l.subject), ['Finish making your BrainDog record', 'Your BrainDog record is ready', 'You are signed out of BrainDog']);
+    assert.deepEqual(theirs.map((l) => l.subject), ['Finish making your BrainDog', 'Your BrainDog is ready', 'You are signed out of BrainDog']);
     /* THE SECOND ADDRESS IS CLOSED BY `erase`, or the next run's invitation would ask it to sign in first. */
     const second = c.letters.filter((l) => String(l.to).toLowerCase() === SECOND);
     assert.equal(second.at(-1)?.subject, 'You are signed out of BrainDog', 'the second address was left open for the next run');

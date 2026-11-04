@@ -179,7 +179,8 @@ test('a read sent as a POST goes on, and the write-marked routes that are reads 
   /* `today` IS TODAY'S TILES IN ONE READ (scope 2026-10-24 A12), each part asked as its own method would be, so it goes on. */
   /* `checkAutomation` AND `automationSentence` KEEP NOTHING: an automation's page checks
      its body, and the look blocked that three times as a write. */
-  assert.deepEqual(posts.sort(), ['automationSentence', 'checkAutomation', 'previewPage', 'reads', 'today']);
+  /* `addonCheck` PLANS A PLUGIN FILE AGAINST THE RECORD AND KEEPS NOTHING (`routes/addons.ts`, f4d6a2faa): a whole file is no query string. */
+  assert.deepEqual(posts.sort(), ['addonCheck', 'automationSentence', 'checkAutomation', 'previewPage', 'reads', 'today']);
   assert.ok(allowed().has('checkAutomation'));
   assert.ok(allowed().has('previewPage'));
   assert.ok(allowed().has('reads'));

@@ -50,7 +50,7 @@ test('THE SOURCE ANSWERS AS THE SEED DOES, with the faults in what it says', asy
     const boot = async (s) => (await (await fetch(`http://127.0.0.1:${s.address().port}/api/boot`)).json()).value;
     const [there, here] = [await boot(a), await boot(b)];
     assert.equal(there.waits.questions, 3);
-    assert.equal(here.waits.questions, 8, 'the seed it is made from says what it always said');
+    assert.equal(here.waits.questions, 10, 'the seed it is made from says what it says today, ten open questions');
     assert.equal(Date.parse(there.now) - Date.parse(here.now), LATER_DAYS * DAY);
     assert.ok(here.pages.some((p) => p.slug === LEFT_OUT) && !there.pages.some((p) => p.slug === LEFT_OUT));
     assert.equal(planted.name, 'planted');
