@@ -158,7 +158,8 @@
 </div>
 
 <style>
-  /* THE MENU'S OWN SURFACE (`Menu.svelte`): the regular film, its radius, 4 inside, the popover's elevation. */
+  /* THE MENU'S RADIUS, INSET AND ELEVATION ON A SOLID TILE: it lies over a sentence and a conversation, so nothing behind it
+     reads through its rows. */
   .ml {
     position: fixed;
     inset: auto;
@@ -167,28 +168,13 @@
     padding: var(--sp-1);
     border: 0;
     border-radius: var(--r-pop, 12px);
-    background: var(--glass-regular, var(--tile));
-    -webkit-backdrop-filter: var(--glass-filter, none);
-    backdrop-filter: var(--glass-filter, none);
+    background: var(--tile);
     box-shadow: var(--glass-edge, none), var(--elev-popover, 0 8px 24px rgb(0 0 0 / 0.16));
     color: var(--ink);
     font-size: var(--fs-ctl);
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
-  }
-
-  @supports not (backdrop-filter: blur(1px)) {
-    .ml {
-      background: var(--tile);
-    }
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .ml {
-      background: var(--tile);
-      backdrop-filter: none;
-    }
   }
 
   .ml-head {
