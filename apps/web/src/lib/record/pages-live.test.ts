@@ -192,10 +192,10 @@ test('a block the caller may not read still gives up its declaration', async () 
   assert.deepEqual(block, { kind: 'table', source: 'register.payroll', where: 'month is this', empty: 'Nobody is paid yet.' });
 });
 
-for (const [what, answer] of [
-  ['nothing answers', null],
-  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
-  ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
+for (const [what, answer, fix] of [
+  ['nothing answers', null, /^BrainDog could not be reached\.$/u],
+  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }), /^Sign in again\.$/u],
+  ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 }), /^BrainDog's answer could not be read\.$/u],
 ] as const)
   test(`the refusal is said in its own words when ${what}, and no sample under it`, async () => {
     const { io } = host(answer);
@@ -204,7 +204,7 @@ for (const [what, answer] of [
        second meaning for these codes to carry, so they are the record's or the client's sentence like any other. */
     for (const out of [await pagesReader(BASE, io).read(), await pagesReader(BASE, io).readOne('money')]) {
       assert.equal(out.from, 'refused', `answered ${JSON.stringify(out)}`);
-      if (out.from === 'refused') assert.match(out.fix, /^(Sign in again\.|BrainDog could not be reached\.)$/u);
+      if (out.from === 'refused') assert.match(out.fix, fix);
     }
   });
 

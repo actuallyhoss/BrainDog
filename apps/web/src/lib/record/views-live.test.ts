@@ -182,10 +182,10 @@ test('a key naming no register asks the record what it holds, and sends no view 
   assert.equal(sent.filter((u) => u.pathname === '/api/view').length, 0);
 });
 
-for (const [what, answer] of [
-  ['nothing answers', null],
-  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
-  ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
+for (const [what, answer, fix] of [
+  ['nothing answers', null, /^BrainDog could not be reached\.$/u],
+  ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }), /^Sign in again\.$/u],
+  ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 }), /^BrainDog's answer could not be read\.$/u],
 ] as const)
   /* NO RECORD IS A REFUSAL NOW, carrying the sentence the record or the client gave. It answered
      `{ from: 'sample' }` and the route drew the seeded studio's `services.lapsing` over whatever address was open. */
@@ -194,7 +194,7 @@ for (const [what, answer] of [
     const out = await viewReader(BASE, io).read('services.lapsing');
     assert.equal(out.from, 'refused', `answered ${JSON.stringify(out)}`);
     if (out.from !== 'refused') return;
-    assert.match(out.fix, /^(Sign in again\.|BrainDog could not be reached\.)$/u);
+    assert.match(out.fix, fix);
   });
 
 test("any other refusal on the view itself is the record's own sentence", async () => {
