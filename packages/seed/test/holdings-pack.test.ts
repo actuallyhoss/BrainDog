@@ -71,7 +71,7 @@ const shippedUpdate = () => handingAsShipped(firstPartyDocument('money-core'));
 const BESIDE = [
   'metric.gold-grams', 'metric.gold-held', 'metric.gold-rate-on', 'metric.gold-rates-current', 'metric.gold-rates-old', 'metric.holding-buys',
   'metric.holdings-at-cost', 'metric.holdings-by-kind', 'metric.holdings-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-gain',
-  'metric.holdings-gain-pct', 'metric.holdings-gained', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-unpriced', 'metric.holdings-value',
+  'metric.holdings-gain-pct', 'metric.holdings-gained', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-uncosted', 'metric.holdings-unpriced', 'metric.holdings-unvalued', 'metric.holdings-value', 'metric.holdings-worth-costed',
   'page.holding', 'page.holdings', 'register.gold_rates', 'register.holding_buys',
   'rule.gold_rate_old', 'rule.holdings_buy', 'rule.holdings_cost', 'rule.holdings_price_old', 'rule.holdings_rate', 'script.holdings_cost', 'script.holdings_twin',
   /* AND SINCE 3.2.0 THE GOLD FEED, the nightly script that writes a world gold rate, off until a source is picked. */
@@ -87,8 +87,9 @@ const snapshot = (k: Kernel, ids: readonly string[]): string[] => ids.map((id) =
 test('THE PACK DECLARES ITS LIST UNDER ITS OWN NAME, with the four 1.x kinds first and gold, funds and shares after them', async () => {
   const doc = holdingsFile() as unknown as Doc;
   assert.equal(doc.pack, 'holdings');
-  /* 3.3.0 SINCE round 1030: gold valued from the newest rate of any karat, and the rate box beside the gold rates. */
-  assert.equal(doc.version, '3.3.0');
+  /* 3.3.0 SINCE round 1030: gold valued from the newest rate of any karat, and the rate box beside the gold rates. 3.7.2
+     SINCE 3 November (3ea2e541c), through what has no price or no cost left out of the figures (d60db4101, 1767124b5). */
+  assert.equal(doc.version, '3.7.2');
   const lists = doc.declarations.filter((d) => typeof d.register === 'string' && d.rule === undefined);
   assert.deepEqual(lists.map((d) => [d.register, d.pack]), [['holdings', 'holdings'], ['holding_buys', 'holdings'], ['gold_rates', 'holdings']]);
   const kind = (lists[0]!.fields as Field[]).find((f) => f.id === 'kind')!;
@@ -121,7 +122,7 @@ test('A RECORD ON 1.8.0 HOLDING ROWS UPDATES TO 2.0.0 AND TAKES THE PACK, every 
   assert.deepEqual(snapshot(k, ids), before, 'a row, its id or its history moved');
   assert.equal(k.count('holdings'), 14);
   const packs = k.packs().filter((p) => p.id === 'holdings' || p.id === 'money-core').map((p) => [p.id, p.version]);
-  assert.deepEqual(packs, [['holdings', '3.3.0'], ['money-core', FIRST_PARTY_VERSIONS['money-core']]]);
+  assert.deepEqual(packs, [['holdings', '3.7.2'], ['money-core', FIRST_PARTY_VERSIONS['money-core']]]);
 
   /* AND THE RECORD GOES ON TAKING GOLD, now the pack's word, and every 1.x kind. */
   assert.ok(k.create('holdings', { kind: 'gold', label: 'Gold 21c', qty: 1, unit_cost: { amount: 480_000, currency: 'EGP' } } as never, { actor: 'p_1' }).ok);

@@ -84,8 +84,9 @@ test('THE PAGE DECLARES TWO LINES ON THE FIGURE, one for one category and one fo
   assert.deepEqual(on.map((b) => b.when), [{ metric: FIGURE, is: 1 }, { metric: FIGURE, gt: 1 }]);
   assert.deepEqual(on.map((b) => b.body), [ONE, MANY]);
   assert.deepEqual([blocks.indexOf(on[0]!), blocks.indexOf(on[1]!)], [0, 1], 'under the name, over what the book has');
-  /* AND THE CASH STILL STANDS BESIDE ITS WALK, one row of four twelfths and eight. */
-  assert.deepEqual(blocks.slice(2, 4).map((b) => b.kind), ['stat', 'forecast']);
+  /* AND THE WALK IS THE FIRST TILE (no What you have since 3.34.0, aaf8e24df), under the line a book with no account reads
+     (3.36.0, fc63fdc5e). */
+  assert.deepEqual(blocks.slice(2, 4).map((b) => b.kind), ['note', 'forecast']);
   for (const b of on) {
     assert.equal(b.lead, true, 'a line under the name, and never a tile over the fold');
     assert.doesNotMatch(String(b.body), /—|\brow\b|\bentity\b/u);

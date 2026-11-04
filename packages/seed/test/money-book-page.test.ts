@@ -64,7 +64,7 @@ const OWED = 'What is due';
 const OWED_CELLS = [
   ['book-owed-to', 'Due to come in'],
   ['book-owed-by', 'Due to go out'],
-  ['book-lasts-until', 'Money lasts until'],
+  ['book-lasts-until', 'Runs out'],
 ] as const;
 /** The line that stood under What is due on a book whose money never goes under, until money-core 3.34.0. */
 const LASTS = 'Lasts the year on what is due.';
@@ -215,20 +215,23 @@ test('THE PAGE DECLARES ONE ROW OF THREE, under what the book has and its walk, 
   );
   /* NO TILE LEADS BUT THE LINES ON CATEGORIES: the walk is first, and is not a lead. */
   assert.deepEqual(blocks.filter((b) => b.lead === true && b.kind !== 'note').map((b) => b.heading), []);
-  /* DRAWN ON A FIGURE OF THIS BOOK: the page fills the name in, as every cell does. */
-  assert.match(String(row.when?.metric), /^book-(in|out|net)-month:\{\{name\}\}$/);
+  /* DRAWN ON THE FIGURES OF THIS BOOK, WHILE MONEY CAME IN OR WENT OUT SINCE 3.35.0 (24fd3a8d4), never three noughts: the
+     page fills the name in, as every cell does. */
+  const asked = (row.when as unknown as { any: { metric: string; gt: number }[] }).any;
+  assert.ok(asked.length >= 2 && asked.every((w) => /^book-(in|out)-month:\{\{name\}\}$/.test(w.metric) && w.gt === 0), JSON.stringify(row.when));
 });
 
 test('THE PAGE STAYS WITHIN THE CEILING OF 24 BLOCKS, with nothing folded away to make room', () => {
   const blocks = MONEY_BOOK_PAGE.blocks as unknown as Declared[];
   assert.ok(blocks.length <= 24, `${blocks.length} blocks`);
-  /* ELEVEN BARE, WITH THE TWO LINES ON CATEGORIES MARKED AGAINST THE LEDGER, AND THIRTEEN WITH ITS OWED ROW AND ITS
+  /* TWELVE BARE, WITH THE TWO LINES ON CATEGORIES MARKED AGAINST THE LEDGER, AND FOURTEEN WITH ITS OWED ROW AND ITS
      MONTHS, whatever the tree declares: well under the ceiling. One fewer each since money-core 3.34.0 took What you
-     have off, and the line that its money lasts went from the full page. */
+     have off, and the line that its money lasts went from the full page; one more each since 3.36.0 (fc63fdc5e) says
+     what a book with no account yet holds. */
   const full = bookPage(() => true).blocks as Declared[];
-  assert.equal((bookPage(() => false).blocks as Declared[]).length, 11);
-  assert.equal(full.length, 13);
-  assert.ok(blocks.length >= 11 && blocks.length <= full.length, `${blocks.length} blocks`);
+  assert.equal((bookPage(() => false).blocks as Declared[]).length, 12);
+  assert.equal(full.length, 14);
+  assert.ok(blocks.length >= 12 && blocks.length <= full.length, `${blocks.length} blocks`);
   for (const heading of ['Accounts', 'Add an account', 'Coming and going', 'Due in the next 30 days', 'The next 30 days', "Where this month's money went", 'What moved'])
     for (const page of [blocks, full]) assert.ok(page.some((b) => b.heading === heading), `${heading} was taken off the page to make room`);
 });
@@ -274,7 +277,7 @@ test('A BLOCK WAITS FOR ITS FIGURES: a cell with no figure is left out, and a ch
   assert.deepEqual(page('book-owed-by').find((b) => b.heading === OWED)?.cells, [{ metric: 'book-owed-by:{{name}}', label: 'Due to go out' }]);
   assert.deepEqual(
     page('book-lasts-until', 'book-owed-to').find((b) => b.heading === OWED)?.cells?.map((c) => c.label),
-    ['Due to come in', 'Money lasts until'],
+    ['Due to come in', 'Runs out'],
   );
   /* THE CHART READS THREE, AND TWO OF THEM DRAW NOTHING: a line or its `when:` would name a figure nobody declared. */
   const three = BY_MONTH.map((f) => String(f.metric));
@@ -282,7 +285,7 @@ test('A BLOCK WAITS FOR ITS FIGURES: a cell with no figure is left out, and a ch
   assert.equal(page(...three).some((b) => b.heading === CHART), true);
   /* EVERY FIGURE THE FULL PAGE NAMES IS ONE THIS TEST KNOWS, so a new one cannot slip onto the page unheld. */
   const named = (bookPage(() => true).blocks as Declared[]).flatMap((b) => [...(b.cells ?? []).map((c) => c.metric), ...(b.series ?? []).map((l) => l.metric), ...(b.when ? [String(b.when.metric)] : [])]);
-  for (const id of named.map((m) => m.split(':')[0]!).filter((id) => id.startsWith('book-') && id !== 'book-cash' && id !== 'book-spent-month')) assert.ok(EVERY.includes(id), id);
+  for (const id of named.map((m) => m.split(':')[0]!).filter((id) => id.startsWith('book-') && id !== 'book-cash' && id !== 'book-spent-month' && id !== 'book-accounts')) assert.ok(EVERY.includes(id), id);
   /* AND THE PAGE MONEY SHIPS IS THAT PAGE OVER THE FIGURES MONEY DECLARES, no more and no fewer. */
   assert.deepEqual(MONEY_BOOK_PAGE, bookPage((id) => IN_TREE.has(id)));
 });

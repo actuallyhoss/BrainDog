@@ -97,15 +97,15 @@ const bill = (k: Kernel, amount: number, due: number): void =>
 /* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0, left out whole with no card that says it. */
 /* AND SINCE money-core 3.33.0 (AF4) THE LINE LEADS WITH WHAT HURTS MOST: what is late, or, with nothing late, the low
    point while the walk goes under inside twelve weeks; the card second. */
-const CARD = '{{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
+/* NO WORD OF THE CARD SINCE money-core 3.38.4 (ceeaf6193): the card's own tile says what is to pay on it. */
 const LOW = 'Cash falls to {{runway-days.low}} by {{runway-days.low_on}}.';
 /* NO WORD OF WHERE THE MONEY IS KEPT SINCE money-core 3.29.1: the Accounts tile draws a row for each, so the line is only
    what needs doing, and on one book with nothing late and no card it says nothing. */
-const WHAT_THERE_IS = `${LOW} ${CARD}`;
-const LASTS = `Lasts the year on what is due. ${CARD}`;
+const WHAT_THERE_IS = LOW;
+const LASTS = 'Lasts the year on what is due.';
 /* SPREAD OVER HOW MANY ACCOUNTS SINCE money-core 3.30.0, AND KEPT IN HOW MANY BOOKS SINCE 3.34.0: the count was of
    books all along, and the line is said only with two or more. */
-const BOOKS = `Kept in {{books-held}} books. ${CARD}`;
+const BOOKS = 'Kept in {{books-held}} books.';
 const bodies = (k: Kernel, page = LINE): (string | undefined)[] => leads(k, page).map((b) => b.body);
 
 test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that it lasts the year', async () => {
@@ -166,7 +166,7 @@ test('TWO CURRENCIES WITH NO RATE STILL READ WHAT THERE IS, and the line does no
   account(k, 'Dollar account', { amount: 500_000, currency: 'USD' });
   bill(k, 900_000, 12);
   assert.equal(figure(k, 'runway-days'), null, 'a day count across two currencies with no rate');
-  assert.deepEqual(bodies(k), [CARD], 'nobody knows whether GBP 5,000 and USD 5,000 pay GBP 9,000');
+  assert.deepEqual(bodies(k), [], 'nobody knows whether GBP 5,000 and USD 5,000 pay GBP 9,000');
 });
 
 test('A RECORD WITH NO ACCOUNT IS NOT TOLD ITS MONEY LASTS', async () => {

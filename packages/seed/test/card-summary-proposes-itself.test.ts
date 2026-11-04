@@ -53,6 +53,8 @@ test('SMALL BUSINESS SAYS MONEY IN AND MONEY OUT, never who owes whom, and is pr
     'business', 'small business', 'my business', 'studio', 'agency', 'freelance', 'freelancer', 'freelancing',
     'consultancy', 'consulting', 'clients', 'client', 'customers', 'invoice', 'invoices', 'invoicing', 'domains',
     'hosting', 'subscriptions', 'contractors', 'accountant', 'vat', 'bookkeeping', 'retainer', 'foundry',
+    /* A CREATOR'S WORK IS A BUSINESS SINCE 2 November (2cb750068), and none of these speaks of owing either. */
+    'streamer', 'youtuber', 'content creator', 'creator', 'sponsors', 'sponsorships', 'brand deals',
   ]);
   assert.equal(arrange('track what my brother owed me for the holiday').pick, null);
 });

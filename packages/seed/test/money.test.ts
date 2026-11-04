@@ -1058,8 +1058,9 @@ test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line
   const blocks = (out.value as { blocks: readonly { heading?: string; drawn?: boolean; refusals: readonly unknown[] }[] }).blocks;
   for (const b of blocks) assert.deepEqual(b.refusals, [], `${String(b.heading)} is refused`);
   assert.deepEqual(
+    /* NO LINE OVER THE BOX TO ADD ONE SINCE money-core 3.36.0 (fc63fdc5e): the box says it, with no line saying it again. */
     blocks.filter((b) => b.drawn !== false).map((b) => b.heading),
-    [undefined, 'Add an account'],
+    ['Add an account'],
   );
 });
 
@@ -1136,7 +1137,8 @@ test("A SPLIT IS DRAWN ONLY WHILE IT HAS A PART TO CUT, on Money's Accounts and 
 
 test('MONEY INSTALLS AND DRAWS WITH PEOPLE OFF, because who a row is with is a link and not a need', async () => {
   const manifest = firstPartyManifest('money-core');
-  assert.deepEqual(manifest.requires, ['register.things']);
+  /* NOT PROJECTS EITHER, SINCE 4b137c806 (31 October): which project a bill is for is a link, as who a row is with is. */
+  assert.deepEqual(manifest.requires, []);
   assert.ok(manifest.links.includes('register.people'), 'Money does not say it links to People');
 
   const k = await openRecord(openSqlite(), { now: () => NOW });

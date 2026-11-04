@@ -168,6 +168,9 @@ const figuresOf = (k: Kernel): Figure[] =>
     /* NOR ONE OF ONE PAYEE (money-core 3.32.0's `paid-to-by-week`): `party` names an organisation, and this record holds
        none, so the payee is no name it could be asked about. Its sum is Spending's, read a category at a time above. */
     .filter((d) => !/party is \{\{it\}\}/u.test(d.body))
+    /* NOR ONE OF ONE FILING RULE (3c699b60d's `filing-rule-filed`): a count of lines, so no two currencies meet in it, and
+       `filed_by` names a rule this record holds none of. `money-rules-page.test.ts` holds it. */
+    .filter((d) => !/filed_by is \{\{it\}\}/u.test(d.body))
     .map((d) => {
       const body = JSON.parse(d.body) as Figure;
       return (JSON.stringify(body).includes('{{it}}') ? fill(body, null, JSON.stringify(body).includes('category is {{it}}') ? 'Software' : KILN) : body) as Figure;

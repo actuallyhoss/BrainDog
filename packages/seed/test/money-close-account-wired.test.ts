@@ -159,12 +159,14 @@ test('closing an account starts the script once, handed the account, and nothing
   value(m.k.update('accounts', m.savings.id, { name: 'Rainy day' }, OWNER));
   m.open('Old dollars', usd(5_000), { state: 'closed' });
   await m.k.drain();
-  assert.deepEqual(m.queued(), []);
+  /* NOT `book_from_account`, WHICH AN ACCOUNT PUT IN A BOOK STARTS SINCE 3.35.0 (24fd3a8d4), and is no part of closing. */
+  const closing = () => m.queued().filter((q) => q.script !== 'book_from_account');
+  assert.deepEqual(closing(), []);
 
   m.close(m.hsbc);
   await m.k.drain();
   /* THE ACCOUNT BY ITS IDENTITY, which is what a script step always hands: nothing a step fills says "accounts#1". */
-  assert.deepEqual(m.queued(), [{ script: 'close_account', version: 1, input: { id: m.hsbc.id, register: 'accounts', seq: m.hsbc.seq } }]);
+  assert.deepEqual(closing(), [{ script: 'close_account', version: 1, input: { id: m.hsbc.id, register: 'accounts', seq: m.hsbc.seq } }]);
   assert.equal(m.k.get(m.hsbc.id)!.fields.state, 'closed');
 });
 

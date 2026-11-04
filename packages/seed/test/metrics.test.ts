@@ -323,6 +323,12 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
     /* NOR OF A FIGURE OF ONE PAYEE (`party is {{it}}`, money-core 3.32.0's `paid-to-by-week`): a project's name is no
        organisation, and `party` is a link the walk cannot follow by name. `money-two-currencies.test.ts` reads Spending by category. */
     if (JSON.stringify(decl).includes('party is {{it}}')) continue;
+    /* NOR OF ONE FILING RULE (`filed_by is {{it}}`, 3c699b60d's `filing-rule-filed`): a project's name is no rule, and
+       `filed_by` a link the walk cannot follow by name. `money-rules-page.test.ts` reads it, a rule at a time. */
+    if (JSON.stringify(decl).includes('filed_by is {{it}}')) continue;
+    /* NOR OF A FIGURE READ FOR WHOEVER IS LOOKING (`owner is not someone else`, work 1.21.0's `tasks-late-yours` and its
+       kin): "someone else" names no row a hand could look up, and each reader gets their own. */
+    if (JSON.stringify(decl).includes('is not someone else')) continue;
     const params = JSON.stringify(decl).includes('{{it}}') ? paramsOf(decl) : [null];
     for (const it of params) {
       const one = it === null ? (decl as MetricDecl) : filled(decl, it);
@@ -410,6 +416,8 @@ test('THE NINE ARE ALL READABLE, so the record ships with no tile it cannot answ
     if (JSON.stringify(decl).includes('category is {{it}}')) continue;
     /* NOR ONE OF ONE PAYEE (money-core 3.32.0's `paid-to-by-week`): a project's name is no organisation. */
     if (JSON.stringify(decl).includes('party is {{it}}')) continue;
+    /* NOR ONE OF ONE FILING RULE: a project's name is no rule (`money-rules-page.test.ts` reads it). */
+    if (JSON.stringify(decl).includes('filed_by is {{it}}')) continue;
     const one = JSON.stringify(decl).includes('{{it}}') ? filled(decl, paramsOf(decl)[0]!) : (decl as MetricDecl);
     const read = k.metric(one);
     if (!read.ok) unreadable.push(`${one.metric}: ${sayOf(read)}`);

@@ -16,21 +16,23 @@ import assert from 'node:assert/strict';
 import { AGENTS_PACK } from '../src/packs/agents.ts';
 import { before, seedCatalogue } from '../src/usecases/catalogue.ts';
 
-test('A LIST OF THE AGENTS MODULE names Agents and what Agents itself needs first, and does not throw', () => {
+/* AGENTS NEEDS NOTHING SINCE 1.32.0 (31f31f175): where a learning applies is a link to Projects, kept only where it is held. */
+test('A LIST OF THE AGENTS MODULE names Agents and nothing before it, and does not throw', () => {
   for (const list of ['skills', 'credentials', 'learnings', 'tools'])
-    assert.deepEqual(before([`register.${list}`]), ['portfolio', 'agents'], list);
+    assert.deepEqual(before([`register.${list}`]), ['agents'], list);
 });
 
 test('WHAT AGENTS NEEDS is read off its own manifest, the one `seedCatalogue` already reads for its entry', () => {
-  assert.deepEqual(AGENTS_PACK.manifest.requires, ['register.things']);
+  assert.deepEqual(AGENTS_PACK.manifest.requires, []);
   const agents = seedCatalogue().find((e) => e.id === 'agents');
-  assert.deepEqual(agents?.modules, ['portfolio']);
+  assert.deepEqual(agents?.modules, []);
 });
 
 test('THE FIVE STARTER MODULES ARE ASKED AS BEFORE, and an agents list beside them lands in install order', () => {
-  // money-core 3.0.0 links People softly (`LINKS['money-core'] = ['party']`), so Money no longer pulls People in.
-  assert.deepEqual(before(['register.transactions']), ['portfolio', 'money-core']);
+  // money-core 3.0.0 links People softly (`LINKS['money-core'] = ['party']`), and Projects the same way since 4b137c806
+  // (`'thing'`, 31 October), so Money pulls neither in.
+  assert.deepEqual(before(['register.transactions']), ['money-core']);
   assert.deepEqual(before(['register.tasks']), ['work']);
-  assert.deepEqual(before(['register.tasks', 'register.skills']), ['portfolio', 'work', 'agents']);
+  assert.deepEqual(before(['register.tasks', 'register.skills']), ['work', 'agents']);
   assert.deepEqual(before(['register.nosuch']), []);
 });

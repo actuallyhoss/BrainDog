@@ -64,7 +64,9 @@ test('HEALTH BUILDS: one page, no list leaned on, and every block reads clean wi
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${String(b.heading ?? (b as { body?: unknown }).body)} reads clean`);
 });
 
-test('IT READS ONLY THE NAMES IT DECLARES: the signs source and its two figures', () => {
+/* ONE FIGURE SINCE core 1.3.1 (7438cc7e8): the lines that read `signs-red` and `signs-unread` went, Needs a look and Not
+   checked yet naming each sign under them. */
+test('IT READS ONLY THE NAMES IT DECLARES: the signs source and its one figure', () => {
   const sources = new Set<string>();
   const figures = new Set<string>();
   for (const b of BLOCKS) {
@@ -104,15 +106,14 @@ test('NO LINE IS SAID FROM signs-red SINCE core 1.3.1, whatever it reads: Needs 
   assert.deepEqual(under(read([RED, RED, RED], { 'signs-red': 3 }), 'Needs a look').length, 3);
 });
 
-test('ONE GREEN AND THE REST UNREAD IS NEVER CALLED ALIVE: the line says only that nothing needs a look', () => {
+test('ONE GREEN AND THE REST UNREAD IS NEVER CALLED ALIVE: there is no line, and each is said under its heading', () => {
   const unread = [NONE, { ...NONE, sign: 'tools-listed', name: 'The tools list' }, { ...NONE, sign: 'rules-ran', name: 'Rules ran this week' }];
   /* `signs-red` reads 0 here, as the kernel reads it once one sign is green (`readVitals`). */
   const blocks = read([GREEN, ...unread], { 'signs-red': 0 });
-  assert.deepEqual(leads(blocks), ['Nothing needs a look.']);
-  for (const line of leads(blocks)) assert.doesNotMatch(line, /alive|healthy|everything/iu, line);
+  assert.deepEqual(leads(blocks), []);
   assert.deepEqual(under(blocks, 'All good'), [GREEN.name]);
-  /* EVERY UNREAD SIGN IS SAID BY ITS NAME, and the ones nothing was ever filed for in one line, not one line each. */
-  assert.deepEqual(under(blocks, 'Not checked yet'), ['The model answers, The tools list and Rules ran this week']);
+  /* THE ONES NOTHING WAS EVER FILED FOR ARE ONE CARD, not one each, titled by how many SINCE core 1.3.0 (3a04e7020). */
+  assert.deepEqual(under(blocks, 'Not checked yet'), ['3 checks with nothing filed yet']);
   for (const b of BLOCKS) if (b.kind === 'note') assert.doesNotMatch(String(b.body), /alive/iu, 'no line says alive of the record');
 });
 
@@ -157,14 +158,13 @@ test('THE WORDS ARE PLAIN: no em dash, no id, and never row, item or entity', ()
   }
 });
 
-test('HOW MANY SIGNS ARE NOT READ YET is said from signs-unread, and not at all at nought or unread', () => {
+test('HOW MANY SIGNS ARE NOT READ YET IS NO LINE, whatever signs-unread says: Not checked yet names them', () => {
   const lines = (n: number | null): string[] =>
     drawn(read([GREEN, NONE], { 'signs-red': 0, 'signs-unread': n })).filter((b) => b.kind === 'note' && !b.lead).map((b) => String((b as { body?: unknown }).body)).filter((w) => !w.includes('[Tidy up]'));
   assert.deepEqual(lines(null), []);
   assert.deepEqual(lines(0), []);
-  assert.deepEqual(lines(1), ['One check has not run yet.']);
-  assert.equal(lines(3).length, 1);
-  assert.match(lines(3)[0]!, /^(\{\{signs-unread\}\}|3) checks have not run yet\.$/u);
+  assert.deepEqual(lines(1), []);
+  assert.deepEqual(lines(3), []);
 });
 
 test('HEALTH AND TIDY UP POINT AT EACH OTHER, so the two counts are never read as one', () => {

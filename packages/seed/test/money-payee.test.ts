@@ -123,8 +123,9 @@ test('THE EXAMPLE RECORD STILL DRAWS: every entry is held with the words the ban
   };
   assert.deepEqual(count(held.map((e) => e.fields)), count(TRANSACTIONS));
   assert.ok(Object.keys(count(TRANSACTIONS)).length > 5, 'the example entries say nothing the bank wrote, so this test holds nothing');
-  /* THE EXAMPLES TYPE NO NAME, so none is invented for them. */
-  for (const e of held) assert.equal(e.fields.payee ?? '', '', String(e.fields.what));
+  /* THE NAME EACH EXAMPLE TYPES IS THE NAME IT HOLDS, SINCE 3c699b60d gave the sample its payees: none is invented. */
+  const payees = (rows: readonly { payee?: unknown }[]): string[] => rows.map((r) => String(r.payee ?? '')).sort();
+  assert.deepEqual(payees(held.map((e) => e.fields)), payees(TRANSACTIONS));
 
   const page = k.page('money');
   assert.ok(page.ok, sayOf(page));

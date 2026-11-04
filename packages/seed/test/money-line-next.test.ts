@@ -115,6 +115,9 @@ async function money(now = TENTH) {
     assert.ok(read.ok, sayOf(read));
     return (read.value as { value: number | null }).value;
   };
+  /* THE ACCOUNT MADE IN ITS BOOK ABOVE RUNS `book_from_account` (3.35.0, 24fd3a8d4): done before a test reads what a payment starts. */
+  await turn();
+  log.length = 0;
   return { k, clock, made, paid, turn, mark, queued, asked, late, log };
 }
 

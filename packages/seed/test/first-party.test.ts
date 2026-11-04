@@ -77,7 +77,8 @@ test('EACH FIRST-PARTY PACK IS A LEGAL PACK, and needs what its fields, pages an
     core: [],
     portfolio: [],
     people: [],
-    'money-core': ['register.things'],
+    /* ONLY LINKS TO PROJECTS SINCE 4b137c806 (31 October): which project a bill or a payment is for. */
+    'money-core': [],
     estate: ['register.things'],
     work: [],
   });
@@ -89,10 +90,11 @@ test('EACH FIRST-PARTY PACK IS A LEGAL PACK, and needs what its fields, pages an
     people: ['register.things', 'register.transactions'],
     /* MONEY ONLY LINKS TO PEOPLE'S LISTS since 3.0.0: who a row is with is left out of a record without them. A ledger
        row names an organisation since 3.10.0, and a bill still names a person. */
-    'money-core': ['register.organisations', 'register.people'],
+    'money-core': ['register.organisations', 'register.people', 'register.things'],
     estate: [],
     /* WORK ONLY LINKS TO PEOPLE AND PROJECTS: who holds a task and what it is for are left out of a record without them. */
-    work: ['register.people', 'register.things'],
+    /* AND WHO A TASK IS FOR, AN ORGANISATION, SINCE 1.23.0. */
+    work: ['register.organisations', 'register.people', 'register.things'],
   });
 
   for (const id of FIRST_PARTY) {

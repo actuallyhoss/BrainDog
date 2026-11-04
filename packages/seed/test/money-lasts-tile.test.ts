@@ -116,7 +116,7 @@ test('CASH BELOW NOUGHT READS THE DAY IT RAN OUT AS TODAY', async () => {
   const h = hero(k);
   assert.ok(shown(h), 'the hero is not drawn over cash below nought');
   /* THE WALK OPENS UNDER, so the day is today. */
-  assert.equal((h.values ?? {})['runs-out-on'], Math.floor(NOW / 86_400_000));
+  assert.equal((h.values ?? {})['runs-out-on'], day(0));
 });
 
 test('A RECORD WITH NO ACCOUNT DRAWS NO HERO: a Cash now of nought held nowhere is not money that lasts', async () => {

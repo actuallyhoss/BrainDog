@@ -145,7 +145,9 @@ test('October\'s rent files and the line reads Next 1 November, last paid 3 Octo
   assert.ok(m.log.includes(`${LANDLORD} is paid for 1 October, and Next is 1 November.`), said(m.log));
   /* FROM THE DAY THE LINE NAMED, NOT THE DAY THE MONEY MOVED. */
   assert.deepEqual(m.cycled, ['2026-10-01']);
-  assert.equal(m.open().length, before, 'a question opened');
+  /* THE ONE QUESTION THE LINE PAST ITS DAY HAD ASKED CLOSES ITSELF, SINCE 3 November (be7728aa4), and no other opens. */
+  assert.equal(before, 1, 'the line past its day asked nothing');
+  assert.equal(m.open().length, 0, 'a question opened, or the one about the line stayed');
   assert.equal(fieldsOf(m.k, pay.id).note ?? null, null);
   /* AND HANDED AGAIN, THE SAME PAYMENT MOVES NOTHING A SECOND TIME. */
   value(m.k.update('transactions', pay.id, { state: 'pending' }, OWNER));
@@ -219,6 +221,8 @@ test('"It went through" marks the open bill for the same money paid, and moves t
   assert.ok(!m.open().some((x) => x.body?.options?.some((o) => o.label === 'Move it on')), said(m.log));
 });
 
+/* THE QUESTION CLOSES ITSELF ONCE THE LINE HAS MOVED, SINCE 3 November (be7728aa4), so a late press is refused and cannot
+   skip a cycle; and the script read handed such a press still moves nothing (`scripts/settle-matched-line.js`). */
 test('"It went through" pressed after the payment moved the line skips no cycle', async () => {
   const m = await money();
   const line = m.made('recurring', LINE);
@@ -227,10 +231,10 @@ test('"It went through" pressed after the payment moved the line skips no cycle'
   m.paid('2026-10-03');
   await m.turn();
   assert.equal(fieldsOf(m.k, line.id).next_due, '2026-11-01', said(m.log));
-  value(m.k.decide(q.id, { decide: { option: q.body!.options!.find((o) => o.label === 'It went through')!.id, reason: 'It went.' } }, 'p_1'));
+  const late = m.k.decide(q.id, { decide: { option: q.body!.options!.find((o) => o.label === 'It went through')!.id, reason: 'It went.' } }, 'p_1') as { ok: boolean; refusal?: { code: string } };
+  assert.deepEqual([late.ok, late.refusal?.code], [false, 'TRANSITION_ILLEGAL']);
   await m.turn();
   assert.equal(fieldsOf(m.k, line.id).next_due, '2026-11-01', said(m.log));
-  assert.ok(m.log.includes(`${LANDLORD} is not past its day any more, so nothing moved.`), said(m.log));
 });
 
 test('without ctx.cycle the script writes nothing and says so, for a payment and for "It went through"', async () => {

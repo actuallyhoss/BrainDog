@@ -117,6 +117,12 @@ async function money(docs: unknown[] = ['portfolio', 'people', 'money-core'].map
 }
 type Rec = Awaited<ReturnType<typeof money>>;
 
+/** A record as money-core held it before 3.35.0 (24fd3a8d4): no rule files what an account holds when it goes in a book. */
+const beforeAccountFiles = (): unknown[] => ['portfolio', 'people', 'money-core'].map((id) => {
+  const doc = firstPartyDocument(id, { seeds: [] }) as Fields & { declarations: Fields[] };
+  return { ...doc, declarations: doc.declarations.filter((d) => d.rule !== 'account-files-book') };
+});
+
 /** Two books, an account in each, and one in no book. */
 const books = (r: Rec) => {
   const acme = r.made('books', { name: 'Acme' }).id;
@@ -178,6 +184,8 @@ test('the decision: each thing with an account in a book and no book of its own 
 test('a Ledger entry, a repeating line and an instalment made on an account in Acme are in Acme, by no hand', async () => {
   const r = await money();
   const b = books(r);
+  /* THE ACCOUNT MADE IN ITS BOOK HAS RUN ITS OWN FILING (`account-files-book`, 3.35.0) before anything is made on it. */
+  await r.turn();
   const made = [r.made('transactions', entry(b.inAcme)), r.made('recurring', repeat(b.inAcme)), r.made('installments', part(b.inAcme))];
   for (const e of made) assert.equal(r.bookOf(e.id), null, 'a book was typed by the test');
   await r.turn();
@@ -186,8 +194,9 @@ test('a Ledger entry, a repeating line and an instalment made on an account in A
   const said = r.log.filter((l) => /Acme/u.test(l)).join(' ');
   assert.match(said, /NORTHGATE ESTATES is in Acme, the book its account is in\./u);
   assert.doesNotMatch(said, /—|#\d|\brow\b|01[0-9A-Z]{24}/u);
-  /* AND NOTHING ELSE ABOUT THE ENTRY CHANGED. `stays` is read through its category, which it has none of. */
-  const { book: _b, stays: _s, ...rest } = r.k.get(made[0]!.id)!.fields;
+  /* AND NOTHING ELSE ABOUT THE ENTRY CHANGED. `stays` is read through its category, which it has none of, and `corrects`
+     is said empty by the script that asks whether it corrects another (1345790b8). */
+  const { book: _b, stays: _s, corrects: _c, ...rest } = r.k.get(made[0]!.id)!.fields;
   assert.deepEqual(rest, made[0]!.fields);
   r.sql.close();
 });
@@ -252,12 +261,38 @@ test('a bank text for an account in a book lands in that book', async () => {
 });
 
 /**
- * WHAT WAS THERE BEFORE THE ACCOUNT HAD A BOOK IS OFFERED ONCE, AS A QUESTION THAT SAYS HOW MANY. Putting an account in
- * a book writes the account and none of what is on it, so the nightly run counts those and asks. Picking "File them"
- * is the change, each at the version the script read; "Leave them" is remembered by the gate, and nothing asks again.
+ * WHAT WAS THERE BEFORE THE ACCOUNT HAD A BOOK IS OFFERED ONCE, AS A QUESTION THAT SAYS HOW MANY, WHERE IT WAS NOT FILED
+ * WHEN THE ACCOUNT WENT IN: an account put in a book since 3.35.0 takes it along at once (`account-files-book`, 24fd3a8d4,
+ * held below), so the night's question is for what is left over, and for an account put in a book before that rule. The
+ * record here has no such rule, as a record of then had none. Picking "File them" is the change, each at the version the
+ * script read; "Leave them" is remembered by the gate, and nothing asks again.
  */
-test('what an account already held is counted in one question, and picking File them files each in its account\'s book', async () => {
+test('an account put in a book takes what it holds at once, leaves a thing with its own book and what is void, and is asked nothing', async () => {
   const r = await money();
+  const acme = r.made('books', { name: 'Acme' }).id;
+  const home = r.made('books', { name: 'Home' }).id;
+  const account = r.made('accounts', { name: 'Acme current', kind: 'bank', liquid: true, balance: gbp(1_000_000), as_of: '2026-10-01' }).id;
+  const other = r.made('accounts', { name: 'Old joint', kind: 'bank', liquid: true, balance: gbp(0), as_of: '2026-10-01' }).id;
+  const held = [r.made('transactions', entry(account)), r.made('recurring', repeat(account)), r.made('installments', part(account))];
+  const own = r.made('transactions', entry(account, { book: home }));
+  const voided = r.made('transactions', entry(account, { state: 'void' }));
+  const left = r.made('transactions', entry(other));
+  await r.turn();
+  for (const e of held) assert.equal(r.bookOf(e.id), null, 'filed before its account had a book');
+
+  value(r.k.update('accounts', account, { book: acme }, OWNER));
+  await r.turn();
+  for (const e of held) assert.equal(r.bookOf(e.id), acme, `${e.register} did not follow its account`);
+  assert.equal(r.bookOf(own.id), home, 'a thing that names its book lost it');
+  assert.equal(r.bookOf(voided.id), null, 'a void entry was filed');
+  assert.equal(r.bookOf(left.id), null, 'an entry on another account was filed');
+  assert.ok(r.log.some((l) => l.includes('3 things on Acme current are in Acme now')), r.log.join(' | '));
+  assert.deepEqual(r.asked('open'), [], 'it asked about what it had filed');
+  r.sql.close();
+});
+
+test('what an account already held is counted in one question, and picking File them files each in its account\'s book', async () => {
+  const r = await money(beforeAccountFiles());
   const acme = r.made('books', { name: 'Acme' }).id;
   const account = r.made('accounts', { name: 'Acme current', kind: 'bank', liquid: true, balance: gbp(1_000_000), as_of: '2026-10-01' }).id;
   const other = r.made('accounts', { name: 'Old joint', kind: 'bank', liquid: true, balance: gbp(0), as_of: '2026-10-01' }).id;
@@ -338,7 +373,7 @@ test('an account that holds only what no longer stands is asked nothing', async 
 });
 
 test('Leave them is remembered: the next night asks nothing, and nothing is filed', async () => {
-  const r = await money();
+  const r = await money(beforeAccountFiles());
   const acme = r.made('books', { name: 'Acme' }).id;
   const account = r.made('accounts', { name: 'Acme current', kind: 'bank', liquid: true, balance: gbp(1_000), as_of: '2026-10-01' }).id;
   const e = r.made('transactions', entry(account));
@@ -381,6 +416,7 @@ test('Bills and invoices holds an account, and a rule of its own files a bill by
 test('a bill written with an account in book Acme and no book gets book Acme', async () => {
   const r = await money();
   const b = books(r);
+  await r.turn();
   const made = r.made('obligations', bill(b.inAcme));
   assert.equal(r.bookOf(made.id), null, 'a book was typed by the test');
   await r.turn();
@@ -462,7 +498,7 @@ test('sixty entries on one account are all counted, and two books are both named
  * nightly run refused and was asked nothing. The first two hundred are asked, and what is left is asked the night after.
  */
 test('two hundred and five entries are asked two hundred at a time, and the five left are asked the next night', async () => {
-  const r = await money();
+  const r = await money(beforeAccountFiles());
   const acme = r.made('books', { name: 'Acme' }).id;
   const account = r.made('accounts', { name: 'Acme current', kind: 'bank', liquid: true, balance: gbp(1_000), as_of: '2026-10-01' }).id;
   for (let i = 0; i < 205; i++) r.made('transactions', entry(account, { what: `CEDAR LANE ${i}` }));

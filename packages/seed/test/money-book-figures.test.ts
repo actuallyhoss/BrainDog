@@ -120,7 +120,11 @@ test('MONEY DECLARES THEM, after every figure it already held, and a fresh recor
      and the eleven of the Budgets, Payees and Reports pages (money-core 3.29.0), and twenty-two more by money-core 3.31.0 and
      3.32.0 (week and year budgets, pending and unfiled lines, payees, net worth, by week); a plan's page's own (3.29.0) are left
      out as an account's are. */
-  assert.deepEqual(Object.keys(MONEY_METRICS).filter((id) => !(id in ACCOUNT_FIGURES) && !(id in PLAN_PAGE_FIGURES)).slice(-ALL.length - 37, -37), ALL);
+  /* SO THEY STAND TOGETHER, IN THIS ORDER, WITH FIGURES AFTER THEM AND NONE AMONG THEM; how many came after is no matter. */
+  const declared = Object.keys(MONEY_METRICS).filter((id) => !(id in ACCOUNT_FIGURES) && !(id in PLAN_PAGE_FIGURES));
+  const first = declared.indexOf(ALL[0]!);
+  assert.deepEqual(declared.slice(first, first + ALL.length), ALL);
+  assert.ok(declared.length - (first + ALL.length) >= 37, 'a figure declared before them moved after them');
   const { k } = await fresh();
   for (const id of ALL) assert.ok(k.declarations().some((d) => d.id === `metric.${id}`), `money-core installed without ${id}`);
 });
@@ -403,7 +407,7 @@ test("IT WALKS THE LEGS THE BOOK'S OWN CASH AHEAD WALKS, held to the book it is 
   assert.doesNotMatch(JSON.stringify(figure.legs), /\{\{name\}\}/u);
   /* AND THE CELL THAT READS IT IS ON THE PAGE, under the words a person reads. */
   const cells = (MONEY_BOOK_PAGE.blocks as { cells?: { metric: string; label: string }[] }[]).flatMap((b) => b.cells ?? []);
-  assert.deepEqual(cells.find((c) => c.metric.startsWith(`${LASTS}:`)), { metric: `${LASTS}:{{name}}`, label: 'Money lasts until' });
+  assert.deepEqual(cells.find((c) => c.metric.startsWith(`${LASTS}:`)), { metric: `${LASTS}:{{name}}`, label: 'Runs out' });
   assert.doesNotMatch(figure.name, /\brows?\b|\bentit|\u2014/iu);
 });
 

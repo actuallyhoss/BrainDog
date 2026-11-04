@@ -167,8 +167,9 @@ test('a repeating line counted by its payment files that payment under the line\
   assert.deepEqual([l.last_paid, l.next_due], ['2026-10-29', '2026-11-25'], said(m.log));
   const f = m.k.get(pay.id)!.fields;
   assert.deepEqual([f.category, f.filed_by ?? null], [m.insurance.id, null], said(m.log));
-  /* THE LINE WAS PAST ITS DAY WHEN IT WAS MADE, SO "It went through?" WAS ASKED; NO FILING RULE WAS OFFERED. */
-  assert.deepEqual(m.asked().map((q) => q.opened_by), ['rule:recurring-missed'], said(m.log));
+  /* THE LINE WAS PAST ITS DAY WHEN IT WAS MADE, SO "It went through?" WAS ASKED, AND CLOSED ITSELF WHEN THE PAYMENT MOVED THE
+     LINE ON, SINCE 3 November (be7728aa4); NO FILING RULE WAS OFFERED. */
+  assert.deepEqual(m.asked().map((q) => q.opened_by), [], said(m.log));
 });
 
 test('the decision leaves a move the record paired, a split entry and a category that goes the other way', () => {

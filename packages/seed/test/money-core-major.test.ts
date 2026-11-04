@@ -141,7 +141,8 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
      floor of money-core moved. */
   /* AND MERCURY 1.3.0 (SHL-A23): it marks each account it keeps with money-core's `no_feed`, which 3.31.0 declares, so
      its floor moves there. */
-  assert.equal(mercuryFile().version, '1.3.0');
+  /* 1.3.1 SINCE 3 November (the plugin words, nothing else). */
+  assert.equal(mercuryFile().version, '1.3.1');
   for (const [name, doc, held] of [['bank-hsbc-eg', bankHsbcEgFile(), ['3.10.0', '3.31.0']], ['mercury', mercuryFile(), ['3.31.0']]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(

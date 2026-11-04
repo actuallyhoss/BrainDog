@@ -32,7 +32,7 @@ const TYPED = new Set(['date', 'day', 'until', 'ago', 'money', 'quantity', 'pct'
 /** What `<figure>.<part>` may ask besides the figure itself. */
 const FIGURE_PARTS = new Set(['change', 'moved', 'first', 'names', 'more', 'since']);
 /** What `<figure>.<part>` may ask of a walk to zero: where it goes under (`crossingValue`), since money-core 3.27.0. */
-const CROSSING_PARTS = new Set(['on', 'because', 'because_amount']);
+const CROSSING_PARTS = new Set(['on', 'because', 'because_amount', 'low', 'low_on']);
 /** And of a money figure, its currencies apart, the sum converted and the rates' day (`convertedValue`), since 3.27.0. */
 const CONVERTED_PARTS = new Set(['apart', 'converted', 'rate_on', 'rate_age', 'groups']);
 /** Where on a page the record fills a name from the figures: the places `pathsOf` reads. */

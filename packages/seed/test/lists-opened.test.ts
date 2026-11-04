@@ -41,7 +41,8 @@ test('PEOPLE OFFERS NO REGISTRAR, and the sample registry\'s contact is filed un
   const role = fieldOf(firstPartyDocument('people'), 'people', 'role');
   assert.equal(role.type, 'enum');
   assert.ok(!role.values!.includes('registrar'), `People still ships ${role.values!.join(', ')}`);
-  assert.deepEqual(role.values, ['client', 'contractor', 'accountant', 'collaborator', 'other']);
+  /* A CO-FOUNDER, A PARTNER AND STAFF ARE ROLES OF THEIR OWN SINCE People 4.5.0 and 4.6.0 (f7adcf8c7, 9dcce7ff2). */
+  assert.deepEqual(role.values, ['client', 'contractor', 'accountant', 'collaborator', 'other', 'cofounder', 'partner', 'staff']);
   /* THE REGISTRY IS AN ORGANISATION SINCE People 3.0.0, and the person who answers its support mail is the `other`. */
   assert.equal(PEOPLE.find((p) => p.name === 'Lars Holm')?.role, 'other');
   assert.ok(PEOPLE.every((p) => p.role === null || p.role === undefined || role.values!.includes(String(p.role))), 'a sample row holds a role People no longer offers');

@@ -2,9 +2,9 @@
  * Health: the record's vital signs, as one page every record can open (when a check fails, the app
  * says so).
  *
- * DRAWN FROM FOUR NAMES THE KERNEL ANSWERS AND NOTHING ELSE: the built-in page source `signs` (each vital sign with its
- * name, its state and its sentence, `packages/kernel/src/pages.ts`) and the built-in figures `signs-red`, `signs-unread`
- * and `green-days` (`packages/kernel/src/built-in-figures.ts`). No list, no figure of its own, so the page leans on no register and every
+ * DRAWN FROM TWO NAMES THE KERNEL ANSWERS AND NOTHING ELSE: the built-in page source `signs` (each vital sign with its
+ * name, its state and its sentence, `packages/kernel/src/pages.ts`) and the built-in figure `green-days`
+ * (`packages/kernel/src/built-in-figures.ts`). No list, no figure of its own, so the page leans on no register and every
  * record that holds it can draw it, whatever else it installs. Nothing here knows whose record it is.
  *
  * IN PEOPLE, BECAUSE PEOPLE IS THE ADD-ON NEARLY EVERY RECORD HOLDS: onboarding installs it for the person's own row even
@@ -23,9 +23,9 @@
 
 import type { SeedPage } from './base.ts';
 
-/** The one source and the three figures the page reads, by the names the kernel answers them under. */
+/** The one source and the one figure the page reads, by the names the kernel answers them under. */
 export const HEALTH_SOURCE = 'signs';
-export const HEALTH_FIGURES = ['signs-red', 'signs-unread', 'green-days'] as const;
+export const HEALTH_FIGURES = ['green-days'] as const;
 
 /**
  * A group of signs in one state: the state's word as the heading, and under it each sign by its name with its sentence.

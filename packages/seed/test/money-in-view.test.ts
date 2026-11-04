@@ -136,7 +136,7 @@ function written({ file }: Ledger): void {
 }
 
 test('MONEY DECLARES WHO FILED ITS LEDGER, two counts of what was made that add no money', () => {
-  assert.deepEqual(Object.keys(FILING_FIGURES), ['filed-for-you-30d', 'filed-today', 'rule-filed', 'filed-by-rule-30d', 'rules-filing-30d', 'rules-filing']);
+  assert.deepEqual(Object.keys(FILING_FIGURES), ['filed-for-you-30d', 'filed-today', 'rule-filed', 'filed-by-rule-30d', 'rules-filing-30d', 'filing-rule-filed', 'filing-rules', 'rules-filing']);
   for (const [id, figure] of Object.entries(FILING_FIGURES).filter(([, f]) => f.source === 'events.transactions')) {
     assert.equal(figure.metric, id);
     assert.equal(figure.source, 'events.transactions', `${id} reads who made the Ledger's entries`);

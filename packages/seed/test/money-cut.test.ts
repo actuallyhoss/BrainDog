@@ -40,7 +40,8 @@ test('EVERY PART OF MONEY IS UNDER 600 LINES, so no part becomes the old file ag
 
 test('THE ONE LINE STILL EXPORTS EVERY NAME MONEY EXPORTED BEFORE THE CUT, so no importer had to change', () => {
   assert.deepEqual(Object.keys(money).sort(), [
-    'ACCOUNTS', 'AVAILABLE', 'CATEGORIES', 'DUE_THIS_WEEK', 'INSTALLMENTS', 'MONEY_AUTOMATIONS', 'MONEY_HOME_SETTING',
+    /* FILING_RULES BESIDE THE REST SINCE 3c699b60d, the sample's rules; every name before the cut is still here. */
+    'ACCOUNTS', 'AVAILABLE', 'CATEGORIES', 'DUE_THIS_WEEK', 'FILING_RULES', 'INSTALLMENTS', 'MONEY_AUTOMATIONS', 'MONEY_HOME_SETTING',
     'MONEY_METRICS', 'MONEY_PAGES', 'MONEY_REGISTERS', 'MONEY_RULES', 'MONEY_TARGET_SETTINGS', 'OBLIGATIONS', 'RECURRING_ITEMS',
     'SNAPSHOTS', 'TARGET_NOTE', 'TRANSACTIONS', 'cashPoints', 'cashSeries', 'nightOf', 'snapshotRows', 'targetConfigOf',
     'withTargetSetting',

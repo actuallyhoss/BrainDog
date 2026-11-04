@@ -92,6 +92,9 @@ async function money() {
     }
   };
   const queued = (): Queued[] => sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'script.run' ORDER BY rowid").map((r) => JSON.parse(r.payload) as Queued);
+  /* THE ACCOUNT MADE IN ITS BOOK ABOVE RUNS `book_from_account` (3.35.0, 24fd3a8d4): done before a test reads what a payment starts. */
+  await turn();
+  log.length = 0;
   return { k, paid, bill, turn, queued, log };
 }
 
