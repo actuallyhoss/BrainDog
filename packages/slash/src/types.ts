@@ -461,8 +461,12 @@ export interface Slash {
   act(id: string, accept: boolean, ctx: CallContext, tools: Pick<ChatTools, 'apply'>): Promise<Result<ChatActed>>;
   /** One conversation, its turns oldest first, for the person who had it and nobody else. */
   thread(id: string, ctx: CallContext): Result<ChatThread>;
-  /** This person's conversations, newest first, each titled by its first words. */
+  /** This person's conversations, newest first, each titled by the name they gave it or else its first words. */
   threads(ctx: CallContext): Result<ChatThreads>;
+  /** Name one of this person's conversations; no words hands it back to its first words. */
+  rename(id: string, name: string, ctx: CallContext): Result<{ id: string }>;
+  /** Delete one of this person's conversations, its turns and what it held for a yes. */
+  remove(id: string, ctx: CallContext): Result<{ id: string }>;
 }
 
 /* ── a conversation ──────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -618,7 +622,25 @@ export type Deep = { inference: DeepInference } | { refused: string };
 export type ChatActed ={ ok: true; receipt?: string | undefined; undo?: { batch: string } | undefined };
 
 /** A person's conversations, newest first. */
-export type ChatThreads = { threads: { id: string; title: string; at: string }[] };
+export type ChatThreads = { threads: { id: string; title: string; at: string; answering?: true }[] };
 
-/** One conversation read back. */
-export type ChatThread = { id: string; turns: { role: 'you' | 'slash'; text: string; mentions?: ChatMention[]; actions: ChatAction[] }[] };
+/**
+ * One conversation read back. `answering` is an answer whose turn is still writing it; `stopped` one whose turn went quiet
+ * partway and will not finish (`ANSWER_QUIET_MS`); `error` what stopped an answer that ended short.
+ */
+export type ChatThread = {
+  id: string;
+  turns: {
+    role: 'you' | 'slash';
+    text: string;
+    mentions?: ChatMention[];
+    actions: ChatAction[];
+    steps?: string[];
+    go?: { href: string; label: string }[];
+    route?: string;
+    error?: string;
+    figures?: ChatFigure[];
+    answering?: true;
+    stopped?: true;
+  }[];
+};

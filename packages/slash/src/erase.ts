@@ -15,7 +15,8 @@
  * `slash_call.question`, the question as it was typed; `slash_call.predicate`, the drafted filter, which carries the values
  * a question named; and the `predicate` of each trace in `slash_call.read`. `slash_settings` holds a tier, a model name, a
  * grant id and a cap, and `slash_meta` a version, and neither holds anybody's words. A conversation's turns
- * (`slash_turn.text`, `slash_turn.actions`) and its held actions (`slash_act.title`, `op`, `receipt`) hold them too.
+ * (`slash_turn.text`, `slash_turn.actions`), its held actions (`slash_act.title`, `op`, `receipt`) and the name somebody
+ * gave it (`slash_thread_name.name`) hold them too.
  */
 
 import type { Sql } from '@braindog/ports';
@@ -94,6 +95,13 @@ const conversationsErased = (sql: Sql, names: (text: string | null) => boolean):
     sql.exec("UPDATE slash_act SET title = ?, op = '{}', receipt = NULL, state = CASE state WHEN 'open' THEN 'declined' ELSE state END WHERE id = ?", ERASED, a.id);
     touched++;
   }
+  /* A NAME SOMEBODY GAVE A CONVERSATION goes outright, and it is called by its first words again. */
+  if (sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_thread_name'") !== undefined)
+    for (const t of sql.all<{ id: string; name: string }>('SELECT id, name FROM slash_thread_name')) {
+      if (!names(t.name)) continue;
+      sql.exec('DELETE FROM slash_thread_name WHERE id = ?', t.id);
+      touched++;
+    }
   return touched;
 };
 

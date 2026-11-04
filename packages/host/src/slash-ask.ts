@@ -116,6 +116,9 @@ export type SlashAskEngine<C> = {
   act?(id: string, accept: boolean, ctx: C, tools: unknown): Promise<Result<unknown>>;
   thread?(id: string, ctx: C): Result<unknown>;
   threads?(ctx: C): Result<unknown>;
+  /** One of this person's conversations named, or deleted (`POST /api/slash/conversation`). */
+  rename?(id: string, name: string, ctx: C): Result<unknown>;
+  remove?(id: string, ctx: C): Result<unknown>;
 };
 
 /**
@@ -239,7 +242,7 @@ export function slashAskDoor<C>(
 }
 
 /** A Slash door this file answers. */
-export type SlashRoute = 'read' | 'status' | 'settings' | 'propose' | 'asks' | 'pattern' | 'setup' | 'mapping' | 'health' | 'chat' | 'act' | 'now' | 'thread' | 'threads';
+export type SlashRoute = 'read' | 'status' | 'settings' | 'propose' | 'asks' | 'pattern' | 'setup' | 'mapping' | 'health' | 'chat' | 'act' | 'now' | 'thread' | 'threads' | 'conversation';
 
 /** The doors that are a GET: they read and change nothing, so a browser sends them with no `Origin`. */
 const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks', 'health', 'now', 'thread', 'threads']);
@@ -253,7 +256,7 @@ const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks', 'health', 'now'
  * the router on `!== null`. `packages/host/test/slash-ask.test.ts` reads both hosts' wiring as text for it.
  */
 export function servesSlash(pathname: string): SlashRoute | null {
-  const hit = /^\/+api\/+slash\/+(read|status|settings|propose|asks|pattern|setup|mapping|health|chat|act|now|threads)\/*$/.exec(pathname);
+  const hit = /^\/+api\/+slash\/+(read|status|settings|propose|asks|pattern|setup|mapping|health|chat|act|now|threads|conversation)\/*$/.exec(pathname);
   if (hit) return hit[1] as SlashRoute;
   /* A CONVERSATION IS READ BACK AT ITS OWN ADDRESS, `thread/<id>`, the id one this door minted. */
   return /^\/+api\/+slash\/+thread\/+[0-9A-Z]{26}\/*$/.test(pathname) ? 'thread' : null;
@@ -363,7 +366,7 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   if (route === null)
     return refusal(404, {
       code: 'ROUTE_UNKNOWN',
-      fix: "Slash's doors are /api/slash/read, /api/slash/status, /api/slash/settings, /api/slash/propose, /api/slash/asks, /api/slash/pattern, /api/slash/setup, /api/slash/mapping, /api/slash/health, /api/slash/chat, /api/slash/act, /api/slash/thread/<id>, /api/slash/threads and /api/slash/now.",
+      fix: "Slash's doors are /api/slash/read, /api/slash/status, /api/slash/settings, /api/slash/propose, /api/slash/asks, /api/slash/pattern, /api/slash/setup, /api/slash/mapping, /api/slash/health, /api/slash/chat, /api/slash/act, /api/slash/thread/<id>, /api/slash/threads, /api/slash/conversation and /api/slash/now.",
     });
   const path = `/api/slash/${route}`;
   const verb = GETS.has(route) ? 'GET' : 'POST';
@@ -498,6 +501,7 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   }
 
   if (route === 'pattern') return pattern(body, door, ctx);
+  if (route === 'conversation') return renamedOrRemoved(body, door, ctx);
   if (route === 'chat' || route === 'act') return conversation(route, body, door, ctx);
   if (route === 'setup' || route === 'mapping') return firstRun(route, body, door, ctx);
 
@@ -669,6 +673,23 @@ async function flat(run: () => Result<unknown> | Promise<Result<unknown>>): Prom
   } catch (e) {
     return refusal(500, { code: 'INTERNAL', fix: `Slash could not answer that: ${e instanceof Error ? e.message : String(e)}.` });
   }
+}
+
+/**
+ * `POST /api/slash/conversation`: one of this person's conversations named (`{ id, name }`) or deleted (`{ id, remove: true }`).
+ * The engine asks whose it is; somebody else's is the same refusal as one that was never there.
+ */
+async function renamedOrRemoved<C>(body: Record<string, unknown>, door: SlashAskDoor<C>, ctx: C): Promise<Response> {
+  if (door.engine === undefined) return refusal(501, NO_CHAT);
+  const { id, name, remove: gone } = body;
+  if (typeof id !== 'string' || !/^[0-9A-Z]{26}$/u.test(id)) return refusal(422, { code: 'VALUE_MALFORMED', fix: 'id is the conversation, as the list named it.', at: 'id' });
+  if (gone !== true && typeof name !== 'string') return refusal(422, { code: 'VALUE_MALFORMED', fix: 'name is what to call the conversation, in words, or remove is true to delete it.', at: 'name' });
+  const engine = await built(door.engine);
+  if (engine instanceof Response) return engine;
+  const rename = engine.rename?.bind(engine);
+  const remove = engine.remove?.bind(engine);
+  if (rename === undefined || remove === undefined) return refusal(501, NO_CHAT);
+  return flat(() => (gone === true ? remove(id, ctx) : rename(id, name as string, ctx)));
 }
 
 /**

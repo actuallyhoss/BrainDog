@@ -82,8 +82,17 @@ const RESULT_SHORT = 500;
 const TURNS_READ = 8;
 /** The most of one earlier turn the model is shown. */
 const TURN_CHARS = 1_200;
-/** The turns one thread keeps; the oldest go first. */
-const TURNS_KEPT = 40;
+/**
+ * The turns one thread keeps; the oldest go first. A LONG WAY OFF: it was 40, so the twenty-first exchange of a conversation
+ * deleted the first, its title with it. What the model reads is `TURNS_READ`, so a long thread costs storage and no tokens.
+ */
+const TURNS_KEPT = 1_000;
+/**
+ * How long an answer may go with nothing written before a reader is told it stopped. A turn writes as it goes (each step,
+ * each sentence), so a row quiet this long has no turn behind it: the host died, or was put to sleep. Read when asked and
+ * never stored, so an answer that does land after all is simply there.
+ */
+export const ANSWER_QUIET_MS = 180_000;
 /** The most ids one answer has turned into links. */
 const REFS_MOST = 10;
 /** The most of the line naming the lists the model is shown. */
@@ -105,6 +114,11 @@ const DDL: readonly string[] = [
      actions TEXT NOT NULL DEFAULT '[]',
      ts      TEXT NOT NULL,
      PRIMARY KEY (thread, n)
+   )`,
+  /* THE NAME SOMEBODY GAVE A CONVERSATION. Its own table, as `slash_thread` is never altered: none here is the first words. */
+  `CREATE TABLE IF NOT EXISTS slash_thread_name (
+     id   TEXT PRIMARY KEY,
+     name TEXT NOT NULL
    )`,
   `CREATE TABLE IF NOT EXISTS slash_act (
      id      TEXT PRIMARY KEY,
@@ -672,15 +686,57 @@ export type Chat = {
   act(id: string, accept: boolean, ctx: CallContext, tools: Pick<ChatTools, 'apply'>): Promise<Result<ChatActed>>;
   thread(id: string, ctx: CallContext): Result<ChatThread>;
   threads(ctx: CallContext): Result<ChatThreads>;
+  rename(id: string, name: string, ctx: CallContext): Result<{ id: string }>;
+  remove(id: string, ctx: CallContext): Result<{ id: string }>;
 };
 
 /** The conversations `threads` lists, newest first. */
-const THREADS_LISTED = 30;
+const THREADS_LISTED = 200;
 /** A conversation's title: its first words, this long at most. */
 const TITLE_CHARS = 80;
+const NO_CONVERSATION = 'There is no conversation under that name.';
 
 const ASKED = { purpose: 'ask', spends: 'person' } as const;
 const STEPPED = { purpose: 'ask', spends: 'none' } as const;
+
+/**
+ * WHAT `slash_turn.actions` HOLDS, read one way. A plain list of actions, as every turn before this held; `{ mentions }` on
+ * a question; and on an answer the same column carries what else a reader needs to draw it as it was drawn: the steps, a
+ * page it offered, what stopped it, the rows it named, and `answering` while the turn is still running. Anything unreadable
+ * holds nothing, so one bad row never costs the conversation.
+ */
+type Kept = {
+  actions: ChatAction[];
+  mentions: ChatMention[];
+  steps: string[];
+  go: { href: string; label: string }[];
+  route: string | null;
+  error: string | null;
+  figures: ChatFigure[];
+  answering: boolean;
+};
+const NOTHING_KEPT: Kept = { actions: [], mentions: [], steps: [], go: [], route: null, error: null, figures: [], answering: false };
+const keptOf = (raw: string): Kept => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return NOTHING_KEPT;
+  }
+  if (Array.isArray(parsed)) return { ...NOTHING_KEPT, actions: parsed.filter(isRecord) as unknown as ChatAction[] };
+  if (!isRecord(parsed)) return NOTHING_KEPT;
+  const list = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.filter(isRecord) : []);
+  return {
+    actions: list(parsed['actions']) as unknown as ChatAction[],
+    mentions: list(parsed['mentions']) as unknown as ChatMention[],
+    steps: Array.isArray(parsed['steps']) ? parsed['steps'].filter((x): x is string => typeof x === 'string') : [],
+    go: list(parsed['go']) as unknown as Kept['go'],
+    route: typeof parsed['route'] === 'string' ? parsed['route'] : null,
+    error: typeof parsed['error'] === 'string' ? parsed['error'] : null,
+    figures: list(parsed['figures']) as unknown as ChatFigure[],
+    answering: parsed['answering'] === true,
+  };
+};
 
 export const chats = (core: Core): Chat => {
   const { sql, clock } = core;
@@ -707,18 +763,11 @@ export const chats = (core: Core): Chat => {
     sql
       .all<{ role: 'you' | 'slash'; text: string; actions: string }>('SELECT role, text, actions FROM slash_turn WHERE thread = ? ORDER BY n DESC LIMIT ?', thread, most)
       .reverse()
-      .map((t) => {
-        let acted: ChatAction[] = [];
-        try {
-          const parsed: unknown = JSON.parse(t.actions);
-          acted = Array.isArray(parsed) ? (parsed.filter(isRecord) as unknown as ChatAction[]) : [];
-        } catch {
-          acted = [];
-        }
-        return { role: t.role, text: t.text, actions: actionsSaid(acted) };
-      });
+      /* AN ANSWER WITH NO WORDS YET IS NOT PART OF THE CONVERSATION THE MODEL READS. */
+      .filter((t) => t.role === 'you' || t.text !== '')
+      .map((t) => ({ role: t.role, text: t.text, actions: actionsSaid(keptOf(t.actions).actions) }));
 
-  const addTurn = (thread: string, role: 'you' | 'slash', text: string, actions: readonly ChatAction[] = [], mentions: readonly ChatMention[] = []): void => {
+  const addTurn = (thread: string, role: 'you' | 'slash', text: string, actions: readonly ChatAction[] | { answering: true } = [], mentions: readonly ChatMention[] = []): number => {
     const n = (sql.one<{ n: number | null }>('SELECT MAX(n) AS n FROM slash_turn WHERE thread = ?', thread)?.n ?? 0) + 1;
     /* A MODEL'S U+0000 IS DROPPED, NOT STORED: the port refuses a text holding one (`guard`), and what the model said is
        ours to keep, where what a person typed is refused at the door instead. */
@@ -728,6 +777,7 @@ export const chats = (core: Core): Chat => {
     sql.exec('INSERT INTO slash_turn (thread, n, role, text, actions, ts) VALUES (?, ?, ?, ?, ?, ?)', thread, n, role, kept, JSON.stringify(mentions.length > 0 ? { mentions } : actions), now());
     sql.exec('DELETE FROM slash_turn WHERE thread = ? AND n <= ?', thread, n - TURNS_KEPT);
     sql.exec('UPDATE slash_thread SET updated = ? WHERE id = ?', now(), thread);
+    return n;
   };
 
   const left = (): number | null => {
@@ -756,8 +806,19 @@ export const chats = (core: Core): Chat => {
     return null;
   };
 
-  const chat: Chat['chat'] = async (input, ctx, tools, emit, inference, deep) => {
+  const chat: Chat['chat'] = async (input, ctx, tools, tell, inference, deep) => {
     open();
+    /* EVERYTHING THE TURN SAYS GOES TO THE RECORD AS WELL AS DOWN THE STREAM (`keeping`, once there is a row to keep it in),
+       so a reader who reloaded, closed the tab or opened another finds as much as this one has seen. */
+    let keeping: ((e: ChatEvent) => void) | null = null;
+    const emit = (e: ChatEvent): void => {
+      keeping?.(e);
+      try {
+        tell(e);
+      } catch {
+        /* THE READER WENT AWAY. The turn goes on: it is the record's to finish now. */
+      }
+    };
     const person = who(ctx);
     const rethink = input.rethink === true;
     const mode: ChatMode = rethink ? 'deep' : input.mode === 'deep' || input.mode === 'auto' ? input.mode : 'quick';
@@ -823,6 +884,13 @@ export const chats = (core: Core): Chat => {
     const beforeDeep = rethink ? again!.before : thread.fresh ? [] : turnsOf(thread.id, DEEP_TURNS_READ);
     if (!rethink) addTurn(thread.id, 'you', message, [], input.mentions);
 
+    /* THE ANSWER HAS ITS ROW FROM THE FIRST MOMENT, and the turn goes on writing into it whether or not anybody is still
+       reading the stream: the person's ask is spent either way, so what it bought is theirs to come back to. */
+    const answerAt = addTurn(thread.id, 'slash', '', { answering: true });
+    const writing = { text: '', steps: [] as string[], go: [] as Kept['go'], route: null as string | null };
+    const keepAnswer = (text: string, blob: string): void =>
+      sql.exec('UPDATE slash_turn SET text = ?, actions = ?, ts = ? WHERE thread = ? AND n = ?', text.replaceAll('\u0000', ''), blob, now(), thread.id, answerAt);
+
     const list = [...tools.list.filter((t) => t.name !== CALC.name), CALC];
     /* THE LISTS ARE READ WHILE THE PREFETCH RUNS, and awaited before the first model call reads them. */
     const listing = (async (): Promise<string> => {
@@ -849,6 +917,19 @@ export const chats = (core: Core): Chat => {
     let answer = null as string | null;
     let failed = null as string | null;
     let mac = false as boolean;
+    const says = (): Partial<Kept> => ({
+      ...(writing.steps.length > 0 ? { steps: writing.steps } : {}),
+      ...(writing.go.length > 0 ? { go: writing.go } : {}),
+      ...(writing.route === null ? {} : { route: writing.route }),
+    });
+    keeping = (e) => {
+      if (e.type === 'delta') writing.text += e.text;
+      else if (e.type === 'step') writing.steps.push(e.text);
+      else if (e.type === 'navigate') writing.go.push({ href: e.href, label: e.label });
+      else if (e.type === 'route') writing.route = e.to;
+      else if (e.type !== 'action') return;
+      keepAnswer(writing.text, JSON.stringify({ answering: true, actions, ...says() }));
+    };
 
     /** A tool call the engine runs, by the name the model gave it. */
     type Asked = { name: string; args: Record<string, unknown> };
@@ -1166,10 +1247,14 @@ export const chats = (core: Core): Chat => {
     }
 
     if (failed !== null) emit({ type: 'error', text: failed });
-    addTurn(thread.id, 'slash', text !== '' ? text : (failed ?? ''), actions);
     /* AND WHERE DEEP WAS WANTED AND COULD NOT ANSWER HERE, THE HAND-OFF, so the screen can offer Claude on their Mac. */
     if (mac) emit({ type: 'route', to: 'mac' });
+    keeping = null;
     const cited = flow.cited();
+    /* THE ANSWER WHOLE, and what stopped it if something did: a part of an answer read back later says so, and is never
+       taken for the whole. A plain list where that is all it holds, as every turn before this was. */
+    const also: Partial<Kept> = { ...says(), ...(failed === null ? {} : { error: failed }), ...(cited.length === 0 ? {} : { figures: cited }) };
+    keepAnswer(text, JSON.stringify(Object.keys(also).length === 0 ? actions : { actions, ...also }));
     emit({ type: 'done', spent: { asks: reached ? 1 : 0, left: left() }, ...(cited.length === 0 ? {} : { figures: cited }) });
   };
 
@@ -1205,30 +1290,33 @@ export const chats = (core: Core): Chat => {
     return ok({ ok: true, receipt: applied.value.receipt, ...(applied.value.undo === undefined ? {} : { undo: applied.value.undo }) });
   };
 
+  /** Whether a row still marked as being written has gone too long with nothing written to it (`ANSWER_QUIET_MS`). */
+  const quiet = (ts: string): boolean => clock.now() - Date.parse(ts) > ANSWER_QUIET_MS;
+
+  /** Whether this conversation is this person's. The one test every door on a conversation passes. */
+  const theirs = (id: string, ctx: CallContext): boolean => sql.one<{ person: string }>('SELECT person FROM slash_thread WHERE id = ?', id)?.person === who(ctx);
+
   const thread: Chat['thread'] = (id, ctx) => {
     open();
-    const row = sql.one<{ person: string }>('SELECT person FROM slash_thread WHERE id = ?', id);
-    if (row === undefined || row.person !== who(ctx)) return no('REF_UNKNOWN', 'There is no conversation under that name.', { at: 'id' });
+    if (!theirs(id, ctx)) return no('REF_UNKNOWN', NO_CONVERSATION, { at: 'id' });
     const held = new Map(
       sql
         .all<{ id: string; state: string; receipt: string | null; undo: string | null }>('SELECT id, state, receipt, undo FROM slash_act WHERE thread = ?', id)
         .map((a) => [a.id, a] as const),
     );
-    const turns = sql.all<{ role: 'you' | 'slash'; text: string; actions: string }>('SELECT role, text, actions FROM slash_turn WHERE thread = ? ORDER BY n', id).map((t) => {
-      let actions: ChatAction[] = [];
-      let mentions: ChatMention[] = [];
-      try {
-        const parsed: unknown = JSON.parse(t.actions);
-        actions = Array.isArray(parsed) ? (parsed.filter(isRecord) as unknown as ChatAction[]) : [];
-        if (isRecord(parsed) && Array.isArray(parsed['mentions'])) mentions = parsed['mentions'].filter(isRecord) as unknown as ChatMention[];
-      } catch {
-        actions = [];
-      }
+    const turns = sql.all<{ role: 'you' | 'slash'; text: string; actions: string; ts: string }>('SELECT role, text, actions, ts FROM slash_turn WHERE thread = ? ORDER BY n', id).map((t) => {
+      const k = keptOf(t.actions);
       return {
         role: t.role,
         text: t.text,
-        ...(mentions.length > 0 ? { mentions } : {}),
-        actions: actions.map((a) => {
+        ...(k.mentions.length > 0 ? { mentions: k.mentions } : {}),
+        ...(k.steps.length > 0 ? { steps: k.steps } : {}),
+        ...(k.go.length > 0 ? { go: k.go } : {}),
+        ...(k.route === null ? {} : { route: k.route }),
+        ...(k.error === null ? {} : { error: k.error }),
+        ...(k.figures.length > 0 ? { figures: k.figures } : {}),
+        ...(k.answering ? (quiet(t.ts) ? { stopped: true as const } : { answering: true as const }) : {}),
+        actions: k.actions.map((a) => {
           const h = held.get(a.id);
           if (h === undefined) return a;
           const state = h.state === 'accepted' ? 'accepted' : h.state === 'declined' ? 'declined' : 'open';
@@ -1243,9 +1331,12 @@ export const chats = (core: Core): Chat => {
      started on one device is there on the next. */
   const threads: Chat['threads'] = (ctx) => {
     open();
-    const rows = sql.all<{ id: string; updated: string; first: string | null }>(
+    const rows = sql.all<{ id: string; updated: string; first: string | null; name: string | null; last: string | null; ts: string | null }>(
       `SELECT t.id AS id, t.updated AS updated,
-              (SELECT text FROM slash_turn WHERE thread = t.id AND role = 'you' ORDER BY n LIMIT 1) AS first
+              (SELECT text FROM slash_turn WHERE thread = t.id AND role = 'you' ORDER BY n LIMIT 1) AS first,
+              (SELECT name FROM slash_thread_name WHERE id = t.id) AS name,
+              (SELECT actions FROM slash_turn WHERE thread = t.id ORDER BY n DESC LIMIT 1) AS last,
+              (SELECT ts FROM slash_turn WHERE thread = t.id ORDER BY n DESC LIMIT 1) AS ts
        FROM slash_thread t WHERE t.person = ? ORDER BY t.updated DESC LIMIT ?`,
       who(ctx),
       THREADS_LISTED,
@@ -1253,9 +1344,35 @@ export const chats = (core: Core): Chat => {
     return ok({
       threads: rows
         .filter((r) => r.first !== null && r.first.trim() !== '')
-        .map((r) => ({ id: r.id, title: cut(r.first!.replace(/\s+/gu, ' ').trim(), TITLE_CHARS).replace(/ \(cut here\)$/u, ''), at: r.updated })),
+        .map((r) => ({
+          id: r.id,
+          title: r.name ?? cut(r.first!.replace(/\s+/gu, ' ').trim(), TITLE_CHARS).replace(/ \(cut here\)$/u, ''),
+          at: r.updated,
+          ...(r.last !== null && r.ts !== null && keptOf(r.last).answering && !quiet(r.ts) ? { answering: true as const } : {}),
+        })),
     });
   };
 
-  return { chat, act, thread, threads };
+  /* A CONVERSATION RENAMED. Its place in the list stays where it was: a name is not something said in it. No words at all
+     hands it back to its first words. */
+  const rename: Chat['rename'] = (id, name, ctx) => {
+    open();
+    if (!theirs(id, ctx)) return no('REF_UNKNOWN', NO_CONVERSATION, { at: 'id' });
+    const said = cut(name.replaceAll('\u0000', '').replace(/\s+/gu, ' ').trim(), TITLE_CHARS).replace(/ \(cut here\)$/u, '');
+    if (said === '') sql.exec('DELETE FROM slash_thread_name WHERE id = ?', id);
+    else sql.exec('INSERT INTO slash_thread_name (id, name) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET name = excluded.name', id, said);
+    return ok({ id });
+  };
+
+  /* A CONVERSATION DELETED: its turns, what it held for a yes and its name, here and now. The ledger keeps its row of what
+     an ask cost, which is the month's meter and is not the conversation. A turn still running finds its row gone, so what
+     it writes after this lands nowhere. */
+  const remove: Chat['remove'] = (id, ctx) => {
+    open();
+    if (!theirs(id, ctx)) return no('REF_UNKNOWN', NO_CONVERSATION, { at: 'id' });
+    for (const table of ['slash_turn WHERE thread', 'slash_act WHERE thread', 'slash_thread_name WHERE id', 'slash_thread WHERE id']) sql.exec(`DELETE FROM ${table} = ?`, id);
+    return ok({ id });
+  };
+
+  return { chat, act, thread, threads, rename, remove };
 };

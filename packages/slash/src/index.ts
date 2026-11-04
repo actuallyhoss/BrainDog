@@ -463,6 +463,8 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
     act: talk.act,
     thread: talk.thread,
     threads: talk.threads,
+    rename: talk.rename,
+    remove: talk.remove,
   };
 }
 
