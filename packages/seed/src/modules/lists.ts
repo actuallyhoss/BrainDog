@@ -20,7 +20,7 @@ import { MODULE_NAMES } from '../usecases/names.ts';
 const BROUGHT: readonly { pack: string; lists: readonly string[] }[] = [
   { pack: 'portfolio', lists: ['things', 'stages', 'datapoints', 'kpis'] },
   { pack: 'people', lists: ['people', 'organisations'] },
-  { pack: 'money-core', lists: ['obligations', 'accounts', 'fx', 'categories', 'filing_rules', 'transactions', 'recurring', 'plans', 'installments', 'balances', 'snapshots', 'books'] },
+  { pack: 'money-core', lists: ['obligations', 'accounts', 'fx', 'categories', 'filing_rules', 'transactions', 'payee_names', 'recurring', 'plans', 'installments', 'balances', 'snapshots', 'books'] },
   { pack: 'estate', lists: ['services'] },
   { pack: 'work', lists: ['tracks', 'updates', 'tasks'] },
   { pack: 'agents', lists: ['learnings', 'skills', 'credentials', 'tools'] },
