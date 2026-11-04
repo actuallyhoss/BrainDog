@@ -286,6 +286,7 @@
   /* FOLDED, ITS GAP HAS NOTHING TO STAND OVER: "How it works" stood 38 over the card's foot, under a 21 at its head. */
   .lock-how:not([open]) {
     gap: 0;
+    margin-block-end: calc((var(--lead-meta) - 28px) / 2);
   }
 
   .lock-how-head {
