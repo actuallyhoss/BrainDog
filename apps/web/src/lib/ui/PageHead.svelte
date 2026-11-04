@@ -509,6 +509,10 @@
     }
   }
 
+  :global(html[data-shell='ios']) .page-head {
+    inset-block-start: env(safe-area-inset-top, 0px);
+  }
+
   .page-head {
     position: sticky;
     inset-block-start: 0;

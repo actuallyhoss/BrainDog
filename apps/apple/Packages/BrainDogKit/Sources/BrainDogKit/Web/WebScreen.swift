@@ -38,6 +38,8 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     public private(set) var asleep = false
     /// Asks the screen does not answer itself: share, tell, ask, notify, badge, visit, pushAsk.
     @ObservationIgnored public var onAsk: ((ShellAsk) -> Void)?
+    /// The page has drawn for the first time since it loaded, for whoever keeps its picture.
+    @ObservationIgnored public var onDrawn: (() -> Void)?
     /// A file the page handed over (an export, a backup, an attachment's Download), saved where the app can share it.
     @ObservationIgnored public var onFile: ((URL) -> Void)?
     /// A file the page opened to be looked at (an attached PDF's "Open full screen"): shown natively, in Quick Look.
@@ -69,23 +71,37 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         controller.addUserScript(ShellBridge.script(kind: kind, inset: kind == .mac ? MacBar.room : 0, textScale: Self.textScale))
         controller.addUserScript(Look.script)
         config.userContentController = controller
-        webView = WKWebView(frame: .zero, configuration: config)
+        #if os(macOS)
+        webView = DeskWebView(frame: .zero, configuration: config)
+        #else
+        webView = PhoneWebView(frame: .zero, configuration: config)
+        #endif
         super.init()
         /* THE BRIDGE HOLDS THE SCREEN WEAKLY, so the content controller (which keeps its handler) keeps nothing alive. */
         controller.add(ShellBridge { [weak self] ask in self?.hear(ask) }, name: ShellBridge.name)
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        /* NO WEB SWIPE BACK ON THE IPHONE: each screen is its own web view in a native stack, whose swipe back is exact. */
-        webView.allowsBackForwardNavigationGestures = false
+        /* NO WEB SWIPE BACK ON THE IPHONE: each screen is its own web view in a native stack, whose swipe back is exact.
+           THE MAC HAS ONE WEB VIEW AND ITS HISTORY: two fingers swipe back and forward, as in any Mac app with a history. */
+        webView.allowsBackForwardNavigationGestures = kind == .mac
         #if DEBUG
         webView.isInspectable = true
+        /* A QUIET WALK ON A MAC SOMEONE IS USING (`-braindogQuiet YES`): the page draws though its window is clear and behind. */
+        if kind == .mac, UserDefaults.standard.bool(forKey: "braindogQuiet") {
+            webView.configuration.preferences.inactiveSchedulingPolicy = .none
+        }
         #endif
         #if os(iOS)
         webView.isOpaque = false
         webView.backgroundColor = PlatformPalette.board
         webView.scrollView.backgroundColor = PlatformPalette.board
         webView.underPageBackgroundColor = PlatformPalette.board
-        webView.scrollView.contentInsetAdjustmentBehavior = .automatic
+        /* NO INSET OF ITS OWN: the page pays for the bars itself (`env(safe-area-inset-*)`, `.body` in `AppFrame.svelte`).
+           With one, the page's own `scrollTo(0, 0)`, on every move in a warm screen, put its head under the nav bar. */
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.automaticallyAdjustsScrollIndicatorInsets = false
+        /* NO LINK PREVIEW: a long press on a row of the app is not a web page's link. */
+        webView.allowsLinkPreview = false
         webView.pageZoom = Self.textScale
         let refresh = UIRefreshControl()
         refresh.addTarget(self, action: #selector(pulled(_:)), for: .valueChanged)
@@ -151,6 +167,11 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         return try? await webView.takeSnapshot(configuration: nil)
     }
 
+    /// True with the page at its top, where a launch opens it: a picture of the middle of the page would jump.
+    public var atTop: Bool {
+        webView.scrollView.contentOffset.y <= 1
+    }
+
     /// Put to sleep deep in a stack (plan 3.3, at most four live per stack): its picture kept as the cover, its page
     /// unloaded, its address kept. `wake` loads it there again when it is next on screen.
     public func sleep() async {
@@ -186,7 +207,11 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     private func hear(_ ask: ShellAsk) {
         switch ask {
         case .ready:
+            #if DEBUG
+            LaunchMark.say("ready \(path)")
+            #endif
             uncover()
+            onDrawn?()
         case .title(let name, _):
             title = name
             /* A WARM SCREEN'S NEW PAGE HAS DRAWN WHEN IT NAMES ITSELF: its `ready()` was said for the page it booted on. */
@@ -411,9 +436,58 @@ public enum MacBar {
 }
 
 #if os(iOS)
+/// The iPhone's web view: its scroll view has no inset, so the scroll bar and the pull's spinner are told where the bars
+/// are, each time they move: under the nav bar, not behind it.
+final class PhoneWebView: WKWebView {
+    override func safeAreaInsetsDidChange() {
+        super.safeAreaInsetsDidChange()
+        scrollView.verticalScrollIndicatorInsets = UIEdgeInsets(top: safeAreaInsets.top, left: 0, bottom: safeAreaInsets.bottom, right: 0)
+        scrollView.refreshControl?.bounds.origin.y = -safeAreaInsets.top
+    }
+}
+#endif
+
+#if os(macOS)
+/// The Mac's web view: its right-click menu holds what a Mac app's does. A browser's items (open in a new window, download,
+/// back, reload as menu words) go, since the app has one window and its own Go and View menus; copy, look up and paste stay.
+final class DeskWebView: WKWebView {
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        super.willOpenMenu(menu, with: event)
+        let gone: Set<String> = [
+            "WKMenuItemIdentifierOpenLinkInNewWindow", "WKMenuItemIdentifierDownloadLinkedFile", "WKMenuItemIdentifierOpenImageInNewWindow",
+            "WKMenuItemIdentifierDownloadImage", "WKMenuItemIdentifierOpenFrameInNewWindow", "WKMenuItemIdentifierOpenMediaInNewWindow",
+            "WKMenuItemIdentifierDownloadMedia", "WKMenuItemIdentifierGoBack", "WKMenuItemIdentifierGoForward", "WKMenuItemIdentifierStop", "WKMenuItemIdentifierReload",
+        ]
+        for item in menu.items where gone.contains(item.identifier?.rawValue ?? "") { menu.removeItem(item) }
+        /* A SEPARATOR LEFT AT EITHER END, or two together, goes with what it stood between. */
+        while menu.items.first?.isSeparatorItem == true { menu.removeItem(at: 0) }
+        while menu.items.last?.isSeparatorItem == true { menu.removeItem(at: menu.items.count - 1) }
+    }
+}
+#endif
+
+#if os(iOS)
 public typealias PlatformImage = UIImage
 #else
 public typealias PlatformImage = NSImage
+#endif
+
+#if DEBUG
+/// A Debug build's clock for the launch (`tools/launch.mjs`): the wall's time at each thing that happens on the way to the
+/// first page, appended to a file in the app's own temporary folder. A Release build has none of it.
+public enum LaunchMark {
+    public static func say(_ what: String) {
+        let line = "\(Date().timeIntervalSince1970) \(what)\n"
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("launch-marks.txt")
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? Data(line.utf8).write(to: file)
+        }
+    }
+}
 #endif
 
 #if os(iOS)
@@ -426,7 +500,8 @@ public struct WebView: View {
             .overlay {
                 if !screen.ready {
                     ZStack(alignment: .top) {
-                        Palette.board
+                        /* THE GROUND THE PAGE ITSELF DRAWS, the board and its light, so nothing jumps when the page comes. */
+                        Ground()
                         if let cover = screen.cover {
                             Image(uiImage: cover).resizable().scaledToFit().frame(maxWidth: .infinity, alignment: .top)
                         }
@@ -437,7 +512,12 @@ public struct WebView: View {
             }
             .background(Palette.board)
             .task { await screen.load() }
-            .onAppear { screen.wake() }
+            .onAppear {
+                #if DEBUG
+                LaunchMark.say("drawn \(screen.path)\(screen.cover == nil ? "" : " with its picture")")
+                #endif
+                screen.wake()
+            }
     }
 
     private struct Host: UIViewRepresentable {

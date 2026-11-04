@@ -138,27 +138,26 @@ public struct NeedsView: View {
                 empty
             }
             if !model.needs.open.isEmpty {
-                Section {
-                    rows(model.needs.open, later: false)
-                } header: {
+                /* THE SCREEN IS ALREADY NAMED NEEDS YOU, WITH ITS COUNT ON THE TAB: this heading only tells the two lists
+                   apart, so with nothing put off it is not drawn and the rows open 12 under the bar. */
+                if model.needs.later.isEmpty {
+                    Color.clear.frame(height: Space.pageTop).listRowInsets(EdgeInsets()).listRowBackground(Color.clear).listRowSeparator(.hidden).accessibilityHidden(true)
+                } else {
                     header(Words.waitingOnYou, count: model.needs.waiting, first: true)
                 }
+                rows(model.needs.open, later: false)
             }
             if !model.needs.later.isEmpty {
-                Section {
-                    rows(model.needs.later, later: true)
-                } header: {
-                    header(Words.later, count: model.needs.later.count, first: model.needs.open.isEmpty && !model.known)
-                }
+                header(Words.later, count: model.needs.later.count, first: model.needs.open.isEmpty && !model.known)
+                rows(model.needs.later, later: true)
             }
             Color.clear.frame(height: Space.foot).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Ground())
-        .environment(\.defaultMinListRowHeight, Space.tap)
-        /* A HEADING IS AS TALL AS ITS WORDS AND ITS OWN PADDING, so the section rhythm below is the whole of it. */
-        .environment(\.defaultMinListHeaderHeight, 0)
+                /* A HEADING IS A ROW AS TALL AS ITS WORDS AND ITS OWN PADDING, never pinned over the rows under it. */
+        .environment(\.defaultMinListRowHeight, 0)
         .refreshable {
             Haptic.select.play()
             await model.read()
@@ -183,6 +182,8 @@ public struct NeedsView: View {
         .padding(.top, first ? Space.pageTop : Space.sectionGap)
         .padding(.bottom, Space.sectionHeadGap)
         .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.tilePad, bottom: 0, trailing: Space.gutter))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }

@@ -155,7 +155,17 @@ final class AppModel {
                 next[place.href] = Stack(place: place, root: nil)
             } else {
                 let screen = WebScreen(kind: .ios, path: place.href)
-                if place.href == Place.today.href { screen.cover = Kept.launch }
+                if place.href == Place.today.href {
+                    screen.cover = Kept.launch
+                    /* THE PICTURE IS KEPT SOON AFTER THE PAGE HAS DRAWN, not only on the way out, where the snapshot often
+                       comes too late: the app is suspended before WebKit answers, and the next launch opens on nothing. */
+                    screen.onDrawn = { [weak self] in
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .seconds(1.5))
+                            await self?.keepLaunchPicture()
+                        }
+                    }
+                }
                 let stack = Stack(place: place, root: screen)
                 bind(screen, in: stack)
                 next[place.href] = stack
@@ -394,7 +404,7 @@ final class AppModel {
 
     /// Today as it is drawn now, kept for the next launch.
     func keepLaunchPicture() async {
-        guard let today = stacks[Place.today.href]?.root, let picture = await today.picture() else { return }
+        guard let today = stacks[Place.today.href]?.root, today.atTop, !today.offline, let picture = await today.picture() else { return }
         Kept.launch = picture
     }
 

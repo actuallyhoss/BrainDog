@@ -122,7 +122,7 @@ struct PhoneTile: View {
                                 status = await Push.status()
                             }
                         }
-                        .buttonStyle(BDButtonStyle(.quiet, onTile: true, full: false))
+                        .buttonStyle(BDButtonStyle(.quiet, size: .small, onTile: true, full: false))
                     }
                 }
                 Hairline(leading: 32 + Space.s3)
@@ -153,6 +153,15 @@ struct PhoneTile: View {
             Row(title, detail: line, glyph: glyph)
         }
         .toggleStyle(.switch)
-        .tint(Palette.on)
+        .modifier(SwitchInk())
+    }
+}
+
+/// A switch that is on, as the web draws one: ink, not the accent, so red stays for what needs him. In dark the ink is too
+/// near the system's white knob to read, so it is the quieter ink there.
+struct SwitchInk: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+    func body(content: Content) -> some View {
+        content.tint(scheme == .dark ? Palette.ink3 : Palette.ink)
     }
 }

@@ -691,7 +691,8 @@ const PLEASANTRY = /^(?:hi|hello|hey|thanks|thank you|thx|please|ok|okay|cheers)
 const acts = (s: string): boolean => ORDER.test(s) || PAID.test(s) || GOT.test(s);
 /* The words around an order's total that say nothing more of it: "total", "not paid yet", "owed". */
 const TOTAL_WORDS = /\b(?:the\s+total(?:\s+is)?|total(?:\s+is)?|in\s+all|not\s+paid(?:\s+yet)?|unpaid|still\s+owed|owed|to\s+pay|due)\b/giu;
-const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+/* AN ADDRESS KEEPS ITS OWN CASE: a shared link read as "Https://…" is not a thing anybody wrote. */
+const capital = (s: string): string => (/^[a-z][a-z0-9+.-]*:\/\//iu.test(s) ? s : s.charAt(0).toUpperCase() + s.slice(1));
 /* "NEXT", "NEXT DUE", "DUE NEXT" LEFT BESIDE A DAY, the words an answer to "When is it next due?" comes in: "Netflix 180 a
    month, next on the 5th", "next due 5 Nov". The day is read off and these say nothing more (AL4 follow). */
 const NEXT_SAID = /(?:^|\s+)(?:(?:it(?:['’]s| is)\s+)?(?:next(?:\s+(?:due|one|payment))?|due\s+next))(?:\s+(?:on|by))?\s*$/iu;

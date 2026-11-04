@@ -37,7 +37,9 @@ public enum Kept {
     public static var launch: UIImage? {
         get { (try? Data(contentsOf: file("launch", "png"))).flatMap(UIImage.init(data:)) }
         set {
-            if let data = newValue?.pngData() {
+            /* A PHOTO'S ENCODING, NOT A PNG: this runs as the app goes to the background, and a full screen's PNG took long
+               enough on the main thread that the system often suspended the app first and nothing was kept. */
+            if let data = newValue?.jpegData(compressionQuality: 0.85) {
                 try? data.write(to: file("launch", "png"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             } else {
                 try? FileManager.default.removeItem(at: file("launch", "png"))

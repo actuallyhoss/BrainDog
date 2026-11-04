@@ -43,7 +43,9 @@ struct BrainDogMac: App {
         .windowResizability(.contentSize)
         #endif
 
-        MenuBarExtra(isInserted: Binding(get: { model.inMenuBar && session.signedIn }, set: { model.inMenuBar = $0 })) {
+        /* SIGNED OUT THE EXTRA IS ONLY HIDDEN: SwiftUI writes back what it was told, and a signed-out launch turned the person's
+           own setting off for good. */
+        MenuBarExtra(isInserted: Binding(get: { model.inMenuBar && session.signedIn }, set: { if session.signedIn { model.inMenuBar = $0 } })) {
             MenuBarPanel()
         } label: {
             MenuBarLabel(count: model.count)
@@ -190,6 +192,8 @@ enum Links {
                 case let s where s.hasPrefix("quickshot:"):
                     Shots.other(titled: "Quick panel", name: String(s.dropFirst(10)))
 
+                case let s where s.hasPrefix("dropshot:"):
+                    Shots.view(TellWindow().overlay { DropRing() }.frame(width: 520, height: 420).environment(\.font, Typeface.body), name: String(s.dropFirst(9)))
                 case "menubar": model.openWindow?("menubar-shot")
                 case "search": model.desk.emit("search")
                 case let s where s.hasPrefix("shot:"): await Shots.window(String(s.dropFirst(5)))
@@ -257,6 +261,11 @@ struct Menus: Commands {
         }
         CommandGroup(replacing: .toolbar) {
             Button("Reload") { model.desk.reload() }.keyboardShortcut("r")
+            Divider()
+            /* THE RAIL'S OWN CONTROL, pressed: the web keeps whether it is folded. */
+            Button("Toggle Sidebar") { model.toggleRail() }
+                .keyboardShortcut("s", modifiers: [.control, .command])
+                .disabled(!session.signedIn)
             Divider()
             Button("Actual Size") { model.zoom = 1 }.keyboardShortcut("0")
             Button("Zoom In") { model.zoomIn() }.keyboardShortcut("=")

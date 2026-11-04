@@ -356,6 +356,22 @@
     letter-spacing: 0;
   }
 
+  /* IN THE IPHONE APP THE DOCUMENT SCROLLS, so a ground on `body` ran the whole page's length and stopped at its ends: a
+     pull past the top showed a flat band with a hard line under it. There the light is a fixed layer behind everything,
+     as native's own ground is, and the same under a pull as at rest. */
+  html[data-shell='ios'] body {
+    background: var(--board);
+  }
+
+  html[data-shell='ios'] body > div:first-of-type::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--ambient);
+    pointer-events: none;
+  }
+
   /* FIGURES THAT LINE UP ARE TABULAR (Jakarta's own run from 0.37 em for a 1 to 0.73 for a 0, its tabular set is 0.60
      each); a number in a sentence keeps the proportional set, whose 1 has no foot and reads as a word's. `.num` is the
      skin's own. */

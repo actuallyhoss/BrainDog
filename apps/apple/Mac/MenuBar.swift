@@ -85,7 +85,7 @@ struct TellWindow: View {
     var body: some View {
         TellSheet(model: model.tell, done: { dismiss() })
             .frame(width: 520)
-            .frame(minHeight: 320)
+            .frame(minHeight: 340, idealHeight: 460)
             .background(Palette.tile)
             /* A FILE DROPPED ON TELL IS ATTACHED, not read as words: "Attach to…" in a sheet, a project or a task picked there. */
             .overlay { if over { DropRing() } }

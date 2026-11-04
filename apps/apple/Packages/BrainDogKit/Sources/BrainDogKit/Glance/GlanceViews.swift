@@ -20,7 +20,7 @@ public enum GlanceLink {
     public static let today = open("/")
 }
 
-/// The small heading a glance starts with: its glyph and its name in the ops caps label (11, 500, +0.3), quiet.
+/// The small heading a glance starts with: its glyph and its name, quiet, with what it counts at the far end.
 struct GlanceHead: View {
     let glyph: Glyph
     let title: String
@@ -28,11 +28,29 @@ struct GlanceHead: View {
 
     var body: some View {
         HStack(spacing: Space.s1 + 2) {
-            glyph.image.resizable().scaledToFit().frame(width: 14, height: 14).foregroundStyle(Palette.ink3)
-            Text(title).font(Typeface.caps).textCase(.uppercase).tracking(0.3).foregroundStyle(Palette.ink3).lineLimit(1)
+            glyph.image.resizable().scaledToFit().frame(width: 15, height: 15).foregroundStyle(Palette.ink3)
+            Text(title).font(Typeface.caption).foregroundStyle(Palette.ink2).lineLimit(1).minimumScaleFactor(0.8)
             Spacer(minLength: 0)
+            if let count, count > 0 {
+                Text(count.formatted()).font(Typeface.tileHeading).foregroundStyle(Palette.red)
+            }
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// What a glance says when it has nothing to show: its glyph in a well and one line, centred in what room there is, so an
+/// empty widget reads as finished and not as one that failed to load.
+struct GlanceEmpty: View {
+    let glyph: Glyph
+    let line: String
+
+    var body: some View {
+        VStack(spacing: Space.s2) {
+            IconWell(glyph, size: .l)
+            Text(line).font(Typeface.meta).foregroundStyle(Palette.ink3).multilineTextAlignment(.center).lineLimit(3)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -59,11 +77,11 @@ public struct NeedsGlance: View {
     private var count: Int { glance?.waiting ?? 0 }
 
     private var countText: some View {
+        /* NOT TABULAR: it stands alone, and Jakarta's tabular 1 carries a foot that reads as an l. */
         Text(count.formatted())
             .font(Typeface.hero)
             .tracking(Typeface.tight(30))
             .foregroundStyle(count > 0 ? Palette.red : Palette.ink)
-            .monospacedDigit()
             .contentTransition(.numericText())
             .accessibilityLabel(count > 0 ? Words.waitCount(count) : Words.nothingWaits)
     }
@@ -71,66 +89,57 @@ public struct NeedsGlance: View {
     private var small: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
             GlanceHead(glyph: .decide, title: Words.needsYou)
-            Spacer(minLength: 0)
             if let glance {
-                countText
                 if let first = glance.questions.first {
+                    Spacer(minLength: 0)
+                    countText
                     Text(first.question).font(Typeface.meta).foregroundStyle(Palette.ink2).lineLimit(2)
                 } else {
-                    Text(Words.nothingWaits).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(2)
+                    GlanceEmpty(glyph: .check, line: Words.nothingWaits)
                 }
             } else {
-                signedOut
+                GlanceEmpty(glyph: .lock, line: Words.signInToSee)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 
     private var medium: some View {
-        HStack(alignment: .top, spacing: Space.s4) {
-            VStack(alignment: .leading, spacing: Space.s1) {
-                GlanceHead(glyph: .decide, title: Words.needsYou)
-                Spacer(minLength: 0)
-                if glance != nil {
-                    countText
-                    Text(count == 0 ? Words.nothingWaits : (count == 1 ? "waits on you" : "wait on you"))
-                        .font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(2)
-                }
-            }
-            .frame(width: 92, alignment: .leading)
-            .frame(maxHeight: .infinity, alignment: .leading)
-
+        VStack(alignment: .leading, spacing: Space.s2) {
+            GlanceHead(glyph: .decide, title: Words.needsYou, count: glance?.waiting)
             if let glance {
                 if glance.questions.isEmpty {
-                    Text(Words.nothingNeedsYouLine).font(Typeface.meta).foregroundStyle(Palette.ink3)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    GlanceEmpty(glyph: .check, line: Words.nothingWaits)
                 } else {
+                    /* ONE QUESTION TAKES THE ROOM OF THREE, at a size to read; several are a list that fills the card. */
+                    let lines = Array(glance.questions.prefix(3))
                     VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(glance.questions.prefix(3).enumerated()), id: \.element.id) { i, q in
+                        ForEach(Array(lines.enumerated()), id: \.element.id) { i, q in
                             Link(destination: GlanceLink.open(q.path)) {
-                                Text(q.question).font(Typeface.meta).foregroundStyle(Palette.ink).lineLimit(2)
+                                Text(q.question)
+                                    .font(lines.count == 1 ? Typeface.bodyMedium : Typeface.meta)
+                                    .foregroundStyle(Palette.ink)
+                                    .lineLimit(lines.count == 1 ? 3 : 2)
+                                    .leading(lines.count == 1 ? .row : .meta)
                                     .multilineTextAlignment(.leading)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    /* THE FIRST LINE STARTS ON THE HEADING'S LINE, so the two columns share a top. */
-                                    .padding(.top, i == 0 ? 0 : 6)
-                                    .padding(.bottom, 6)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                             }
-                            if i < min(3, glance.questions.count) - 1 { Hairline() }
+                            if i < lines.count - 1 { Hairline() }
                         }
-                        Spacer(minLength: 0)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             } else {
-                signedOut.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                GlanceEmpty(glyph: .lock, line: Words.signInToSee)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var circular: some View {
         VStack(spacing: 0) {
             Glyph.decide.image.resizable().scaledToFit().frame(width: 16, height: 16)
-            Text(glance.map { $0.waiting.formatted() } ?? "–").font(Typeface.figure).monospacedDigit()
+            Text(glance.map { $0.waiting.formatted() } ?? "–").font(Typeface.figure)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(glance.map { $0.waiting > 0 ? Words.waitCount($0.waiting) : Words.nothingWaits } ?? Words.signInToSee)
@@ -172,8 +181,7 @@ public struct NumbersGlance: View {
             GlanceHead(glyph: .observe, title: Words.keyNumbers)
             if let glance {
                 if glance.figures.isEmpty {
-                    Spacer(minLength: 0)
-                    Text(Words.noKeyNumbers).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(3)
+                    GlanceEmpty(glyph: .observe, line: Words.noKeyNumbers)
                 } else if size == .medium {
                     Spacer(minLength: 0)
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: Space.s4, alignment: .topLeading), GridItem(.flexible(), alignment: .topLeading)],
@@ -187,8 +195,7 @@ public struct NumbersGlance: View {
                     }
                 }
             } else {
-                Spacer(minLength: 0)
-                Text(Words.signInToSee).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(3)
+                GlanceEmpty(glyph: .lock, line: Words.signInToSee)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -200,9 +207,9 @@ public struct NumbersGlance: View {
             Text(f.said)
                 .font(Typeface.figure)
                 .foregroundStyle(f.met == false ? Palette.red : Palette.ink)
+                .tracking(Typeface.tight(22))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-                .monospacedDigit()
         }
         .accessibilityElement(children: .combine)
     }
@@ -242,6 +249,13 @@ public struct DueGlance: View {
 
     private var most: Int { size == .medium ? 3 : 2 }
 
+    /// The Lock Screen's line: what falls due next and how much, or why there is none.
+    private var dueLine: String {
+        guard let glance else { return Words.signInToSee }
+        guard let first = glance.due?.first else { return Words.nothingDue }
+        return [first.day, first.text, first.figure].compactMap { $0 }.joined(separator: " · ")
+    }
+
     public var body: some View {
         if size == .rectangular {
             VStack(alignment: .leading, spacing: 1) {
@@ -249,35 +263,60 @@ public struct DueGlance: View {
                     Glyph.clock.image.resizable().scaledToFit().frame(width: 13, height: 13)
                     Text(Words.dueNext).font(Typeface.caption)
                 }
-                Text(glance?.due?.first?.text ?? (glance == nil ? Words.signInToSee : Words.nothingDue)).font(Typeface.meta).lineLimit(2)
+                Text(dueLine).font(Typeface.meta).lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             VStack(alignment: .leading, spacing: Space.s2) {
                 GlanceHead(glyph: .clock, title: Words.dueNext)
-                Spacer(minLength: 0)
                 if let glance {
                     let due = glance.due ?? []
                     if due.isEmpty {
-                        Text(Words.nothingDue).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(3)
-                    } else {
-                        VStack(alignment: .leading, spacing: Space.s2) {
+                        GlanceEmpty(glyph: .check, line: Words.nothingDue)
+                    } else if size == .medium {
+                        VStack(spacing: 0) {
                             ForEach(Array(due.prefix(most).enumerated()), id: \.element.id) { index, line in
-                                Text(line.text)
-                                    .font(index == 0 ? Typeface.bodyMedium : Typeface.meta)
-                                    .foregroundStyle(index == 0 ? Palette.ink : Palette.ink2)
-                                    .lineLimit(2)
-                                    .leading(index == 0 ? .row : .meta)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                DueLine(line: line)
+                                    .frame(maxHeight: .infinity)
+                                if index < min(due.count, most) - 1 { Hairline() }
                             }
+                        }
+                        .frame(maxHeight: .infinity, alignment: .top)
+                    } else if let line = due.first {
+                        Spacer(minLength: 0)
+                        if let figure = line.figure {
+                            Text(figure).font(Typeface.figure).tracking(Typeface.tight(22)).foregroundStyle(Palette.ink).lineLimit(1).minimumScaleFactor(0.6)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(line.text).font(Typeface.meta).foregroundStyle(Palette.ink).lineLimit(2).leading(.meta)
+                            if let day = line.day { Text(day).font(Typeface.caption).foregroundStyle(Palette.ink3).lineLimit(1) }
                         }
                     }
                 } else {
-                    Text(Words.signInToSee).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(3)
+                    GlanceEmpty(glyph: .lock, line: Words.signInToSee)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+    }
+}
+
+/// One line of Due next on a wide card: the day, what falls due, and its amount at the far end.
+private struct DueLine: View {
+    let line: Glance.Due
+
+    var body: some View {
+        HStack(spacing: Space.s3) {
+            if let day = line.day {
+                Text(day).font(Typeface.caption).foregroundStyle(Palette.ink3).lineLimit(1).frame(width: 68, alignment: .leading)
+            }
+            Text(line.text).font(Typeface.meta).foregroundStyle(Palette.ink).lineLimit(1)
+            Spacer(minLength: Space.s2)
+            if let figure = line.figure {
+                Text(figure).font(Typeface.meta).monospacedDigit().foregroundStyle(figure.hasPrefix("+") ? Palette.good : Palette.ink).lineLimit(1)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -299,18 +338,18 @@ public struct FigureGlance: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.s1) {
-            GlanceHead(glyph: .observe, title: figure?.label ?? Words.todayNumber)
-            Spacer(minLength: 0)
+            GlanceHead(glyph: .observe, title: Words.todayNumber)
             if let figure {
+                Spacer(minLength: 0)
                 Text(figure.said)
                     .font(Typeface.hero)
+                    .tracking(Typeface.tight(30))
                     .foregroundStyle(figure.met == false ? Palette.red : Palette.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                    .monospacedDigit()
-                if let record = glance?.record { Text(record).font(Typeface.caption).foregroundStyle(Palette.ink3).lineLimit(1) }
+                Text(figure.label).font(Typeface.meta).foregroundStyle(Palette.ink2).lineLimit(2).leading(.meta)
             } else {
-                Text(glance == nil ? Words.signInToSee : Words.pickNumber).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(3)
+                GlanceEmpty(glyph: glance == nil ? .lock : .observe, line: glance == nil ? Words.signInToSee : Words.pickNumber)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

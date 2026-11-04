@@ -15,17 +15,22 @@ struct SettingsView: View {
     var body: some View {
         TabView(selection: $tab) {
             GeneralSettings()
-                .tabItem { Label { Text("General") } icon: { Glyph.settings.image } }
+                .tabItem { Label { Text("General") } icon: { glyph(.settings) } }
                 .tag("general")
             ShortcutSettings()
-                .tabItem { Label { Text("Shortcut") } icon: { Glyph.keyboard.image } }
+                .tabItem { Label { Text("Shortcut") } icon: { glyph(.keyboard) } }
                 .tag("shortcut")
             SigningInSettings()
-                .tabItem { Label { Text("Signing in") } icon: { Glyph.session.image } }
+                .tabItem { Label { Text("Signing in") } icon: { glyph(.session) } }
                 .tag("signing-in")
         }
         .frame(width: 500)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// A tab's glyph at the toolbar's own size, 20, not the 24 it was drawn at.
+    private func glyph(_ glyph: Glyph) -> Image {
+        glyph.templateImage(side: 20).map { Image(nsImage: $0) } ?? glyph.image
     }
 }
 

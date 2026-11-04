@@ -11,8 +11,8 @@ struct SearchTab: View {
         @Bindable var search = app.search
         NavigationStack(path: $search.path) {
             SearchView()
-                .navigationTitle(Words.searchPrompt)
-                .modifier(ScreenBar(root: true, title: Words.searchPrompt))
+                .navigationTitle(Words.searchTab)
+                .modifier(ScreenBar(root: true, title: Words.searchTab))
                 .navigationDestination(for: Screen.self) { screen in
                     switch screen {
                     case .web(let pushed): WebPage(screen: pushed.screen, root: false, stack: app.search)
@@ -48,21 +48,19 @@ struct SearchView: View {
                     .listRowInsets(EdgeInsets(top: Space.pageTop, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
             } else {
                 ForEach(Array(groups.enumerated()), id: \.element.name) { index, group in
-                    Section {
-                        tiled(group.hits) { hit in
-                            Row(hit.title, glyph: Glyph.named(group.icon))
-                        } open: { hit in app.push(hit.path, on: app.search) }
-                    } header: {
-                        heading(group.name, count: group.hits.count, first: index == 0)
-                    }
+                    heading(group.name, count: group.hits.count, first: index == 0)
+                    tiled(group.hits) { hit in
+                        Row(hit.title, glyph: Glyph.named(group.icon))
+                    } open: { hit in app.push(hit.path, on: app.search) }
                 }
+                Color.clear.frame(height: Space.foot).listRowBackground(Color.clear).listRowSeparator(.hidden)
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Ground())
         .scrollDismissesKeyboard(.immediately)
-        .environment(\.defaultMinListHeaderHeight, 0)
+        .environment(\.defaultMinListRowHeight, 0)
         .searchable(text: $app.searchText, prompt: Text(Words.searchPrompt))
         .task(id: typed) { await find(typed) }
     }
@@ -104,23 +102,23 @@ struct SearchView: View {
 
     @ViewBuilder private var placesList: some View {
         ForEach(Array(sections.enumerated()), id: \.element.name) { index, section in
-            Section {
-                tiled(section.spots) { spot in Row(spot.label, glyph: Glyph.named(spot.icon)) } open: { app.push($0.id, on: app.search) }
-            } header: { heading(section.name, count: nil, first: index == 0) }
+            /* A SECTION HOLDING ONE PLACE OF THE SAME NAME ("Dashboard" over Dashboard) DRAWS THE PLACE ALONE. */
+            if section.spots.count == 1, section.spots.first?.label == section.name {
+                gap(first: index == 0)
+            } else {
+                heading(section.name, count: nil, first: index == 0)
+            }
+            tiled(section.spots) { spot in Row(spot.label, glyph: Glyph.named(spot.icon)) } open: { app.push($0.id, on: app.search) }
         }
         if !lists.isEmpty {
-            Section {
-                tiled(lists) { spot in Row(spot.label, when: spot.detail, glyph: Glyph.named(spot.icon)) } open: { app.push($0.id, on: app.search) }
-            } header: { heading(Words.lists, count: lists.count, first: false) }
+            heading(Words.lists, count: lists.count, first: false)
+            tiled(lists) { spot in Row(spot.label, when: spot.detail, glyph: Glyph.named(spot.icon)) } open: { app.push($0.id, on: app.search) }
         }
-        Section {
-            tiled([Spot(id: "settings", label: Words.settings, icon: "settings", detail: nil)]) { spot in
-                Row(spot.label, glyph: .settings)
-            } open: { _ in app.search.path.append(.settings) }
-        } header: {
-            /* NO HEADING, THE SAME AIR: Settings stands a section's distance under the card before it. */
-            Color.clear.frame(height: Space.sectionGap).listRowInsets(EdgeInsets()).accessibilityHidden(true)
-        }
+        /* NO HEADING, THE SAME AIR: Settings stands a section's distance under the card before it. */
+        gap(first: false)
+        tiled([Spot(id: "settings", label: Words.settings, icon: "settings", detail: nil)]) { spot in
+            Row(spot.label, glyph: .settings)
+        } open: { _ in app.search.path.append(.settings) }
         Color.clear.frame(height: Space.foot).listRowBackground(Color.clear).listRowSeparator(.hidden)
     }
 
@@ -173,7 +171,18 @@ struct SearchView: View {
         .padding(.top, first ? Space.pageTop : Space.sectionGap)
         .padding(.bottom, Space.sectionHeadGap)
         .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.tilePad, bottom: 0, trailing: Space.gutter))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
         .accessibilityAddTraits(.isHeader)
+    }
+
+    /// A section's air with no heading.
+    private func gap(first: Bool) -> some View {
+        Color.clear.frame(height: first ? Space.pageTop : Space.sectionGap)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .accessibilityHidden(true)
     }
 
     private func plain(_ text: String) -> some View {

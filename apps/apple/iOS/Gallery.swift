@@ -10,8 +10,10 @@ enum Gallery: Identifiable, Hashable {
     /// The second page: Due next, a picked Today number, and the Due next Lock Screen line (M5, second pass).
     case widgets2
     case share(String)
+    case attach
     var id: String {
         switch self {
+        case .attach: "attach"
         case .share(let s): "share:\(s)"
         case .widgets: "widgets"
         case .widgets2: "widgets2"
@@ -28,6 +30,7 @@ struct GalleryView: View {
         case .widgets: WidgetsGallery(close: { dismiss() })
         case .widgets2: WidgetsGallery(close: { dismiss() }, second: true)
         case .share(let what): ShareGallery(what: what, close: { dismiss() })
+        case .attach: AttachGallery(close: { dismiss() })
         }
     }
 }
@@ -101,6 +104,24 @@ private struct WidgetsGallery: View {
             .padding(width == height ? 0 : 8)
             .frame(width: width, height: height)
             .background(Palette.tile2, in: width == height ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 14, style: .continuous)))
+    }
+}
+
+/// The share sheet's Attach over the app: a sample file on its way to a project or a task.
+private struct AttachGallery: View {
+    let close: () -> Void
+    @State private var tell = TellModel(keepsDraft: false)
+    @State private var model = AttachModel(files: [AttachModel.File(data: Data(count: 48_000), name: "Receipt for October.pdf")])
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 120)
+            ShareView(model: tell, attach: model, startsAttaching: true, signedIn: Session.shared.signedIn, close: close)
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: Radius.tile, topTrailingRadius: Radius.tile, style: .continuous))
+        }
+        .background(Palette.ink.opacity(0.3))
+        .background(Palette.board)
+        .ignoresSafeArea(edges: .bottom)
     }
 }
 

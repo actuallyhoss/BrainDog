@@ -32,6 +32,8 @@ struct Shell: View {
             TellSheet(model: app.tell)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+                /* WORDS ARE READ ON A SOLID GROUND (ops rule 1): the glass sheet let Today's red press show through them. */
+                .presentationBackground(Palette.tile)
         }
         .sheet(isPresented: $app.accountOpen) {
             AccountSheet()
@@ -137,8 +139,12 @@ struct WebPage: View {
     let stack: Stack
 
     var body: some View {
+        /* THE PAGE RUNS UNDER THE BARS, top and foot, as a native list does, and the web view's own insets keep its words
+           clear of them: no band of flat board above the page, no hard line where a scrolled card is cut off, and the
+           glass has something to float over. */
         WebView(screen)
-            .ignoresSafeArea(.container, edges: .bottom)
+            .ignoresSafeArea(.container, edges: [.top, .bottom])
+            .background(ScrollEdge(scroll: screen.webView.scrollView))
             .overlay {
                 if screen.offline { Offline { screen.reload() } }
             }
@@ -199,6 +205,38 @@ struct ScreenBar: ViewModifier {
     }
 }
 
+/// Tells the bars which scroll view is the page's: a web view's is two levels in, so the bar's soft edge (the fade under
+/// the name) and the tab bar's shrink as you scroll would otherwise never hear it.
+struct ScrollEdge: UIViewControllerRepresentable {
+    let scroll: UIScrollView
+
+    func makeUIViewController(context: Context) -> Finder { Finder(scroll: scroll) }
+    func updateUIViewController(_ controller: Finder, context: Context) {}
+
+    final class Finder: UIViewController {
+        let scroll: UIScrollView
+        init(scroll: UIScrollView) {
+            self.scroll = scroll
+            super.init(nibName: nil, bundle: nil)
+        }
+        @available(*, unavailable) required init?(coder: NSCoder) { nil }
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            /* THE SOFT EDGE, the same as a native list's: the hard one draws a line under the bar. */
+            scroll.topEdgeEffect.style = .soft
+            scroll.bottomEdgeEffect.style = .soft
+            var at: UIViewController? = parent
+            while let controller = at {
+                controller.setContentScrollView(scroll, for: .top)
+                controller.setContentScrollView(scroll, for: .bottom)
+                if controller is UINavigationController || controller.parent is UINavigationController { break }
+                at = controller.parent
+            }
+        }
+    }
+}
+
 /// The system's edge swipe back, kept on a screen whose back button is the app's own: UIKit turns it off when the back
 /// button is hidden, and this hands it a delegate that allows it whenever there is a screen to go back to.
 struct SwipeBack: UIViewControllerRepresentable {
@@ -242,6 +280,10 @@ struct RootTools: ToolbarContent {
                 Glyph.bell.image.resizable().frame(width: 22, height: 22).foregroundStyle(Palette.ink2)
             }
             .accessibilityLabel(Words.activity)
+        }
+        /* TWO CIRCLES, as the ops page draws them: one glass capsule held the two 44 apart with air only on one side. */
+        ToolbarSpacer(.fixed, placement: .topBarTrailing)
+        ToolbarItem(placement: .topBarTrailing) {
             Button {
                 app.accountOpen = true
             } label: {

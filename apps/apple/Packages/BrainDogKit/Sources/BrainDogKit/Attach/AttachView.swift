@@ -59,25 +59,28 @@ public struct AttachView: View {
                         .accessibilityAddTraits(.updatesFrequently)
                 }
 
-                if model.receipt == nil {
-                    VStack(alignment: .leading, spacing: Space.s2) {
-                        Button {
-                            Haptic.press.play()
-                            finding = false
-                            Task { await model.send() }
-                        } label: {
-                            Text(model.sending ? Words.attaching : (model.chosen.map { Words.attachPress($0.title) } ?? Words.attachTab))
-                                .lineLimit(1)
-                        }
-                        .buttonStyle(.primary)
-                        Text(Words.attachHint).font(Typeface.meta).foregroundStyle(Palette.ink3).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
             }
             .padding(Space.gutter)
             .padding(.top, Space.s2)
         }
         .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if model.receipt == nil {
+                Button {
+                    Haptic.press.play()
+                    finding = false
+                    Task { await model.send() }
+                } label: {
+                    Text(model.sending ? Words.attaching : (model.chosen.map { Words.attachPress($0.title) } ?? Words.attachTab))
+                        .lineLimit(1)
+                }
+                .buttonStyle(.primary)
+                .padding(.horizontal, Space.gutter)
+                .padding(.top, Space.s2)
+                .padding(.bottom, Space.s3)
+                .background(Palette.tile)
+            }
+        }
         .task { await model.start() }
         .animation(.easeOut(duration: 0.18), value: model.shown)
         .animation(.easeOut(duration: 0.18), value: model.receipt)

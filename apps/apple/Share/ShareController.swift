@@ -70,7 +70,16 @@ enum Shared {
                 }
             }
         }
-        return Read(text: words.joined(separator: "\n"), attachment: attachment, files: files, page: page, pageFile: pageFile)
+        /* A PAGE'S TITLE AND ITS ADDRESS ARE ONE THING SHARED, not two lines, each read as an entry of its own. */
+        var lines: [String] = []
+        for word in words {
+            if word.hasPrefix("http://") || word.hasPrefix("https://"), let last = lines.last, !last.contains("://") {
+                lines[lines.count - 1] = "\(last) \(word)"
+            } else {
+                lines.append(word)
+            }
+        }
+        return Read(text: lines.joined(separator: "\n"), attachment: attachment, files: files, page: page, pageFile: pageFile)
     }
 
     /// A page's file name: its title, or its host, made safe, as `.html`.

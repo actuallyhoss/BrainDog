@@ -1943,15 +1943,25 @@
     overflow: visible;
   }
 
+  /* THE PAGE RUNS UNDER NATIVE'S BARS, top and foot, and the work starts and ends clear of them: what the safe area says
+     they hold, and the page's own air under the last card. The scroll view has no inset of its own (`WebScreen`), because
+     the page's `scrollTo(0, 0)` means its true top only then; with an inset it landed under the bar. An older app that
+     does not run the page under its bar reports no top inset, so it is unchanged. */
   :global(html[data-shell='ios']) .body {
     overflow: visible;
-    padding-block-end: var(--tabbar);
+    padding-block: env(safe-area-inset-top, 0px) calc(var(--tabbar) + var(--sp-5));
+  }
+
+  /* NATIVE HAS NO KEYBOARD USER TO SKIP THE RAIL (there is no rail), and it took the page's focus when an alert closed. */
+  :global(html[data-shell='ios']) .skip {
+    display: none;
   }
 
   :global(html[data-shell='ios']) .bare {
     block-size: auto;
     min-block-size: 100dvh;
     overflow: visible;
+    padding-block: env(safe-area-inset-top, 0px) calc(var(--tabbar) + var(--sp-5));
   }
 
   /* A SURFACE WITH NO SHELL SCROLLS ITSELF. Same architecture as `.body` below — one container, one

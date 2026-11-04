@@ -86,7 +86,10 @@ struct Root: View {
             if !now { AppModel.shared.forget() }
         }
         #if DEBUG
-        .task { await Links.pressOnLaunch() }
+        .task {
+            LaunchMark.say("root")
+            await Links.pressOnLaunch()
+        }
         #endif
     }
 }
@@ -151,10 +154,24 @@ extension Links {
         case let p where p.hasPrefix("see:"):
             let css = String(p.dropFirst(4)).replacingOccurrences(of: "'", with: "\\'")
             _ = try? await app.current?.top?.webView.evaluateJavaScript("document.querySelector('\(css)')?.scrollIntoView({block: 'center'})")
+        case let p where p.hasPrefix("offset:"):
+            /* How the page sits pulled past its top or foot, for a shot of what shows behind it. */
+            let y = Double(p.dropFirst(7)) ?? 0
+            app.current?.top?.webView.scrollView.setContentOffset(CGPoint(x: 0, y: y), animated: false)
+        case "refreshing":
+            /* The pull's spinner as a pull leaves it, for a shot on a simulator nobody can pull. */
+            guard let scroll = app.current?.top?.webView.scrollView else { break }
+            scroll.refreshControl?.beginRefreshing()
+            scroll.setContentOffset(CGPoint(x: 0, y: -80), animated: false)
+        case let p where p.hasPrefix("js:"):
+            let result = try? await app.current?.top?.webView.evaluateJavaScript(String(p.dropFirst(3)))
+            let scroll = app.current?.top?.webView.scrollView
+            LaunchMark.say("js \(String(describing: result)) offset \(scroll?.contentOffset.y ?? -1) safe \(app.current?.top?.webView.safeAreaInsets.top ?? -1) foot \(app.current?.top?.webView.safeAreaInsets.bottom ?? -1)")
         case "end": _ = try? await app.current?.top?.webView.evaluateJavaScript("window.scrollTo(0, document.documentElement.scrollHeight)")
         case "account": app.accountOpen = true
         case "widgets": app.gallery = .widgets
         case "widgets2": app.gallery = .widgets2
+        case "attach": app.gallery = .attach
         case "lock": Lock.shared.coverForShot()
         case let p where p.hasPrefix("quick:"): QuickActions.run("dog.brain." + String(p.dropFirst(6)))
         case "tellLink": await Links.open(GlanceLink.tell)
@@ -167,6 +184,7 @@ extension Links {
         case "answer":
             if let q = app.needs.needs.open.first(where: { $0.quickAnswer != nil }), let option = q.quickAnswer { await app.needs.answer(q, with: option) }
         case "later": app.needs.putting = app.needs.needs.open.first
+        case "openFirst": if let q = app.needs.needs.open.first { app.needs.onOpen?("/decide/\(q.id)") }
         default:
             app.open(step)
             if let y {
@@ -183,7 +201,8 @@ extension Links {
 enum Bars {
     static func dress() {
         let bar = UINavigationBarAppearance()
-        bar.configureWithDefaultBackground()
+        /* NO BACKGROUND OF ITS OWN AT ANY SCROLL: the system's soft edge over the page is the whole of it on iOS 26. */
+        bar.configureWithTransparentBackground()
         bar.shadowColor = .clear
         bar.titleTextAttributes = [.font: Typeface.navTitleFont(), .foregroundColor: PlatformPalette.ink]
         bar.largeTitleTextAttributes = [.font: Typeface.navTitleFont(), .foregroundColor: PlatformPalette.ink]

@@ -35,6 +35,9 @@ nonisolated public struct Glance: Codable, Sendable, Equatable {
     public struct Due: Codable, Sendable, Equatable, Identifiable, Hashable {
         public let text: String
         public let at: String
+        /// When it falls due as a day ("Thu 5 Nov"), and its amount with its sign ("−$2,600"): a date on the money, not a reminder.
+        public var day: String? = nil
+        public var figure: String? = nil
         public var id: String { "\(at) \(text)" }
     }
 
@@ -58,15 +61,15 @@ nonisolated public struct Glance: Codable, Sendable, Equatable {
             Question(id: "SG3", question: "Keep the photo shoot in the spring launch?"),
         ],
         figures: [
-            Figure(metric: "cash-now", label: "Cash now", said: "GBP 12,480", met: true),
+            Figure(metric: "cash-now", label: "Cash now", said: "£12,480", met: true),
             Figure(metric: "runway-days", label: "Days the money lasts", said: "119 days", met: false),
-            Figure(metric: "owed-to-me", label: "Owed to you", said: "GBP 4,800", met: nil),
+            Figure(metric: "owed-to-me", label: "Owed to you", said: "£4,800", met: nil),
         ],
         record: "The Studio",
         readAt: Date(),
         due: [
-            Due(text: "Pay the studio rent, GBP 1,850, due Friday", at: "2026-11-03T08:00:00Z"),
-            Due(text: "Send Acme the November invoice", at: "2026-11-03T08:00:00Z"),
+            Due(text: "Studio rent", at: "2026-11-06", day: "Fri 6 Nov", figure: "−£1,850"),
+            Due(text: "Invoice to Acme", at: "2026-11-09", day: "Mon 9 Nov", figure: "+£4,800"),
         ]
     )
 }
@@ -80,6 +83,9 @@ public extension Calls {
             "blocks": .array([
                 ["kind": "queue", "source": "governance.open", "limit": .number(3)],
                 ["kind": "stat", "source": "figures.home"],
+                /* WHAT TODAY'S COMING UP READS: dates on the money in the next two weeks, for Due next. */
+                ["kind": "timeline", "source": "deadlines", "horizon": .number(14), "where": "amount is set, day after -1d", "limit": .number(4),
+                 "columns": .array([["field": "day"], ["field": "title"], ["field": "amount"]])],
             ]),
         ]
         async let reminders = try? Client.shared.call("todayReminders", [:], as: JSONValue.self)
@@ -94,11 +100,19 @@ public extension Calls {
         let waiting = max(Int(queue?["matched"]?.number ?? 0), questions.count)
         let currency = Kept.load("boot", as: Boot.self)?.currency
         let figures = (stat?["readings"]?.array ?? []).compactMap { Reading.figure($0, currency: currency) }
-        let due = (await reminders)?["lines"]?.array?.compactMap { r -> Glance.Due? in
+        let told = (await reminders)?["lines"]?.array?.compactMap { r -> Glance.Due? in
             guard let text = r["text"]?.string, let at = r["at"]?.string else { return nil }
             return Glance.Due(text: text, at: at)
+        } ?? []
+        let dated = (blocks.first { $0["source"]?.string == "deadlines" }?["rows"]?.array ?? []).compactMap { row -> Glance.Due? in
+            guard let fields = row["fields"], let title = fields["title"]?.string, let day = fields["day"]?.string else { return nil }
+            var figure: String?
+            if let amount = fields["amount"]?["amount"]?.number, let code = fields["amount"]?["currency"]?.string {
+                figure = (fields["direction"]?.string == "in" ? "+" : "−") + Money.said(minor: abs(amount), currency: code)
+            }
+            return Glance.Due(text: title, at: day, day: Said.date(day).map { Said.day($0, weekday: true) }, figure: figure)
         }
-        return Glance(waiting: waiting, questions: questions, figures: figures, record: Kept.load("boot", as: Boot.self)?.record?.name, readAt: Date(), due: due ?? [])
+        return Glance(waiting: waiting, questions: questions, figures: figures, record: Kept.load("boot", as: Boot.self)?.record?.name, readAt: Date(), due: told + dated)
     }
 }
 
@@ -196,6 +210,8 @@ nonisolated public enum Money {
         "PYG": 0, "RWF": 0, "UGX": 0, "UYI": 0, "VND": 0, "VUV": 0, "XAF": 0, "XOF": 0, "XPF": 0,
     ]
 
+    static let symbols: [String: String] = ["USD": "$", "GBP": "£", "EUR": "€", "JPY": "¥", "INR": "₹", "CAD": "CA$", "AUD": "A$"]
+
     public static func said(minor: Double, currency: String) -> String {
         let code = currency.uppercased()
         let exp = exponent[code] ?? 2
@@ -214,6 +230,8 @@ nonisolated public enum Money {
         let grouped = groups.joined(separator: ",")
         let body = exp == 0 || part.allSatisfy({ $0 == "0" }) ? grouped : "\(grouped).\(part)"
         let zero = body.allSatisfy { $0 == "0" || $0 == "," || $0 == "." }
+        /* THE SIGN THE PAGE DRAWS WHERE THERE IS ONE ("$48,210", as Today says it); a code that has none stays a code. */
+        if let symbol = symbols[code] { return "\(negative && !zero ? "−" : "")\(symbol)\(body)" }
         return "\(code) \(negative && !zero ? "−" : "")\(body)"
     }
 }

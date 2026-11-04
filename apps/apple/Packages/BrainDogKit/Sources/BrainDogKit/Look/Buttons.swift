@@ -11,24 +11,29 @@ import SwiftUI
 /// A PRESS IS A FILL CHANGE AND A LITTLE GIVE: scale .98 over 70 ms, and only the fill under Reduce Motion. Nothing lifts.
 public struct BDButtonStyle: ButtonStyle {
     public enum Weight: Sendable { case primary, ink, quiet, bare }
+    /// The page tier, or the panel tier: a control in a row or a card head (28, 12 in), keeping its 44 press under a thumb.
+    public enum Size: Sendable { case regular, small }
 
     let weight: Weight
+    let size: Size
     let onTile: Bool
     let full: Bool
 
-    public init(_ weight: Weight, onTile: Bool = false, full: Bool = true) {
+    public init(_ weight: Weight, size: Size = .regular, onTile: Bool = false, full: Bool = true) {
         self.weight = weight
+        self.size = size
         self.onTile = onTile
         self.full = full
     }
 
     public func makeBody(configuration: Configuration) -> some View {
-        Pressed(configuration: configuration, weight: weight, onTile: onTile, full: full)
+        Pressed(configuration: configuration, weight: weight, size: size, onTile: onTile, full: full)
     }
 
     private struct Pressed: View {
         let configuration: ButtonStyleConfiguration
         let weight: Weight
+        let size: Size
         let onTile: Bool
         let full: Bool
         @Environment(\.accessibilityReduceMotion) private var still
@@ -40,8 +45,8 @@ public struct BDButtonStyle: ButtonStyle {
                 .font(Typeface.control)
                 .foregroundStyle(ink)
                 .lineLimit(1)
-                .padding(.horizontal, weight == .bare ? Space.s3 : Space.s4)
-                .frame(maxWidth: full ? .infinity : nil, minHeight: Space.control)
+                .padding(.horizontal, weight == .bare || size == .small ? Space.s3 : Space.s4)
+                .frame(maxWidth: full ? .infinity : nil, minHeight: size == .small ? 28 : Space.control)
                 .background {
                     ZStack {
                         Capsule(style: .continuous).fill(fill(down))
@@ -50,10 +55,21 @@ public struct BDButtonStyle: ButtonStyle {
                     .accessibilityHidden(true)
                 }
                 .elevation(weight == .primary && enabled ? .raised : .flat)
+                .padding(.vertical, reach)
                 .contentShape(Capsule(style: .continuous))
+                .padding(.vertical, -reach)
                 .scaleEffect(down && !still ? 0.98 : 1)
                 .opacity(enabled ? 1 : 0.5)
                 .animation(.easeOut(duration: 0.07), value: down)
+        }
+
+        /// How far a small control's press reaches past what is drawn, up and down.
+        private var reach: CGFloat {
+            #if os(iOS)
+            size == .small ? (Space.tap - 28) / 2 : 0
+            #else
+            0
+            #endif
         }
 
         private var ink: Color {
@@ -136,8 +152,12 @@ public enum Space {
     public static let sectionGap: CGFloat = 32
     /// A section's heading to its cards (`--section-head-gap`).
     public static let sectionHeadGap: CGFloat = 12
-    /// A target under a thumb, and a row's least height.
+    /// A target under a thumb, and a row's least height. A pointer needs less, so a Mac's row and field are desk sized.
+    #if os(macOS)
+    public static let tap: CGFloat = 36
+    #else
     public static let tap: CGFloat = 44
+    #endif
     /// A row's block padding: 10 above and below its words or its well, and the row is `tap` tall at least, so a subject
     /// with a meta line is 56 (`--row-h-2`), a one-line row with a 32 well 52, a bare line 44; never 44 plus padding.
     public static let rowY: CGFloat = 10

@@ -30,12 +30,46 @@ const opt = (name) => {
 };
 const only = opt('only')?.split(',') ?? null;
 const themes = (opt('themes') ?? 'light,dark').split(',');
-const out = join(homedir(), 'Developer', 'braindog', '.notes', 'shots', 'apps', milestone);
+/* `--out <folder>`: where the pictures go, for a lane that keeps its own. */
+const out = opt('out') ?? join(homedir(), 'Developer', 'braindog', '.notes', 'shots', 'apps', milestone);
 /* `--server http://localhost:5203`: another lane's web dev server may hold 5183. */
 const server = opt('server') ?? 'http://localhost:5183';
 
 /** Each screen: its name, the launch press (`go:` steps joined by `;;`, three seconds apart), and how long to wait. */
 const WALKS = {
+  /* EVERY SCREEN ONCE, on Maya's demo record (`demo-record.mjs make`): what a polish pass looks at. */
+  all: [
+    ['today', 'go:tab:/', 9],
+    ['today-end', 'go:tab:/;;end', 12],
+    ['needs', 'go:tab:/decide', 8],
+    ['card', 'go:tab:/decide;;openFirst', 13],
+    ['money', 'go:tab:/p/money', 9],
+    ['money-end', 'go:tab:/p/money;;end', 12],
+    ['agents', 'go:tab:/p/agents', 9],
+    ['projects', 'go:/p/portfolio', 11],
+    ['project', 'go:/p/tidepool', 11],
+    ['people', 'go:/p/people', 11],
+    ['person', 'go:/r/people/8', 11],
+    ['tasks', 'go:/r/tasks', 11],
+    ['task', 'go:/r/tasks/13', 11],
+    ['activity', 'go:/audit', 11],
+    ['slash', 'go:/slash', 11],
+    ['search-empty', 'go:search:', 8],
+    ['search-results', 'go:search:north', 10],
+    ['account', 'go:account', 8],
+    ['settings', 'go:settings', 8],
+    ['settings-area', 'go:/settings/notifications', 12],
+    ['tell-empty', 'go:tell:', 7],
+    ['tell-typed', 'go:tell:New project: autumn fair|Paid $120 for the domain renewal yesterday|Call June tomorrow', 8],
+    ['ask', 'go:ask:What is due this week?', 7],
+    ['widgets', 'go:widgets', 9],
+    ['widgets2', 'go:widgets2', 9],
+    ['share-link', 'go:share:Read before the launch https://www.example.com/spring-launch-checklist', 9],
+    ['share-photo', 'go:share:Paid $34 for lunch with June today|photo', 9],
+    ['lock-cover', 'go:tab:/;;lock', 8],
+    ['attach', 'go:attach', 9],
+    ['bounce', 'go:tab:/;;offset:-260', 12],
+  ],
   m2: [
     ['today', 'go:tab:/', 9],
     ['needs', 'go:tab:/decide', 8],

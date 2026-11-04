@@ -25,7 +25,7 @@ public struct Row: View {
             if let glyph { IconWell(glyph, size: .l, tone: tone) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(subject).font(Typeface.bodyMedium).foregroundStyle(Palette.ink).lineLimit(2).leading(.row)
-                if let detail { Text(detail).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(1) }
+                if let detail { Text(detail).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(2).leading(.meta) }
             }
             Spacer(minLength: Space.s2)
             if figure != nil || when != nil {

@@ -27,7 +27,7 @@
     display: none;
   }
 
-  /* 44 ON BOTH AXES UNDER A THUMB, IN THE ACCENT: the head's one primary as a square. */
+  /* 44 ON BOTH AXES UNDER A THUMB, IN THE ACCENT: the head's one primary as a circle, as every "+" is. */
   @media (width < 640px) {
     .capture-open {
       display: inline-grid;
@@ -37,7 +37,7 @@
       padding: 0;
       background: var(--red-fill);
       border: 0;
-      border-radius: var(--r-ctl);
+      border-radius: var(--r-pill);
       color: var(--on-red);
       cursor: pointer;
     }

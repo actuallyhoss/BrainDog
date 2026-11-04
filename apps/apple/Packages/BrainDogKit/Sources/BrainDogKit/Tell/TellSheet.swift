@@ -352,7 +352,16 @@ public struct TellSheet: View {
                         Text(Words.tellTitle).font(Typeface.heading).foregroundStyle(Palette.ink)
                     }
                     Spacer(minLength: 0)
+                    /* A MAC WINDOW HAS ITS OWN CLOSE, and Escape does what Done did; a sheet has neither. */
+                    #if os(iOS)
                     Button(Words.done) { if let done { done() } else { dismiss() } }.buttonStyle(.bare)
+                    #else
+                    if !asks || done == nil {
+                        Button(Words.done) { if let done { done() } else { dismiss() } }.buttonStyle(.bare)
+                    } else {
+                        Button("") { done?() }.keyboardShortcut(.cancelAction).opacity(0).frame(width: 0, height: 0).accessibilityHidden(true)
+                    }
+                    #endif
                 }
 
                 field
@@ -377,23 +386,30 @@ public struct TellSheet: View {
                         .accessibilityAddTraits(.updatesFrequently)
                 }
 
-                VStack(alignment: .leading, spacing: Space.s2) {
-                    Button {
-                        Haptic.press.play()
-                        Task { await model.press() }
-                    } label: {
-                        Text(model.mode == .ask ? Words.askIt : (model.sending ? Words.adding : Words.add))
-                    }
-                    .buttonStyle(.primary)
-                    if model.mode == .tell {
-                        Text(Words.addNothingYet).font(Typeface.meta).foregroundStyle(Palette.ink3)
-                    }
-                }
             }
             .padding(Space.gutter)
             .padding(.top, Space.s2)
         }
         .scrollDismissesKeyboard(.interactively)
+        /* THE ONE PRIMARY STAYS IN REACH, over the sheet's foot and over the keyboard, however long "That becomes" runs. */
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if model.receipt == nil || !model.text.isEmpty {
+                Button {
+                    Haptic.press.play()
+                    Task { await model.press() }
+                } label: {
+                    Text(model.mode == .ask ? Words.askIt : (model.sending ? Words.adding : Words.add))
+                }
+                .buttonStyle(.primary)
+                #if os(macOS)
+                .keyboardShortcut(.return, modifiers: .command)
+                #endif
+                .padding(.horizontal, Space.gutter)
+                .padding(.top, Space.s2)
+                .padding(.bottom, Space.s3)
+                .background(Palette.tile)
+            }
+        }
         .onChange(of: model.mode) { _, _ in model.opened(mode: model.mode) }
         /* THE KEYBOARD COMES UP FOR AN EMPTY FIELD; words that arrived with it (a share, Siri) are read first. */
         .onAppear { typing = model.receipt == nil && model.text.isEmpty }

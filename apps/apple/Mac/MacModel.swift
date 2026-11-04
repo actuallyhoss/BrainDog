@@ -89,6 +89,12 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
         NotificationCenter.default.addObserver(forName: NSApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.keepPicture() }
         }
+        desk.onDrawn = { [weak self] in
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.5))
+                self?.keepPicture()
+            }
+        }
         desk.onAsk = { [weak self] ask in self?.heard(ask) }
         desk.onFile = { [weak self] file in self?.keep(file) }
         desk.onPreview = { [weak self] file in self?.previewing = file }
@@ -256,6 +262,10 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
         tell.opened(prefill: prefill, mode: mode)
         if !Self.quiet { NSApp.activate() }
         openWindow?("tell")
+    }
+
+    func toggleRail() {
+        desk.webView.evaluateJavaScript("var b=document.querySelector('.s-hide');if(b)b.click();else window.dispatchEvent(new KeyboardEvent('keydown',{key:'[',bubbles:true}))")
     }
 
     func back() { desk.webView.goBack() }

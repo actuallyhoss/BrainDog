@@ -8,6 +8,7 @@ struct AccountSheet: View {
     @State private var reach: [Reach] = []
     @State private var opening: String?
     @State private var said: String?
+    @State private var tall: CGFloat = 0
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -17,7 +18,6 @@ struct AccountSheet: View {
                     Face(app.boot?.me?.name ?? "B", side: 44)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(app.boot?.me?.name ?? Words.account).font(Typeface.heading).foregroundStyle(Palette.ink)
-                        Text(Session.deviceLabel).font(Typeface.meta).foregroundStyle(Palette.ink3)
                     }
                     Spacer(minLength: 0)
                     Button(Words.done) { dismiss() }.buttonStyle(.bare)
@@ -60,35 +60,44 @@ struct AccountSheet: View {
                     }
                 }
 
-                VStack(spacing: Space.s2) {
+                VStack(spacing: 0) {
                     Button {
+                        Haptic.press.play()
                         dismiss()
                         app.current?.path.append(.settings)
                     } label: {
-                        HStack(spacing: Space.s2) {
-                            Glyph.settings.image.resizable().frame(width: 18, height: 18).accessibilityHidden(true)
-                            Text(Words.settings)
-                            Spacer(minLength: 0)
+                        HStack(spacing: Space.s3) {
+                            Row(Words.settings, glyph: .settings)
+                            Glyph.chevron.image.resizable().frame(width: 14, height: 14).foregroundStyle(Palette.ink3).accessibilityHidden(true)
                         }
                     }
-                    .buttonStyle(.quiet)
-
-                    Button(Words.signOut) {
+                    .buttonStyle(.plain)
+                    Hairline(leading: 32 + Space.s3)
+                    Button {
                         Task {
                             dismiss()
                             /* THIS PHONE STOPS BEING RUNG ON THIS BRAINDOG FIRST, while the session can still say so (M4). */
                             await Push.unregister(record: app.boot?.record?.slug)
                             await Session.shared.signOut()
                         }
+                    } label: {
+                        Row(Words.signOut, glyph: .external)
                     }
-                    .buttonStyle(.quiet)
+                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, Space.tilePad)
+                .background(Palette.tile, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
             }
             .padding(Space.gutter)
             .padding(.top, Space.s2)
+            /* THE SHEET IS AS TALL AS WHAT IT HOLDS, with no blurred half under Sign out. */
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { tall = $0 }
         }
-        .presentationDetents([.medium, .large])
+        .scrollBounceBehavior(.basedOnSize)
+        .background(Ground())
+        .presentationDetents(tall > 0 ? [.height(tall + Space.s4)] : [.medium])
         .presentationDragIndicator(.visible)
+        .presentationBackground(Palette.board)
         .task { reach = (try? await Calls.reach()) ?? [] }
     }
 

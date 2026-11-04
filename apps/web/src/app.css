@@ -58,6 +58,36 @@
      only what the safe area says is under native's, which native reports and the web never measures. */
   html[data-shell='ios'] {
     --tabbar: env(safe-area-inset-bottom, 0px);
+    /* AND NATIVE'S NAV BAR: a heading kept in view, or a place scrolled to, stops under it. */
+    scroll-padding-block-start: calc(env(safe-area-inset-top, 0px) + var(--sp-3));
+  }
+
+  /* IN THE APPS THE PAGE IS AN APP'S SCREEN, NOT A DOCUMENT. On the iPhone a long press on a row, a label or a button does
+     not start selecting words or offer a link's callout, and a press never flashes a grey box; what a person reads or
+     types at length (a paragraph, a note, a field, code) still selects. */
+  html[data-shell='ios'] {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  html[data-shell='ios'] :is(input, textarea, [contenteditable], p, blockquote, pre, code, td, dd) {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+
+  /* ON THE MAC THE CHROME IS CHROME: a label in the rail or a button does not select when dragged across, and takes the
+     arrow as a native control does, and the system draws its own scrollbars (a custom colour turns the overlay ones off). */
+  html[data-shell='mac'] :is(nav, aside, button, summary, label, [role='button'], [role='tab'], [role='menuitem'], [role='switch']) {
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  html[data-shell='mac'] * {
+    scrollbar-color: auto;
   }
 
   /* A TAP IS A TAP AT ONCE: no wait to see whether it was the first half of a double-tap zoom, which a phone browser

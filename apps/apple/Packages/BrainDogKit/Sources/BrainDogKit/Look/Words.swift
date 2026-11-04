@@ -122,7 +122,7 @@ public enum Words {
     public static let tell = "Tell"
     public static let ask = "Ask"
     public static let tellLine = "Tell BrainDog…"
-    public static let tellLike = "Paid £120 for the domain renewal yesterday"
+    public static let tellLike = "Call June tomorrow, or paid 120 for hosting"
     public static let askLike = "What is due this week?"
     public static let becomes = "That becomes"
     public static let addNothingYet = "Nothing is added until you press Add."
@@ -180,14 +180,14 @@ public enum Words {
     // On this iPhone (Settings root, M4 and M5)
     public static let onThisPhone = "On this \(device)"
     public static let notifications = "Notifications"
-    public static let notificationsOn = "On. BrainDog rings this \(device) for what you chose in Notifications."
-    public static let notificationsOff = "Off. Turn them on to hear when something needs you."
-    public static let notificationsDenied = "Off in the \(device)'s Settings, under Notifications."
+    public static let notificationsOn = "On, for what you chose in Notifications."
+    public static let notificationsOff = "Off. Turn them on to hear when you are needed."
+    public static let notificationsDenied = "Off in the \(device)'s own Settings."
     public static let turnOn = "Turn on"
     public static let saysWhat = "Say what it is about"
-    public static let saysWhatLine = "Read the question on this \(device) and show its words. Off, a notification says only what kind of thing it is."
+    public static let saysWhatLine = "Show the question itself, not only that one came."
     public static let faceLock = "Lock with Face ID"
-    public static let faceLockLine = "Ask for Face ID when BrainDog opens, and after five minutes away."
+    public static let faceLockLine = "On opening, and after five minutes away."
     public static let faceLockUnavailable = "This \(device) has no Face ID or passcode set up."
     public static let unlock = "Unlock"
     public static let locked = "BrainDog is locked"
@@ -195,7 +195,7 @@ public enum Words {
 
     // Widgets (M5)
     public static let dueNext = "Due next"
-    public static let nothingDue = "Nothing due on Today."
+    public static let nothingDue = "Nothing falls due in the next two weeks."
     public static let todayNumber = "Today number"
     public static let pickNumber = "Pick a number in the widget's settings."
 
