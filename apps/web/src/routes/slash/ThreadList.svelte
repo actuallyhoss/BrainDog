@@ -236,6 +236,11 @@
     border-radius: var(--r-ctl);
   }
 
+  /* A ROW'S MENU HANGS OVER THE ROWS AFTER IT. */
+  .t-line:has(:global([aria-expanded='true'])) {
+    z-index: 2;
+  }
+
   .thread {
     display: flex;
     align-items: center;
