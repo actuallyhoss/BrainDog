@@ -211,10 +211,8 @@ test('BOOT CARRIES THE SHELL: the record, who is asking, the rail, the counts an
   const boot = value<Boot>(await api.boot(bo));
   /* NO HOME CURRENCY IS CHOSEN ON THIS RECORD, and the shell is told so rather than handed a guess. */
   assert.deepEqual(boot.record, { slug: 'the-studio', name: 'The Studio', locale: 'en', currency: null, money: [] });
-  const { levels, prefs, ...me } = boot.me;
-  assert.deepEqual(me, { kind: 'person', person: 'p_2', name: 'Bo', level: 'read' });
-  /* BOOT WRITES WHEN SHE OPENED IT, for People to say, and nothing else is kept for her yet. */
-  assert.deepEqual(Object.keys(prefs), ['record.opened']);
+  const { levels, ...me } = boot.me;
+  assert.deepEqual(me, { kind: 'person', person: 'p_2', name: 'Bo', level: 'read', prefs: {} });
   /* AND THE LEVEL ON EACH LIST SHE HOLDS, her record-wide `read` on both (`me.levels`). */
   assert.equal(levels.obligations, 'read', 'boot did not say the level Bo holds on Obligations');
   assert.equal(levels.diary, 'read');

@@ -10975,7 +10975,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               ...(label === null || label.trim() === '' ? {} : { app: agentSaid(label) }),
             }))(kernel.findRun(ctx.session ?? {}, p.id), sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', p.id)?.label ?? null)
           : {}),
-        ...(p.kind === 'person' ? { prefs: ((own) => (Object.hasOwn(own, OWN_TODAY) ? Object.fromEntries(Object.entries(own).filter(([k]) => k !== OWN_TODAY)) : own))(prefs as Record<string, unknown>) as Prefs } : {}),
+        ...(p.kind === 'person' ? { prefs: ((own) => (Object.hasOwn(own, OWN_TODAY) || Object.hasOwn(own, OPENED) ? Object.fromEntries(Object.entries(own).filter(([k]) => k !== OWN_TODAY && k !== OPENED)) : own))(prefs as Record<string, unknown>) as Prefs } : {}),
       },
       pages,
       pagesByRow,

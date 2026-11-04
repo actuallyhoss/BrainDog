@@ -24,11 +24,7 @@ type Api = Awaited<ReturnType<typeof record>>['api'];
 const prefsOf = async (api: Api, ctx: CallContext) => {
   const out = await api.boot(ctx);
   assert.ok(out.ok, JSON.stringify(out));
-  /* LESS WHEN THEY LAST OPENED IT, which `boot` itself writes for People to say (`markOpened`): not one of their choices. */
-  const held = out.value.me.prefs as Record<string, unknown> | undefined;
-  if (held === undefined) return held;
-  const { 'record.opened': _opened, ...prefs } = held;
-  return prefs;
+  return out.value.me.prefs;
 };
 const refusal = (r: { ok: boolean }) => (r as unknown as { refusal: { code: string; fix: string } }).refusal;
 
