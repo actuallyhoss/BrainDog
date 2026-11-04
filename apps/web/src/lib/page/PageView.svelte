@@ -1058,7 +1058,9 @@
   function pullStart(e: TouchEvent): void {
     const t = e.target as HTMLElement | null;
     const inner = t?.closest?.('input, textarea, select, [contenteditable], dialog, [role="dialog"]');
-    pullFrom = mode === 'preview' || pullBusy || inner || window.scrollY > 0 || e.touches.length !== 1 ? null : e.touches[0]!.clientY;
+    /* IN THE APP THE PULL IS NATIVE'S, and asks for this same reread: a second one here drew a pill over the nav bar. */
+    const native = document.documentElement.dataset.shell !== undefined;
+    pullFrom = native || mode === 'preview' || pullBusy || inner || window.scrollY > 0 || e.touches.length !== 1 ? null : e.touches[0]!.clientY;
   }
   function pullMove(e: TouchEvent): void {
     if (pullFrom === null) return;

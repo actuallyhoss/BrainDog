@@ -73,6 +73,12 @@
     user-select: none;
   }
 
+  /* A FIGURE THAT IS A DOOR HAS NO BOX ON A PRESS: its wash is square, a touch leaves `:hover` on after the finger has gone,
+     and `:active` stays through a drag that started on it, so scrolling from Cash now lit the whole card. */
+  html[data-shell='ios'] a.cell:is(:hover, :active) {
+    background: none;
+  }
+
   html[data-shell='ios'] :is(input, textarea, [contenteditable], p, blockquote, pre, code, td, dd) {
     -webkit-user-select: text;
     user-select: text;

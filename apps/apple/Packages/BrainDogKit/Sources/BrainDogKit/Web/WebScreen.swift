@@ -42,6 +42,10 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     @ObservationIgnored public var onAsk: ((ShellAsk) -> Void)?
     /// The page has drawn for the first time since it loaded, for whoever keeps its picture.
     @ObservationIgnored public var onDrawn: (() -> Void)?
+    #if os(iOS)
+    public private(set) var restsAtTop = true
+    @ObservationIgnored private var topWatch: NSKeyValueObservation?
+    #endif
     /// A file the page handed over (an export, a backup, an attachment's Download), saved where the app can share it.
     @ObservationIgnored public var onFile: ((URL) -> Void)?
     /// A file the page opened to be looked at (an attached PDF's "Open full screen"): shown natively, in Quick Look.
@@ -105,6 +109,13 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         /* NO LINK PREVIEW: a long press on a row of the app is not a web page's link. */
         webView.allowsLinkPreview = false
         webView.pageZoom = Self.textScale
+        /* WHETHER THE PAGE RESTS AT ITS TOP, for the tab bar (`Shell`): told only when it changes, never per frame. */
+        topWatch = webView.scrollView.observe(\.contentOffset, options: [.new]) { [weak self] scroll, _ in
+            let top = scroll.contentOffset.y <= 1
+            MainActor.assumeIsolated {
+                if self?.restsAtTop != top { self?.restsAtTop = top }
+            }
+        }
         let refresh = UIRefreshControl()
         refresh.addTarget(self, action: #selector(pulled(_:)), for: .valueChanged)
         webView.scrollView.refreshControl = refresh
@@ -449,7 +460,13 @@ final class PhoneWebView: WKWebView {
     override func safeAreaInsetsDidChange() {
         super.safeAreaInsetsDidChange()
         scrollView.verticalScrollIndicatorInsets = UIEdgeInsets(top: safeAreaInsets.top, left: 0, bottom: safeAreaInsets.bottom, right: 0)
-        scrollView.refreshControl?.bounds.origin.y = -safeAreaInsets.top
+        /* THE PULL'S SPINNER DRAWS UNDER THE BAR: left alone it turned on top of the Dynamic Island. Its own frame and bounds
+           are the control's to set during a pull, so what it draws is moved, and over the page, which would cover it. */
+        if let refresh = scrollView.refreshControl {
+            refresh.clipsToBounds = false
+            refresh.layer.zPosition = 1
+            refresh.layer.sublayerTransform = CATransform3DMakeTranslation(0, safeAreaInsets.top, 0)
+        }
     }
 }
 #endif

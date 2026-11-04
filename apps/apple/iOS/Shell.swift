@@ -25,7 +25,9 @@ struct Shell: View {
                 Label { Text(Words.searchTab) } icon: { Glyph.search.tabImage }
             }
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
+        /* AT THE PAGE'S TOP THE BAR STAYS WHOLE: a pull's bounce back counted as scrolling down, and left it shrunk with
+           nothing above it to read. Past the top it steps aside as usual. */
+        .tabBarMinimizeBehavior(app.current?.top?.restsAtTop == true ? .never : .onScrollDown)
         .modifier(TellAccessory(on: app.canTell, stepsAside: app.current?.top?.modal == true) { app.openTell() })
         .sensoryFeedback(.selection, trigger: app.selected)
         .sheet(isPresented: $app.tellOpen) {
