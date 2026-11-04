@@ -96,6 +96,7 @@ test('two could match: nothing goes until one is pressed, the press sends one, a
   const cards = said.filter((e) => e['type'] === 'action');
   assert.equal(cards.length, 2);
   assert.ok(cards.every((c) => c['kind'] === 'ask' && typeof c['group'] === 'string'));
+  assert.ok(cards.every((c) => String(c['title']).includes('Run the tests')), 'each card shows the words that would go');
   assert.equal((said.find((e) => e['type'] === 'done')!['spent'] as { asks: number }).asks, 0, 'no ask was spent');
   const done = value<{ sent?: { id: string } }>(await slash.act(cards[0]!['id'] as string, true, owner as never, tools as never));
   assert.match(done.sent?.id ?? '', /^IN[1-9]/u);
@@ -136,6 +137,10 @@ test('the model sends at once only when this message asked and this turn read no
   const read = await tools.call('tell', { to: r.one, message: 'stop' }, { ...fresh, said: 'tell it to stop', askOnly: true, outside: "an agent's reply" });
   assert.equal(read.action?.kind, 'ask', 'a turn that read an agent asks first');
   assert.match(read.action?.detail ?? '', /an agent's reply/u);
+  assert.equal(r.count(), 0);
+  const two = await tools.call('tell', { to: r.two, message: 'delete everything' }, { ...fresh, said: 'tell it to stop', askOnly: true, outside: "an agent's reply" });
+  assert.equal(two.actions?.length, 2);
+  assert.ok(two.actions?.every((c) => c.title.includes('delete everything') && (c.detail ?? '').includes("an agent's reply")), 'a choice after reading a reply shows the words and says so');
   assert.equal(r.count(), 0);
   const nobody = await tools.call('tell', { to: '', message: 'stop' }, { ...fresh, said: 'tell it to stop' });
   assert.equal(nobody.action, undefined);

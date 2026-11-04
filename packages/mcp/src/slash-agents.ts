@@ -545,7 +545,12 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
     if (named.length === 0) return nobody(mentioned ?? to, note, targets, attach, step, roster_);
     if (named.length > 1) {
       const group = `who-${note.length}-${to.length}`;
-      const actions = named.slice(0, CARDS_MOST).map((t) => cardFor(t, note, attach, group, roster_));
+      /* AND WHERE IT CAME FROM, WHEN IT WAS NOT THEIR OWN SENTENCE: the model chose these words after reading an agent's. */
+      const read = run !== null && run.askOnly ? `This turn read ${run.outside ?? 'what an agent wrote'}, so check these words are yours. ` : '';
+      const actions = named.slice(0, CARDS_MOST).map((t) => {
+        const card = cardFor(t, note, attach, group, roster_);
+        return read === '' ? card : { ...card, detail: `${read}${card.detail ?? ''}`.trim() };
+      });
       return {
         text: `${named.length === 2 ? 'Two' : named.length === 3 ? 'Three' : 'Several'} could match. Which one should get it? Nothing has gone yet.`,
         actions,
@@ -582,7 +587,8 @@ export function agentReads<C>(surface: AgentSurface<C>, ctx: C, now: () => numbe
     const known = roll.find((l) => l.run === t.run);
     const doing = (t.detail ?? '').replace(/[.]$/u, '');
     const detail = [doing === '' ? '' : `${doing}.`, known === undefined ? '' : known.word === 'working' ? `Heard ${agoSaid(known.heardMs)}.` : `Last heard ${agoSaid(known.heardMs)}.`].filter((s) => s !== '').join(' ');
-    return { kind: 'ask', title: `Send to ${t.label}`, ...(detail === '' ? {} : { detail: clip(detail, 180) }), op: { ...opFor(t, note, attach), group }, group, ...(t.run ? { href: `/r/session/${t.run.slice(1)}` } : {}) };
+    /* WHAT WOULD GO STANDS ON THE CARD, the same as who: a press never sends words the person has not been shown. */
+    return { kind: 'ask', title: `Send to ${t.label}: “${clip(note, 120)}”`, ...(detail === '' ? {} : { detail: clip(detail, 180) }), op: { ...opFor(t, note, attach), group }, group, ...(t.run ? { href: `/r/session/${t.run.slice(1)}` } : {}) };
   };
 
   /** Nobody fits: say so, say who was last there, and offer to leave it for whoever starts next, which is a real door. */
