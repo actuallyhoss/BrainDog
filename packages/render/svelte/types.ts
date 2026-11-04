@@ -129,7 +129,7 @@ export function cardCells(row: TableRow, columns: readonly Column[], plan: CardP
 
 /**
  * WHEN A CARD SAYS A COLUMN'S NAME (audit 31 Oct, B11). Most values say what they are without one: a day reads as a day,
- * "Every month" as how often, the figure beside a title as that thing's amount. Two kinds do not. A BARE COUNT is a
+ * "Every month" as how often, the figure beside a title as that thing's amount. Two sorts do not. A BARE COUNT is a
  * number with nothing to say what it counts, so a savings circle's card read "£200" over "10 4", its people and your
  * turn; it reads "People 10" and "Your turn 4". And A SECOND FIGURE beside the first: a subscription that went up read
  * "£34" over "£39", which is the price it was and the price it is, so both are named, "Was £34" and "Now £39".
