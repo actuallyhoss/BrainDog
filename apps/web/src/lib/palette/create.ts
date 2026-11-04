@@ -286,5 +286,5 @@ export const PEOPLE_IMPORT: Command = {
   href: '/add/contacts',
   group: copy.commands,
   icon: 'upload',
-  aliases: ['contacts', 'vcard', 'vcf', 'address book', 'import people'],
+  aliases: ['vcard', 'vcf', 'address book', 'import people'],
 };
