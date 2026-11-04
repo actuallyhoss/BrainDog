@@ -108,7 +108,7 @@ const text = (html: string): string =>
 test('the built home page has one h1, the headline', when(NO_BUILD), () => {
   const h1s = [...page().matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)];
   assert.equal(h1s.length, 1, 'one h1');
-  assert.equal(text(h1s[0]![1]!).trim(), 'Stop re-explaining your work.');
+  assert.equal(text(h1s[0]![1]!).trim(), 'Your agents keep track. You make the calls.');
   assert.match(h1s[0]![0], /\bid="hero-title"/, 'the h1 is #hero-title, which scripts/product.mjs reads');
 });
 
@@ -117,7 +117,7 @@ test('the hero is section.hero with the headline and the .sub sentence', when(NO
   const hero = html.match(/<section\b[^>]*class="[^"]*\bhero\b[^"]*"[^>]*>[\s\S]*?<\/section>/);
   assert.ok(hero, 'section.hero');
   assert.match(hero[0], /id="hero-title"/);
-  assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*One record of your projects/);
+  assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*One place for your projects/);
 });
 
 test('the six bands and the ask, in order, and no close after them', when(NO_BUILD), () => {

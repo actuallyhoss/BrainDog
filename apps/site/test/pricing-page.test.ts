@@ -199,7 +199,7 @@ test('the built pricing page: one h1 with no $, and as billing stands, the early
   const text = words(html);
   if (!LAUNCH.billing) {
     for (const plan of PAID) assert.ok(!text.includes(plan.price), `pricing.html prices ${plan.name} while billing is off`);
-    assert.ok(text.includes('priced at launch'), 'pricing.html does not say the paid plans are priced at launch');
+    assert.ok(text.includes('Paid plans for more agents, more questions and your team come later.'), 'pricing.html does not say paid plans come later');
     return;
   }
   for (const plan of PLANS) assert.ok(text.includes(plan.name), `pricing.html does not name ${plan.name}`);
