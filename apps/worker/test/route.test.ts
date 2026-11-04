@@ -752,7 +752,7 @@ test('A WRITE THE DIRECTORY REFUSES IS NOT AN ADDRESS ANYBODY WAS SHOWN', async 
  * and stop it arriving without ever proving they are the owner.
  *
  * SO THE SHAPE IS COPIED AND NOT INVENTED: `provedAt` absent passes, older than fifteen minutes is
- * `NEEDS_BROWSER_SESSION` at `principal`, and it is decided after the owner check so that somebody who is
+ * `NEEDS_BROWSER_SESSION` at `proof`, and it is decided after the owner check so that somebody who is
  * not an owner is told that instead. The one difference is the clock, which is `Date.now()` here rather
  * than an injected one, for the reason the constant's comment in `inbound.ts` gives.
  *
@@ -779,7 +779,7 @@ test('A PROOF OLDER THAN FIFTEEN MINUTES MINTS NOTHING AND REVOKES NOTHING', asy
     assert.equal(res.status, 403, which);
     const said = await refusalOf(res);
     assert.equal(said.code, 'NEEDS_BROWSER_SESSION', which);
-    assert.equal(said.at, 'principal', which);
+    assert.equal(said.at, 'proof', which);
   }
   /* AND NEITHER REFUSAL WAS A WRITE. A stale proof that rotated the address on its way to saying no
      would have revoked a working one, which is the one outcome worse than minting. */

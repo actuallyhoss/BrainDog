@@ -59,7 +59,7 @@ test('A RECORD NOT CREATED YET KEEPS NOTHING, and the day is asked before a part
   const store = cloudSealed(bucket(), () => {
     throw new Error('This BrainDog has not been made yet, so it keeps no sealed files.');
   });
-  await assert.rejects(store.put(await sealedName('sync/key', SHA, 0), Uint8Array.of(1)), /not been created/);
+  await assert.rejects(store.put(await sealedName('sync/key', SHA, 0), Uint8Array.of(1)), /not been made yet/);
 
   const asked: number[] = [];
   const metered = cloudSealed(bucket(), () => REC, async (n) => (asked.push(n), null));

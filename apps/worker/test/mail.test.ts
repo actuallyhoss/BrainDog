@@ -180,7 +180,7 @@ test('THE INVITE LETTER GOES FROM AUTH_MAIL_FROM, and not without a link', async
 
 test('THE WELCOME READS WITHOUT "OPEN IT HERE": the button says it, and the text puts the link on its own line', () => {
   const letter = letterOf('welcome', { record: 'Acme', link: 'https://app.brain.dog/acme/start' });
-  assert.ok(letter.text.startsWith('Acme is ready.\n\nhttps://app.brain.dog/acme/start\n\n'), letter.text);
+  assert.ok(letter.text.startsWith('Your BrainDog is ready, at the address Acme. Start on Today: tell it one real thing, like a bill or somebody you met.\n\nhttps://app.brain.dog/acme/start\n\n'), letter.text);
   assert.doesNotMatch(letter.html, /Open it here/u);
 });
 

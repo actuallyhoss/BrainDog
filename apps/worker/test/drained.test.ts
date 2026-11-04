@@ -33,5 +33,5 @@ test('AN UNREAD BODY IS READ TO ITS END BEFORE THE ANSWER IS HANDED BACK', async
 
 test('AND THE RECORD\'S OBJECT ANSWERS THROUGH IT', () => {
   const source = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
-  assert.match(source, /override async fetch\(request: Request\): Promise<Response> \{\s*const out = await this\.#answer\(request\);[\s\S]{0,700}?return drained\(request, out\);/);
+  assert.match(source, /override async fetch\(request: Request\): Promise<Response> \{[\s\S]{0,700}?let out: Response;\s*try \{\s*out = await this\.#answer\(request\);[\s\S]{0,900}?return drained\(request, out\);/);
 });
