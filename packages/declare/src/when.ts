@@ -73,6 +73,24 @@ export function holdsOf(installed: Pick<Installed, 'declarations'>, given: Pick<
   return held;
 }
 
+/**
+ * A sentence without its `<field> is empty` clauses over fields that wait. True of every row where the field is not
+ * there, so the rest of the sentence still means what it said: Work's With no project reads `thing is empty, client is
+ * empty`, and on a record with Projects and no People it is still the open work with no project. Kept, the kernel
+ * refuses the page for a field the list does not have.
+ */
+function emptied(where: string, away: ReadonlySet<string>): string {
+  if (away.size === 0) return where;
+  return where
+    .split(',')
+    .filter((clause) => {
+      const said = /^\s*(\S+) is empty\s*$/u.exec(clause);
+      return said === null || !away.has(said[1]!);
+    })
+    .join(',')
+    .trim();
+}
+
 /** Whether a part waits: the names it still waits for, or none when it is in. */
 type Decide = (at: string, names: readonly string[]) => readonly string[];
 
@@ -80,10 +98,20 @@ type Decide = (at: string, names: readonly string[]) => readonly string[];
  * One declaration's body with every waiting part taken out and the key off every part kept. `at` names the declaration.
  * A part taken out takes what is inside it: a block that waits says nothing about its columns.
  */
-function sifted(kind: DeclKind, body: Body, at: string, decide: Decide, out: Waiting[]): Body {
+function sifted(kind: DeclKind, body: Body, at: string, decide: Decide, out: Waiting[], figures: ReadonlyMap<string, readonly string[]>, away: ReadonlySet<string>): Body {
   const keep = (part: Body, where: string): boolean => {
     const names = holdsIn(part.when);
-    if (names === null) return true;
+    if (names === null) {
+      /* A BLOCK DRAWN ON A FIGURE'S TEST WAITS WITH THAT FIGURE, since it cannot say `holds` as well: a part's `when` is
+         one or the other (`holdsFault`). Work's Late is drawn when `tasks-late-yours` says so, and that figure waits for
+         People, so with no People the block goes with it. Its `when` stays on it where it is in, being the block's own. */
+      const leans = isBody(part.when) && typeof part.when.metric === 'string' ? figures.get(part.when.metric.split(':')[0]!) : undefined;
+      if (leans === undefined) return true;
+      const missing = decide(where, leans);
+      if (missing.length === 0) return true;
+      out.push({ at: where, holds: [...missing] });
+      return false;
+    }
     const missing = decide(where, names);
     if (missing.length > 0) {
       out.push({ at: where, holds: [...missing] });
@@ -148,6 +176,8 @@ function sifted(kind: DeclKind, body: Body, at: string, decide: Decide, out: Wai
     sift(body, 'blocks', at, (block, where) => {
       sift(block, 'columns', where);
       sift(block, 'legs', where);
+      if (typeof block.where === 'string') block.where = emptied(block.where, away);
+      if (block.where === '') delete block.where;
     });
     /* A LIST ONLY WAITING BLOCKS READ LEAVES THE PAGE'S REQUIRES WITH THEM, since the kernel refuses a page requiring a
        list the record does not hold (people-pack-file-90). */
@@ -156,7 +186,11 @@ function sifted(kind: DeclKind, body: Body, at: string, decide: Decide, out: Wai
       body.requires = body.requires.filter((r) => !reads(all, r) || reads(body.blocks as unknown[], r));
     }
   }
-  if (kind === 'metric') sift(body, 'legs', at);
+  if (kind === 'metric') {
+    sift(body, 'legs', at);
+    if (typeof body.where === 'string') body.where = emptied(body.where, away);
+    if (body.where === '') delete body.where;
+  }
   return body;
 }
 
@@ -164,6 +198,24 @@ function sifted(kind: DeclKind, body: Body, at: string, decide: Decide, out: Wai
 function settled(pack: Pack, decide: Decide): { pack: Pack; waiting: Waiting[] } {
   const waiting: Waiting[] = [];
   const gone = new Set<string>();
+  /* THE FIGURES OF THIS ADD-ON THAT WAIT, by name, for a block drawn on one of them. */
+  const figures = new Map(
+    pack.declarations.flatMap((d) => {
+      const names = d.kind === 'metric' ? holdsIn(d.body.when) : null;
+      return names === null ? [] : [[d.id.slice('metric.'.length), names] as const];
+    }),
+  );
+  /* THE FIELDS OF THIS ADD-ON'S OWN LISTS THAT WAIT AND ARE NOT LET IN, for a sentence that says one is empty. */
+  const away = new Set(
+    pack.declarations.flatMap((d) =>
+      d.kind !== 'register' || !Array.isArray(d.body.fields)
+        ? []
+        : d.body.fields.flatMap((f, i) => {
+            const names = isBody(f) && typeof f.id === 'string' ? holdsIn(f.when) : null;
+            return names !== null && decide(`${d.id}.fields[${i}]`, names).length > 0 ? [String((f as Body).id)] : [];
+          }),
+    ),
+  );
   const declarations = pack.declarations.flatMap((d) => {
     const names = d.kind === 'rule' ? null : holdsIn(d.body.when);
     if (names !== null) {
@@ -175,9 +227,9 @@ function settled(pack: Pack, decide: Decide): { pack: Pack; waiting: Waiting[] }
       }
     }
     /* NOTHING TO SIFT IS THE COMMON CASE, said without a copy: no `holds` anywhere in the body. */
-    if (names === null && !JSON.stringify(d.body).includes('"holds"')) return [d];
+    if (names === null && !JSON.stringify(d.body).includes('"holds"') && !(d.kind === 'page' && figures.size > 0) && away.size === 0) return [d];
     const before = waiting.length;
-    const body = sifted(d.kind, structuredClone(d.body) as Body, d.id, decide, waiting);
+    const body = sifted(d.kind, structuredClone(d.body) as Body, d.id, decide, waiting, figures, away);
     if (names !== null) delete body.when;
     if (names === null && waiting.length === before && jcs(body as Json) === d.canonical) return [d];
     return [{ ...d, body: body as Record<string, Json>, canonical: jcs(body as Json) }];

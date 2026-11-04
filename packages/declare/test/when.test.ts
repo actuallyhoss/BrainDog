@@ -242,3 +242,60 @@ test('THE CUTS A FILE CANNOT WRITE: a role and hand lose a field that waits, and
   assert.deepEqual(bodyOf(settleWhen(pack, plan.waiting), 'register.contacts'), list);
   assert.deepEqual(bodyOf(settleWhen(pack, plan.waiting), 'page.contacts'), page);
 });
+
+test('A BLOCK DRAWN ON A FIGURE THAT WAITS WAITS WITH IT, and a sentence loses its clause over a field that waits', async () => {
+  const doc = {
+    ...DOC,
+    declarations: [
+      {
+        register: 'clients',
+        name: 'Clients',
+        title: 'name',
+        fields: [
+          { id: 'name', type: 'text', required: true },
+          { id: 'contact', type: 'ref', to: 'people', when: PEOPLE },
+          { id: 'project', type: 'ref', to: 'projects', when: { holds: ['projects'] } },
+        ],
+      },
+      { metric: 'clients-with-contact', name: 'With a contact', source: 'register.clients', op: 'count', where: 'contact is set', when: PEOPLE },
+      { metric: 'clients-unfiled', name: 'Unfiled', source: 'register.clients', op: 'count', where: 'project is empty, contact is empty' },
+      {
+        page: 'clients',
+        title: 'Clients',
+        requires: ['register.clients'],
+        blocks: [
+          { kind: 'table', heading: 'Spoken to', source: 'register.clients', when: { metric: 'clients-with-contact', gt: 0 }, columns: [{ field: 'name' }] },
+          { kind: 'table', heading: 'Unfiled', source: 'register.clients', where: 'project is empty, contact is empty', columns: [{ field: 'name' }] },
+        ],
+      },
+    ],
+    seeds: [],
+  };
+  const pack = await packOf(doc);
+  const body = (p: Pack, id: string) => p.declarations.find((d) => d.id === id)!.body as { blocks?: { heading: string; when?: unknown; where?: string }[]; where?: string };
+
+  /* WITHOUT PEOPLE: the block goes with its figure and is named, and "contact is empty" is true of every row, so it goes
+     from the sentence and the rest stands. */
+  const apart = resolveWhen(pack, new Set(['projects']));
+  assert.deepEqual(apart.waiting, [
+    { at: 'register.clients.fields[1]', holds: ['people'] },
+    { at: 'metric.clients-with-contact', holds: ['people'] },
+    { at: 'page.clients.blocks[0]', holds: ['people'] },
+  ]);
+  assert.deepEqual(body(apart.pack, 'page.clients').blocks!.map((b) => [b.heading, b.where]), [['Unfiled', 'project is empty']]);
+  assert.equal(body(apart.pack, 'metric.clients-unfiled').where, 'project is empty');
+  /* WITH NEITHER THE WHOLE SENTENCE WAS TRUE OF EVERY ROW, so no sentence is left to read. */
+  const neither = resolveWhen(pack, new Set());
+  assert.equal(body(neither.pack, 'metric.clients-unfiled').where, undefined);
+  assert.equal(body(neither.pack, 'page.clients').blocks![0]!.where, undefined);
+
+  /* WITH PEOPLE: the block stays with its own figure test, and the sentence is as it was written. */
+  const whole = resolveWhen(pack, new Set(['people', 'projects']));
+  assert.deepEqual(whole.waiting, []);
+  assert.deepEqual(body(whole.pack, 'page.clients').blocks![0]!.when, { metric: 'clients-with-contact', gt: 0 });
+  assert.equal(body(whole.pack, 'page.clients').blocks![1]!.where, 'project is empty, contact is empty');
+
+  /* THE INSTALL STAGES WHAT THE PLAN SAID, by the same road. */
+  assert.deepEqual(settleWhen(pack, apart.waiting).declarations.map((d) => d.id), apart.pack.declarations.map((d) => d.id));
+  assert.equal(body(settleWhen(pack, apart.waiting), 'metric.clients-unfiled').where, 'project is empty');
+});
