@@ -407,6 +407,19 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
 
     {
       /**
+       * `boards.pages`: a page a person laid out as a board draws as one (`PageBoard.svelte`), and a page nobody did draws
+       * as a page. The board is empty on purpose, since the words here are whether the board is drawn at all.
+       */
+      name: 'boards.pages',
+      record: true,
+      what: 'whether a page draws as the board the person laid it out as, when the record keeps it (Edit layout > Lay out as a board)',
+      route: '/p/kiln',
+      values: [{ shape: 'rail', '@record': {} }, { shape: 'rail', '@record': { 'boards.pages': { kiln: { order: [], sizes: {} } } } }],
+      probe: () => String(document.querySelector('.page-board') !== null),
+    },
+
+    {
+      /**
        * `shelf.kept`: the components a person kept, drawn as a "Your shelf" group in the add menu of Edit layout
        * (`AddBlock.svelte`). THE SHELF IS A SHEET AND NOT A LOAD, so the probe walks in the way the a11y gate does (the
        * page menu, Edit layout, then Add to this page) and reads the names the sheet lists. A build that stopped handing
@@ -629,7 +642,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
   /**
    * AND THE RECORD'S KEYS THE SAME WAY, both directions, read off `PREF_KEYS` as text as `Pref` is read above.
    *
-   * `nav.order` AND `nav.hidden` ARE EXCUSED because the rail keeps them through the same `nav-prefs.svelte.ts` path the
+   * `nav.order`, `nav.hidden` AND `nav.pins` ARE EXCUSED because the rail keeps them through the same `nav-prefs.svelte.ts` path the
    * three cases above measure, and their cookie and `localStorage` copies are what the `nav` case already loads.
    *
    * THE FIVE `look.*` KEYS ARE NOT EXCUSED ANY MORE, and have their cases above.
@@ -661,13 +674,23 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    * `agents.answer_on_word` DRAWS NOTHING: it decides whether an agent's answer on the owner's word is taken, and the
    * record tests that, a refusal naming the switch when it is off: `packages/record/test/on-word.test.ts`.
    *
+   * `agents.bypass` DRAWS ONLY ITS OWN SWITCH, as `agents.answer_on_word` does: it decides whether his agents' calls are
+   * taken without asking, and the record tests who may turn it on in `packages/record/test/on-word.test.ts`.
+   *
+   * `push.off` IS EXCUSED BECAUSE THE RECORD APPLIES IT. It draws only its own switches in Settings; what it changes is
+   * which pushes are sent, and two loads that differ only in it draw the same page. `packages/kernel/test/push.test.ts`.
+   *
+   * `name.asked` IS EXCUSED BECAUSE IT IS A MEMORY. It says a nameless person was asked their name once, and it changes a
+   * page only for somebody with no name who has not put the ask off on this device (`nameAskDue` in
+   * `apps/web/src/lib/sharing/name-ask.ts`), which the fixtures this gate loads are not. No test holds it yet.
+   *
    * `widgets.held` IS EXCUSED BECAUSE IT IS A MEMORY AND THE RECORD APPLIES IT. It keeps the widget offers a person put
    * off with Not now and the day one was last answered; the brakes it feeds (two Not nows in a week pause offers, one
    * answer a day) are the record's `widgetOffers`, so two loads that differ only in it draw the same page until an offer
    * is due, which no fixture loading a URL can stage. The record tests the brakes in
    * `packages/record/test/widgets-gallery.test.ts`, and the tab's copy in `apps/web/src/lib/board/widget-read.test.ts`.
    */
-  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'notify.muted', 'look.shot', 'packs.known_keys', 'agents.answer_on_word', 'widgets.held']);
+  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'nav.pins', 'notify.muted', 'look.shot', 'push.off', 'name.asked', 'packs.known_keys', 'agents.answer_on_word', 'agents.bypass', 'widgets.held']);
   const recordSrc = await readFile(join(root, 'packages', 'record', 'src', 'index.ts'), 'utf8').catch(() => '');
   const keysSaid = /export const PREF_KEYS = \[([^\]]*)\]/u.exec(recordSrc)?.[1];
   const RECORD_KEYS = keysSaid === undefined ? [] : [...keysSaid.matchAll(/'([^']+)'/gu)].map((m) => m[1]);
