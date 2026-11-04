@@ -85,6 +85,14 @@ function keptFor(base: string, store: Store | null): Kept {
     k = { answers: new Map(), pool: new Map(), person: null, read: false, timer: undefined, names: [], namesAt: 0 };
     kept.set(base, k);
   }
+  /* ANOTHER PERSON SIGNED IN ON THIS TAB KEEPS NOTHING OF THE LAST ONE'S, in memory as on the device. */
+  if (k.read && k.person !== null && keptPerson(base) !== k.person) {
+    k.answers.clear();
+    k.pool.clear();
+    k.names = [];
+    k.namesAt = 0;
+    k.read = false;
+  }
   if (!k.read) {
     k.read = true;
     k.person = keptPerson(base);
