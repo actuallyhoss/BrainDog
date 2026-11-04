@@ -112,7 +112,8 @@ test('A BUDGET SETS EACH LIMIT AGAINST WHAT ITS FIGURE SPENT, zero where nothing
   const block = drawn(b);
   assert.equal(block.form, 'budget');
   assert.deepEqual(block.rows.map((r) => r.cells[0]), ['Groceries', 'Eating out', 'Travel']);
-  assert.match(block.rows[0]!.cells[1]!, /212\.40/u);
+  /* A BUDGET IS A SUMMARY, SAID WHOLE (aa560291b): what is spent to the unit, the limit beside it as the record holds it. */
+  assert.match(block.rows[0]!.cells[1]!, /212\.00/u);
   assert.match(block.rows[1]!.cells[1]!, /140\.00/u);
   assert.match(block.rows[2]!.cells[1]!, /0\.00/u);
   assert.match(block.rows[1]!.cells[2]!, /120\.00/u);

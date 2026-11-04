@@ -18,6 +18,7 @@ import { METRICS } from './declared.ts';
 import { feedTable } from './api.ts';
 import { ROWS } from './fixtures/sample.ts';
 import { toSegments } from './blocks.ts';
+import { FIGURES_KNOWN } from './figures-known.ts';
 import { askWalk, blockOf, forgetWalks, liveWords, pageReader, resolverOf, tileOf, walkAsked, type Fetch } from './page-live.ts';
 
 const BASE = 'http://record.test';
@@ -340,7 +341,7 @@ test('the page route reads the record, waits for it, and draws what it cannot sa
   /* THE ROUTE KEEPS THE READ; WHAT IT DRAWS IS `PageView`, moved out whole. */
   const view = ['PageView.svelte', 'BlockSlot.svelte'].map((f) => readFileSync(new URL(`../page/${f}`, import.meta.url), 'utf8')).join('\n');
   assert.match(route, /<PageView /);
-  assert.match(view, /\{#if got === null\}/);
+  assert.match(view, /\{#if got === null \|\| \(got\.from === 'live' && projectPage/);
   assert.match(view, /block\.cannot/);
   assert.match(view, /<ActionRows /);
   assert.match(view, /<Actions project=\{\{ spoken: `\$\{param\.register\}#\$\{param\.seq\}`, title: param\.title \}\} \/>/, 'Runs on went missing from the project pages');
@@ -1104,14 +1105,16 @@ test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own l
   assert.deepEqual(named.cells.slice(0, 2), ['Mara Lindqvist (personal)', 'Orchardline']);
   assert.ok(!named.sent.includes('list'), 'a list was walked for names the record had already said');
 
-  /* AND DRAWN WHOLE, A BAR'S VALUE IS A FIGURE, EXACT: EGP 1,086,213.41, as EGP is written everywhere, and never
-     rounded, since it is read against the bars beside it (`money.ts` `figure`). A fraction of zeros is dropped. */
+  /* AND DRAWN WHOLE, A FIGURE'S PARTS ARE TOTALS (the one rule for cents, 4d1155b5f): from a thousand up said whole, half a
+     unit rounding away from nought, and under a thousand to the cent. */
   const { draw } = await import('./blocks.ts');
   const { learnHome } = await import('./api.ts');
   learnHome('EGP');
   try {
-    const figures = draw(walked.block).segments.flatMap((s) => (s.type === 'block' ? s.rows.map((r) => r.cells[1]) : []));
-    assert.deepEqual(figures, ['EGP\u00a01,086,213.41', 'EGP\u00a0120,000', 'EGP\u00a09,382.59']);
+    const figuresOf = (block: typeof walked.block) => draw(block).segments.flatMap((s) => (s.type === 'block' ? s.rows.map((r) => r.cells[1]) : []));
+    assert.deepEqual(figuresOf(walked.block), ['EGP\u00a01,086,213', 'EGP\u00a0120,000', 'EGP\u00a09,383']);
+    const small = await read([{ key: MARA, value: 14_885 }, { key: ORCHARD, value: 90_000 }]);
+    assert.deepEqual(figuresOf(small.block), ['EGP\u00a0148.85', 'EGP\u00a0900', 'EGP\u00a01,198,951'], 'and what no part holds, by the same rule');
   } finally {
     learnHome(null);
   }
@@ -1152,7 +1155,7 @@ test('EVERY CURRENCY A BOOK IS KEPT IN IS DRAWN THE SAME WAY, under its own code
   );
   const segments = toSegments(block).filter((s) => s.type === 'block') as { kind: string; rows: { cells: string[] }[] }[];
   assert.deepEqual(segments.map((s) => s.kind), ['bar', 'bar'], 'a chart a currency, none of them a bare figure');
-  assert.deepEqual(segments.map((s) => s.rows.map((r) => r.cells.slice(0, 2).join(' | '))), [['Mara Lindqvist | EGP 1,086,213.41'], ['Orchardline | USD 12,000.00']]);
+  assert.deepEqual(segments.map((s) => s.rows.map((r) => r.cells.slice(0, 2).join(' | '))), [['Mara Lindqvist | EGP 1,086,213.00'], ['Orchardline | USD 12,000.00']]);
 
   /* TWO BOOKS IN POUNDS AND ONE IN DOLLARS: each currency is a chart under its code, so the dollars read as the pounds do. */
   const PERSONAL = '01M3VMPSHV07AM4S51WDTFM5XJ';
@@ -1253,7 +1256,8 @@ test('A PART KEYED BY A WORD IS SAID IN THE PERSON’S OWN WORD FOR IT, over the
 
 test('A PART KEYED BY A YES OR NO IS SAID AS ONE, and not as yes twice', () => {
   /* THE RECORD KEYS A YES OR NO AS TEXT, `1` and `0`, which `display` read as yes whatever it held. */
-  METRICS['cash-by-liquid'] = { ...METRICS['cash-by-book']!, metric: 'cash-by-liquid', group_by: 'liquid', where: undefined } as never;
+  /* THE TABLE `blocks.ts` READS (`figures-known.ts`), which the build's `METRICS` fills once and is not read from after. */
+  FIGURES_KNOWN['cash-by-liquid'] = { ...METRICS['cash-by-book']!, metric: 'cash-by-liquid', group_by: 'liquid', where: undefined } as never;
   try {
     const parts = (labelled: boolean) =>
       blockOf(
@@ -1290,7 +1294,7 @@ test('A PART KEYED BY A YES OR NO IS SAID AS ONE, and not as yes twice', () => {
     assert.deepEqual(cells(true), ['Yes', 'No'], 'the record’s word');
     assert.deepEqual(cells(false), ['yes', 'no'], 'and the value it stands for, on a record that sent none');
   } finally {
-    delete METRICS['cash-by-liquid'];
+    delete FIGURES_KNOWN['cash-by-liquid'];
   }
 });
 

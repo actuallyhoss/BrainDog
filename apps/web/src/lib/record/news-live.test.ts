@@ -14,7 +14,7 @@ import { forget, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { hrefFor } from './metrics.ts';
 import { LOG_PAGE, markAll, readLog, tileOf } from './news-live.ts';
-import { liveWords, tileOf as pageTile } from './page-live.ts';
+import { liveWords, tileOf as pageTile, wholeMoneyIn } from './page-live.ts';
 import { readToday, sinceOf, tasksOf } from './today-live.ts';
 
 const BASE = 'http://record.test';
@@ -120,10 +120,13 @@ test('ONE READING OF ONE FIGURE, THREE ENGINES, ONE ANSWER: no row has filled th
      the declaration are written here: the figure, its unit, and the two counts the state turns on. */
   const sample = figureTile(id, decl, { ...shape, shown: money(0, 'GBP'), delta: null, why: '', unmeasured: null, href: hrefFor(decl)! });
 
-  const answers = [home, page, sample].map((t) => [t.value, t.tone ?? null, t.href ?? null, t.note]);
+  /* THE FIGURE AS IT IS DRAWN: a page's tile writes the one rule for cents itself (dd6b3b9bf), and the palette, the one
+     reader of Home's tile left, writes it where it draws the row (`figureOf`), so the stored form is held to that. */
+  const answers = [home, page, sample].map((t) => [wholeMoneyIn(t.value), t.tone ?? null, t.href ?? null, t.note]);
+  assert.equal(home.value, money(0, 'GBP'));
   assert.deepEqual(answers[1], answers[0], 'Home and the page answered one reading differently');
   assert.deepEqual(answers[2], answers[0], 'the sample engine and Home answered one reading differently');
-  assert.deepEqual(answers[0], ['GBP 0.00', null, null, liveWords.unsaid], 'a total of nothing is still zero, and carries no verdict and no door');
+  assert.deepEqual(answers[0], ['GBP 0', null, null, liveWords.unsaid], 'a total of nothing is still zero, and carries no verdict and no door');
 });
 
 /**

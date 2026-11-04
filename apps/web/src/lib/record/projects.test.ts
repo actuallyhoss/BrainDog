@@ -9,10 +9,12 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
-import { NOW, PAGES, installSeed } from '@braindog/seed';
+import { money } from 'braindog-render';
+import { NOW, installSeed } from '@braindog/seed';
 
 import { page, readBlock } from './fixtures/readers.ts';
 import { toSegments } from './blocks.ts';
+import { wholeMoneyIn } from './page-live.ts';
 import { drawerOf } from '../page/kinds/index.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
 import './fixtures/fill.ts';
@@ -78,7 +80,11 @@ for (const slug of ['portfolio', 'kiln', 'marlow-co', 'portage'])
         return;
       }
       if (kb.kind === 'stat') {
-        assert.deepEqual(wb.metrics?.map((m) => digits(m.value)), (kb.readings ?? []).map((r) => digits(r.reading?.value)), at);
+        /* A TILE SAYS MONEY BY THE ONE RULE FOR CENTS (`wholeMoneyIn`, dd6b3b9bf), so the record's minor units go through the
+           same words, or a figure out by a hundred would pass. */
+        const said = (r: { value?: unknown; unit?: unknown } | undefined) =>
+          typeof r?.value === 'number' && typeof r.unit === 'string' && r.unit !== '' ? digits(wholeMoneyIn(money(Math.round(r.value), r.unit))) : digits(r?.value);
+        assert.deepEqual(wb.metrics?.map((m) => digits(m.value)), (kb.readings ?? []).map((r) => said(r.reading as never)), at);
         return;
       }
       if (kb.kind === 'split' && kb.source?.startsWith('metric.')) {
@@ -118,9 +124,9 @@ test('THE CARDS IN PLAY SAY WHICH PROJECTS ARE NOT GOING WELL, with no table say
 });
 
 test('HOW THEY ARE GOING DRAWS EACH PART IN ITS INTENT, and a part nobody has said about stays neutral', () => {
-  /* DRAWN ONLY PAST FOUR PROJECTS IN PLAY, SINCE portfolio 1.12.0, so the sample's three are read without its `when:`. */
-  const declared = (PAGES.portfolio!.blocks as { heading?: string }[]).find((b) => b.heading === 'How they are going')!;
-  const split = readBlock({ ...declared, when: undefined } as never);
+  /* PROJECTS' OWN PAGE DREW THIS UNTIL portfolio 1.31.2 (fdc1b185b), and the figure stays declared for a page somebody
+     makes, so the block is written here as such a page would. */
+  const split = readBlock({ kind: 'split', heading: 'How they are going', source: 'metric.projects-by-health', unset: 'Not said yet', tones: { on_track: 'good', at_risk: 'warn', off_track: 'bad' } } as never);
   const said = JSON.stringify(toSegments(split));
   for (const tone of ['good', 'warn', 'bad']) assert.ok(said.includes(`"tone":"${tone}"`), `no part is drawn ${tone}: ${said}`);
 });
