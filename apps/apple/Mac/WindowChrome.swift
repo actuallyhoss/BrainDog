@@ -2,9 +2,9 @@ import AppKit
 import BrainDogKit
 import SwiftUI
 
-/// The main window's frame (plan M6, Window): no title bar of its own, the traffic lights standing in the web's 56px bar
-/// at the start of its row, where the web leaves them `MacBar.room` (`--shell-lead`), centred on the row. Its size and place are
-/// remembered between launches.
+/// The main window's frame (plan M6, Window): no title bar of its own, the traffic lights standing in the web's bar at the
+/// start of its row, where the web leaves them `MacBar.room` (`--shell-lead`), on the line of the row's words. Its size and
+/// place are remembered between launches. Full screen has no lights, so the web gives their room back.
 ///
 /// THE LIGHTS ARE MOVED, NOT DRAWN. AppKit keeps them in a title bar 32 tall at the top of the window; their container is
 /// made as tall as the web's bar and each light is centred in it. AppKit lays them out again when the window resizes,
@@ -23,6 +23,7 @@ final class WindowChrome: NSObject {
         self.window = window
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
         window.styleMask.insert(.fullSizeContentView)
         window.isMovableByWindowBackground = false
         window.tabbingMode = .disallowed
@@ -33,6 +34,13 @@ final class WindowChrome: NSObject {
                      NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification, NSWindow.didDeminiaturizeNotification] {
             watching.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.place() }
+            })
+        }
+        for (name, room) in [(NSWindow.willEnterFullScreenNotification, 0), (NSWindow.didExitFullScreenNotification, MacBar.room)] {
+            watching.append(center.addObserver(forName: name, object: window, queue: .main) { _ in
+                MainActor.assumeIsolated {
+                    MacModel.shared.desk.webView.evaluateJavaScript("document.documentElement.style.setProperty('--shell-lead','\(room)px')")
+                }
             })
         }
         place()
@@ -54,7 +62,7 @@ final class WindowChrome: NSObject {
         let gap = max(6, mini.frame.minX - close.frame.maxX)
         var x = Self.lead
         for light in [close, mini, zoom] {
-            let origin = NSPoint(x: x, y: ((height - light.frame.height) / 2).rounded())
+            let origin = NSPoint(x: x, y: (height - MacBar.centre - light.frame.height / 2).rounded())
             if light.frame.origin != origin { light.setFrameOrigin(origin) }
             x += light.frame.width + gap
         }

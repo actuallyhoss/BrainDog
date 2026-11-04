@@ -1294,10 +1294,10 @@
     border-block-end: 0;
   }
 
-  /* IN THE MAC APP THE RAIL'S HEAD IS WHERE THE TRAFFIC LIGHTS STAND (`--shell-lead`), so the mark gives them its place;
-     the bar after it takes the rest of their room (`AppFrame.svelte`). */
-  :global(:root[data-shell='mac']) .s-rhead > :global(*) {
-    visibility: hidden;
+  /* IN THE MAC APP THE LIGHTS ARE WIDER THAN THE RAIL (60 against 44), so they stand above it on the window's ground and the rail
+     starts under them, with no head of its own (`AppFrame.svelte`). */
+  :global(:root[data-shell='mac']) .s-rhead {
+    display: none;
   }
 
   .s-rlist {

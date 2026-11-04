@@ -2106,6 +2106,11 @@
     background: none;
   }
 
+  /* IN THE MAC APP THE RAIL STARTS UNDER THE TRAFFIC LIGHTS, which are wider than it and stand on the window's ground. */
+  :global(:root[data-shell='mac']) .shell[data-side='rail'] .side-slot {
+    padding-block-start: 68px;
+  }
+
   /* A DOCKED PANEL STANDS UNDER THE BAR, not under its edge. On a phone it is the bottom sheet (`Panel.svelte`,
      `PHONE`), which hangs from the screen's foot and is left alone. */
   @media (width >= 900px) {

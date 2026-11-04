@@ -442,15 +442,18 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     #endif
 }
 
-/// The Mac window's bar, which the web draws and the traffic lights stand in (plan M6): 56 tall, the lights `lead` from
-/// the window's edge and centred on it, and `room` left for them at the start of the row (`--shell-lead` in the web).
+/// The Mac window's bar, which the web draws and the traffic lights stand in (plan M6). The sidebar is a floating card 12 from
+/// the window (`--window-inset`), so the lights stand inside it: `lead` puts the first on the rows' own left edge, and `centre`
+/// puts all three on the line the mark, the page's name and the bar's controls sit on, not in the card's corner (Sam, 4 Nov:
+/// "the placement of the close minimize icons").
 ///
-/// THE ROOM IS MEASURED, NOT GUESSED. macOS 26 draws the lights 14 wide on a 23 pitch, 60 for the three, so 16 + 60 and
-/// 12 to the web's first mark is 88. The web's own default for a shell that says nothing is 78, the Tauri app's lights.
+/// THE ROOM IS MEASURED, NOT GUESSED. macOS 26 draws the lights 14 wide on a 23 pitch, 60 for the three, so 28 + 60 and
+/// 12 to the web's first mark is 100. The web's own default for a shell that says nothing is 78, the Tauri app's lights.
 public enum MacBar {
     public static let height: CGFloat = 56
-    public static let lead: CGFloat = 16
-    public static let room = 88
+    public static let centre: CGFloat = 40
+    public static let lead: CGFloat = 28
+    public static let room = 100
 }
 
 #if os(iOS)
