@@ -845,8 +845,8 @@
     text-underline-offset: 3px;
     /* 24 TALL UNDER A MOUSE, and the line does not grow. */
     box-sizing: border-box;
-    padding-block: 2px;
-    margin-block: -2px;
+    padding-block: 3px;
+    margin-block: -3px;
   }
 
   .win :global(.area) {

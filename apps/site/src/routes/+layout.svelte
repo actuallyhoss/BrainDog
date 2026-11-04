@@ -491,6 +491,7 @@
 
     .foot a {
       display: inline-block;
+      min-inline-size: 44px;
       padding-block: 10px;
       line-height: 24px;
     }

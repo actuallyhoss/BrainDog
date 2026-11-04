@@ -147,7 +147,6 @@
        `aria-activedescendant` says the same list and which option is active. */
     if (el.tagName !== 'TEXTAREA') el.setAttribute('role', 'combobox');
     el.setAttribute('aria-autocomplete', 'list');
-    el.setAttribute('aria-controls', listId);
     el.addEventListener('keydown', onkey, true);
     el.addEventListener('input', onInput);
     el.addEventListener('click', onCaret);
@@ -181,6 +180,9 @@
     const el = field;
     if (!el) return;
     if (el.tagName !== 'TEXTAREA') el.setAttribute('aria-expanded', open ? 'true' : 'false');
+    /* ONLY WHILE THE LIST IS THERE: an `aria-controls` naming nothing is a broken reference. */
+    if (open) el.setAttribute('aria-controls', listId);
+    else el.removeAttribute('aria-controls');
     if (open && matches[active]) el.setAttribute('aria-activedescendant', `${listId}-${active}`);
     else el.removeAttribute('aria-activedescendant');
   });
