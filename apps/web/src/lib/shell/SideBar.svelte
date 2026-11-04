@@ -800,10 +800,12 @@
     border-inline-end: 0;
   }
 
-  /* AS THE ONE BUTTON'S PANEL IT FLOATS OVER THE WORK, so the film is the thick one and the shadow a sheet's: the words
-     behind it never read through its rows. */
+  /* AS THE ONE BUTTON'S PANEL IT FLOATS OVER THE WORK, so it is solid, with a sheet's shadow: nothing behind it reads
+     through its rows, not even as a blur. */
   .s-side[data-panel] {
-    background: var(--glass-sheet);
+    background: var(--tile);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
     box-shadow: var(--glass-edge), var(--elev-modal);
   }
 

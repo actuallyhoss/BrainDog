@@ -160,6 +160,11 @@
     }
   }
 
+  /* THE SAME AT LARGE TEXT, on any phone: "Needs you" at the larger size needs the tab's whole width at 390. */
+  :global(html[data-text='md']) .tab {
+    padding-inline: 0;
+  }
+
   /* FIVE TABS ON A 320px PHONE ARE 64px EACH, so a long section name ends in an ellipsis rather than pushing its neighbours. */
   .tab-name {
     max-inline-size: 100%;
