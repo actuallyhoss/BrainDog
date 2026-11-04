@@ -315,17 +315,21 @@ export async function drill(file) {
       const ctx = sessionContext({ person, provedAt: Date.now() }, held);
       const allows = grant.rows.filter((r) => r.effect === 'allow');
       const denies = grant.rows.filter((r) => r.effect === 'deny');
+      /* "NO MONEY" ON THE PROJECTS LIST HIDES ITS AMOUNTS AND NEVER THE PROJECT (`lens.ts`, since fcf3c811d): the row stays
+         in sight, and its amounts are held below as a hidden grant's are. */
+      const moneyDeny = (d) => d.what.lists !== undefined && !Array.isArray(d.what.lists) && d.what.lists.has === 'money';
+      const noMoney = denies.some(moneyDeny);
       const sees = (r) =>
         r.deleted_at === null &&
         (!privateRows.has(r.id) || privateRows.get(r.id) === person) &&
         allows.some((a) => reaches(a.what, r, lists)) &&
-        !denies.some((d) => reaches(d.what, r, lists));
+        !denies.some((d) => !(moneyDeny(d) && lists.projects.has(r.register)) && reaches(d.what, r, lists));
       const visible = every.filter(sees);
       const inSight = new Set([...visible.map((r) => r.id), ...visible.flatMap((r) => JSON.stringify(r.fields).match(ULID) ?? [])]);
       const out = new Set(every.filter((r) => !inSight.has(r.id)).map((r) => r.id));
       const granted = [...new Set(visible.map((r) => r.register))];
       /* WHAT A GUEST AMOUNTS ARE HIDDEN FROM MUST NEVER BE ANSWERED: each money field's amount, and each written in text. */
-      const amounts = grant.hidesMoney ? hiddenAmounts(visible, registers) : [];
+      const amounts = grant.hidesMoney ? hiddenAmounts(visible, registers) : noMoney ? hiddenAmounts(visible.filter((r) => lists.projects.has(r.register)), registers) : [];
       /* A SAMPLE OF ROWS IN AND OUT OF SIGHT, per list in sight, and one list not in sight. */
       const asked_lists = [...granted, ...[...registers.keys()].filter((l) => !granted.includes(l)).slice(0, 1)];
       const sample = asked_lists.flatMap((l) => [
