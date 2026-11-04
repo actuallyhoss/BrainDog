@@ -153,7 +153,7 @@
 
   /* WITH THE PAGE'S BUTTONS BESIDE IT, the name takes its own width and the buttons the rest, up to Ask. */
   .crumb:has(+ .bar-page) {
-    flex: 0 1 auto;
+    flex: 0 0.01 auto;
   }
 
   /* AT THE LARGE TEXT SIZE THE NAME KEEPS ITS WORD: "Work" read "Wo..." beside its own field and buttons at 1440. The search
@@ -167,10 +167,16 @@
     min-inline-size: 120px;
   }
 
+  /* IT GIVES WAY FIRST, by what in it can: the bar ran past the window at 900 on Work, and at 1000 at the Large text size. */
   .bar-page {
     display: flex;
-    flex: 1 0 auto;
+    flex: 1 1 auto;
     align-items: center;
+    min-inline-size: 0;
+  }
+
+  .bar-page > :global(.desk-bar-actions) {
+    flex: 0 1 auto;
     min-inline-size: 0;
   }
 

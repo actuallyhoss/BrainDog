@@ -68,6 +68,9 @@
      field, as a quiet control beside the name is. */
   .head-capture {
     inline-size: 320px;
+    /* IN A NARROW BAR THE FIELD GIVES WAY BEFORE THE PAGE'S NAME OR ITS BUTTONS DO. */
+    flex-shrink: 1;
+    min-inline-size: 140px;
     max-inline-size: 100%;
     margin: 0;
   }

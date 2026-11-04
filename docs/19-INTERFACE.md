@@ -102,8 +102,8 @@ A nav of four entries in one section on a wide screen is not the nav that argume
 |---|---|---|
 | **Rail** | the left sidebar above, sectioned and arrangeable | the default, and every record with sections |
 | **Rail, collapsed** | icons only, names on hover and on focus, full names when it opens | somebody who wants the width back and knows the icons |
-| **Top bar** | one horizontal strip, spine then declared entries, overflow into More | a small nav, a wide screen, a person who wants vertical space |
-| **Menu** | no persistent nav: one button opens the whole sectioned list as a sheet | the smallest chrome, and anybody who lives in the palette |
+| **Sidebar** | the full column beside the work, with the top bar over the work only; its narrow rail under 1,280 (stored as `bar`) | the default |
+| **Menu** (on screen, One button) | no sidebar: the same top bar with one button at its start, which opens the sidebar as a panel | the whole width for the work |
 | **Tab bar** | the phone shape, spine plus a sheet | below 900 px, where it is not a choice |
 
 Three conditions keep this from being a way to smuggle the rejected default back in.

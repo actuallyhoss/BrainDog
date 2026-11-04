@@ -1023,7 +1023,7 @@
   /* A PROJECT PINNED UNDER PROJECTS: its mark on the edge the lists under a place start on, its name a step down from the
      place's, as tall as its mark needs. */
   .s-nested .s-proj {
-    min-block-size: 30px;
+    min-block-size: calc(var(--side-sub, 28px) + 2px);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-regular);
   }
@@ -1156,7 +1156,7 @@
   }
 
   .s-part {
-    min-block-size: 28px;
+    min-block-size: var(--side-sub, 28px);
     font-size: var(--fs-meta);
     font-weight: var(--fw-regular);
   }
