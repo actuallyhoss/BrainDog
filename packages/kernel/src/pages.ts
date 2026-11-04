@@ -2592,10 +2592,14 @@ function narrowed(deps: PageDeps, block: PageBlock, clauses: ReadonlyMap<string,
   };
   const and = (where: Predicate | undefined): Predicate => andFlat(where, extra);
   const readings = deps.readings;
+  /* AND WHAT A BLOCK ADDS UP IN ONE QUERY (`wholeParts`): Payees with one payee picked still drew a bar for everybody, and Reports with
+     This month picked added up thirteen months, because only a walk of `list` was narrowed. */
+  const whole = deps.whole;
   return {
     ...deps,
     list: (q) => deps.list(q.register === register && !named(q.where) ? { ...q, where: and(q.where) } : q),
     ...(readings ? { readings: (q: Parameters<typeof readings>[0]) => readings(q.register === register ? { ...q, where: and(q.where) } : q) } : {}),
+    ...(whole ? { whole: (q: WholeAsk) => whole(q.register === register ? { ...q, where: and(q.where) } : q) } : {}),
   };
 }
 

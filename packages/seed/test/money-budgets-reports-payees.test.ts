@@ -41,11 +41,17 @@ type Drawn = Block & { drawn?: boolean; refusals?: unknown[]; rows?: { fields: R
 const SLUGS = ['money-budgets', 'money-reports', 'money-payees'] as const;
 const blocksOf = (slug: string): Block[] => MONEY_PAGES[slug]!.blocks as unknown as Block[];
 
-test('EACH PAGE OPENS ON ITS LINE, holds no more than a page may, and stands six tiles at most before its fold', () => {
+test('EACH PAGE OPENS ON ITS LINE OR ITS TOTALS, holds no more than a page may, and stands six tiles at most before its fold', () => {
   for (const slug of SLUGS) {
     const blocks = blocksOf(slug);
-    assert.equal(blocks[0]!.kind, 'note', `${slug} does not open on a line`);
-    assert.equal(blocks[0]!.lead, true, `${slug} does not open on a line`);
+    /* REPORTS OPENS ON ITS TOTALS SINCE money-core 3.38.4 (ceeaf6193), which say what its line said; the line is said only while nothing moved. */
+    if (slug === 'money-reports') {
+      assert.deepEqual([blocks[0]!.kind, blocks[0]!.heading], ['stat', 'Totals'], 'Reports does not open on its totals');
+      assert.deepEqual(blocks.filter((b) => b.lead === true).map((b) => b.when), [{ metric: 'out-by-month', lt: 1 }], 'Reports says a line beside its totals');
+    } else {
+      assert.equal(blocks[0]!.kind, 'note', `${slug} does not open on a line`);
+      assert.equal(blocks[0]!.lead, true, `${slug} does not open on a line`);
+    }
     assert.ok(blocks.length <= 24, `${slug} declares ${blocks.length} blocks`);
     const fold = blocks.findIndex((b) => b.kind === 'section' && b.fold === true);
     /* THE BUDGETS BY PERIOD ARE ONE TILE (money-core 3.31.0): a week's and a year's draw only while such a budget is set,
@@ -62,7 +68,8 @@ test('EACH PAGE OPENS ON ITS LINE, holds no more than a page may, and stands six
       return true;
     };
     const above = (fold < 0 ? blocks : blocks.slice(0, fold)).filter((b) => !b.lead && b.kind !== 'section' && !period(b)).filter(once);
-    assert.ok(above.length <= 6, `${slug} stands ${above.length} tiles before its fold`);
+    /* REPORTS STANDS SEVEN: the over-by-one `calm-pages.test.ts` holds, its totals and health over the month picked. */
+    assert.ok(above.length <= (slug === 'money-reports' ? 7 : 6), `${slug} stands ${above.length} tiles before its fold`);
     for (const b of blocks) if (b.heading !== undefined) assert.match(String(b.icon), /^[a-z][a-z0-9-]*$/u, `${slug}: ${b.heading} wears no glyph`);
     const read = blocks.flatMap((b) => [b.heading, b.body, b.empty, b.unset, ...(b.cells ?? []).flatMap((c) => [c.label, c.note])]).filter((t): t is string => typeof t === 'string');
     assert.ok(read.length >= 10, `${slug} reads ${read.length} texts`);
@@ -90,7 +97,9 @@ test('EVERY FIGURE A PAGE NAMES IS MONEY’S, and every page answers on the samp
   for (const slug of SLUGS) {
     const page = value<{ blocks: Drawn[] }>(k.page(slug));
     for (const b of page.blocks) assert.deepEqual(b.refusals ?? [], [], `${slug}: ${b.heading ?? b.kind} is refused`);
-    assert.ok(page.blocks.some((b) => b.lead && b.drawn !== false), `${slug} draws no line`);
+    /* A LINE OR, ON REPORTS WITH MONEY MOVED, ONE TOTALS (ceeaf6193). */
+    if (slug === 'money-reports') assert.equal(page.blocks.filter((b) => b.heading === 'Totals' && b.drawn !== false).length, 1, 'Reports draws other than one Totals');
+    else assert.ok(page.blocks.some((b) => b.lead && b.drawn !== false), `${slug} draws no line`);
   }
 });
 
@@ -266,6 +275,10 @@ test('REPORTS AND PAYEES NARROW BY WHAT IS PICKED: the months on Reports, one pa
   const m = await spending();
   const split = m.block('money-reports', 'Spending by category', { months: 'this' });
   assert.ok(split.rows!.every((r) => String(r.fields.on) >= '2026-10-01'), 'a month before this one is in This month');
+  /* AND WHAT IT ADDS UP IS THE SAME MONTH, not the thirteen the whole Ledger holds: a bar is drawn from one query (`wholeRead`), which the pick has to narrow too. */
+  const parts = (b: Drawn) => (b as { wholeRead?: { rows: { rows: number }[] } }).wholeRead!.rows.reduce((n, r) => n + r.rows, 0);
+  assert.equal(parts(split), split.rows!.length, 'This month adds up other months');
+  assert.ok(parts(m.block('money-reports', 'Spending by category')) > parts(split), 'with no month picked it reads no more than this month, so this proves nothing');
   const last = m.block('money-reports', 'Spending by category', { months: 'last' });
   assert.ok(last.rows!.length > 0 && last.rows!.every((r) => String(r.fields.on) < '2026-10-01' && String(r.fields.on) >= '2026-09-01'));
 
