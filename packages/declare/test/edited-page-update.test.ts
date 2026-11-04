@@ -148,7 +148,11 @@ test('a block the owner took off is not offered back, only what the update adds'
   const without = (home: Body): Body => ({ ...home, blocks: home.blocks.filter((b) => b.heading !== 'Lapsing') });
   const diff = await plan(next, await recordWith(next, without));
 
-  assert.deepEqual(diff.brings, [{ id: HOME, title: 'Founder overview', blocks: [{ kind: 'table', heading: 'Late' }] }]);
+  /* THE TITLE IS CARRIED IN, as on the page above, so only the Late table is offered, and Lapsing is not. */
+  assert.deepEqual(diff.brings, [{ id: HOME, blocks: [{ kind: 'table', heading: 'Late' }] }]);
+  const page = JSON.parse(diff.kept[0]!.rebased!) as Body;
+  assert.equal(page.title, 'Founder overview');
+  assert.ok(!page.blocks.some((b) => b.heading === 'Lapsing'), 'the block the owner took off came back');
 });
 
 test('a page nobody changed is updated as before, with nothing kept and nothing asked', async () => {

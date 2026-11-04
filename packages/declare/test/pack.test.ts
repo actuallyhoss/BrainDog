@@ -630,7 +630,7 @@ test('AND A DECLARATION SOMEBODY WROTE IN THE APP IS NOT A PACK’S TO TAKE EITH
   assert.equal(out.code, 'PROVIDES_CONFLICT');
   /* AND THE REMEDY IS THE ONE THAT WORKS. There is no pack to uninstall here, so the sentence names
      the thing that does free the id. */
-  assert.match(out.fix, /was written in this record/);
+  assert.match(out.fix, /was made here/);
   assert.match(out.fix, /Retire it first/);
 
   // And the pack's own declaration at the same id is still its own to change.
