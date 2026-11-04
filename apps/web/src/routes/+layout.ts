@@ -13,7 +13,7 @@
  */
 import { redirect, type LoadEvent } from '@sveltejs/kit';
 
-import { direction, setDirection } from '$lib/a11y/direction.ts';
+import { readingWay, setReadingWay } from '$lib/a11y/reading.ts';
 import { apiBase, at, here, signInFirst } from '$lib/at.ts';
 import type { Shell } from '$lib/record/boot-live.ts';
 import type AppFrame from '$lib/shell/AppFrame.svelte';
@@ -23,8 +23,8 @@ import { light, type FrameData } from '$lib/shell/light.ts';
 import { exitSeeAs, seeingAs } from '$lib/sharing/see-as.svelte.ts';
 import { shellSignedOut } from '$lib/shell.ts';
 
-/* WHICH WAY THE APP READS IS SET BEFORE ANYTHING IS DRAWN (`direction.ts`). */
-if (typeof document !== 'undefined' && direction() === 'rtl') setDirection('rtl', false);
+/* WHICH WAY THE APP READS IS SET BEFORE ANYTHING IS DRAWN (`reading.ts`). */
+if (typeof document !== 'undefined' && readingWay() === 'rtl') setReadingWay('rtl', false);
 
 export const ssr = false;
 export const prerender = false;

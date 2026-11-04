@@ -103,22 +103,6 @@
     user-select: none;
   }
 
-  /* A VERY SHORT WINDOW (a phone on its side, a laptop at 400% zoom, where 900 tall reads as 225): the bar kept a third of
-     the screen. It goes down to its glyphs, each still a 44 tall target with its name for a screen reader. */
-  @media (height < 360px) {
-    :global(:root) {
-      --tab-h: 48px;
-    }
-
-    .tab-name {
-      position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-    }
-  }
-
   /* THE KEYBOARD TAKES THE BOTTOM OF THE SCREEN, and four dead targets over the keys somebody is using would sit above
      the sheet being typed into. `a11y/keyboard.ts` sets `data-kb` for exactly the readers that have to disappear. */
   :global(html[data-kb]) .tabs {
@@ -194,6 +178,22 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* A VERY SHORT WINDOW (a phone on its side, a laptop at 400% zoom, where 900 tall reads as 225): the bar kept a third of
+     the screen. It goes down to its glyphs, each still a 44 tall target with its name for a screen reader. */
+  @media (height < 360px) {
+    :global(:root) {
+      --tab-h: 48px;
+    }
+
+    .tab-name {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
   }
 
   /* NEEDS YOU'S COUNT ON THE CORNER OF ITS GLYPH: 4 over its top, 14 in from its start, its ring cut out of the glyph. */

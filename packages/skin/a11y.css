@@ -61,7 +61,7 @@
     }
   }
 
-  /* RIGHT TO LEFT (`lib/a11y/direction.ts`, Settings > Appearance).
+  /* RIGHT TO LEFT (`lib/a11y/reading.ts`, Settings > Appearance).
 
      A GLYPH THAT POINTS ALONG THE LINE TURNS WITH IT (`Icon.svelte`). What turns it is `scale`, so a host's `rotate` or
      `transform` on the same glyph is left alone; a chevron a fold opens by a quarter turn has to turn the other way to

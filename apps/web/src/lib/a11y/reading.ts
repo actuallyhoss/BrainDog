@@ -10,16 +10,16 @@
  * Written on the first line of `+layout.ts`, before anything is drawn.
  */
 
-export type Direction = 'ltr' | 'rtl';
+export type ReadingWay = 'ltr' | 'rtl';
 
 const NAME = 'bd_dir';
 const YEAR = 60 * 60 * 24 * 365;
 
-export const direction = (cookie: string = typeof document === 'undefined' ? '' : document.cookie): Direction =>
+export const readingWay = (cookie: string = typeof document === 'undefined' ? '' : document.cookie): ReadingWay =>
   /(?:^|; )bd_dir=rtl(?:;|$)/u.test(cookie) ? 'rtl' : 'ltr';
 
-/** Sets the document's direction, and keeps it on this device when `keep` says so. */
-export function setDirection(to: Direction, keep = true): void {
+/** Sets which way the document reads, and keeps it on this device when `keep` says so. */
+export function setReadingWay(to: ReadingWay, keep = true): void {
   if (typeof document === 'undefined') return;
   if (to === 'rtl') document.documentElement.setAttribute('dir', 'rtl');
   else document.documentElement.removeAttribute('dir');

@@ -31,7 +31,7 @@
 -->
 <script lang="ts">
   import * as pref from '$lib/pref.ts';
-  import { direction, setDirection, type Direction } from '$lib/a11y/direction.ts';
+  import { readingWay, setReadingWay, type ReadingWay } from '$lib/a11y/reading.ts';
   import { ACCENTS, apply as accentApply } from '$lib/accent.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -294,11 +294,11 @@
     ['dark', copy.schemeDark, 'moon'],
   ] as const;
 
-  const DIRECTIONS: readonly (readonly [Direction, string])[] = [
+  const WAYS: readonly (readonly [ReadingWay, string])[] = [
     ['ltr', copy.directionLtr],
     ['rtl', copy.directionRtl],
   ];
-  let reads = $state<Direction>(direction());
+  let reads = $state<ReadingWay>(readingWay());
 
   const TEXTS = [
     ['sm', copy.textSmall],
@@ -380,7 +380,7 @@
         <div class="choice">
           <span class="choice-name" id="choice-direction">{copy.direction}</span>
           <Segmented full role="group" aria-labelledby="choice-direction">
-            {#each DIRECTIONS as [v, label] (v)}
+            {#each WAYS as [v, label] (v)}
               <button
                 type="button"
                 class="segment"
@@ -388,7 +388,7 @@
                 data-on={reads === v ? '' : undefined}
                 onclick={() => {
                   reads = v;
-                  setDirection(v);
+                  setReadingWay(v);
                 }}>{label}</button
               >
             {/each}

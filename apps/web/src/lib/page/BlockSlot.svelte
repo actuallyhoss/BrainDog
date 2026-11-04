@@ -1325,7 +1325,7 @@
       position: absolute;
       inset-block-start: 0;
       inset-inline-end: 0;
-      z-index: 1;
+      z-index: var(--z-raise);
       overflow: visible;
       padding-inline-start: var(--sp-2);
       background: var(--tile);
@@ -1387,6 +1387,12 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* A HEADING KEPT FOR A SCREEN READER HOLDS NO STOP FOR THE KEYBOARD: focus landed on a link nobody could see, on every
+     quiet tile of Today. The tile's own "more" is the way in. */
+  .block-bar[data-quiet] .block-source {
+    display: none;
   }
 
 
