@@ -452,27 +452,30 @@ export async function redeliver(message: HeldMessage, deps: HeldDeps): Promise<R
   } catch {
     return giveUp(deps, bucket, message.held, sealed, rec, 'unreadable');
   }
-  let answer: Response;
+  /* A DOOR THAT THREW RINGS AGAIN AS A 503 WOULD. It needs no Response to say so: this is a queue's consumer, nobody is
+     waiting on an answer, and one built here would be an answer without `no-store`. */
+  let answer: Response | null = null;
   try {
     answer = await serveIngest(again(envelope.url, envelope.headers, unbase64(envelope.body)), unlimited(deps.door()));
   } catch {
-    answer = new Response(null, { status: 503 });
+    /* Said as `status` below. */
   }
-  if (answer.status === 202) {
+  const status = answer?.status ?? 503;
+  if (status === 202) {
     await bucket.delete(message.held);
     const late = Math.round(((deps.now ?? Date.now)() - Date.parse(envelope.at)) / 1000);
     op({ op: 'door', delivered: true, rec, tries: message.tries + 1, late_s: Number.isFinite(late) ? late : null });
     return 'delivered';
   }
-  if (answer.status === 503 || answer.status === 429) {
+  if (status === 503 || status === 429) {
     const now = (deps.now ?? Date.now)();
     const kept = Date.parse(envelope.at);
     /* A WEEK IS LONG ENOUGH: a record that has refused every ring for seven days is not going to be reset back to health
        by the next one, and what it holds is the deployment's room for every other record's outage. */
     if (Number.isFinite(kept) && now - kept > HELD_OLDEST_MS) return giveUp(deps, bucket, message.held, sealed, rec, 'too-old');
     const tries = message.tries + 1;
-    const after = Number(answer.headers.get('retry-after') ?? '');
-    const delay = Math.min(Math.max(1, Math.round(answer.status === 429 && Number.isFinite(after) && after > 0 ? after : stepOf(tries))), 43_200);
+    const after = Number(answer?.headers.get('retry-after') ?? '');
+    const delay = Math.min(Math.max(1, Math.round(status === 429 && Number.isFinite(after) && after > 0 ? after : stepOf(tries))), 43_200);
     await deps.queue.send({ held: message.held, tries }, { delaySeconds: delay });
     /* THE OBJECT SAYS WHEN ITS NEXT RING IS DUE, so the sweep leaves a live chain alone. Put after the ring is queued:
        a put that fails costs at most one extra ring from the sweep, which the door's dedupe stores once.
@@ -498,12 +501,12 @@ export async function redeliver(message: HeldMessage, deps: HeldDeps): Promise<R
       op({ op: 'door', marked: false, rec, why: 'gone' });
       return 'gone';
     }
-    op({ op: 'door', waiting: true, rec, tries, status: answer.status }, 'error');
+    op({ op: 'door', waiting: true, rec, tries, status }, 'error');
     if (tries === HELD_TELL_AFTER) await deps.tell?.({ why: 'waiting', rec });
     return 'waiting';
   }
   /* ANY OTHER ANSWER IS THE DOOR SAYING IT NEVER WILL: gone (404), switched off (410), too big (413). */
-  return giveUp(deps, bucket, message.held, sealed, rec, `status-${String(answer.status)}`);
+  return giveUp(deps, bucket, message.held, sealed, rec, `status-${String(status)}`);
 }
 
 async function giveUp(deps: HeldDeps, bucket: HeldBucket, key: string, sealed: Uint8Array, rec: string, why: string): Promise<'gave-up'> {
