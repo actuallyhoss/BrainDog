@@ -198,6 +198,14 @@ final class AppModel {
         case .ask(let prefill):
             openTell(prefill: prefill, mode: .ask)
         case .badge(let n):
+            /* THE COUNT MOVED, SO TODAY'S PICTURE IS OLD (an answered card in it): kept again in a moment, not only on the
+               way out, where the snapshot often comes too late, so the next launch does not open on the card just closed. */
+            if n != badge {
+                Task {
+                    try? await Task.sleep(for: .seconds(0.6))
+                    await keepLaunchPicture()
+                }
+            }
             badge = n
         case .open(let url):
             outside = Outside(url: url)
