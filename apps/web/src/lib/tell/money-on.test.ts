@@ -18,7 +18,8 @@ type Declared = { register?: string; name: string; title: string; fields: FieldD
 
 const declared = Object.fromEntries(
   ((firstPartyDocument('money-core' as never)?.declarations ?? []) as Declared[]).flatMap((d) =>
-    d.register ? [[d.register, { id: d.register, name: d.name, title: d.title, fields: d.fields, ...(d.state ? { state: d.state } : {}) }]] : [],
+    /* A rule names its list as `register` too, and holds no fields: only a list's own declaration is the list. */
+    d.register && d.fields ? [[d.register, { id: d.register, name: d.name, title: d.title, fields: d.fields, ...(d.state ? { state: d.state } : {}) }]] : [],
   ),
 );
 const PEOPLE: TellList = { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] as FieldDecl[] };

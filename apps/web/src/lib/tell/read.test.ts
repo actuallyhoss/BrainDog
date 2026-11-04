@@ -462,14 +462,14 @@ test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oc
   const on = { ...shop, today: '2026-10-31' };
   const way = (s: string, c: Partial<typeof on> = {}) => tellRead(s, { ...on, ...c }).rows.find((r) => r.register === 'transactions');
   /* RG4: a refund is money back, and money put into the account is in. */
-  assert.equal(way('Refund of EGP 500 credited to your card ending 1234 for your purchase at Amazon')?.said, 'EGP 500 in, from Amazon');
-  assert.equal(way('EGP 500 transferred to your a/c from Ahmed')?.said, 'EGP 500 in, from Ahmed');
+  assert.equal(way('Refund of EGP 500 credited to your card ending 1234 for your purchase at Amazon')?.said, 'EGP\u00a0500 in, from Amazon');
+  assert.equal(way('EGP 500 transferred to your a/c from Ahmed')?.said, 'EGP\u00a0500 in, from Ahmed');
   /* RG5: a balance is never the amount, so a text whose amount names no currency keeps nothing. */
   assert.equal(way('Purchase of 450.00 at CARREFOUR. Your available balance is EGP 12,000.00'), undefined);
   /* RG6: "Rent paid 12000" is the rent paid, out, and nobody called Rent. */
   const rent = tellRead('Rent paid 12000', on).rows;
   assert.deepEqual(rent.map((r) => r.register), ['transactions']);
-  assert.equal(rent[0]!.said, 'EGP 12,000 out, for rent');
+  assert.equal(rent[0]!.said, 'EGP\u00a012,000 out, for rent');
   /* RG7: a bare "$" is the record's dollar, and a question anywhere else. */
   assert.deepEqual(way('I paid $40 for hosting', { currency: 'CAD' })?.fields.amount, { amount: 4000, currency: 'CAD' });
   /* RG8: lakhs and a decimal comma, by the one money reader. */
@@ -478,7 +478,7 @@ test('A BANK TEXT AND A BILL WORD ARE READ THE WAY THE MONEY MOVED (review 31 Oc
   /* RG9: "30/10" told on 31 Oct is yesterday. */
   assert.equal(way('I paid 900 on 30/10')?.fields.on, '2026-10-30');
   /* RG16: "paid out" with no platform named is money out. */
-  assert.equal(way('Paid out 300 to the cleaner')?.said, 'EGP 300 out, for the cleaner');
+  assert.equal(way('Paid out 300 to the cleaner')?.said, 'EGP\u00a0300 out, for the cleaner');
 });
 
 test('A NEW NAME BEFORE A BARE "PAID" IS ASKED WHICH WAY, never made a person who paid you (MC1)', () => {
@@ -603,7 +603,7 @@ test('PLAIN MONEY LINES ARE MONEY, never tasks (AL4)', () => {
   const netflix = tellRead('Netflix 180 a month', { ...founder, lists: [...founder.lists, RECURRING] }).rows;
   assert.deepEqual(netflix.map((r) => [r.register, r.fields.direction, r.fields.every]), [['recurring', 'out', 'monthly']]);
   /* Repeating needs its next day, so Tell asks for it and never makes one up. */
-  assert.deepEqual(netflix[0]!.missing, ['next_due']);
+  assert.deepEqual(netflix[0]!.missing, ['the day it is due']);
   assert.equal(tellRead('Netflix 180 a month', founder).rows[0]!.fields.repeats, 'monthly');
   /* Where nothing is a task list, they are still money, never "Not sure". */
   const personal = { lists: [PEOPLE, LEDGER, DUE], today: TODAY, currency: 'EGP' };
@@ -1241,7 +1241,7 @@ test('"NETFLIX 180 A MONTH" ASKS FOR ITS NEXT DAY, never a day made up (AO5, kep
   const withRepeating = { ...founder, lists: [...founder.lists, RECURRING] };
   const told = tellRead('Netflix 180 a month', withRepeating);
   assert.equal(told.rows[0]!.fields.next_due, undefined);
-  assert.deepEqual(told.rows[0]!.missing, ['next_due']);
+  assert.deepEqual(told.rows[0]!.missing, ['the day it is due']);
   /* A day said is kept, and nothing is missing. */
   const fifth = tellRead('Netflix 180 a month on the 5th', withRepeating).rows[0]!;
   assert.equal(fifth.fields.next_due, '2026-11-05');
@@ -1253,8 +1253,10 @@ test('MONEY IN KEPT AS A PAID ITEM IS IN MONEY BEFORE THE ADD AND AFTER IT (AO10
   const salary = tellRead('Got paid 45,000 salary today', personal).rows[0]!;
   assert.equal(salary.detail, 'kept in Money');
   assert.deepEqual(salary.where, { name: 'Money', href: '/p/money' });
-  /* A client's payment is the invoice it settles, and its place is its list's own. */
-  assert.equal(tellRead(NADIA, fresh).rows[2]!.where, undefined);
+  /* EVERY PAYMENT SAID THE ONE WAY (AP27): a client's payment settles her invoice, and it is still money kept in Money. */
+  const hers = tellRead(NADIA, fresh).rows[2]!;
+  assert.equal(hers.detail, 'kept in Money');
+  assert.deepEqual(hers.where, { name: 'Money', href: '/p/money' });
 });
 
 test('A DAY OF THE MONTH IS SAID BACK AS A DATE, never as a weekday (AO18)', () => {
