@@ -725,7 +725,7 @@ export { ANSWERED_IN, CHANGED_NOTE, GONE_NOTE, APART_PREF, apartIds, apartJson, 
    `agentOf` goes out as `ladderAgentOf`, since `session.ts`'s `agentOf` (the kind of agent a run is) already has the name. */
 export {
   ATTACH, ADDONS, AUTOMATION, CALL, FLOORS, KEPT_DAYS, RUNGS, agentOf as ladderAgentOf, dearest, keysOfStamp, kindOfEvent, kindOfAttach, kindOfWrite, kindsOfProposal, kindsOfWrite, madeByIn,
-  personOf, recordReader, rungOf, seedLadder, shapeIn, stampOf, tokenOfRun, askedKeyOf, ASKED_KEY,
+  personOf, JOINED_AT, recordReader, rungOf, seedLadder, shapeIn, stampOf, tokenOfRun, askedKeyOf, ASKED_KEY,
   type ChangeKind, type Floor, type KindReader, type ListShape, type Rung, type WriteSaid,
 } from './change-kind.ts';
 /* UNDO ON THE SERVER (`undo.ts`) and THE WALK OVER WHAT THE RECORD ALREADY HOLDS (`backfill.ts`), each also a kernel

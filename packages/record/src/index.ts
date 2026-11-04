@@ -48,7 +48,7 @@ import type { ContactArgs, ContactMet, EraseReport, EraseRequest } from '@braind
 import { NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
-import { PUSH_KINDS, SAID_MOST, mayOf, openInstructions, shareMeOf, type Instr, type Profile, type Stop } from '@braindog/kernel';
+import { JOINED_AT, PUSH_KINDS, SAID_MOST, mayOf, openInstructions, shareMeOf, type Instr, type Profile, type Stop } from '@braindog/kernel';
 import { OWN_RUN, nameMid, personNamed, stopLine, toldOf, toldTo, type Told } from './methods/instructions.ts';
 import { saysOf } from './methods/agent-profile.ts';
 import type { Grant, InvitationRow } from '@braindog/kernel';
@@ -17051,7 +17051,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          joining did. Signed by the joiner, their own Activity said "You created Mira Chen" and Needs you said "You" under
          a question they never asked. Still believed as typed (a person's principal): the host has just verified the address. */
       if (joined.ok && kernel.meetsList() !== null && !isOrganisationAddress(email))
-        kernel.meet({ ...(name ? { name } : {}), email, where: 'accepted an invitation' }, { actor: 'system', principal: { kind: 'person' } }, { viewer: null });
+        kernel.meet({ ...(name ? { name } : {}), email, where: JOINED_AT }, { actor: 'system', principal: { kind: 'person' } }, { viewer: null });
       /* AND WHOEVER INVITED THEM HEARS IT ON THEIR PHONE (collab pass 2), as their own settings allow: a tap opens People. */
       if (joined.ok) {
         const inv = sql.one<{ id: string; invited_by: string | null }>('SELECT id, invited_by FROM invitation WHERE accepted_by = ? ORDER BY accepted_at DESC LIMIT 1', id);

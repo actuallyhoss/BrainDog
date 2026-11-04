@@ -75,10 +75,15 @@ async function setup(guestName: string, guestEmail: string) {
 }
 
 test('A GUEST JOINING UNDER ANOTHER PERSON\'S NAME KEEPS THEIR OWN ROW, and `$me` is never that person', async () => {
-  const { sql, sam } = await setup('Sam Rivera', 'samrivera@guest.example');
+  const { api, sql, sam } = await setup('Sam Rivera', 'samrivera@guest.example');
   const me = shareMeOf(sql as never, 'p_guest', 'contacts');
   assert.ok(me.length > 0, 'the guest was met as nobody, so this proves nothing');
   assert.ok(!me.includes(sam), 'the guest was folded into the person they named themselves after');
   assert.equal(sql.one<{ deleted_at: string | null }>('SELECT deleted_at FROM entry WHERE id = ?', sam)?.deleted_at, null);
+  /* AND SO THE GUEST'S SHARE READS NONE OF SAM'S JOBS, which is what the fold would have handed over. */
+  const held = api.kernel.access('p_guest')!;
+  const guest = { principal: { kind: 'person', id: 'p_guest', level: held.level }, registers: held.registers ?? '*', levels: held.levels, wheres: held.wheres } as CallContext;
+  const jobs = await api.list({ register: 'jobs' }, guest);
+  assert.doesNotMatch(JSON.stringify(jobs), /VICTIM-ONLY/u, "the guest read the rows of the person they named themselves after");
   sql.close();
 });

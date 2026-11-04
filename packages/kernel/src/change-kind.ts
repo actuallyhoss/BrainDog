@@ -39,6 +39,7 @@ import { meetsRole, orgRole, type RoleField } from './roles.ts';
 import { SESSION, SESSION_PREFIX } from './session.ts';
 import { SLASH } from './slash.ts';
 import { kindOfAutomationChange } from './automation-kind.ts';
+import { keyOf } from './identity-keys.ts';
 
 /** The rungs, lowest first: ask before writing, write and say so, write and say nothing. */
 export const RUNGS = ['ask', 'tell', 'quiet'] as const;
@@ -560,10 +561,26 @@ export function personOf(sql: Sql, actor: string): string | null {
   return token === null ? null : (sql.one<{ p: string }>('SELECT person_id AS p FROM token WHERE id = ?', token)?.p ?? null);
 }
 
-/** The person who made a row, read from its `create` event, or `null`. */
+/** The place a joiner is met at (`acceptInvite`), which the key their row is made with keeps as its source. */
+export const JOINED_AT = 'accepted an invitation';
+
+/**
+ * Who joined to make this row. Joining is signed by the record, so its Activity never says they wrote it, but the row is
+ * still theirs: read as nobody's, a guest whose name and address look like a contact's was folded into that contact, and
+ * their share's `$me` then read the contact's rows. The key the meeting kept names them.
+ */
+function joinerOf(sql: Sql, rowId: string): string | null {
+  const keys = new Set(sql.all<{ key: string }>('SELECT key FROM entity_key WHERE row_id = ? AND source = ?', rowId, JOINED_AT).map((k) => k.key));
+  if (keys.size === 0) return null;
+  const people = sql.all<{ id: string; email: string }>('SELECT id, email FROM person WHERE email IS NOT NULL');
+  return people.find((p) => keys.has(keyOf('email', p.email) ?? ''))?.id ?? null;
+}
+
+/** The person who made a row, read from its `create` event, or `null`. A row joining made is the joiner's (`joinerOf`). */
 export function madeByIn(sql: Sql, rowId: string): string | null {
   const actor = sql.one<{ a: string }>("SELECT actor AS a FROM event WHERE target = ? AND kind = 'create' ORDER BY rowid LIMIT 1", `entry:${rowId}`)?.a;
-  return actor === undefined ? null : personOf(sql, actor);
+  if (actor === undefined) return null;
+  return personOf(sql, actor) ?? (actor === 'system' ? joinerOf(sql, rowId) : null);
 }
 
 /** Whether a person keeps the whole record: an owner of every list, not suspended, as `members.ts` counts one. */
