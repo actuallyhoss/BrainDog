@@ -169,6 +169,13 @@ test('A DOOR\'S CONNECT RECIPE KEEPS ITS SCRIPT AND ITS HOSTS, a key in the scri
   assert.deepEqual(elsewhere.dropped.map((d) => d.why), [scrubWords.link]);
 });
 
+test('SOMEONE ELSE IS READ FOR WHOEVER IS LOOKING, as me is, so it names nobody of this record and stays', () => {
+  const page = [{ page: 'work', title: 'Work', blocks: [{ kind: 'table', source: 'register.tasks', where: 'agent is empty, owner is not someone else' }] }];
+  const out = scrubbed(page);
+  assert.deepEqual(out.settings, []);
+  assert.deepEqual(out.declarations, page);
+});
+
 test('A SHIPPED ADD-ON IS LEFT AS IT IS, but for a door address and a row its page points at', () => {
   const root = new URL('../../../packs/', import.meta.url);
   for (const id of readdirSync(root)) {

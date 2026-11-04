@@ -85,7 +85,7 @@ const ADDRESS_IN = /[^\s@<>()"']+@[^\s@<>()"']+\.[a-z]{2,}/iu;
 const LINK = /^https?:\/\/\S+$/iu;
 const LINK_IN = /https?:\/\/\S+/iu;
 /** The words a filter uses that name no value. */
-const NO_VALUE = new Set(['set', 'empty', 'unset', 'true', 'false', 'me', 'today', 'yesterday', 'tomorrow']);
+const NO_VALUE = new Set(['set', 'empty', 'unset', 'true', 'false', 'me', 'someone else', 'today', 'yesterday', 'tomorrow']);
 /** A clause of a filter written as a sentence: `field is value`, `field is not value`, `field not value`, comma between. */
 const CLAUSE = /(^|,)(\s*)([a-z][a-z0-9_]*)(\s+(?:is not|is|not)\s+)([^,]+)/gu;
 /** The operators whose value a leaf of a filter tree compares against. */
