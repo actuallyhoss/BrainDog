@@ -194,6 +194,21 @@ function withMenu(el: Element): HTMLElement | null {
 type Picked = { host: HTMLElement; link: string | null } | { thing: string; from: HTMLElement };
 
 /** What a press on `el` opens, or null where the browser keeps its menu. */
+/**
+ * THE ROW A PRESS LANDED IN, WHEN THE ROW STANDS FOR ONE THING: it says which (`data-row="tasks#8"`), or it holds one link and
+ * no other, whose figure and date around it are that same thing. A row with two links stands for neither.
+ */
+function rowHeld(el: Element): { thing: string; from: HTMLElement } | null {
+  const said = el.closest<HTMLElement>('[data-row]');
+  const ref = said?.dataset.row?.match(/^([a-z][a-z0-9_-]*)#([1-9]\d*)$/u);
+  if (said && ref) return { thing: `/r/${ref[1]}/${ref[2]}`, from: said };
+  const row = el.closest<HTMLElement>('li, tr, [role="row"]');
+  if (!row) return null;
+  const links = new Set([...row.querySelectorAll('a[href]')].map((a) => appAddress(a)));
+  const [only] = links;
+  return links.size === 1 && only ? { thing: only, from: row } : null;
+}
+
 function pick(el: Element | null, shift: boolean, selected: boolean): Picked | null {
   if (!el || shift || selected || editable(el)) return null;
   const host = withMenu(el);
@@ -204,13 +219,19 @@ function pick(el: Element | null, shift: boolean, selected: boolean): Picked | n
   if (link && address === null && (!host || host.contains(link))) return null;
   if (!host) {
     if (address !== null) return { thing: address, from: link as HTMLElement };
-    return marked?.dataset.thing ? { thing: marked.dataset.thing, from: marked } : null;
+    if (marked?.dataset.thing) return { thing: marked.dataset.thing, from: marked };
+    return rowHeld(el);
   }
   const named = host.dataset.menuHost;
   /* A SELECTED ROW'S PRESS IS THE SELECTION'S, whatever part of the row it hit. */
   const handsOn = named !== undefined && named !== '' && named !== 'self';
   if (marked?.dataset.thing && host.contains(marked) && marked !== host && (!link || marked.contains(link))) {
     if (!handsOn) return { thing: address ?? marked.dataset.thing, from: marked };
+  }
+  /* A ROW OF SOMETHING INSIDE A BLOCK WITH A MENU OF ITS OWN IS THE ROW, not the block. */
+  if (!link && !marked && !handsOn) {
+    const row = rowHeld(el);
+    if (row && row.from !== host && host.contains(row.from) && !row.from.querySelector('[data-menu-host]')) return row;
   }
   if (!link || address === null) return { host, link: marked === host ? (marked.dataset.thing ?? null) : null };
   /* THE LINK STANDS AROUND THE HOST, OR THE HOST IS THE LINK'S OWN: one thing, and its menu gains the link's verbs. */
