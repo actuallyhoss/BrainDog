@@ -204,7 +204,7 @@ export const SEARCH_HINTS: Readonly<Record<string, string>> = {
   update: 'edit change fix row field',
   log: 'note comment page html attach',
   propose: 'ask person decide suggest',
-  act: 'undo revert settings packs add-on plugin board widget page automation rule share invite key zone currency export anything app',
+  act: 'undo settings plugin page share anything',
   record_index: 'registers lists fields schema',
   activity: 'history changes recent',
   governance: 'decisions waiting questions',
