@@ -9722,7 +9722,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * The name a key number's readings are written under, from the key number or a name a person says for it.
    *
    * ASKED FOR BY A CLEANUP RUN ON HIS RECORD (1 Nov): the key number "Monthly revenue" was read as "Monthly revenue,
-   * Encore", so `kpi-stale:Monthly revenue` and a filter of the readings by that name found nothing, and a check said it
+   * Kiln", so `kpi-stale:Monthly revenue` and a filter of the readings by that name found nothing, and a check said it
    * was never read. So a key number's row (`kpis#4`, its prefix or its id, when the caller reads key numbers) is read as
    * its measure, or its name, and as that name with its project after it where the readings carry that; and a name no
    * reading holds is read as the one reading name that is it with something after a comma. A name readings hold is
@@ -10578,8 +10578,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const peopleModule = () =>
       kernel.register(PEOPLE) !== undefined && kernel.packStates().some((p) => p.id === PEOPLE && p.disabled_at === null && p.registers.includes(PEOPLE));
     const mayKnow = allows(ctx, 'owner') === null || (readable(ctx, PEOPLE) === null && peopleModule());
-    /* A GUEST STILL KNOWS WHO SHARED WITH THEM (collab pass 2, 2 Nov): the invitation and its mail already said "Sam
-       shared Kiln website with you", so their bell may say Sam too. Only those people, and only their names. */
+    /* A GUEST STILL KNOWS WHO SHARED WITH THEM (collab pass 2, 2 Nov): the invitation and its mail already said "Ada
+       shared Kiln website with you", so their bell may say Ada too. Only those people, and only their names. */
     if (!mayKnow) {
       const me = ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? (ctx.principal.person ?? null) : null;
       if (me === null) return null;
@@ -17027,7 +17027,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           expires_at,
           record: kernel.identity()?.name ?? null,
           /* WHO INVITED THEM, by the name the record keeps for them (collab pass, 2 Nov), so the page and the mail say
-             "Sam invited you" and not only where to. `null` for a person the record holds no name for. */
+             "Ada invited you" and not only where to. `null` for a person the record holds no name for. */
           by: ((n) => (typeof n === 'string' && n.trim() !== '' ? n.trim() : null))(sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', invited_by)?.name),
           level,
           lists: Object.entries(registers).flatMap(([id, held]) => {
