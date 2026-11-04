@@ -1347,6 +1347,14 @@
     font-size: var(--fs-ctl);
   }
 
+  /* UNDER A THUMB THE SELECT ITSELF IS THE TARGET: the select is what opens, so the floor is its own and not its box's. */
+  @media (pointer: coarse) {
+    .lock-field,
+    .lock-field .field-input {
+      min-block-size: var(--tap);
+    }
+  }
+
   /* ON A PHONE THE FINDER AND ITS ORDER SHARE ONE LINE: the order no longer wraps under the box at half its width. */
   @media (width < 640px) {
     .find {
@@ -1511,7 +1519,7 @@
   .state {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     white-space: nowrap;
   }
 
@@ -1685,7 +1693,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
   }
 
   .shown-left {
@@ -1724,7 +1732,7 @@
   .code-said {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: calc(6px * var(--dense, 1));
     min-block-size: 18px;
     margin: var(--sp-2) 0 0;
     color: var(--ink-2);

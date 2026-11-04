@@ -1571,6 +1571,21 @@
       background: var(--tile);
     }
 
+    /* THE LOWEST HANGS UNDER THE PLOT, not over it: a line that starts at its lowest (Dashboard's "6 hours") ran into the
+       word, and the word's fill cut the line. The plot gives up the line's height, so nothing under it moves. */
+    .lines-bottom {
+      translate: 0 100%;
+      line-height: var(--lead-cap);
+    }
+
+    .lines-plot:has(> .lines-bottom) {
+      margin-block-end: var(--lead-cap);
+    }
+
+    .lines-plot:has(> .lines-bottom) .lines-chart {
+      block-size: calc(128px - var(--lead-cap));
+    }
+
     /* AND THE READOUT STAYS INSIDE THE PLOT. Its 11rem is most of a phone's plot, so beside the rule it ran off one edge
        or the other wherever the flip fell. Here it slides with the point instead: its own start at the plot's start
        for the first day, its own end at the plot's end for the last, and in proportion between. */

@@ -347,6 +347,7 @@
 
   /* UNDER A THUMB every press is 44 tall. */
   @media (pointer: coarse) {
+    .step-acts .step-btn,
     .step-btn,
     .steps-more {
       min-block-size: var(--tap, 44px);

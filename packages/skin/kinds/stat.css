@@ -54,6 +54,25 @@
     background: var(--tile-2);
   }
 
+  /* THE LEAD FIGURE IS MOST OF ITS TILE, SO A PRESS IS THE FIGURE AND NOT A BOX: Money's Cash now went grey from edge to
+     edge, and with that gone a thumb saw nothing. The number gives under it, and comes back on the press's own spring. */
+  .block[data-kind='stat'][data-form='lead'] a.cell .cell-figure {
+    transform-origin: 0 50%;
+    transition:
+      scale var(--d-press-out, 190ms) var(--spring-press, ease-out),
+      opacity var(--d-press-out, 190ms) ease-out;
+  }
+
+  .block[data-kind='stat'][data-form='lead'] a.cell:active {
+    background: none;
+  }
+
+  .block[data-kind='stat'][data-form='lead'] a.cell:active .cell-figure {
+    opacity: 0.6;
+    scale: 0.97;
+    transition-duration: 60ms;
+  }
+
   /* A LINKED FIGURE IS A TARGET, so under a thumb it is 44 tall (pages §2.5, stat lead). */
   @media (pointer: coarse) {
     a.cell {

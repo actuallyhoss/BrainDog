@@ -154,9 +154,17 @@
 
   /* THE WHOLE 64 FOR THE WORD ON THE NARROWEST PHONES (skills pass follow-up, 2 Nov): with 4 of padding a side "Needs
      you" was cut to "Needs y…" at 320. The target is the tab's full box either way. */
-  @media (width < 360px) {
+  @media (width < 390px) {
     .tab {
       padding-inline: 0;
+    }
+  }
+
+  /* AT LARGE ON THE NARROWEST PHONES the word gets the size that fits the tab: 320 over five leaves 57 for a 12.65 caption. */
+  @media (width < 360px) {
+    :global(html[data-text='md']) .tab {
+      font-size: calc(11px * 1.04);
+      letter-spacing: -0.005em;
     }
   }
 
