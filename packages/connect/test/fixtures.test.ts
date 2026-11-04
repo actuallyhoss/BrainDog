@@ -304,7 +304,7 @@ const GITHUB: Fixture = {
   writes: { series: 'github-visitors', kind: 'unique', unit: 'count' },
 };
 
-const GITHUB_GRANT = { token: 'ghp_fixtureTokenNotReal', owner: 'sam', repo: 'braindog' };
+const GITHUB_GRANT = { token: 'ghp_fixtureTokenNotReal', owner: 'sami', repo: 'braindog' };
 const GITHUB_NEXT =
   'https://api.github.com/repositories/48127465/traffic/views?per=day&after=Y3Vyc29yOnYyOpK5MjAyNi0wMS0xNlQwMDowMDowMFrOAAFS4w%3D%3D';
 const GITHUB_FIRST = 'https://api.github.com/repositories/48127465/traffic/views?per=day';
@@ -340,7 +340,7 @@ test('GitHub: the next page is the Link taken verbatim, the credential goes with
 
   assert.equal(out.outcome, 'ok', out.error?.fix);
   assert.equal(seen.length, 2);
-  assert.equal(seen[0]?.url.href, 'https://api.github.com/repos/sam/braindog/traffic/views?per=day');
+  assert.equal(seen[0]?.url.href, 'https://api.github.com/repos/sami/braindog/traffic/views?per=day');
   assert.equal(seen[1]?.url.href, GITHUB_NEXT, 'the next page was rebuilt rather than taken from the Link');
   for (const call of seen) {
     assert.equal(call.init.headers.authorization, 'Bearer ghp_fixtureTokenNotReal');
@@ -1157,7 +1157,7 @@ const deployment = (uid: string, createdAt: number, readyState = 'READY'): Recor
   type: 'LAMBDAS',
   target: 'production',
   source: 'git',
-  creator: { uid: 'u_9KfixtureUser', username: 'sam' },
+  creator: { uid: 'u_9KfixtureUser', username: 'sami' },
   meta: { githubCommitRef: 'master' },
 });
 

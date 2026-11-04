@@ -117,13 +117,13 @@ test('WHERE THE REGISTER KEEPS THE CLIENT, its name and version are recorded, an
   /* A kind the register has no value for is left to the register's `other`, and the run still wears its own name. */
   assert.equal(provisionalTitle(hints, 'Kiln', REGISTER_2.kinds), 'Gemini in Kiln');
   /* WITH NO PLACE, THE APP AND ITS KIND OF MACHINE, never the host's own name and never "run". */
-  assert.equal(provisionalTitle({ client: 'claude-code', host: 'Maras-MacBook-Pro.local' }, null), 'Claude Code on MacBook');
+  assert.equal(provisionalTitle({ client: 'claude-code', host: 'Samis-MacBook-Pro.local' }, null), 'Claude Code on MacBook');
   assert.equal(provisionalTitle({ client: 'zed', host: 'DESKTOP-7F3K2Q' }, null), 'Zed on Windows PC');
   assert.equal(provisionalTitle({ client: 'mcp-remote', host: 'box-17' }, null), 'An agent');
   assert.equal(provisionalTitle({ client: 'claude-ai' }, null), 'Claude');
   /* AN APP'S OWN NAME NEVER PASSES FOR SOMEBODY (RM8): a person's name here, or a word of BrainDog's own, follows "An app calling itself". */
-  const taken = (name: string) => name.toLowerCase() === 'sam';
-  assert.equal(provisionalTitle({ client: 'Sam', host: 'Maras-MacBook-Pro.local' }, null, undefined, taken), 'An app calling itself Sam on MacBook');
+  const taken = (name: string) => name.toLowerCase() === 'sami';
+  assert.equal(provisionalTitle({ client: 'Sami', host: 'Samis-MacBook-Pro.local' }, null, undefined, taken), 'An app calling itself Sami on MacBook');
   assert.equal(provisionalTitle({ client: 'Owner' }, null), 'An app calling itself Owner');
   assert.equal(provisionalTitle({ client: 'BrainDog Health' }, null), 'An app calling itself BrainDog Health');
   assert.equal(provisionalTitle({ client: 'zed', host: 'DESKTOP-7F3K2Q' }, null, undefined, taken), 'Zed on Windows PC', 'an app named for nobody is said by its name');

@@ -59,7 +59,7 @@ const value = <T>(r: Result<T>): T => {
 async function record(): Promise<{ k: Kernel; sql: NodeSql; live: string; grant: string }> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  assert.ok(k.createRecord({ id: ID, slug: 'sam', name: 'Sam', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  assert.ok(k.createRecord({ id: ID, slug: 'sami', name: 'Sami', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
   assert.ok((await k.install([NUMBERS, CREDENTIALS])).ok);
   /* THE OLD IMPORT: a row of the same name, retired, whose grant is gone. */
   const old = value(k.depositGrant({ register: 'credentials', field: 'value', fields: { label: 'sketchpad-metrics', opens: 'admin.sketchpad.com', state: 'retired' }, grant: SEALED('sketchpad-metrics') }, { actor: 'p_1' }));
@@ -76,7 +76,7 @@ const file = (k: Kernel, ingest: Record<string, unknown>): string => {
   return (out.value as { id: string }).id;
 };
 
-const accept = (k: Kernel, id: string) => k.decide(id, { decide: { option: 'accept', reason: 'Sam told S959: "accept it"' } }, 'p_1');
+const accept = (k: Kernel, id: string) => k.decide(id, { decide: { option: 'accept', reason: 'Sami told S959: "accept it"' } }, 'p_1');
 
 test('A KEY RENAMED ON THE KEYS SCREEN IS FOUND BY ITS NEW NAME, and the poll that names it is accepted', async () => {
   const { k, sql, grant } = await record();

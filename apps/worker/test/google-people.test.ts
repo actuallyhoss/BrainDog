@@ -61,7 +61,7 @@ const value = <T>(r: { ok: boolean }): T => {
 
 type FakeMail = { id: string; thread: string; labels: string[]; headers: Record<string, string> };
 
-const ME = 'sam@gmail.com';
+const ME = 'sami@gmail.com';
 
 /** A thread with Ada both of them wrote in, a newsletter he once answered, and nothing else. */
 const MAILS: FakeMail[] = [
@@ -80,8 +80,8 @@ type Card = { name: string; emails?: string[]; phones?: string[] };
 
 const CARDS: Card[] = [
   /* HIS OWN: an address Gmail sends as, and his second address, which his own person already holds, in other case. */
-  { name: 'Sam Work', emails: ['sam@work.example'], phones: ['+20 100 000 0001'] },
-  { name: 'Avery', emails: ['Sam.Second@Example.com'] },
+  { name: 'Sami Work', emails: ['sami@work.example'], phones: ['+20 100 000 0001'] },
+  { name: 'Samira', emails: ['Sami.Second@Example.com'] },
   /* SOMEBODY KEPT, by the second address her row holds as a key, in other case. */
   { name: 'Grace H.', emails: ['Amazing.Grace@COBOL.example', 'grace.hopper@yale.example'], phones: ['+1 202 555 0143'] },
   /* A THREAD BOTH WROTE IN. */
@@ -103,7 +103,7 @@ function google(cards: Card[] = CARDS): { send: Send; asked: string[] } {
     asked.push(`${url.host}${url.pathname}`);
     const path = url.pathname;
     if (path.endsWith('/users/me/profile')) return Promise.resolve(json({ historyId: '100' }));
-    if (path.endsWith('/users/me/settings/sendAs')) return Promise.resolve(json({ sendAs: [{ sendAsEmail: ME }, { sendAsEmail: 'sam@work.example' }] }));
+    if (path.endsWith('/users/me/settings/sendAs')) return Promise.resolve(json({ sendAs: [{ sendAsEmail: ME }, { sendAsEmail: 'sami@work.example' }] }));
     if (path.endsWith('/users/me/messages')) return Promise.resolve(json({ messages: MAILS.map((m) => ({ id: m.id, threadId: m.thread })) }));
     const one = /\/users\/me\/messages\/([^/]+)$/.exec(path);
     if (one) {
@@ -140,7 +140,7 @@ async function record() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   value(await api.kernel.install([PEOPLE, TASKS]));
-  value(await api.create({ register: 'people', fields: { name: 'Sam Example', email: ME, self: true, keys: ['email:sam.second@example.com'] } as never }, owner));
+  value(await api.create({ register: 'people', fields: { name: 'Sami Example', email: ME, self: true, keys: ['email:sami.second@example.com'] } as never }, owner));
   value(await api.create({ register: 'people', fields: { name: 'Grace Hopper', email: 'grace@navy.example', keys: ['email:amazing.grace@cobol.example'] } as never }, owner));
   value(await api.create({ register: 'tasks', fields: { what: 'Send Rohan Meduri the signed contract' } as never }, owner));
   /* THE MAIL ITSELF GOES TO THE GMAIL ADD-ON'S DOOR, which this record does not have; what is measured is who it says. */
@@ -169,7 +169,7 @@ test('ONLY PEOPLE OF USE ARE ADDED: a thread both wrote in, a name the record sa
 
   assert.deepEqual(
     people(sql).map((p) => p.name),
-    ['Sam Example', 'Grace Hopper', 'Ada Lovelace', 'Rohan Meduri'],
+    ['Sami Example', 'Grace Hopper', 'Ada Lovelace', 'Rohan Meduri'],
     'a card was added for being a card, or one of use was not',
   );
   const ada = named(sql, 'Ada Lovelace')!;
@@ -190,11 +190,11 @@ test('A CARD WITH ONE OF HIS OWN ADDRESSES IS HIS: what it holds goes onto his o
   const { sql, w, conn } = await record();
   await syncOnce(conn, 'access', w, google().send, NOW);
 
-  assert.equal(people(sql).filter((p) => /sam/i.test(p.name)).length, 1, 'his own address became somebody else');
-  const mine = keysOf(sql, 'Sam Example');
-  assert.ok(mine.includes('email:sam@work.example'), `the address Gmail sends as is not his: ${mine.join(', ')}`);
+  assert.equal(people(sql).filter((p) => /sami/i.test(p.name)).length, 1, 'his own address became somebody else');
+  const mine = keysOf(sql, 'Sami Example');
+  assert.ok(mine.includes('email:sami@work.example'), `the address Gmail sends as is not his: ${mine.join(', ')}`);
   assert.ok(mine.some((k) => k.startsWith('phone:')), 'the phone on his own card is not his');
-  assert.equal(named(sql, 'Sam Example')?.name, 'Sam Example', 'a card renamed him');
+  assert.equal(named(sql, 'Sami Example')?.name, 'Sami Example', 'a card renamed him');
   sql.close();
 });
 
