@@ -1047,14 +1047,17 @@
       /* A ROLE OF "Other" SAYS NOTHING (29 October, "Other, on Lanternfish and Copperleaf"), as the list leaves it unsaid. */
       const roleSaid = role && row.fields[role] !== 'other' ? display(id, role, row.fields[role], clock, names) : null;
       const org = meets.org ? namedRef(fieldTo(meets.org), row.fields[meets.org]) : null;
+      /* A ROLE WITH NOTHING TO SAY ABOUT IT IS A FACT, NOT A SENTENCE (4 Nov): "Contractor." alone stood at 17 under the
+         name, saying a field as if it were news. It leads the small facts; "Contractor at Brightwell, on Kiln." stays. */
+      const roleAlone = roleSaid?.trim() && !org && projects.length === 0 ? roleSaid.trim().replace(/^./u, (c) => c.toUpperCase()) : null;
       return {
-        parts: whoParts({ role: roleSaid, org, projects }),
+        parts: roleAlone ? null : whoParts({ role: roleSaid, org, projects }),
         named: projects.length > 0 || chipSays(meets.projects),
         /* WHEN, AS A SMALL FACT OF ITS OWN (3 Nov, Sam): "Last in touch 2 Nov", and where they were first met as another,
            "Met Oct 2026 · Roomy creator outreach mail", where the two were one garbled sentence. Yourself, never: "Last in
            touch" over your own name said nothing, so your page says it is you. */
         last: self ? seenWords.isYou : null,
-        facts: self ? [] : [day ? seenWords.inTouch(daySaid(day, clock)) : null, metSaid(seen, (d) => daySaid(d, clock), day)].filter((x): x is string => x !== null),
+        facts: [roleAlone, ...(self ? [] : [day ? seenWords.inTouch(daySaid(day, clock)) : null, metSaid(seen, (d) => daySaid(d, clock), day)])].filter((x): x is string => x !== null),
         /* THE FIELDS THE SENTENCE SAYS, so the facts do not say them a second time under it. */
         said: [roleSaid?.trim() || (role && row.fields[role] === 'other') ? role : null, org ? meets.org : null, day ? meets.in_touch : null].filter((x): x is string => Boolean(x)),
       };
@@ -1065,11 +1068,13 @@
     const pointing = incoming.filter((g) => isProjects(g.register)).reduce((n, g) => n + g.total, 0);
     const kind = orgRole?.kind ? display(id, orgRole.kind, row.fields[orgRole.kind], clock, names) : null;
     const said = orgSaid({ kind, people, projects: projects.length > 0 || chipped ? 0 : pointing });
+    /* AND AN ORGANISATION'S KIND ALONE, "Client.", by the same reasoning: "Client · 24 people, on Kiln." stays a line. */
+    const kindAlone = said && said === kind?.trim().replace(/^./u, (c) => c.toUpperCase()) && projects.length === 0 ? said : null;
     return {
-      parts: whoParts({ role: said, org: null, projects }),
+      parts: kindAlone ? null : whoParts({ role: said, org: null, projects }),
       named: projects.length > 0 || chipped,
       last: null,
-      facts: [] as string[],
+      facts: kindAlone ? [kindAlone] : ([] as string[]),
       said: [kind?.trim() && orgRole?.kind ? orgRole.kind : null].filter((x): x is string => Boolean(x)),
     };
   });
@@ -1114,7 +1119,7 @@
   /* WHAT THE SENTENCE UNDER THE NAME SAYS ("Client at Halden Type Co. Last in touch 28 Aug."), and only while it is the
      sentence drawn: not listed as facts as well, and changed from "Add a field", where its box opens in the list. */
   const saidAbove = $derived(
-    !archived && (lead?.parts || lead?.last) ? readable.filter((f) => lead?.said.includes(f.id) && editing !== f.id) : [],
+    !archived && (lead?.parts || lead?.last || (lead?.facts && lead.facts.length > 0)) ? readable.filter((f) => lead?.said.includes(f.id) && editing !== f.id) : [],
   );
   /* WHAT "Add a field" OFFERS: every field the row has not answered that this reader can write, prose included. */
   const addable = $derived(
@@ -1438,7 +1443,7 @@
   {#snippet sentenceLine()}{#each sentence as piece, i (i)}{#if piece.kind === 'state'}<span class="lead-word">{stateSaid(decl, stateValue)}</span>{:else if piece.kind === 'late'}<span class="said-late" data-tone={piece.tone} data-needs={piece.tone === 'bad' ? '' : undefined}>{piece.text}</span>{:else}{piece.text}{/if}{/each}{/snippet}
 
   <!-- WHO A PERSON IS, OR WHAT AN ORGANISATION IS, in place of the sentence a row of any other list leads with. -->
-  {#snippet whoLine()}{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link tap" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}{#if lead?.facts && lead.facts.length > 0}<span class="who-facts">{#each lead.facts as fact (fact)}<span class="who-fact">{fact}</span>{/each}</span>{/if}{/snippet}
+  {#snippet whoLine()}{#if lead?.parts || lead?.last}<span class="who-said">{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link tap" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}</span>{' '}{/if}{#if lead?.facts && lead.facts.length > 0}<span class="who-facts">{#each lead.facts as fact (fact)}<span class="who-fact">{fact}</span>{' '}{/each}</span>{/if}{/snippet}
 
   <!-- A VALUE AS THE PAGE SAYS IT, in its line of the fields tile. -->
   {#snippet foundChips(list: FoundChip[])}<span class="found">{#each list as c, i (i)}{#if c.href}<a
@@ -1946,7 +1951,7 @@
         <!-- WHERE A PERSON WAS SEEN: each place once, newest first, with how often and when, in a person's words. ONE PLACE,
              ONCE, WITH NOTHING ABOUT IT is the head's "Met" fact already (3 Nov), so it is not a card as well. -->
         {#if seen.length > 1 || (seen.length === 1 && (seen[0]!.times > 1 || seen[0]!.about.length > 0 || !meets || self))}
-          <Tile icon="link" title={seenWords.seenIn}>
+          <Tile icon="eye" title={seenWords.seenIn}>
             <ul class="items" aria-label={seenWords.seenIn}>
               {#each seen as place (place.where)}
                 <li class="item">
@@ -2848,12 +2853,27 @@
   /* A LIST WITHOUT BOXES: each line its title over its detail, the trailing edge for when or where it stands, and the
      tile's own heading the only icon. A line that opens its row takes a wash under a pointer, reaching to the tile's
      inside edge. */
+  /* THE LIST TAKES BACK ITS ROWS' AIR AT ITS ENDS (4 Nov), as the rows' own step says where one ends and not where the card
+     does: a one-line row's 44 stood its words 12 further from the head than "Seen in" is from any other card's first
+     line, and the same again over the card's foot. A two-line row (56) holds 8 and gives back 8. */
   .items {
     display: flex;
     flex-direction: column;
-    margin: 0 calc(-1 * var(--sp-2));
+    margin: calc(-1 * var(--divider-space)) calc(-1 * var(--sp-2)) 0;
     padding: 0;
     list-style: none;
+  }
+
+  .items:has(> :first-child .item-detail) {
+    margin-block-start: calc(-1 * var(--row-pad-y));
+  }
+
+  .items:last-child {
+    margin-block-end: calc(-1 * var(--divider-space));
+  }
+
+  .items:last-child:has(> :last-child .item-detail) {
+    margin-block-end: calc(-1 * var(--row-pad-y));
   }
 
   .item {
@@ -2870,11 +2890,13 @@
 
   /* A place a person was seen leads with what kind of place it was, mail or a commit. */
   .item:has(.item-icon) {
-    grid-template-columns: 20px minmax(0, 1fr) auto;
+    grid-template-columns: var(--head-glyph) minmax(0, 1fr) auto;
   }
 
+  /* IN THE HEAD'S GLYPH COLUMN, so the place's mark stands under the card's and its words under the card's name. */
   .item-icon {
     display: inline-flex;
+    justify-content: center;
     color: var(--ink-3);
   }
 
@@ -3068,19 +3090,22 @@
   /* THE SMALL FACTS AFTER WHO THEY ARE: "Last in touch 2 Nov · Met Oct 2026 · Roomy creator outreach mail", in the meta
      size and ink, each kept whole on a line. */
   .who-facts {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: 0 var(--sp-3);
-    margin-inline-start: var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 400;
     line-height: var(--lead-meta, 18px);
     letter-spacing: 0;
-    vertical-align: baseline;
+  }
+
+  /* INLINE, WITH THE STEP AFTER EACH AND NONE BEFORE (4 Nov): a box of facts with its margin at its start kept that margin
+     when it dropped under the words, "Last in touch" 8px in from "Contractor". Now a line that wraps starts on the edge. */
+  .who-said {
+    margin-inline-end: var(--sp-2);
   }
 
   .who-fact {
+    display: inline-block;
+    margin-inline-end: var(--sp-3);
     white-space: nowrap;
   }
 
