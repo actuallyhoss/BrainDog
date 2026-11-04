@@ -30,6 +30,7 @@
 import { createClient } from '@braindog/client';
 
 import { copy } from '../copy.ts';
+import { dropOut, HOLD_MS, landedOut, outWaiting, pageGoing, REPLAY_MS, sentOut, type Out } from './answers-out.ts';
 import { forget, type Fetch } from './boot-live.ts';
 
 /**
@@ -71,15 +72,33 @@ const trimmed = (verdict: Verdict): Verdict =>
       }
     : { defer: { until: verdict.defer.until, why: verdict.defer.why.trim() } };
 
-/** Send one verdict on suggestion `id`. */
+/**
+ * THE RECORD'S REFUSAL OF AN ANSWER TO A QUESTION ALREADY CLOSED. To whoever is sending an answer again (`replayAnswers`,
+ * or a tab whose timer was asleep) that is the answer landing: the question is closed, which is what was asked.
+ */
+const closedAlready = (refusal: { code: string; at?: string | undefined; fix?: string }): boolean => refusal.code === 'TRANSITION_ILLEGAL' && refusal.at === 'status' && / is resolved\b/u.test(refusal.fix ?? '');
+
+/**
+ * Send one verdict on suggestion `id`.
+ *
+ * SENT TO OUTLIVE THE PAGE (`outlive`), BECAUSE THIS IS WHAT THE PAGE SENDS AS IT GOES: a card's held answer on `pagehide`.
+ * And written down first (`answers-out.ts`), so what the page never heard back about is sent again by the next one.
+ */
 export async function writeDecision(base: string, id: string, verdict: Verdict, io?: Fetch): Promise<Written> {
   const said = missing(verdict);
   if (said !== null) return { from: 'refused', fix: said };
+  const sent = trimmed(verdict);
+  sentOut(base, id, sent);
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const out = await client.call<{ decision?: unknown; applied?: unknown; status?: unknown; skipped?: unknown; settled?: unknown }>('decide', { id, ...trimmed(verdict) });
+  const out = await client.call<{ decision?: unknown; applied?: unknown; status?: unknown; skipped?: unknown; settled?: unknown }>('decide', { id, ...sent }, { outlive: true });
+  /* WHAT GOES WRONG WHILE THE PAGE GOES IS NOT AN ANSWER ANYBODY HEARS: it stays listed, for the next page to send. */
+  if (!out.ok && pageGoing()) return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : copy.decideConflict };
   if (out.ok) {
     forget();
     const decision = out.value && typeof out.value.decision === 'string' ? out.value.decision : null;
+    /* TAKEN IN PART IT IS STILL OPEN, and is drawn with what is left of it. */
+    if (out.value?.status === 'open') dropOut(base, id);
+    else landedOut(base, id, decision);
     /* AN ACCEPTED ARRANGEMENT SAYS WHAT IT APPLIED, and the screen says it back. */
     const applied = out.value && typeof out.value.applied === 'object' && out.value.applied !== null ? (out.value.applied as Record<string, string[]>) : undefined;
     /* AND ONE TAKEN IN PART IS STILL OPEN, holding the parts left (`govern.ts` `decide`, `status: 'open'`). */
@@ -90,9 +109,52 @@ export async function writeDecision(base: string, id: string, verdict: Verdict, 
     const said = typeof skipped?.said === 'string' ? skipped.said : typeof out.value?.settled === 'string' ? out.value.settled : undefined;
     return { from: 'written', decision, ...(applied ? { applied } : {}), ...(open ? { open: true as const } : {}), ...(said ? { said } : {}) };
   }
+  if (!('conflict' in out) && closedAlready(out.refusal)) {
+    forget();
+    landedOut(base, id, null);
+    return { from: 'written', decision: null };
+  }
+  dropOut(base, id);
   if ('conflict' in out) return { from: 'conflict', fix: copy.decideConflict };
   const wants = out.refusal.code === 'REQUIRED_MISSING' && out.refusal.at === 'reason';
   return { from: 'refused', fix: out.refusal.fix, ...(wants ? { wants: 'reason' as const } : {}) };
+}
+
+/** What `replayAnswers` says, in plain words. */
+export const replayWords = {
+  /** The answer could not be given, and the question is waiting again. */
+  failed: (title: string | undefined, fix: string) => (title ? `Your answer to “${title}” didn’t go through, so it’s waiting again. ${fix}` : `One of your answers didn’t go through, so it’s waiting again. ${fix}`),
+  /** Too long ago to send without asking. */
+  old: (title: string | undefined) => (title ? `Your answer to “${title}” was never sent, so it’s waiting again.` : 'One of your answers was never sent, so it’s waiting again.'),
+};
+
+/** Whether `one` may still be taken back by the tab holding it, inside its own six seconds and a moment for its timer. */
+const stillHeld = (one: Out, now: number): boolean => one.s === 'held' && now - one.at < HOLD_MS + 2_000;
+
+/**
+ * WHAT THE LAST PAGE PRESSED AND NEVER HEARD BACK ABOUT, sent again as this one opens. `tell` is told each that is settled.
+ * Answers given by the last page that did land are refused as closed, which `writeDecision` reads as landed.
+ */
+export async function replayAnswers(
+  base: string,
+  tell: (one: { id: string; out: Written | null; say: string | null }) => void,
+  now: number = Date.now(),
+): Promise<void> {
+  await Promise.all(
+    outWaiting(base, now).map(async (one) => {
+      if (stillHeld(one, now)) {
+        /* ANOTHER TAB'S, OR A PAGE THAT DIED INSIDE THE HOLD WITH NO `pagehide`: looked at again once its time is up. */
+        setTimeout(() => void replayAnswers(base, tell), HOLD_MS + 2_000 - (now - one.at) + 50);
+        return;
+      }
+      if (now - one.at > REPLAY_MS || !one.v) {
+        dropOut(base, one.id);
+        return tell({ id: one.id, out: null, say: replayWords.old(one.t) });
+      }
+      const out = await writeDecision(base, one.id, one.v);
+      tell({ id: one.id, out, say: out.from === 'written' ? null : replayWords.failed(one.t, out.fix) });
+    }),
+  );
 }
 
 /**
@@ -117,8 +179,11 @@ export type WrittenMany =
 /** Answer several the same way in one call (`decide { ids }`), so the record moves once and one Undo puts all back. */
 export async function answerMany(base: string, ids: readonly string[], option: string, reason?: string, io?: Fetch): Promise<WrittenMany> {
   if (ids.length === 0 || option === '' || (reason !== undefined && reason.trim() === '')) return { from: 'refused', fix: copy.reasonRequired };
+  const each: Verdict = { decide: { option, ...(reason !== undefined ? { reason: reason.trim() } : {}) } };
+  for (const id of ids) sentOut(base, id, each);
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const out = await client.call<{ decided?: unknown; refused?: unknown }>('decide', { ids: [...ids], decide: { option, ...(reason !== undefined ? { reason: reason.trim() } : {}) } });
+  const out = await client.call<{ decided?: unknown; refused?: unknown }>('decide', { ids: [...ids], decide: { option, ...(reason !== undefined ? { reason: reason.trim() } : {}) } }, { outlive: true });
+  if (!out.ok && pageGoing()) return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : copy.decideConflict };
   if (out.ok) {
     forget();
     const decided = Array.isArray(out.value?.decided) ? (out.value.decided as { decision?: unknown }[]) : [];
@@ -126,8 +191,11 @@ export async function answerMany(base: string, ids: readonly string[], option: s
       ? (out.value.refused as { id?: unknown; fix?: unknown }[]).flatMap((r) => (typeof r.id === 'string' && typeof r.fix === 'string' ? [{ id: r.id, fix: r.fix }] : []))
       : [];
     const first = decided.find((d) => typeof d.decision === 'string')?.decision;
+    const no = new Set(refused.map((r) => r.id));
+    for (const id of ids) no.has(id) ? dropOut(base, id) : landedOut(base, id, typeof first === 'string' ? first : null);
     return { from: 'written', done: decided.length, decision: typeof first === 'string' ? first : null, refused };
   }
+  for (const id of ids) dropOut(base, id);
   if ('conflict' in out) return { from: 'conflict', fix: copy.decideConflict };
   return { from: 'refused', fix: out.refusal.fix };
 }

@@ -18,6 +18,7 @@
 import { REGISTERS } from '../record/held.ts';
 import type { RegisterDecl } from '../record/schema.ts';
 import { dropCopy, readCopy } from '../record/boot-copy.ts';
+import { dropAllOut } from '../record/answers-out.ts';
 import { idbKey, idbStore, openEarly } from './local-db.ts';
 import { dropMark, memoryKey, readMark, writeMark, type MarkDeps } from './local-mark.ts';
 import { localCopy, memoryStore, railOf, scopeOf, type LocalCopy, type Log, type Near, type Rail, type Spot } from './local.ts';
@@ -181,6 +182,7 @@ export function stampLocal(v: { format: number; kernel: number; primitives: numb
 /** Sign-out, a 401, a refused boot: nothing kept outlives the reason it was kept. */
 export function wipeLocal(): Promise<void> {
   dropMark(strings());
+  dropAllOut();
   verified.clear();
   return tab().wipe().catch(() => undefined);
 }

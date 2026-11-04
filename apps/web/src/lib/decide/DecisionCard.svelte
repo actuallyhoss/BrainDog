@@ -65,7 +65,7 @@
   import { copy } from '$lib/copy.ts';
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { COMMENT_MOST, readMentionable, sayComment, type Mentionable } from '$lib/record/comments.ts';
-  import { answerQuestion } from '$lib/record/decide-write.ts';
+  import { answerQuestion, replayWords } from '$lib/record/decide-write.ts';
   import { may as mayOf } from '$lib/record/may.ts';
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
@@ -80,7 +80,8 @@
   import MergeCard from '../../routes/decide/MergeCard.svelte';
   import { answeredLine, answerRowOf, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, leadOf, pressOf, pressSaid, primaryOf, putsOff, saysChanges, startsOn, wayTail } from './card.ts';
   import { leave, pointerOff, settle, snapshot } from './settle.ts';
-  import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
+  import { answerPressed, answerTakenBack, answerWritten, waitsSaid } from '$lib/home/waits.svelte.ts';
+  import { dropOut, heldOut, lineHere } from '$lib/record/answers-out.ts';
   import { haptic } from '$lib/shell.ts';
   import { step } from '$lib/funnel.ts';
   import { othersLine, namer } from '../../routes/decide/[id]/decider.ts';
@@ -284,6 +285,9 @@
   let holding = $state<Held | null>(null);
   /* THE ANSWER WAITING OUT ITS SIX SECONDS IS ON THE TAB'S UNDO HISTORY, so ⌘Z takes it back as the Undo beside it does (fluid F15). */
   const mark = `held:${uid}`;
+  /* THIS CARD DRAWS ITS OWN ANSWERED LINE, so nothing takes its row away while it does (`answers-out.ts`). */
+  let ownLine: (() => void) | null = null;
+  let here = true;
   /* AN ANSWER PRESSED WHILE THE SCREEN WAS A SAVED COPY, kept for the record: what it said, and which answer (fluid F5). */
   let waiting = $state<{ key: string; said: string } | null>(null);
   /* THE ROW IS ON ITS WAY OUT, sent and waiting for the pointer to leave its queue, or closing (`settle.ts` `leave`). It
@@ -406,6 +410,11 @@
       }
       mergeLine = '';
       answerTakenBack(question.id);
+      ownLine?.();
+      ownLine = null;
+      /* A CARD ALREADY GONE (he moved on inside the six seconds) HAS NOWHERE TO SAY IT, so a toast does: the question is
+         back on the list, and never silently. */
+      if (!here) return void toasts.push(replayWords.failed(card.question, out.fix), { intent: 'warn' });
       /* THE REFUSAL IS FELT IN THE IPHONE APP (`shell.ts`), as the press that sent it was. */
       haptic('warning');
       /* A REFUSED ANSWER OPENS THE CARD BACK OUT OF ITS LINE as Undo does, rather than in one jump. */
@@ -435,6 +444,9 @@
     /* THE COUNT MOVES ON THE PRESS (`waits.svelte.ts`): the rail, the tab and the head say one less now, not after the
        six seconds of Undo and the poll that follows the write. AND THE IPHONE APP'S HAND FEELS THE ANSWER (`shell.ts`). */
     answerPressed(question.id);
+    /* WRITTEN DOWN BEFORE ANYTHING ELSE, so a reload from here on neither draws the question nor loses the answer. */
+    ownLine ??= lineHere(question.id);
+    heldOut(apiBase(), question.id, { decide: { option: way.key } }, card.question, waitsSaid());
     haptic('success');
     await morph(() => {
       phase = 'answered';
@@ -475,6 +487,9 @@
     holding = null;
     history.spend(mark);
     answerTakenBack(question.id);
+    dropOut(apiBase(), question.id);
+    ownLine?.();
+    ownLine = null;
     mergeLine = '';
     const key = chosen?.key;
     await morph(() => (phase = 'open'));
@@ -593,6 +608,8 @@
     if (reason.trim() === '') return reveal();
     answeredAt = new Date().toISOString();
     answerPressed(question.id);
+    ownLine ??= lineHere(question.id);
+    heldOut(apiBase(), question.id, { decide: { option: chosen.key, reason } }, card.question, waitsSaid());
     haptic('success');
     void morph(() => (phase = 'answered'));
     void send(chosen, reason);
@@ -625,6 +642,9 @@
     return () => {
       window.removeEventListener('pagehide', leave);
       leave();
+      here = false;
+      ownLine?.();
+      ownLine = null;
     };
   });
 

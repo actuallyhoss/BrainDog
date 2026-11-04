@@ -20,6 +20,7 @@
 import { createClient } from '@braindog/client';
 
 import { copy } from '../copy.ts';
+import { dropDecision } from './answers-out.ts';
 import { forget, type Fetch } from './boot-live.ts';
 
 /**
@@ -147,6 +148,8 @@ export async function undoApply(base: string, scope: UndoScope, plan: UndoPlan, 
   const out = (await client.call(name, { ...args, hash: plan.hash })) as Wire;
   if (!out.ok) return failed(out);
   forget();
+  /* THE QUESTION THAT DECISION CLOSED IS OPEN AGAIN, and may be drawn (`answers-out.ts`). */
+  if ('decision' in scope) dropDecision(scope.decision);
   const answered = isRow(out.value) ? out.value : {};
   const skipped = Array.isArray(answered.skipped) ? (planOf({ hash: plan.hash, skipped: answered.skipped })?.skipped ?? plan.skipped) : plan.skipped;
   const put = typeof answered.put === 'number' && Number.isInteger(answered.put) ? answered.put : Array.isArray(answered.steps) ? answered.steps.length : plan.steps.length;

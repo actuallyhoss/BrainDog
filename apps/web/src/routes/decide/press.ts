@@ -18,6 +18,7 @@
 
 import { money } from 'braindog-render';
 
+import { HOLD_MS } from '../../lib/record/answers-out.ts';
 import { moneyInText } from '../../lib/record/money.ts';
 import type { Question } from '../../lib/record/schema.ts';
 import { words } from './words.ts';
@@ -50,7 +51,7 @@ export function fromInput(target: unknown): boolean {
 }
 
 /** How long a held answer waits for its Undo before it goes to the record: the six seconds every Undo in the app gives. */
-export const HOLD_MS = 6_000;
+export { HOLD_MS };
 
 /** An answer held for its Undo: `undo` takes it back while it waits, and `flush` sends it at once. */
 export type Held = { undo: () => boolean; flush: () => void; readonly done: boolean };
@@ -71,7 +72,8 @@ const WINDOW_CLOCK: Clock = {
 /**
  * AN ANSWER THAT CANNOT BE TAKEN BACK IS HELD, NOT CONFIRMED. A declined question is never reopened and a declined
  * merge is never asked again, so the press is kept for `HOLD_MS` with Undo beside it, and only then sent. `flush` sends
- * it early, for a reader who leaves the page before the time is up; whichever comes first, it is sent once.
+ * it early, for a reader who leaves the page before the time is up; whichever comes first, it is sent once. It is written
+ * down on the press (`record/answers-out.ts`), so a page that dies inside the hold has it sent by the next.
  */
 export function hold(send: () => void, ms = HOLD_MS, clock: Clock = WINDOW_CLOCK): Held {
   let done = false;

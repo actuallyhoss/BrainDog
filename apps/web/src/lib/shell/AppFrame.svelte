@@ -81,7 +81,8 @@
   import { AGENTS_PAGE, agentsHref, agentsPlace, heldHref, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount, toldReadable } from '$lib/home/need-you.ts';
-  import { heardWaits, waitsNow, waitsTicket, workingNow } from '$lib/home/waits.svelte.ts';
+  import { answerTakenBack, answerWritten, heardWaits, waitsNow, waitsTicket, workingNow } from '$lib/home/waits.svelte.ts';
+  import { outWaiting } from '$lib/record/answers-out.ts';
   import { heardTold, toldNow } from '$lib/home/told-now.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
@@ -97,7 +98,7 @@
   import { drewFirst } from '$lib/data/first-drawn.ts';
   import { tick, untrack, type Snippet } from 'svelte';
   import type { FrameData } from '$lib/shell/light.ts';
-  import { afterNavigate, beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
+  import { afterNavigate, beforeNavigate, goto, invalidate, invalidateAll, onNavigate } from '$app/navigation';
   import { noteOpened } from '$lib/palette/opened.ts';
   import { heard, quietFocus } from '$lib/ui/quiet-focus.ts';
   import { hush } from '$lib/motion/index.ts';
@@ -292,6 +293,24 @@
   const railNav = $derived.by(() => {
     const placed = new Set(data.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
     return navPrefs.relabel(data.nav.filter((n) => !n.cut && !placed.has(n.href)));
+  });
+  /* WHAT THE LAST PAGE PRESSED AND NEVER HEARD BACK ABOUT GOES AGAIN NOW (`answers-out.ts`), and only a refusal is said: its
+     question is open again, so it is drawn again and the reader is told why. Asks nothing where nothing waits. */
+  let replayed = false;
+  $effect(() => {
+    const base = apiBase();
+    /* ONCE, AS THE PAGE OPENS: later on this list is this page's own answers, going out as they should. */
+    if (replayed || data.stale === true) return;
+    replayed = true;
+    if (outWaiting(base).length === 0) return;
+    void import('$lib/record/decide-write.ts').then((m) =>
+      m.replayAnswers(base, ({ id, out, say }) => {
+        if (out?.from === 'written') answerWritten(id);
+        else answerTakenBack(id);
+        if (say !== null) toasts.push(say, { intent: 'warn' });
+        void invalidateAll();
+      }),
+    );
   });
   /* WHAT WAITS, AS THE NEWEST `boot` SAID IT (`waits.svelte.ts`): the shell's, and then the poll's re-read of `boot`, so
      the badge moves with the record and says the number Today's header and the sentence in Needs you say. */

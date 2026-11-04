@@ -14,16 +14,34 @@
 
 import { untrack } from 'svelte';
 import type { Waits, Working } from '../record/boot-live.ts';
+import { apiBase } from '../at.ts';
+import { outWaiting } from '../record/answers-out.ts';
 import { heard, lessPending, pressed, takenBack, written, type Pending } from './answers-pending.ts';
 
 const state = $state<{ waits: Waits | null; working: readonly Working[] }>({ waits: null, working: [] });
+/* WHAT THE LAST PAGE PRESSED AND NEVER HEARD BACK ABOUT (`answers-out.ts`). The `boot` this page opened with may or may not
+   count it, since its write and that read raced, and it cannot say which. So until each is settled the count is never over
+   what `boot` said when it was pressed less what is outstanding, and never under what `boot` says now. */
+const left = typeof location === 'undefined' ? [] : outWaiting(apiBase());
+const carried = new Set(left.map((o) => o.id));
+const carriedTop = Math.max(-1, ...left.map((o) => o.n ?? -1));
 /* `raw`: each change is a new Map, so the screens that read it follow it. */
-let pending = $state.raw<Pending>(new Map());
+let pending = $state.raw<Pending>(new Map(left.map((o) => [o.id, null] as const)));
 /* THE TICKET OF THE NEWEST WRITE, counted up once a write lands. Plain, since nothing draws it. */
 let tickets = 0;
 
 /** What waits on the reader now, less what was just pressed, or `null` where no record said. Reactive where it is read. */
-export const waitsNow = (): Waits | null => (state.waits === null ? null : { ...state.waits, questions: lessPending(state.waits.questions, pending) });
+export const waitsNow = (): Waits | null => (state.waits === null ? null : { ...state.waits, questions: carriedCount(state.waits.questions) ?? lessPending(state.waits.questions, pending) });
+
+/** The count while something the last page pressed is still outstanding (`carried`), or `null` when nothing is. */
+function carriedCount(said: number): number | null {
+  const before = [...pending.keys()].filter((id) => carried.has(id)).length;
+  if (before === 0 || carriedTop < 0) return null;
+  return Math.max(0, Math.min(said, carriedTop - before) - (pending.size - before));
+}
+
+/** How many `boot` last said wait, with nothing taken off: what a press writes down beside itself. */
+export const waitsSaid = (): number | undefined => state.waits?.questions;
 
 /** The agents working now, as the newest `boot` said it. Reactive where it is read. */
 export const workingNow = (): readonly Working[] => state.working;

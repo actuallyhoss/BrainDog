@@ -8,7 +8,8 @@
  *
  * READ-ONLY, AND NOTHING WAITS TO BE SENT. A write made offline is answered at once with a sentence that says it was
  * not sent, and nothing is queued: a queue replayed hours later against a record other people wrote to meanwhile would
- * land changes nobody could see being made, which is the one thing this record must never do.
+ * land changes nobody could see being made, which is the one thing this record must never do. (An answer pressed moments
+ * ago and cut off by a reload is sent again by the next page, and only then: `record/answers-out.ts`.)
  *
  * NOTHING READABLE OUTLIVES THE SESSION. The copy is deleted on a 401, on sign-out and when the phone moves to another
  * record, so a signed-out or shared phone keeps nothing of the record it was on.

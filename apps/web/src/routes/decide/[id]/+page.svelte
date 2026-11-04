@@ -71,6 +71,8 @@
   import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
   import { everyGovernance, plainOf, readOne, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
+  import { dropOut, heldOut } from '$lib/record/answers-out.ts';
+  import { waitsSaid } from '$lib/home/waits.svelte.ts';
   import { publishAsked, publishAskOf } from '$lib/market/publish-asked.ts';
   import { kennelFetch } from '$lib/market/publish.ts';
   import { proposer, queueMergeOf, queueWords, type FileAt } from '$lib/page/queue-answer.ts';
@@ -594,6 +596,8 @@
     const id = question.id;
     deferring = false;
     fix = '';
+    /* WRITTEN DOWN FIRST (`answers-out.ts`): a reload from here on neither draws it on a list nor loses the answer. */
+    heldOut(apiBase(), id, { decide: { option: key, ...(rows ? { rows } : {}) } }, question.title, waitsSaid());
     const h = hold(() => {
       if (holding) toasts.dismiss(holding.toast);
       holding = null;
@@ -610,6 +614,7 @@
     const was = holding;
     if (!was) return void toasts.push(mergeWords.tooLate);
     if (!was.held.undo()) return void toasts.push(mergeWords.tooLate);
+    dropOut(apiBase(), was.id);
     holding = null;
     toasts.push(mergeWords.undone);
     void tick().then(() => document.getElementById(`opt-${was.key}`)?.focus());

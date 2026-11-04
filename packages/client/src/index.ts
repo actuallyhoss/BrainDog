@@ -2121,9 +2121,10 @@ export function createClient(options: ClientOptions) {
 
   /**
    * `outlive` asks that the request be finished though the page that sent it has gone (`keepalive`). ONLY `markRead`
-   * ASKS, because it is the one call a screen makes as it is left: a plain fetch of a closing page is cancelled, and
-   * the reader's mark was lost with it, so what was new stayed new. It is not an option of the client, and a body
-   * at or over the ceiling goes plain, since a browser refuses that one rather than sending it late.
+   * ASKS, AND AN ANSWER TO A QUESTION (`decide-write.ts`), because those are the calls a screen makes as it is left: a
+   * plain fetch of a closing page is cancelled, or refused here as "being left" (`LEAVING`), and the reader's mark or
+   * their answer was lost with it. It is not an option of the client, and a body at or over the ceiling goes plain,
+   * since a browser refuses that one rather than sending it late.
    *
    * `wave` sends a figure with the others asked beside it (`inMetricWave`) only when it is not already kept: a revisit's
    * figures are answered from the kept copy at once, as they were before the waves, and never wait for one. `bare` skips
