@@ -65,7 +65,8 @@ export const ALLOWED = [
   { file: `${R}/index.ts`, fn: 'reseed', why: `${SYSTEM}an add-on update writing again a row its install planted (installs are ADMIN).` },
   { file: `${R}/index.ts`, fn: 'slashFile', why: `${SYSTEM}Slash's look reads a figure as NOBODY (\`viewer: NOBODY\`), so no private row is in it.` },
   { file: `${R}/index.ts`, fn: 'lookRehearsed', why: `${SYSTEM}a look is rehearsed over the page read as NOBODY before it is written.` },
-  { file: `${R}/index.ts`, fn: 'slashHeadlines', why: `${SYSTEM}Slash's headlines are drawn as NOBODY (\`viewer: NOBODY\`).` },
+  { file: `${R}/index.ts`, fn: 'dueOf', why: `${SYSTEM}what a page's headline is worked out from, its page and how far its figures moved, both read as NOBODY (\`viewer: NOBODY\`).` },
+  { file: `${R}/index.ts`, fn: 'rowWords', why: `${SYSTEM}the night's page lint reads the words of the row a page is made for, to leave them out of what it flags; nothing read is answered.` },
   { file: `${R}/index.ts`, fn: 'drawn', why: `${SYSTEM}what is pressing, drawn as NOBODY for the record's own digest and pushes.` },
   { file: `${R}/index.ts`, fn: 'understoodLines', why: `${SYSTEM}the nightly understand walk saying what it wrote, for the owner's Decide card.` },
   { file: `${R}/index.ts`, fn: 'heldDraft', why: `${SYSTEM}the understand walk's draft question about an organisation, accepted by the owner.` },
@@ -73,6 +74,9 @@ export const ALLOWED = [
   { file: `${R}/index.ts`, fn: 'understoodAnswer', why: `${SYSTEM}the answer to the understand walk's own question, applied as \`rule:backfill\`.` },
   { file: `${R}/index.ts`, fn: 'questionsOpen', why: `${SYSTEM}the page lint's count of open questions, a number for the lint round and never a row.` },
   { file: `${R}/index.ts`, fn: 'deviceStart', why: `${SYSTEM}a device with no credential yet; the project a device grant names is resolved to its id and answered to nobody.` },
+  { file: `${R}/addon-data.ts`, fn: 'binOwnRows', why: `${OWNER}removing a plugin with its data (\`uninstallPack\`, behind \`admin\`): each row of its own lists goes in the bin, and the answer counts them by list and names none.` },
+  { file: `${R}/addon-data.ts`, fn: 'rehearseMove', why: `${OWNER}an update moving a plugin's entries (\`installPack\`, behind \`admin\`): which list a write the move answered lands on, to refuse one outside it. What the move itself reads goes through \`get\` and \`list\` held to the lists it named.` },
+  { file: `${R}/addon-data.ts`, fn: 'within', why: `${OWNER}the same move's writes, in the install's transaction: which list a row is on, to write it there, and its name in a refusal said to the owner.` },
   { file: `${R}/arrange.ts`, fn: '*', why: `${OWNER}arranging by proposal, worked out when a pack, settings or arrange question is filed and applied on the owner's accept (ADMIN).` },
   { file: `${R}/emergent.ts`, fn: '*', why: "The holding pen, offered only to a caller who reads every list (`readsEveryList` in `boot`): whether a list's fields are filled, to propose a page." },
   { file: `${R}/emergent-grows.ts`, fn: '*', why: "The holding pen's grouping offer, to a caller who reads every list (`readsEveryList`): how filled a field is, to propose a grouping." },
@@ -105,6 +109,18 @@ export const ALLOWED = [
   { file: `${R}/preview-change.ts`, fn: 'drawn', why: "The row a template page is previewed for, picked from the caller's own `list` read above (`mine`)." },
   { file: `${R}/preview-change.ts`, fn: 'walkCost', why: `${NONE}how many rows and currencies a walk would read, to refuse one too costly to preview.` },
   { file: `${R}/row-values.ts`, fn: 'docValues', why: 'Fills the `{{path}}`s of a document on a row `get` already admitted, each block held by `hold` (`heldBlock`).' },
+
+  { file: `${R}/index.ts`, fn: 'readingNameOf', why: `${NONE}words a filter of Numbers or a figure over it is asked in, turned into a reading's name where the caller reads key numbers (\`readable\`). It finds only readings she reads, and nothing of the row or its project is answered (\`readings-named.test.ts\`).` },
+  { file: `${R}/index.ts`, fn: 'actions', why: `${NONE}which list an action's project row lives in, to hold the action to who reads that list whole (\`whole\`, which asks \`sight.whole\` and \`kernel.scope\`).` },
+  { file: `${R}/methods/comments.ts`, fn: 'ringNamed', why: `${NONE}the number of a row the comment's own write already asked \`sightOf\` and \`sight.mayWrite\` of, for the link in a ring; each person told is asked \`seenBy\` first.` },
+
+  /* READ FOR A LINK, WHICH IS NOBODY: the same rule `viewer: NOBODY` keeps, asked row by row, on a page the owner chose to share (`openShare`, ADMIN). */
+  { file: `${R}/methods/shares.ts`, fn: 'projectOf', why: 'A project as a link says it: every row asked of `entry_private` (`hidden`), never a personal list, a list no link reads, the agents\' lists, an owner-only list or a money list, its own amounts taken out on a link with money off, its figures read as NOBODY.' },
+  { file: `${R}/methods/shares.ts`, fn: 'refSaid', why: 'The name of a row a drawn row links to, on a link: a row that is there, in no personal list or list no link reads, not money on a link with money off, and asked of `entry_private`. Only its title goes, and `rowShown` holds back one that is an address.' },
+
+  /* WHO AND WHAT A SHARE NAMES, TURNED INTO IDS. */
+  { file: `${R}/methods/sharing.ts`, fn: 'resolved', why: `A share as its maker names it, behind \`team\` (an owner or Admin, who read the record), or \`shareOnward\`, which answers a row that is not there and one out of her reach in one refusal (\`share-onward-names.test.ts\`).` },
+  { file: `${R}/methods/sharing.ts`, fn: 'projectId', why: `A project a share names, for \`resolved\`, under its doors and its one refusal.` },
 
   /* WRITE PATHS NOT YET HELD TO THE ROW. `update`, `log`, `handoff`, `makePrivate` and `meet` ask `sight.mayWrite` and are gated. */
   { file: `${R}/index.ts`, fn: 'mentioned', why: `${WRITE}the caller's own run and its project, to keep a mention where the agent was.` },
