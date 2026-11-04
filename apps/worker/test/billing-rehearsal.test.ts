@@ -60,6 +60,7 @@ const ACTED = [
   'customer.subscription.updated',
   'customer.subscription.deleted',
   'invoice.paid',
+  'invoice.payment_failed',
   'charge.refunded',
 ];
 
@@ -254,7 +255,10 @@ test('A STRANGER’S WHOLE PAID LIFE, FREE TO DELETED, THROUGH THE REAL DOORS AN
   const applied = lines.map((l) => { try { return JSON.parse(l) as Record<string, unknown>; } catch { return null; } }).filter((l) => l?.['op'] === 'billing' && l['door'] === 'webhook');
   for (const type of ACTED) assert.ok(delivered.includes(type), `${type} was never sent in the walk`);
   for (const type of ACTED) assert.ok(applied.some((l) => l?.['event'] === type && l['ok'] === true), `no billing line says ${type} was applied`);
-  assert.equal(applied.filter((l) => l?.['ok'] === true).length, delivered.filter((t) => ACTED.includes(t)).length, 'an acted-on event was applied more or less than once');
+  /* TYPE BY TYPE, not one total: a total can hide one event applied twice beside another not applied at all. An event the
+     webhook acts on that this list has not heard of shows up here too, as an applied type nothing delivered. */
+  const tally = (types: unknown[]) => Object.fromEntries([...new Set(types)].map((t) => [String(t), types.filter((x) => x === t).length]).sort());
+  assert.deepEqual(tally(applied.filter((l) => l?.['ok'] === true).map((l) => l?.['event'])), tally(delivered.filter((t) => ACTED.includes(t))), 'an acted-on event was applied more or less than once');
   assert.ok(!applied.some((l) => l?.['ok'] === false), `a delivery failed: ${JSON.stringify(applied.find((l) => l?.['ok'] === false))}`);
   assert.doesNotMatch(lines.join('\n'), new RegExp(`${KEY}|${SECRET}|${EMAIL.replace('.', '\\.')}`, 'u'));
   w.sql.close();

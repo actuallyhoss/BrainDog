@@ -41,7 +41,7 @@ test('THE CEILING IS UNDER CLOUDFLARE’S OWN, so the two hundred left over cove
 test('the alarm passes a budget to `runActions`, and rings again when the pass says there is more', () => {
   const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8');
 
-  assert.match(source, /const budget = invocation\(\);/, 'the alarm stopped making a budget');
-  assert.match(source, /budget,/, 'the budget stopped reaching runActions, so nothing is counted');
+  assert.match(source, /const budget = \{ \.\.\.invocation\(\), until: Date\.now\(\) \+ ALARM_ACT_MS,/, 'the alarm stopped making a budget');
+  assert.match(source, /runActions\(execute, \{[^}]*\bbudget,/, 'the budget stopped reaching runActions, so nothing is counted');
   assert.match(source, /if \(out\.more\) await this\.#alarm\.set\(/, 'rows released for room are no longer re-armed');
 });
