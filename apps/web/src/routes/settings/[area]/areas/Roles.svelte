@@ -9,6 +9,7 @@
   row with the roles that may do it said in words under it, which is the same fact read one line at a time.
 -->
 <script lang="ts">
+  import { at } from '$lib/at.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { MATRIX, ROLES, ROLE_ORDER, RUNG_LINES, RUNG_NAMES, RUNG_ORDER } from '$lib/sharing/roles.ts';
@@ -90,7 +91,7 @@
       <li><span class="rung-name">{RUNG_NAMES[rung]}</span><span class="rung-line">{RUNG_LINES[rung]}</span></li>
     {/each}
   </ul>
-  <a class="to-people" href="/settings/people">{words.people}<Icon name="arrow" size="s" /></a>
+  <a class="to-people" href={at('/settings/people')}>{words.people}<Icon name="arrow" size="s" /></a>
 </Tile>
 
 <style>

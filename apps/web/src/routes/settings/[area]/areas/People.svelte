@@ -6,7 +6,7 @@
   import { flip } from 'svelte/animate';
   import { dismiss, lineIn } from '$lib/motion';
   import { settle as settleRows } from '$lib/ui/motion.ts';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -917,7 +917,7 @@
               </span>
             </label>
           {/each}
-          <a class="roles-all" href="/settings/roles">{copy.rolesCompare}</a>
+          <a class="roles-all" href={at('/settings/roles')}>{copy.rolesCompare}</a>
         </fieldset>
         <!-- WHAT A WHOLE-RECORD "ADDS ONLY" LEAVES OUT, said before the link is made (`20 §1`): the record keeps an
              appender off Keys, People and any list declared for owners, and an owner who meant them to add keys would
