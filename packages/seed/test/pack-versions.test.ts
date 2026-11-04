@@ -4101,7 +4101,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'a042ee8f7f2b6ddc',
     history: [
-      'money-core 3.38.6 of 4 November (test triage): `categories.correction` and `transactions.corrects` read "A correction and not spending", as a comma ends a clause -> a042ee8f7f2b6ddc',
+      'money-core 3.38.6 of 4 November (test triage): the `correction` of `register.categories` and `corrects` of `register.transactions` read "A correction and not spending", as a comma ends a clause -> a042ee8f7f2b6ddc',
     ],
   },
 
