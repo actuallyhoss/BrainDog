@@ -28,6 +28,8 @@ const PEOPLE = {
       { id: 'met', type: 'list', of: 'text' },
       { id: 'merged_into', type: 'ref', to: 'people' },
     ],
+    /* A LIST WITH NO projects PART SAYS WHICH PARTS IT PLAYS: the defaults name a projects field it does not have. */
+    meets: { name: 'name', email: 'email', org: 'org', keys: 'keys', handles: 'handles', met: 'met', merged_into: 'merged_into' },
   } as never,
 };
 const ORGS = {
@@ -152,5 +154,5 @@ test('AN ORGANISATION A MEMBER KEPT PRIVATE IS NOT THERE FOR THE OWNER\'S AGENT,
   assert.equal((await fieldsOf(api, hidden.row.id)).domain, 'clinic.example', 'it reads as an organisation met at a domain nobody holds');
   /* A PERSON MET AT THE DOMAIN IS PUT WITH THE ORGANISATION THE AGENT SEES, never with the private one. */
   const lena = value<{ row: { id: string } }>(await api.meet({ name: 'Lena Berg', email: 'lena@clinic.example', where: 'session in kiln' } as never, agent));
-  assert.equal((await fieldsOf(api, lena.row.id)).org, hidden.row.id);
+  assert.equal((await fieldsOf(api, lena.row.id)).org, api.kernel.get(hidden.row.id)?.id);
 });
