@@ -35,6 +35,7 @@
   import { createClient } from '@braindog/client';
   import { markOf } from '@braindog/skin/agent-marks.ts';
   import { apiBase, at } from '$lib/at.ts';
+  import { covered } from '$lib/a11y/keys.svelte.ts';
   import { heardOf, poll, type Heard } from '$lib/agents/connect.ts';
   import { appLines, firstWords, signOf, type AppLine } from '$lib/agents/first-connect.ts';
   import { listenFor } from '$lib/agents/listen.ts';
@@ -144,7 +145,7 @@
 
   /* ENTER GOES TO TODAY (1 Nov, keyboard first): from anywhere on the screen that is not a control of its own. */
   function enterToday(e: KeyboardEvent): void {
-    if (e.key !== 'Enter' || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    if (e.key !== 'Enter' || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || covered()) return;
     const t = e.target instanceof Element ? e.target : null;
     if (t?.closest('a, button, input, textarea, select, [contenteditable], [role="button"]')) return;
     e.preventDefault();
