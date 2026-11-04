@@ -82,7 +82,7 @@ A `register` declaration is a list. Its `fields` each have an `id` and a `type`,
 - `or`: another field read where `field` holds nothing, or a list of up to three read in turn.
 - `label`: the column's heading, up to 40 characters, in place of the field's own label.
 
-```json
+```code | table
 "table": ["on", { "field": "payee", "or": ["counterparty_text", "what"], "label": "Payee" }, "account", "category", "amount"]
 ```
 
