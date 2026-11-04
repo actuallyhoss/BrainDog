@@ -197,8 +197,13 @@
     const before = Math.max(0, GUTTER - box.left);
     if (past || before) list.style.setProperty('--menu-shift', `${Math.round(before - past)}px`);
 
-    const below = view.clientHeight - GUTTER - box.top;
-    const above = (anchor?.top ?? 0) - GUTTER;
+    /* A MENU IN A DIALOG FITS THE DIALOG (4 Nov): a dialog clips what hangs past its edge, so measuring against the window
+       opened Slash's picker downward with plenty of room on screen and none in the panel, and its focus then scrolled
+       the panel's head away. */
+    const frame = root?.closest('dialog');
+    const clip = frame && getComputedStyle(frame).overflowY !== 'visible' ? frame.getBoundingClientRect() : null;
+    const below = (clip ? Math.min(clip.bottom, view.clientHeight) : view.clientHeight) - GUTTER - box.top;
+    const above = (anchor?.top ?? 0) - (clip ? Math.max(clip.top, 0) : 0) - GUTTER;
     /* Above only when it does not fit below AND there is more room there: a menu that flips for a few pixels moves
        under the finger that opened it. */
     if (box.height > below && above > below) {

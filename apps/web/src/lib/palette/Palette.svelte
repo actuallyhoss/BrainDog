@@ -1913,6 +1913,29 @@
     reader who heard both would hear every heading twice.
   -->
   {#if inAsk}
+    <!-- WHO IT GOES TO, WHAT IS ATTACHED, AND ONCE AN ANSWER IS WHOLE, THINK HARDER; then, quiet, what Enter does while a
+         card waits and the asks left this month once there is a number to say. -->
+    <footer class="p-foot p-ask-foot" id="palette-ask-foot">
+      {#if attaching}
+        <div class="p-attach"><AttachPicker onpick={attachOne} onclose={() => ((attaching = false), input?.focus())} taken={attachNow()} /></div>
+      {/if}
+      <Menu label={sendWords.sheet}>
+        {#snippet trigger()}<span class="p-to">{#if askTo.to === 'target' && askTo.t.live}<span class="p-live" aria-hidden="true"></span>{/if}{askLabel}<Icon name="chevronDown" size="s" /></span>{/snippet}
+        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'quick'} onclick={() => (askTo = { to: 'slash', mode: 'quick' })}>{sendWords.slash} · {sendWords.quick}</button>
+        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'deep'} onclick={() => (askTo = { to: 'slash', mode: 'deep' })}>{sendWords.slash} · {sendWords.deep}</button>
+        {#each switchable as t (t.id)}
+          <button type="button" role="menuitemradio" aria-checked={askTo.to === 'target' && askTo.t.id === t.id} onclick={() => (askTo = { to: 'target', t })}><span class="mi-name">{t.label}</span></button>
+        {/each}
+      </Menu>
+      {#each attached as a (a.ref)}
+        <span class="p-attached"><span class="p-attached-name" dir="auto">{a.label}</span><button type="button" class="p-attached-x tap" aria-label={sendWords.remove(a.label)} onclick={() => (attached = attached.filter((x) => x.ref !== a.ref))}><Icon name="close" size="s" /></button></span>
+      {/each}
+      <button type="button" class="p-at tap" aria-label={sendWords.attach} title={sendWords.attach} aria-expanded={attaching} onclick={() => (attaching = !attaching)}>@</button>
+      {#if harder}<button type="button" class="p-harder tap" onclick={() => void rethink(apiBase())}>{sendWords.thinkHarder}</button>{/if}
+      {#if routedMac && firstMac}<button type="button" class="p-harder tap" onclick={toMac}>{sendWords.toMac(firstMac.label)}</button>{/if}
+      {#if waitingCard}<span class="p-keys-hint">{threadWords.enterDoes}</span>{/if}
+      {#if asksLeft !== null}<span class="p-left">{threadWords.left(asksLeft)}</span>{/if}
+    </footer>
     <SlashThread bind:this={threadView} here={behind} base={apiBase()} onask={(question) => asked(question)} onleave={() => (open = false)} />
   {:else}
   <div class="p-body">
@@ -1961,30 +1984,6 @@
     <footer class="p-foot">
       <span class="p-cap">{slashWords.capLine(slashStatus.asks.used, slashStatus.asks.cap, slashStatus.asks.resets)}</span>
       <button type="button" class="p-cap-hide tap" onclick={dismissCapLine}>{slashWords.capDismiss}</button>
-    </footer>
-  {:else if inAsk}
-    <!-- WHO IT GOES TO, WHAT IS ATTACHED, AND ONCE AN ANSWER IS WHOLE, THINK HARDER; then, quiet, what Enter does while a
-         card waits and the asks left this month once there is a number to say. -->
-    <footer class="p-foot p-ask-foot" id="palette-ask-foot">
-      {#if attaching}
-        <div class="p-attach"><AttachPicker onpick={attachOne} onclose={() => ((attaching = false), input?.focus())} taken={attachNow()} /></div>
-      {/if}
-      <Menu label={sendWords.sheet}>
-        {#snippet trigger()}<span class="p-to">{#if askTo.to === 'target' && askTo.t.live}<span class="p-live" aria-hidden="true"></span>{/if}{askLabel}<Icon name="chevronDown" size="s" /></span>{/snippet}
-        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'quick'} onclick={() => (askTo = { to: 'slash', mode: 'quick' })}>{sendWords.slash} · {sendWords.quick}</button>
-        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'deep'} onclick={() => (askTo = { to: 'slash', mode: 'deep' })}>{sendWords.slash} · {sendWords.deep}</button>
-        {#each switchable as t (t.id)}
-          <button type="button" role="menuitemradio" aria-checked={askTo.to === 'target' && askTo.t.id === t.id} onclick={() => (askTo = { to: 'target', t })}><span class="mi-name">{t.label}</span></button>
-        {/each}
-      </Menu>
-      {#each attached as a (a.ref)}
-        <span class="p-attached"><span class="p-attached-name" dir="auto">{a.label}</span><button type="button" class="p-attached-x tap" aria-label={sendWords.remove(a.label)} onclick={() => (attached = attached.filter((x) => x.ref !== a.ref))}><Icon name="close" size="s" /></button></span>
-      {/each}
-      <button type="button" class="p-at tap" aria-label={sendWords.attach} title={sendWords.attach} aria-expanded={attaching} onclick={() => (attaching = !attaching)}>@</button>
-      {#if harder}<button type="button" class="p-harder tap" onclick={() => void rethink(apiBase())}>{sendWords.thinkHarder}</button>{/if}
-      {#if routedMac && firstMac}<button type="button" class="p-harder tap" onclick={toMac}>{sendWords.toMac(firstMac.label)}</button>{/if}
-      {#if waitingCard}<span class="p-keys-hint">{threadWords.enterDoes}</span>{/if}
-      {#if asksLeft !== null}<span class="p-left">{threadWords.left(asksLeft)}</span>{/if}
     </footer>
   {/if}
 </dialog>
@@ -2524,7 +2523,43 @@
 
   /* IN ASK THE THREAD IS THE BODY: it fills what the palette has and scrolls inside it. */
   .palette[data-mode='ask'] {
-    min-block-size: min(280px, 60dvh);
+    min-block-size: min(520px, calc(100dvh - var(--kb, 0px)));
+  }
+
+  /* SLASH IS A CONVERSATION, SO IT GROWS (Sam, 4 Nov: "make the whole thing grow bigger when it's slash mode"). Search
+     stays 640 by 640, the size of a list; asking takes 860 and most of the window's height, from wherever it opened. */
+  @media (width >= 640px) {
+    .palette[data-mode='ask'][open] {
+      inline-size: min(860px, calc(100vw - 2 * var(--sp-4)));
+      max-block-size: calc(100dvh - 8vh - var(--sp-6));
+      min-block-size: min(600px, calc(100dvh - 8vh - var(--sp-6)));
+      inset-block-start: 8vh;
+    }
+
+    .palette[data-mode='ask'][open]:global([data-from='bar']) {
+      inline-size: min(860px, calc(100vw - var(--from-end, 0px) - var(--sp-4)));
+      inset-block-start: var(--from-top);
+      max-block-size: calc(100dvh - var(--from-top) - var(--sp-6));
+      min-block-size: min(600px, calc(100dvh - var(--from-top) - var(--sp-6)));
+    }
+
+    .palette[data-mode='ask'][open]:global([data-from='bar'][data-side='start']) {
+      inline-size: min(860px, calc(100vw - var(--from-start, 0px) - var(--sp-4)));
+    }
+
+    .palette[data-mode='ask'][open]:global([data-from='head']) {
+      inline-size: auto;
+      inset-block-start: var(--from-top);
+      max-block-size: calc(100dvh - var(--from-top) - var(--sp-6));
+      min-block-size: min(600px, calc(100dvh - var(--from-top) - var(--sp-6)));
+    }
+  }
+
+  /* WHO IT GOES TO SITS RIGHT UNDER THE FIELD (Sam, 4 Nov), field and controls as one block with the thread below. */
+  .p-ask-foot {
+    flex: none;
+    border-block-start: 0;
+    border-block-end: 1px solid var(--sep, var(--rule));
   }
 
   .p-left {
@@ -2534,6 +2569,7 @@
   /* THE FOOTER'S CONTROLS (`$lib/send`): who Ask talks to as a quiet menu, the rows attached as small rectangles, and @. */
   .p-attach {
     flex: 1 1 100%;
+    order: 1;
   }
 
   .p-to {
