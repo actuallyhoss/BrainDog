@@ -8,7 +8,7 @@
  * hook for somebody not on the record yet, and the inline confirm (§6, default 1).
  *
  * AGENTS SHARE ONLY AS THE OWNER (the owner's word of 2 Nov, "fully inclusive"). The owner's and Admin's methods are
- * `team`, which refuses every token `NEEDS_BROWSER_SESSION` but his own agent's while he lets his agents do everything
+ * `team`, which refuses every token `NEEDS_BROWSER_SESSION` but his own agent's while he lets their agents do everything
  * without asking, or told it to and it sent his words as `said` (`agentFor`); the grantee's two refuse a token the same
  * way. Such a call is his own: made as him, and its inline confirm is his call. `sharing` is this file's list of shares;
  * `shares` was already the page links' (`shares.ts`), and one surface keeps one method per name.
@@ -164,7 +164,7 @@ const refuse = (code: string, fix: string, at: string): Result<never> => ({ ok: 
 /** A token is never a sharer: the one sentence every share route gives one, before it reads anything. */
 const AGENTS_NEVER: Refusal = {
   code: 'NEEDS_BROWSER_SESSION',
-  fix: 'Open this from the app; an agent shares only while the owner lets his agents do everything without asking, or told it to: then send his words as said.',
+  fix: 'Open this from the app; an agent shares only while the owner lets their agents do everything without asking, or told it to: then send their words as said.',
   at: 'principal',
 };
 

@@ -2044,7 +2044,7 @@
       content: '';
       position: absolute;
       inset-block: 0;
-      inset-inline: -4px;
+      inset-inline: min(-4px, calc((100% - var(--tap)) / 2));
     }
 
     .block-slot :global(.block[data-kind='note'] p:has(> :not(a)) > a) {

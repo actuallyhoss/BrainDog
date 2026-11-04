@@ -5254,7 +5254,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           if (w.principal?.kind === 'token')
             return no<Entry>(
               'HUMAN_ONLY',
-              `${keyedHere.role === 'meets' ? 'Somebody' : 'An organisation'} with that ${keyedHere.role === 'meets' ? 'address or handle' : 'domain or key'} was deleted by the owner, so only he brings them back (Undo, or adding them by hand). Nothing was written; leave them out.`,
+              `${keyedHere.role === 'meets' ? 'Somebody' : 'An organisation'} with that ${keyedHere.role === 'meets' ? 'address or handle' : 'domain or key'} was deleted by the owner, so only they bring them back (Undo, or adding them by hand). Nothing was written; leave them out.`,
               { at: 'fields' },
             );
           const row = byId(gone.id, true);

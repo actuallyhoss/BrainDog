@@ -98,7 +98,7 @@ import { LINKS_NONE, linkPlan } from './links.ts';
 import { GALLERY_NONE, galleryPlan, pictureSrc } from './gallery.ts';
 import { EMBED_NONE, embedOpen, embedPlan } from './embed.ts';
 import { formLines, formOf } from './form.ts';
-import { hueOf } from './cards.ts';
+import { hueOf, trendSaid } from './cards.ts';
 import { pathRest, pathShort } from './path.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 import { actionLabels } from './actions.ts';
@@ -485,12 +485,12 @@ function trendSvg(cls: string, label: string, value: string, o: RenderOptions): 
   const ahead = trendAhead(plain(inline(value, o)));
   if (ahead) {
     const run = trendOf(ahead.run)!;
-    const named = `${plain(inline(label, o)) || TREND}, ${TREND_TODAY.toLowerCase()} to ${ahead.to}: ${run.said.join(', ')}`;
+    const named = `${plain(inline(label, o)) || TREND}, ${TREND_TODAY.toLowerCase()} to ${ahead.to}: ${trendSaid(run.said)}`;
     return `<span class="${cls}-ahead"><svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(named)}"><path class="trend-area" d="${run.area}"></path>${run.zero ? `<path class="trend-zero" d="${run.zero}" vector-effect="non-scaling-stroke"></path>` : ''}<path class="trend-line" d="${run.d}" vector-effect="non-scaling-stroke"></path><path class="trend-today" d="${ahead.today}" vector-effect="non-scaling-stroke"></path><path class="trend-low" d="${ahead.low}" vector-effect="non-scaling-stroke"${run.below ? ' data-below=""' : ''}></path></svg><span class="trend-days" aria-hidden="true"><span>${escape(TREND_TODAY)}</span><span>${escape(ahead.to)}</span></span></span>`;
   }
   const t = trendOf(plain(inline(value, o)));
   if (!t) return '';
-  const name = `${plain(inline(label, o)) || TREND}: ${t.said.join(', ')}`;
+  const name = `${plain(inline(label, o)) || TREND}: ${trendSaid(t.said)}`;
   /* A STAT'S SHORT RUN IS BARS; a `sparkline` keeps its line. */
   if (cls === 'cell-trend' && t.bars)
     return `<svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(name)}"><path class="trend-bar" d="${t.bars}" vector-effect="non-scaling-stroke"></path></svg>`;

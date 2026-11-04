@@ -1012,6 +1012,13 @@
     }
   }
 
+  /* A THUMB'S TARGET, AS EVERY OTHER CONTROL HERE. */
+  @media (pointer: coarse) {
+    .opens-inline .home-select {
+      min-block-size: var(--tap);
+    }
+  }
+
   /* AT A PHONE'S WIDTH THE SELECT TAKES WHAT IS LEFT OF THE LINE, and a long page name is cut rather than pushing it off. */
   @media (width < 640px) {
     .home-select {

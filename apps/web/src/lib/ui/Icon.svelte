@@ -21,6 +21,10 @@
   import { PATHS, glyphSet, glyphSetNow, shapesOf, type IconName } from './icons.ts';
 
   export { PATHS, type IconName };
+
+  /* A GLYPH THAT POINTS ALONG THE LINE TURNS WITH IT: under right-to-left "next" points left. `a11y.css` does the turning
+     (`data-along`), so it holds for every arrow in the product and no screen needs its own rule. */
+  const ALONG: ReadonlySet<string> = new Set(['chevron', 'arrow', 'back', 'arrow-right', 'arrow-left', 'chevron-right', 'chevron-left']);
 </script>
 
 <script lang="ts">
@@ -44,6 +48,7 @@
 <svg
   class="icon"
   data-size={size}
+  data-along={ALONG.has(name) ? '' : undefined}
   viewBox="0 0 24 24"
   fill="none"
   stroke="currentColor"

@@ -46,6 +46,60 @@
     inset: min(0px, calc((100% - var(--tap)) / 2));
   }
 
+  /* A MOUSE'S TARGET IS 24 AT THE LEAST (WCAG 2.5.8), and these are one line of text with a link on it. The air is the
+     link's: it takes three pixels above and below and gives them back, so no row moves. `!important` because each of these
+     writes its own padding or margin at another size for a thumb, and this holds only under a mouse. */
+  @media (hover: hover) and (pointer: fine) {
+    :is(.crumb-up, .ln-title, .r-name, .li-text, .pres-what, .runs-name, .pres-name, .to-people, .gate-link, .addons-manage, .w-more, .doc-crumb, summary.label) {
+      padding-block: 3px !important;
+      margin-block: -3px !important;
+    }
+
+    .ins-select {
+      padding-block: 2px !important;
+      margin-block: -2px !important;
+    }
+  }
+
+  /* RIGHT TO LEFT (`lib/a11y/direction.ts`, Settings > Appearance).
+
+     A GLYPH THAT POINTS ALONG THE LINE TURNS WITH IT (`Icon.svelte`). What turns it is `scale`, so a host's `rotate` or
+     `transform` on the same glyph is left alone; a chevron a fold opens by a quarter turn has to turn the other way to
+     still point down, which is what `--open-turn` is for. */
+  .icon[data-along]:dir(rtl) {
+    scale: -1 1;
+  }
+
+  :root {
+    --open-turn: 90deg;
+  }
+
+  :root:dir(rtl) {
+    --open-turn: -90deg;
+  }
+
+  /* A LINE HOLDS ITS OWN DIRECTION. With the shell mirrored, "64 days late" and "£9,190" came out as "days late 64" and
+     "£9,190-": the bidi algorithm reads a run of Latin and digits against the block's direction. So each block takes its
+     direction from its own first letter, and an Arabic line and an English line both read right beside each other.
+     `match-parent` keeps it where the shell's start is, so an English line in a mirrored shell still stands on the right. */
+  :root:dir(rtl) :where(p, li, a, button, label, span, h1, h2, h3, h4, h5, h6, dt, dd, td, th, summary, figcaption, legend, [role='cell'], [role='gridcell'], [role='columnheader']) {
+    unicode-bidi: plaintext;
+    text-align: match-parent;
+  }
+
+  /* A FIGURE OR A SHORTCUT IS LEFT TO RIGHT IN EVERY LANGUAGE, and stands apart from the words round it, so a minus stays
+     in front of its amount and "cmd K" does not turn round. */
+  :where(.num, .money, kbd) {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  /* WHAT SOMEBODY TYPES TAKES ITS DIRECTION FROM WHAT THEY TYPE, in either shell: an Arabic name in a field starts at
+     the right and its punctuation lands where they put it. */
+  :where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='date'], [type='time'], [type='number']), textarea) {
+    unicode-bidi: plaintext;
+  }
+
   /* Reduced motion is a PROMISE, not a preference: nothing moves, and a state still changes. Replace, never
      delete: every state must still change something.
 

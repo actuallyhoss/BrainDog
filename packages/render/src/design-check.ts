@@ -201,7 +201,7 @@ export function designCheck(draft: DesignDraft): DesignFinding[] {
     }
 
     const heading = said(b.heading);
-    if (SYSTEM_WORDS.test(heading)) out.push({ at, rule: 'words', said: `its heading "${heading.trim()}" says the system's word. Name his own things instead.` });
+    if (SYSTEM_WORDS.test(heading)) out.push({ at, rule: 'words', said: `its heading "${heading.trim()}" says the system's word. Name the person's own things instead.` });
     for (const [name, text] of [
       [heading.trim() || 'its heading', heading],
       ['its words', said(b.body)],

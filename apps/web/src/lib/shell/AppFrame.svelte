@@ -2260,6 +2260,9 @@
       /* THE LAST ROW ENDS 16px ABOVE THE TAB BAR (design 6.6). `--tabbar` is the bar and the home
          indicator under it, summed once in `tokens.css`; the bar sits on the window's bottom edge. */
       padding-block-end: calc(var(--tabbar) + var(--sp-4));
+      /* WHAT THE KEYBOARD LANDS ON IS NEVER UNDER THE TAB BAR (WCAG 2.4.11): the browser scrolls a focused control clear of
+         this. Measured on a phone and at 400% zoom, up to 30 stops a screen sat behind the bar. */
+      scroll-padding-block-end: calc(var(--tabbar) + var(--sp-3));
     }
 
     .tab-slot {

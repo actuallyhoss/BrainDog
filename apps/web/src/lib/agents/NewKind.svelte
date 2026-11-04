@@ -288,11 +288,17 @@
 
   .more-head {
     cursor: pointer;
-    min-block-size: var(--ctl-h);
+    min-block-size: max(var(--ctl-h), var(--tap-floor, 0px));
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     list-style: none;
+  }
+
+  @media (pointer: coarse) {
+    .more-head {
+      --tap-floor: var(--tap);
+    }
   }
 
   .more-head::-webkit-details-marker {
@@ -305,7 +311,7 @@
   }
 
   .more[open] > .more-head :global(svg) {
-    rotate: 90deg;
+    rotate: var(--open-turn, 90deg);
   }
 
   .more > .column {

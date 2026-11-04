@@ -297,7 +297,7 @@
   }
 
   .more[aria-expanded='true'] :global(svg) {
-    transform: rotate(90deg);
+    transform: rotate(var(--open-turn, 90deg));
   }
 
   @media (hover: hover) and (pointer: fine) {

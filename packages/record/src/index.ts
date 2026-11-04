@@ -3500,7 +3500,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         code: 'NEEDS_BROWSER_SESSION',
         fix:
           (reads === undefined ? 'Open this from the app; a token cannot change what this BrainDog is' : `Open this from the app; a token cannot ${reads}`) +
-          ' unless the owner lets his agents do everything without asking, or told you to: then send his words as said.',
+          ' unless the owner lets their agents do everything without asking, or told you to: then send their words as said.',
         at: 'principal',
       };
     return allows(ctx, 'owner', listName);
@@ -10039,7 +10039,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * A change an agent filed, accepted at once because its owner lets his agents do everything without asking
+   * A change an agent filed, accepted at once because its owner lets their agents do everything without asking
    * (`bypassOf`): decided as his own, through the run that filed it, as an answer on his word is (`onWord`), so `decide`
    * holds it to every check it holds him to, the log keeps the run's name beside it (`keepWordAnswer`), and Undo takes
    * the decision back. `null` leaves the question open: no bypass, a choice between options, a settings row that narrows
@@ -18147,7 +18147,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * `everywhere: true` FILES A NEW KEY FOR EVERY PROJECT, which is a key of no project, the one a script running for
      * the whole record can send (`keyOutOfScope`). A person may always say it, and a keychain grant only when it is
      * already for every project. A login token's run puts its key in its own project, so it may say it only while the
-     * owner lets his agents do everything without asking (`bypassOf`), or when its run is in no project anyway.
+     * owner lets their agents do everything without asking (`bypassOf`), or when its run is in no project anyway.
      */
     async depositGrant(
       args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown; sealed_under?: unknown; everywhere?: unknown },

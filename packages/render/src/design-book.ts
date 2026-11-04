@@ -229,7 +229,7 @@ export function designBook(input: { look: string; scale: string }): DesignBook {
       "It uses only the book's colours, so it reads in light and dark.",
       'It follows Look B: no pill, gradient, glass or shadow; nothing red unless something is late, failing or below nought; no tile inside a tile; every tile opens on the same heading row.',
       'It says what it shows when it has nothing, and its loading state is the picture drawn first.',
-      'It uses his words: names, never ids, no em dash, and no heading that says row, register, block or entity.',
+      'It uses the words of the person it is for: names, never ids, no em dash, and no heading that says row, register, block or entity.',
       `It draws in budget: under ${DESIGN_BUDGET.composedMs} ms composed, and a drawn one alive within ${DESIGN_BUDGET.aliveMs} ms of its picture.`,
     ],
   };

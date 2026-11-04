@@ -20,3 +20,9 @@
 .ov-adds .ov-names > span, .ov-moves .ov-move { padding: 0 var(--sp-2); border-radius: var(--r-ctl); background: color-mix(in srgb, var(--ink) 6%, var(--tile)); overflow-wrap: anywhere; }
 .ov-moves { gap: var(--sp-1) var(--sp-2); }
 @media (prefers-reduced-motion: no-preference) { .ov-fill { transition: inline-size var(--d-state) var(--ease-out); } }
+
+/* THE ARROW BETWEEN WAS AND NOW IS A CHARACTER, and no font turns it for right to left. */
+.ov-arrow:dir(rtl) {
+  display: inline-block;
+  scale: -1 1;
+}

@@ -58,7 +58,9 @@
     <span class="dots"><i></i><i></i><i></i></span>
     <span class="title">{title}</span>
   </div>
-  <div class="body">
+  <!-- A PHONE SCROLLS A LONG LINE SIDEWAYS, and a keyboard has to be able to as well. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div class="body" tabindex="0" role="group" aria-label={label}>
     <div class="screen">
       {#each lines as line, i}
         <div class="ln" data-kind={line.kind} class:shown={i < shown}>
@@ -80,9 +82,9 @@
     --tw-edge: rgb(255 255 255 / 0.09);
     --tw-cmd: #f5f6f8;
     --tw-out: #b9bec7;
-    --tw-dim: #7d838d;
+    --tw-dim: #8a909a;
     /* THE ONE RED IS BRAINDOG'S (`--red`, SPEC 1.1), here and on the close dot. */
-    --tw-accent: var(--red);
+    --tw-accent: #f0776c;
     --tw-ok: #5fd08f;
     --tw-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 
@@ -192,7 +194,7 @@
     block-size: 1.15em;
     vertical-align: text-bottom;
     background: var(--tw-cmd);
-    animation: blink 1.1s steps(1, end) infinite;
+    animation: blink 1.1s steps(1, end) 4;
   }
 
   @keyframes blink {

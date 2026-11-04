@@ -5,7 +5,7 @@
  * READING IS FOR ANY TOKEN; STARTING, STOPPING AND RESUMING ARE THE OWNER'S. `automations` is READ+, held to the lists
  * the caller reads, so `list` and `show` answer a login from this machine. `automationRun`, `cancelRun` and
  * `resumeScript` are ADMIN, and `packages/record/src/index.ts`'s `admin()` refuses a `token` principal before it reads
- * the arguments, with "Open this from the app; a token cannot start an automation.", unless the owner lets his agents do
+ * the arguments, with "Open this from the app; a token cannot start an automation.", unless the owner lets their agents do
  * everything without asking (`bypassOf`), when his own whole-record login is admitted as he is. So `run`, `cancel` and
  * `resume` are built exactly as the record takes them: they work while his switch is on, and otherwise a person reading
  * the refusal learns where the button is rather than learning that the command does not exist.

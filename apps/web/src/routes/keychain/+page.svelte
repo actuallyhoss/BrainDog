@@ -925,7 +925,7 @@
 
   {#snippet groupKeys(g: KeyGroup)}
       {#each g.services as sv (sv.provider ?? '')}
-      {#if severalGroups && sv.provider}<h4 class="service-head">{sv.provider}</h4>{/if}
+      {#if severalGroups && sv.provider}<h3 class="service-head">{sv.provider}</h3>{/if}
       <ul class="ledger ledger-lead whos keys">
         {#each sv.keys as k (k.id)}
           <!--

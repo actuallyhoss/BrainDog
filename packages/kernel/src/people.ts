@@ -586,7 +586,7 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
      refused, saying so, and anything else is a mention with no row, as a sender nobody needs is. */
   if (!hit && deps.typed !== true && buried(deps.sql, { register: list.register, role: 'meets', fields: list.fields }, keys) !== null) {
     if (deps.token === true)
-      return no<Met>('HUMAN_ONLY', 'The owner deleted the person with that address or handle, so only he brings them back (Undo, or adding them by hand). Nothing was written; leave them out.', { at: 'email' });
+      return no<Met>('HUMAN_ONLY', 'The owner deleted the person with that address or handle, so only they bring them back (Undo, or adding them by hand). Nothing was written; leave them out.', { at: 'email' });
     noteMention(deps.sql, { name: s.name ?? nameFromKeys(keys), kind: 'person', project, source: s.source, at: instant(deps.nowMs) });
     return ok({ ...mention(), deleted: true });
   }
@@ -1085,7 +1085,7 @@ function meetOrg(deps: PeopleDeps, s: Said, rerouted: boolean): Result<Met> {
     /* AN ORGANISATION THE OWNER DELETED IS NOT MET AGAIN (`buried`), but by him at his own keyboard. */
     if (deps.typed !== true && buried(deps.sql, { register: orgs.register, role: 'org', fields: orgs.fields }, keys) !== null) {
       if (deps.token === true)
-        return no<Met>('HUMAN_ONLY', 'The owner deleted the organisation with that domain or key, so only he brings it back (Undo, or adding it by hand). Nothing was written; leave it out.', { at: 'domain' });
+        return no<Met>('HUMAN_ONLY', 'The owner deleted the organisation with that domain or key, so only they bring it back (Undo, or adding it by hand). Nothing was written; leave it out.', { at: 'domain' });
       noteMention(deps.sql, { name: name ?? '', kind: 'organisation', project, source: s.source, at: instant(deps.nowMs) });
       return ok({ ...mention(), deleted: true });
     }

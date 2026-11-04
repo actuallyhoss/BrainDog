@@ -223,7 +223,7 @@
     height: 6px;
     border-radius: 50%;
     background: var(--red);
-    animation: blink 0.8s steps(2) infinite;
+    animation: blink 0.8s steps(2) 6;
   }
 
   @keyframes blink {

@@ -451,10 +451,9 @@
     {value}
     {placeholder}
     {disabled}
-    role="combobox"
     aria-label={label}
     aria-autocomplete="list"
-    aria-expanded={drawn}
+    aria-haspopup="listbox"
     aria-controls={drawn ? listId : undefined}
     aria-activedescendant={drawn && offers[cursor] ? `${listId}-${cursor}` : undefined}
     aria-describedby={describedby}
@@ -559,6 +558,24 @@
     overscroll-behavior: contain;
     appearance: none;
     scrollbar-width: thin;
+  }
+
+  /* THE FIELD IS A THUMB'S TARGET, 44 TALL (`13 §7`), and the line it sits on stays the size it was: the air is padding on
+     the field and its mirror alike, so the words stay over their fills, and the same margin gives it back. */
+  @media (pointer: coarse) {
+    .mf {
+      --mf-pad: 11px;
+    }
+
+    .mf-mirror,
+    .mf-input {
+      margin-block: -9px;
+    }
+
+    .mf-input {
+      block-size: auto;
+      align-self: stretch;
+    }
   }
 
   .mf-input::placeholder {

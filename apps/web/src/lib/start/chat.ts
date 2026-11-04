@@ -90,7 +90,7 @@ export const chatWords = {
   caseIs: (title: string) => `I'll set it up as ${title}.`,
   callYou: (name: string) => `Nice to meet you, ${name}.`,
   /** Asked once more where an answer to the name question held no name BrainDog could be sure of (`nameIn`). */
-  nameAgain: "I didn't catch a name there. What's your first name?",
+  nameAgain: "I didn't catch a name there. What should I call you?",
   /** The business use case as a freelancer hears it (`caseTitle`). */
   freelance: 'Freelance',
   /** The business use case as a streamer, YouTuber or other creator hears it (`caseTitle`). */

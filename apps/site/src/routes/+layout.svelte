@@ -234,6 +234,8 @@
   .links :global(a) {
     color: inherit;
     text-decoration: none;
+    /* 24 TALL UNDER A MOUSE (WCAG 2.5.8) and nothing moves: the air is the link's and the line does not grow. */
+    padding-block: 3px;
   }
 
   .links a[aria-current] {
@@ -476,6 +478,7 @@
   .foot a {
     color: inherit;
     text-decoration: none;
+    padding-block: 3px;
   }
 
   /* 44 TALL UNDER A THUMB: each link grows to the site's tap height and the rows close up to meet, so the targets touch

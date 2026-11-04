@@ -138,6 +138,13 @@
     .field {
       min-block-size: var(--tap);
     }
+
+    /* THE INPUT IS THE TARGET, ALL 44 OF IT, and the wrapper's two 1px edges come back off its margin so the field stays 44. */
+    .field .field-input,
+    .field-lg .field-input {
+      min-block-size: var(--tap);
+      margin-block: -1px;
+    }
   }
 
   .field-lg {

@@ -34,6 +34,7 @@ export {
   ringDash,
   ringOf,
   trendOf,
+  trendSaid,
   trendTrimmed,
   trendAhead,
   TREND_TODAY,

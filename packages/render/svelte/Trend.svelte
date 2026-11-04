@@ -5,17 +5,17 @@
   today marked at its start, its lowest point marked, and its two ends dated under it.
 -->
 <script lang="ts">
-  import { inline, text, trendAhead, trendOf, trendTrimmed, TREND, TREND_TODAY, type RenderOptions } from '../src/index.ts';
+  import { inline, text, trendAhead, trendOf, trendSaid, trendTrimmed, TREND, TREND_TODAY, type RenderOptions } from '../src/index.ts';
 
   let { cls, label, value, opts = {}, dated = false }: { cls: string; label: string; value: string; opts?: RenderOptions; dated?: boolean } = $props();
 
   const ahead = $derived(trendAhead(text(inline(value, opts))));
   const run = $derived(ahead ? trendOf(ahead.run) : null);
-  const named = $derived(ahead && run ? `${text(inline(label, opts)) || TREND}, ${TREND_TODAY.toLowerCase()} to ${ahead.to}: ${run.said.join(', ')}` : '');
+  const named = $derived(ahead && run ? `${text(inline(label, opts)) || TREND}, ${TREND_TODAY.toLowerCase()} to ${ahead.to}: ${trendSaid(run.said)}` : '');
   /* A RUN BEHIND THAT IS DATED IS DRAWN FROM ITS FIRST READING TO ITS LAST (`trendTrimmed`), so its line spans the frame. */
   const span = $derived(ahead || !dated ? null : trendTrimmed(text(inline(value, opts))));
   const t = $derived(ahead ? null : trendOf(span ? span.value : text(inline(value, opts))));
-  const name = $derived(t ? `${text(inline(label, opts)) || TREND}: ${t.said.join(', ')}` : '');
+  const name = $derived(t ? `${text(inline(label, opts)) || TREND}: ${trendSaid(t.said)}` : '');
   /* A RUN BEHIND, ONE READING A DAY TO TODAY, SAYS ITS TWO ENDS UNDER IT where the host asks (`dated`): the day its
      first reading was taken and today, as the walk ahead says its own. */
   const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });

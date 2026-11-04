@@ -143,7 +143,9 @@
     const onInput = () => read();
     const onCaret = () => untrack(() => (open || el.value.includes('@') ? read() : undefined));
     const onBlur = () => untrack(shut);
-    el.setAttribute('role', 'combobox');
+    /* NO `combobox` ROLE: this is a `textarea`, which may not carry one. A textbox with `aria-autocomplete` and
+       `aria-activedescendant` says the same list and which option is active. */
+    if (el.tagName !== 'TEXTAREA') el.setAttribute('role', 'combobox');
     el.setAttribute('aria-autocomplete', 'list');
     el.setAttribute('aria-controls', listId);
     el.addEventListener('keydown', onkey, true);
@@ -178,7 +180,7 @@
   $effect(() => {
     const el = field;
     if (!el) return;
-    el.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (el.tagName !== 'TEXTAREA') el.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (open && matches[active]) el.setAttribute('aria-activedescendant', `${listId}-${active}`);
     else el.removeAttribute('aria-activedescendant');
   });

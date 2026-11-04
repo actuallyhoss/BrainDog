@@ -13,6 +13,7 @@
  */
 import { redirect, type LoadEvent } from '@sveltejs/kit';
 
+import { direction, setDirection } from '$lib/a11y/direction.ts';
 import { apiBase, at, here, signInFirst } from '$lib/at.ts';
 import type { Shell } from '$lib/record/boot-live.ts';
 import type AppFrame from '$lib/shell/AppFrame.svelte';
@@ -21,6 +22,9 @@ import { light, type FrameData } from '$lib/shell/light.ts';
 /* SEE AS PUTS ITS HEADER ON THE TAB'S FETCH AS THIS LOADS, before the first `boot` is asked (`see-as.svelte.ts`). */
 import { exitSeeAs, seeingAs } from '$lib/sharing/see-as.svelte.ts';
 import { shellSignedOut } from '$lib/shell.ts';
+
+/* WHICH WAY THE APP READS IS SET BEFORE ANYTHING IS DRAWN (`direction.ts`). */
+if (typeof document !== 'undefined' && direction() === 'rtl') setDirection('rtl', false);
 
 export const ssr = false;
 export const prerender = false;

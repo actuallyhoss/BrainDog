@@ -31,6 +31,7 @@
 -->
 <script lang="ts">
   import * as pref from '$lib/pref.ts';
+  import { direction, setDirection, type Direction } from '$lib/a11y/direction.ts';
   import { ACCENTS, apply as accentApply } from '$lib/accent.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -293,6 +294,12 @@
     ['dark', copy.schemeDark, 'moon'],
   ] as const;
 
+  const DIRECTIONS: readonly (readonly [Direction, string])[] = [
+    ['ltr', copy.directionLtr],
+    ['rtl', copy.directionRtl],
+  ];
+  let reads = $state<Direction>(direction());
+
   const TEXTS = [
     ['sm', copy.textSmall],
     ['base', copy.textNormal],
@@ -365,6 +372,24 @@
                 aria-pressed={text === v}
                 data-on={text === v ? '' : undefined}
                 onclick={() => set('text', v)}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
+              >
+            {/each}
+          </Segmented>
+        </div>
+
+        <div class="choice">
+          <span class="choice-name" id="choice-direction">{copy.direction}</span>
+          <Segmented full role="group" aria-labelledby="choice-direction">
+            {#each DIRECTIONS as [v, label] (v)}
+              <button
+                type="button"
+                class="segment"
+                aria-pressed={reads === v}
+                data-on={reads === v ? '' : undefined}
+                onclick={() => {
+                  reads = v;
+                  setDirection(v);
+                }}>{label}</button
               >
             {/each}
           </Segmented>

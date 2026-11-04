@@ -941,8 +941,10 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
 
     const show = (id, e) => {
       console.error(`\n  ${id} (${e.impact}): ${e.help}`);
-      for (const n of [...e.nodes].slice(0, 6)) console.error(`      ${n}`);
-      if (e.nodes.size > 6) console.error(`      ...and ${e.nodes.size - 6} more`);
+      /* `BRAINDOG_GATE_ALL` PRINTS EVERY NODE, for a pass that means to fix them rather than read that they exist. */
+      const cut = process.env.BRAINDOG_GATE_ALL ? Infinity : 6;
+      for (const n of [...e.nodes].slice(0, cut)) console.error(`      ${n}`);
+      if (e.nodes.size > cut) console.error(`      ...and ${e.nodes.size - cut} more`);
     };
 
     for (const [id, e] of found) show(id, e);

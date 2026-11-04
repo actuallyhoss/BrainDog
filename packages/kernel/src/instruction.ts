@@ -881,7 +881,7 @@ export function replyInstruction(d: InstructionDeps, ref: string, runRef: string
   const state = answer?.state ?? 'done';
   if (!(REPLY_STATES as readonly string[]).includes(state))
     return no('ENUM_VALUE_UNKNOWN', `state is one of ${REPLY_STATES.join(', ')}.`, { at: 'state', allowed: REPLY_STATES });
-  if (said === '' && state !== 'done') return no('REQUIRED_MISSING', 'Say in a line why, so he can answer it.', { at: 'said' });
+  if (said === '' && state !== 'done') return no('REQUIRED_MISSING', 'Say in a line why, so they can answer it.', { at: 'said' });
   if ([...said].length > SAID_MOST) return no('OUT_OF_BOUNDS', `A reply is at most ${String(SAID_MOST)} characters.`, { at: 'said' });
   return d.sql.transactionSync((): Result<Instr> => {
     let i = instructionOf(d.sql, ref);

@@ -675,7 +675,7 @@ export function mayaRecord(today) {
           cause: 'pay-dana-friday',
           question: `Dana Reyes sent a ${dollars(CENTS.danaInvoice)} invoice, due ${said(friday)}. Pay it with the salaries?`,
           options: (bill) => [
-            { id: 'plan', label: 'Plan it for Friday', because: 'Her invoice came in Monday. You paid her last three with the salaries.', patches: [{ at: bill, patch: { note: `Tidepool icons. Planned for ${said(friday)}, with the salaries.` } }] },
+            { id: 'plan', label: 'Plan it for Friday', because: 'Their invoice came in Monday. You paid the last three with the salaries.', patches: [{ at: bill, patch: { note: `Tidepool icons. Planned for ${said(friday)}, with the salaries.` } }] },
             { id: 'later', label: 'Not now', because: 'Decide closer to the day.' },
           ],
           bill: 'bill:dana-4',

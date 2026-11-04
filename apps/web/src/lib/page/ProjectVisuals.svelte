@@ -634,7 +634,7 @@
   }
 
   .show-data[aria-expanded='true'] :global(svg) {
-    transform: rotate(90deg);
+    transform: rotate(var(--open-turn, 90deg));
   }
 
   @media (pointer: coarse) {

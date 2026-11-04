@@ -1317,6 +1317,12 @@
     .block-source:focus-visible {
       opacity: 1;
     }
+
+    /* A DOOR THE KEYBOARD LANDS ON HAS A WIDTH. It shrinks first, down to nothing beside a long heading, so a keyboard
+       reader's focus landed on a link 0px wide. */
+    .block-source:focus-visible {
+      flex-shrink: 0;
+    }
   }
 
   @media not ((hover: hover) and (pointer: fine)) {

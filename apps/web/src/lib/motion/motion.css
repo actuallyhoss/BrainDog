@@ -38,7 +38,7 @@ details[open]::details-content {
 }
 
 :where(details[open] > summary) :where([data-chevron], .disclosure-chevron) {
-  rotate: 90deg;
+  rotate: var(--open-turn, 90deg);
 }
 
 @media (prefers-reduced-motion: reduce) {

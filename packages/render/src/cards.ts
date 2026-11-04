@@ -181,6 +181,21 @@ const NO_VALUE = 'no value';
  * after it, because a dip to zero claims the value was zero (05 §7.4). `said` keeps what the author
  * wrote, so the accessible name reads the same numbers the shape was drawn from.
  */
+/**
+ * WHAT A LINE SAYS TO A SCREEN READER. Eighty raw readings read out one by one is not a chart anybody can follow, and
+ * it was what Money said. A short run is said whole; a long one is said as where it went: its two ends, its lowest and
+ * highest, and how many readings there are. The readings themselves stay in the chart's own fold.
+ */
+export const TREND_WHOLE_AT = 8;
+export function trendSaid(said: readonly string[]): string {
+  if (said.length <= TREND_WHOLE_AT) return said.join(', ');
+  const by = said.map((s) => ({ s, n: Number(s.replace(/[^\d.-]/gu, '')) })).filter((x) => Number.isFinite(x.n));
+  if (by.length === 0) return said.join(', ');
+  const low = by.reduce((a, b) => (b.n < a.n ? b : a));
+  const high = by.reduce((a, b) => (b.n > a.n ? b : a));
+  return `${said[0]} to ${said.at(-1)}, lowest ${low.s}, highest ${high.s}, ${said.length} readings`;
+}
+
 export function trendOf(value: string): { d: string; area: string; end: string; said: string[]; bars: string | null; zero: string | null; below: boolean } | null {
   const tokens = runTokens(value);
   const numbers = tokens.map((t) => {

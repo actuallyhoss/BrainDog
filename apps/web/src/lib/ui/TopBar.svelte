@@ -256,10 +256,6 @@
     opacity: 0.7;
   }
 
-  .crumb-sep:dir(rtl) {
-    scale: -1 1;
-  }
-
   @media (hover: hover) and (pointer: fine) {
     .crumb-up:hover {
       color: var(--ink);

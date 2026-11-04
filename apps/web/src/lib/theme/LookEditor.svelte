@@ -684,7 +684,7 @@
   }
 
   .fold[aria-expanded='true'] :global(.icon) {
-    transform: rotate(90deg);
+    transform: rotate(var(--open-turn, 90deg));
   }
 
   @media (width < 900px) {

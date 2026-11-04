@@ -2360,7 +2360,7 @@
 
   /* JUST ITS LINE OF WORDS UNDER A MOUSE, so the air over the foot's rule is the foot's alone; under a thumb its 44 below. */
   .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line) {
-    min-block-size: 20px;
+    min-block-size: 24px;
     padding-block-start: 0;
     font-size: var(--fs-meta);
     line-height: calc(20px * var(--type, 1));
@@ -3147,7 +3147,7 @@
       min-block-size: 36px;
     }
 
-    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-actions > .dc-btn::after) {
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-actions > .dc-btn::before) {
       content: '';
       position: absolute;
       inset: -4px 0;

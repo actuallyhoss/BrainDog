@@ -788,10 +788,6 @@
     scale: -1 1;
   }
 
-  .back-mark:dir(rtl) {
-    scale: none;
-  }
-
   /**
    * THE SENTENCE: once, 17/24 at 400 in body text, 8 under the name and lined up with it. The figures in it at 500 and
    * the phrase that needs him in the red at 500. A reading measure, so a long line wraps where an eye can follow it.

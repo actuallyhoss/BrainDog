@@ -102,6 +102,9 @@
   let saving = $state(false);
   let said = $state('');
 
+  /* A GROUP'S HEADING IS ONE LEVEL UNDER ITS PART'S: a part is an h2 on a page and an h3 in the sheet. */
+  const groupTag = $derived(page ? 'h3' : 'h4');
+
   /* A FRESH DRAFT EACH TIME IT OPENS, from the row as it stands, and once the row arrives on a page, which is open
      before the agents are read. */
   let seeded: string | null = null;
@@ -318,7 +321,7 @@
         {@render head(`${ids}-tools`, 'grid', 'Tools')}
         <p class="pf-quiet">A tool you turn off is hidden from it.</p>
         {#each GROUPS as [group, title] (group)}
-          <h4 class="group-title">{title}</h4>
+          <svelte:element this={groupTag} class="group-title">{title}</svelte:element>
           {#if group === 'write' && d.ceiling === 'read'}<p class="pf-quiet">At Read it has none of these.</p>{/if}
           <div class="tools">
             {#each TOOL_ROWS.filter((t) => t.group === group && !t.always) as t (t.name)}
@@ -367,7 +370,7 @@
             </label>
           </div>
         {/if}
-        <h4 class="group-title" id="{ids}-finish">Tell me when it finishes</h4>
+        <svelte:element this={groupTag} class="group-title" id="{ids}-finish">Tell me when it finishes</svelte:element>
         <Segmented role="group" aria-labelledby="{ids}-finish" full>
           {#each NOTIFY_ONS as on (on)}
             <button type="button" class="segment" aria-pressed={d.notify.on === on} data-on={d.notify.on === on ? '' : undefined} onclick={() => pickNotify(on)}>{NOTIFY_WORDS[on]}</button>
@@ -382,7 +385,7 @@
           </label>
         {/if}
         {#if d.notify.on !== 'off'}
-          <h4 class="group-title" id="{ids}-by">How</h4>
+          <svelte:element this={groupTag} class="group-title" id="{ids}-by">How</svelte:element>
           <Segmented role="group" aria-labelledby="{ids}-by" full>
             {#each NOTIFY_BYS as by (by)}
               <button type="button" class="segment" aria-pressed={d.notify.by === by} data-on={d.notify.by === by ? '' : undefined} onclick={() => (d.notify = { ...d.notify, by })}>{NOTIFY_BY_WORDS[by]}</button>
@@ -438,7 +441,7 @@
           </div>
           {@render sw(d.context.lines, 'News on its answers', () => (d.context = { ...d.context, lines: !d.context.lines }), false, `${ids}-lines-line`)}
         </div>
-        <h4 class="group-title" id="{ids}-budget">How much it reads at the start</h4>
+        <svelte:element this={groupTag} class="group-title" id="{ids}-budget">How much it reads at the start</svelte:element>
         <Segmented role="group" aria-labelledby="{ids}-budget" full>
           {#each CONTEXT_BUDGETS as b (b)}
             <button type="button" class="segment" aria-pressed={d.context.budget === b} data-on={d.context.budget === b ? '' : undefined} onclick={() => (d.context = { ...d.context, budget: b })}>{BUDGET_WORDS[b]}</button>

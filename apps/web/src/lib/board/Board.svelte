@@ -696,6 +696,10 @@
     content: '→';
   }
 
+  .board :global(a[data-fit-more]:dir(rtl)::after) {
+    content: '←';
+  }
+
   .board-root:not([data-editing]) .board :global([data-board-key] > a[data-fit-more]) {
     position: static;
     order: 1;
@@ -779,6 +783,10 @@
 
   .board :global(:is(.late-more, .queue-more, .tile-link, .block-more, .kb-all, .p-more):not(:has(svg))::after) {
     content: '→';
+  }
+
+  .board :global(:is(.late-more, .queue-more, .tile-link, .block-more, .kb-all, .p-more):not(:has(svg)):dir(rtl)::after) {
+    content: '←';
   }
 
   .board :global(:is(.late-more, .queue-more, .tile-link, .block-more, .kb-all, .p-more):hover) {

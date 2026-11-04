@@ -103,7 +103,7 @@
   }
 
   .disclosure[data-open] > .dis-button .dis-chevron {
-    rotate: 90deg;
+    rotate: var(--open-turn, 90deg);
   }
 
   :global([dir='rtl']) .dis-chevron {

@@ -495,7 +495,7 @@
 }
 
 .settings-place .how[open] > .how-head .icon {
-  rotate: 90deg;
+  rotate: var(--open-turn, 90deg);
 }
 
 @media (hover: hover) and (pointer: fine) {

@@ -559,7 +559,8 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       console.log(`  ${again.lost + again.unreached} page(s) loaded only on a second try: ${again.lost} lost a module, ${again.unreached} found the port not answering`);
 
     /* EVERY FINDING OF A SEEDED RUN, because `self-test` reads them for each seed's name and a cut would hide a seed's. */
-    const shown = seeds ? findings.length : L.findingsShown;
+    /* `BRAINDOG_GATE_ALL` PRINTS THEM ALL: a target pass needs the whole list, and a cut at forty left 872 of 912 unread. */
+    const shown = seeds || process.env.BRAINDOG_GATE_ALL ? findings.length : L.findingsShown;
     for (const f of findings.slice(0, shown)) console.error(`      ${f}`);
     if (findings.length > shown) console.error(`      ...and ${findings.length - shown} more`);
 

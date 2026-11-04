@@ -388,7 +388,7 @@
   }
 
   .way[data-on] .way-chev {
-    transform: rotate(90deg);
+    transform: rotate(var(--open-turn, 90deg));
   }
 
   .way-pick:focus-visible {

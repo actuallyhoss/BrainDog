@@ -394,7 +394,7 @@
       position: relative;
     }
 
-    a.ln-title::after {
+    a.ln-title::before {
       content: '';
       position: absolute;
       inset: min(0px, calc((100% - var(--tap, 44px)) / 2)) 0;

@@ -333,7 +333,7 @@ export const NEEDS: Need[] = [
     late: false,
     amount: usd(CENTS.danaInvoice),
     ask: `Dana Reyes sent a ${usd(CENTS.danaInvoice)} invoice, due Friday. Pay it with the salaries?`,
-    why: 'Her invoice came in Monday. You paid her last three with the salaries.',
+    why: 'Their invoice came in Monday. You paid the last three with the salaries.',
     yes: 'Plan it for Friday',
     no: 'Not now',
     done: "Dana's invoice is planned for Friday, with the salaries",

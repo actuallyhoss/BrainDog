@@ -152,6 +152,8 @@
   }
 
   .toc a {
+    /* 24 TALL UNDER A MOUSE, and the line does not grow. */
+    padding-block: 3px;
     color: var(--ink);
     text-decoration: none;
   }
