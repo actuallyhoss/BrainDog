@@ -20,6 +20,8 @@
   import { actor } from '$lib/record/names.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
   import type { IconName } from '$lib/ui/icons.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -118,6 +120,9 @@
     if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) void send(e.dataTransfer.files);
   }
 
+  let menuFile = $state.raw<Listed | null>(null);
+  let point = $state.raw<{ x: number; y: number; height: number } | null>(null);
+
   function startRename(f: Listed) {
     renaming = f.id;
     newName = f.name;
@@ -175,6 +180,18 @@
   <Button size="sm" onclick={() => picker?.click()}><Icon name="plus" size="s" />{words.add}</Button>
 {/snippet}
 
+<!-- A FILE'S VERBS AT THE POINTER: the same three its "…" unfolds, and opening it. -->
+<Menu label={menuFile?.name ?? words.heading} open={point !== null} at={point} onclose={() => (point = null)}>
+  {#if menuFile}
+    {@const f = menuFile}
+    <button type="button" role="menuitem" onclick={() => open(f)}><Icon name="arrow" size="s" /><span class="mi-name">{words.open(f.name)}</span></button>
+    <button type="button" role="menuitem" onclick={() => startRename(f)}><Icon name="edit" size="s" /><span class="mi-name">{words.rename}</span></button>
+    <button type="button" role="menuitem" onclick={() => void save(f)}><Icon name="download" size="s" /><span class="mi-name">{words.download}</span></button>
+    <hr />
+    <button type="button" role="menuitem" data-tone="bad" onclick={() => void remove(f)}><Icon name="trash" size="s" /><span class="mi-name">{words.remove}</span></button>
+  {/if}
+</Menu>
+
 {#snippet body()}
   <input bind:this={picker} class="at-picker" type="file" multiple tabindex="-1" aria-hidden="true" onchange={chosen} />
   {#if over}
@@ -205,7 +222,7 @@
   {#if files.length > 0}
     <ul class="at-list">
       {#each files as f (f.id)}
-        <li class="at-one">
+        <li class="at-one" {@attach ownMenu((p) => ((menuFile = f), (point = p)))}>
           {#if renaming === f.id}
             <form class="at-rename" onsubmit={(e) => (e.preventDefault(), void saveRename(f))}>
               <label class="at-sr" for="{uid}-{f.id}">{words.renameTo(f.name)}</label>

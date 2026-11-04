@@ -16,6 +16,7 @@
   back link to the index.
 -->
 <script lang="ts">
+  import { answerVerbs } from '$lib/things/page-verbs.ts';
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { page } from '$app/state';
@@ -211,6 +212,7 @@
   const mayArrange = $derived(!shell.refused && may(shell, 'owner'));
   let arranging = $state(false);
 
+  $effect(() => answerVerbs({ reorder: mayArrange ? () => void arrangeIndex() : null }));
   async function arrangeIndex(): Promise<void> {
     if (arranging) return;
     arranging = true;

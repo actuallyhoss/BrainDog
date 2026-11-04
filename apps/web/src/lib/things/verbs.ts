@@ -79,6 +79,7 @@ export const thingWords = {
   boardOff: 'Back to a plain page',
   contacts: 'Import contacts',
   statement: 'Import a statement',
+  reorder: 'Reorder the areas',
   ask: 'Note a choice to make',
   whole: 'Add one with all its fields',
   hide: 'Hide from the sidebar',

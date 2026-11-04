@@ -42,6 +42,7 @@ import { toasts } from '../ui/toast.svelte.ts';
 import type { IconName } from '../ui/icons.ts';
 import { createClient } from '@braindog/client';
 import { editWords, openAutomations } from '../flow/source.ts';
+import { live } from '../data/live.svelte.ts';
 import { askPage } from './page-verbs.ts';
 import { askSheet } from './asks.svelte.ts';
 import { dotOf } from './state-dot.ts';
@@ -252,6 +253,20 @@ function aboutOf(slug: string): { list: string; seq: number } | null {
 /** A page as the record answers it, as far as a menu reads it. */
 type PageBody = { look?: unknown; page?: string; pack?: unknown; requires?: readonly string[]; nav?: { section?: string | null } | null };
 
+/* A PAGE'S READ IS THE RECORD'S WHOLE ANSWER FOR IT, so it is asked once for each version of the record: a person going down a list
+   of links with the right button does not ask for each again. */
+const bodies = new Map<string, { at: number | null; body: Promise<PageBody | null> }>();
+function pageBody(slug: string): Promise<PageBody | null> {
+  const had = bodies.get(slug);
+  if (had && had.at === live.version) return had.body;
+  const body = client()
+    .page(slug)
+    .then((read) => (read.ok ? (read.value as PageBody) : null))
+    .catch(() => null);
+  bodies.set(slug, { at: live.version, body });
+  return body;
+}
+
 /** What a page of money offers: where a statement comes in, and what its figures are counted in. */
 function moneyItems(t: Extract<Thing, { kind: 'page' }>, shell: Shell, body: PageBody | null): ThingItem[] {
   if (!body) return [];
@@ -268,8 +283,7 @@ function moneyItems(t: Extract<Thing, { kind: 'page' }>, shell: Shell, body: Pag
 async function pageThing(t: Extract<Thing, { kind: 'page' }>, shell: Shell, from: ThingFrom): Promise<ThingItem[]> {
   const about = aboutOf(t.slug);
   const out: ThingItem[] = [];
-  const read = await client().page(t.slug).catch(() => null);
-  const body = read && read.ok ? (read.value as PageBody) : null;
+  const body = await pageBody(t.slug);
   if (about) {
     const decl = await declOf(about.list);
     const project = decl !== undefined && isProject(decl);
@@ -384,6 +398,11 @@ export async function itemsOf(address: string, shell: Shell, from: ThingFrom, na
         item('duplicate', 'copy', editWords.duplicate, G.more, { href: `/automations/new?${new URLSearchParams({ from: rule.id }).toString()}` }),
         ...(owns ? [item('remove', 'delete', editWords.remove, G.going, { tone: 'bad', run: () => askPage(t.href, 'remove') })] : []),
       ];
+      break;
+    }
+    case 'place': {
+      /* THE PLACES WITH A "…" OF THEIR OWN. Settings' index, for who may arrange it. */
+      if (t.href === '/settings' && shell.me?.owner === true) out = [item('reorder', 'move', thingWords.reorder, G.page, { icon: 'edit', run: () => askPage('/settings', 'reorder') })];
       break;
     }
     case 'question':

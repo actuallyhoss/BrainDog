@@ -117,7 +117,7 @@
   let link = $state<string | null>(null);
   const oneWindow = inIosApp || inMacApp;
   let clip: typeof import('../clipboard.ts') | null = null;
-  const onPage = (href: string): boolean => (inside(location.pathname) + location.search).split('#')[0] === href;
+  const onPage = (href: string): boolean => inside(location.pathname) === inside(href.split('?')[0] ?? href);
 
   function ended() {
     if (told) return;

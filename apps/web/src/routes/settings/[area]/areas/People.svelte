@@ -34,6 +34,8 @@
   import Segmented from '$lib/ui/Segmented.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
   import Face from '$lib/ui/Face.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -255,6 +257,10 @@
    * wanted them out for a week had to remember every list to invite them back to. Stopping keeps all of it, and the
    * same press on a stopped person lets them back in with exactly that.
    */
+  /* A PERSON'S VERBS AT THE POINTER: the same presses their row draws. */
+  let menuPerson = $state.raw<Person | null>(null);
+  let menuAt = $state.raw<{ x: number; y: number; height: number } | null>(null);
+
   function stopOrLetBack(p: Person) {
     if (peopleFrom !== 'live') cannotWrite();
     else if (p.suspended) void settle(() => suspendPerson(apiBase(), p, false), copy.accessLetBack(p.name));
@@ -542,6 +548,19 @@
   control, and the segments, the exceptions, the two hints and the erasure appear on the day
   a second person exists, which is the day each of them means something.
 -->
+<Menu label={menuPerson ? said(menuPerson) : copy.theyDid} open={menuAt !== null} at={menuAt} onclose={() => (menuAt = null)}>
+  {#if menuPerson}
+    {@const p = menuPerson}
+    <a role="menuitem" href={at(`/audit?by=${encodeURIComponent(p.id)}`)}><Icon name="activity" size="s" /><span class="mi-name">{copy.theyDid}</span></a>
+    {#if !self(p)}
+      {#if anOwner && p.level !== 'owner' && !p.suspended}<button type="button" role="menuitem" disabled={peopleBusy} onclick={() => (handing = p)}><Icon name="user-check" size="s" /><span class="mi-name">{copy.handOverPress}</span></button>{/if}
+      <button type="button" role="menuitem" disabled={lastOwner(p) || peopleBusy} onclick={() => stopOrLetBack(p)}><Icon name="ban" size="s" /><span class="mi-name">{p.suspended ? copy.letBackIn : copy.stopAccess}</span></button>
+      <hr />
+      <button type="button" role="menuitem" data-tone="bad" disabled={lastOwner(p) || peopleBusy} onclick={() => takeAway(p)}><Icon name="trash" size="s" /><span class="mi-name">{copy.removeAccess}</span></button>
+    {/if}
+  {/if}
+</Menu>
+
 <!-- NOTHING WHILE IT IS READ: an empty tile under its title read as nobody at all. -->
 {#if peopleFrom === 'reading'}
   <!-- AND WHAT FOLLOWS WAITS OUT OF SIGHT (`settings.css`): the tile landed over Sharing's and pushed them down 116px. -->
@@ -580,7 +599,7 @@
            can do on the second, and the sentence directly under the control that sets it. -->
       <ul class="whos">
         {#each people as p (p.id)}
-          <li class="who" in:lineIn out:dismiss animate:flip={settleRows()}>
+          <li class="who" {@attach ownMenu((a) => ((menuPerson = p), (menuAt = a)))} in:lineIn out:dismiss animate:flip={settleRows()}>
             <div class="who-head">
               <Face name={said(p)} you={self(p)} kind="person" />
               <span class="who-name">{said(p)}</span>

@@ -212,8 +212,9 @@ function pick(el: Element | null, shift: boolean, selected: boolean): Picked | n
   if (!link || address === null) return { host, link: marked === host ? (marked.dataset.thing ?? null) : null };
   /* THE LINK STANDS AROUND THE HOST, OR THE HOST IS THE LINK'S OWN: one thing, and its menu gains the link's verbs. */
   if (handsOn) return { host, link: null };
-  if (link.contains(host) || isFace(link, host)) return { host, link: address };
-  if (host.dataset.menuThing && bare(host.dataset.menuThing) === bare(address)) return { host, link: address };
+  /* A HOST THAT SAYS WHICH THING IT IS DRAWS THE LINK'S VERBS ITSELF. */
+  if (host.dataset.menuThing && bare(host.dataset.menuThing) === bare(address)) return { host, link: null };
+  if (link.contains(host) || isFace(link, host)) return { host, link: host.dataset.menuThing ? null : address };
   return { thing: address, from: link as HTMLElement };
 }
 
@@ -260,6 +261,7 @@ export function watchMenus(): () => void {
     const el = e.target instanceof Element ? e.target : null;
     if (e.pointerType === 'mouse') {
       if (e.button === 2 && el) selectedAtPress = selectedOver(el);
+      else pressedLink = null;
       return;
     }
     drop();
