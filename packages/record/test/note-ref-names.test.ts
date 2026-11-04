@@ -16,7 +16,7 @@ const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'own
 const reg = (id: string, name: string, title: string, fields: unknown[]) => ({ id: `register.${id}`, kind: 'register' as const, body: { id, name, title, fields } as never });
 
 const DECLS = [
-  reg('tasks', 'Tasks', 'title', [{ id: 'title', type: 'text', required: true }]),
+  reg('tasks', 'Tasks', 'what', [{ id: 'what', type: 'text', required: true }]),
   reg('payroll', 'Payroll', 'who', [{ id: 'who', type: 'text', required: true }]),
   {
     id: 'page.notes',
@@ -35,7 +35,7 @@ async function record() {
   const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW) });
   assert.ok((await api.kernel.install(DECLS)).ok);
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
-  value(await api.create({ register: 'tasks', fields: { title: 'Turn auto-renew back on' } }, owner));
+  value(await api.create({ register: 'tasks', fields: { what: 'Turn auto-renew back on' } }, owner));
   value(await api.create({ register: 'payroll', fields: { who: 'Sam Secret' } }, owner));
   value(await api.invite({ person: 'p_9', name: 'Wren', registers: { tasks: 'read' } }, owner));
   const held = api.kernel.access('p_9')!;

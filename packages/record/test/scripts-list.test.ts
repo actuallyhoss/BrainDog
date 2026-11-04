@@ -80,10 +80,10 @@ test('scripts LISTS EVERY INSTALLED SCRIPT, with what it may touch and how its r
   const g = first[0]!;
   assert.deepEqual(
     [g.title, g.version, g.runs, g.reads, g.writes, g.egress, g.keys, g.status, g.last, g.refused, g.month],
-    ['Gold rate', 1, { every: '1h', door: null, rule: false }, [], ['gold_egp'], ['https://api.goldapi.io'], ['goldapi'], 'on', null, { in_a_row: 0, pauses_at: REFUSED_IN_A_ROW }, { runs: 0, ok: 0, refused: 0 }],
+    ['Gold rate', 1, { every: '1h', at: null, door: null, rule: false }, [], ['gold_egp'], ['https://api.goldapi.io'], ['goldapi'], 'on', null, { in_a_row: 0, pauses_at: REFUSED_IN_A_ROW }, { runs: 0, ok: 0, refused: 0 }],
   );
   assert.equal(typeof g.next, 'string', 'an armed clock says when it runs next');
-  assert.deepEqual(first[1]!.runs, { every: null, door: 'bank-in', rule: false });
+  assert.deepEqual(first[1]!.runs, { every: null, at: null, door: 'bank-in', rule: false });
 
   await turn(wrote);
   let now = await gold();

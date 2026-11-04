@@ -43,6 +43,8 @@ async function record() {
   const api = await createRecordApi({ sql, clock });
   value(await installSeed(api.kernel));
   sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_seed', 'teo@vance-studio.example', 'Teodor')");
+  /* HE OWNS IT, so the line an agent reads says what his word lifts (`wordOf`). */
+  sql.exec("INSERT OR REPLACE INTO member (person_id, register, level) VALUES ('p_seed', '*', 'owner')");
   clock.advance(MIN);
   return { api, sql, clock };
 }

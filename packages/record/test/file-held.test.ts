@@ -91,16 +91,16 @@ test('RE6: A FILE PUT ON A PRIVATE ROW BY A WRITE THAT LOGS NOTHING IS STILL KEP
   assert.ok(made.ok);
   const { id, seq } = (made as { value: { id: string; seq: number } }).value;
   assert.ok((await api.makePrivate({ ref: `notes#${seq}` }, ada)).ok);
-  const open = await api.create({ register: 'notes', fields: { what: 'Open scan', scan: file('g') } } as never, ada);
+  const open = await api.create({ register: 'notes', fields: { what: 'Open scan', scan: file('0') } } as never, ada);
   assert.ok(open.ok);
   const openId = (open as { value: { id: string } }).value.id;
   /* THE MAP IS WALKED NOW, with the private row naming e and the open one naming g. */
   assert.equal(api.fileHeld(sha('e'), bo), true);
-  assert.equal(api.fileHeld(sha('g'), bo), false);
-  /* A REPAIR THAT LOGS NOTHING puts f on the private row, and moves g there from the open row. */
-  sql.exec(`UPDATE entry SET fields = json_set(fields, '$.scan', json(?)) WHERE id = ?`, JSON.stringify([file('e'), file('f'), file('g')]), id);
+  assert.equal(api.fileHeld(sha('0'), bo), false);
+  /* A REPAIR THAT LOGS NOTHING puts f on the private row, and moves 0 there from the open row. */
+  sql.exec(`UPDATE entry SET fields = json_set(fields, '$.scan', json(?)) WHERE id = ?`, JSON.stringify([file('e'), file('f'), file('0')]), id);
   sql.exec(`UPDATE entry SET fields = json_remove(fields, '$.scan') WHERE id = ?`, openId);
   assert.equal(api.fileHeld(sha('f'), bo), true, 'a file on a private row was served because the map had not seen it');
-  assert.equal(api.fileHeld(sha('g'), bo), true, 'a file now only on a private row was served by the row it left');
+  assert.equal(api.fileHeld(sha('0'), bo), true, 'a file now only on a private row was served by the row it left');
   assert.equal(api.fileHeld(sha('f'), ada), false, 'the maker lost her own file');
 });

@@ -24,7 +24,7 @@ const RP_ID = 'studio.example';
 const serverKey = 'a-throwaway-server-key-for-these-tests-only';
 const KEYS = testKeys()!;
 const NOT_YOU = { code: 'UNAUTHORIZED', fix: 'That did not sign you in.' };
-const STALE = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to change your passkeys. It has been more than fifteen minutes since you last did.' };
+const STALE = { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to change your passkeys. It has been more than fifteen minutes since you last did.', at: 'proof' };
 
 /** A fresh address per request, unless a test is about one address, so no test measures a lockout it did not mean to. */
 let seq = 0;

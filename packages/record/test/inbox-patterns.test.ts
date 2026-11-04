@@ -78,7 +78,7 @@ test('THE REACH IS THE INBOX’S: an owner, a token given the inbox, and nobody 
   assert.equal(value<PatternReport>(await api.inboxPatterns(undefined, reach)).doors.length, 1);
   const narrow = refusal(await api.inboxPatterns({}, { ...reach, registers: ['transactions'] }));
   assert.equal(narrow.code, 'FORBIDDEN');
-  assert.match(narrow.fix, /whole record/u);
+  assert.match(narrow.fix, /all of this BrainDog/u);
   /* THE ARGUMENT IS HELD TO WHAT IT IS, and never quietly read as 14. */
   for (const days of [0, 1.5, 400, '14'])
     assert.equal(refusal(await api.inboxPatterns({ days } as never, owner)).code, 'VALUE_MALFORMED', String(days));

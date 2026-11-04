@@ -1291,13 +1291,13 @@ test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member h
 
   /* THE METHODS THAT ARE ABOUT THE RECORD REFUSE. Somebody who holds only named registers holds
      none of the record, and these two are about the record, and about the other people in it, rather
-     than about rows. */
-  for (const [name, call] of [
-    ['members', () => api.members(them)],
-    ['whoami', () => api.whoami(them)],
+     than about rows. `whoami` refuses as `boot` does (final polish, 2 Nov), so a device asks one and hears what the other would say. */
+  for (const [name, call, code] of [
+    ['members', () => api.members(them), 'FORBIDDEN'],
+    ['whoami', () => api.whoami(them), 'LEVEL_REQUIRED'],
   ] as const) {
     const out = await call();
-    assert.equal((out as { refusal?: { code: string } }).refusal?.code, 'FORBIDDEN', name);
+    assert.equal((out as { refusal?: { code: string } }).refusal?.code, code, name);
   }
 
   /* AND THE ONES THAT ARE ABOUT ROWS ANSWER, filtered. Refusing these outright made every ceiling

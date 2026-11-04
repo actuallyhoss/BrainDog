@@ -120,7 +120,7 @@ test('AN AGENT READS HOW THE RECORD IS ARRANGED IN ONE COMPACT ANSWER, and the g
   const page = value<{ block: { kind: string[] }; example: { id: string; kind: 'page'; body: never } }>(await api.arrangement({ grammar: 'page' }, agent));
   assert.ok(value(await api.arrangement({ grammar: 'proposals' }, agent)));
   const wrong = refusal(await api.arrangement({ grammar: 'yaml' }, agent));
-  assert.deepEqual(wrong.allowed, ['page', 'register', 'metric', 'rule', 'proposals', 'ingest', 'kinds']);
+  assert.deepEqual(wrong.allowed, ['page', 'register', 'metric', 'rule', 'proposals', 'ingest', 'kinds', 'pack']);
   assert.equal(refusal(await api.arrangement({ pages: 'x' } as never, agent)).code, 'FIELD_UNKNOWN');
 
   /* THE KINDS ARE THE ONES THE LINT REFUSES AGAINST, and the example is a page that installs over Work. */
@@ -676,6 +676,8 @@ test("ON HIS WORD AN AGENT ACCEPTS AN ADD-ON (the owner's decision of 27 October
   const { api, sql } = await record();
   sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_owner', 'owner@vance-studio.example', 'Teodor')");
   sql.exec("INSERT OR REPLACE INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  /* THE KEY THAT ASKS IS HIS, so what it asked is his to answer on his word (RK1). */
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_1', 'p_owner', 'h1', 'propose', 'Claude', '2026-10-01T00:00:00.000Z')");
   /* ANOTHER OF HIS KEYS: the key that asked is never the one that answers (`wordAnswer`, audit 10k AK2). */
   const writer: CallContext = { principal: { kind: 'token', id: 't_2', scope: 'write', person: 'p_owner', level: 'owner' }, session: { client_id: 'c1', agent: 'claude' } };
   const asked = value<{ id: string }>(await api.propose({ question: 'Add Work?', body_kind: 'pack', body: { install: 'work' } } as never, agent));

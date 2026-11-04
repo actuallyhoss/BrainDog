@@ -211,8 +211,10 @@ test('BOOT CARRIES THE SHELL: the record, who is asking, the rail, the counts an
   const boot = value<Boot>(await api.boot(bo));
   /* NO HOME CURRENCY IS CHOSEN ON THIS RECORD, and the shell is told so rather than handed a guess. */
   assert.deepEqual(boot.record, { slug: 'the-studio', name: 'The Studio', locale: 'en', currency: null, money: [] });
-  const { levels, ...me } = boot.me;
-  assert.deepEqual(me, { kind: 'person', person: 'p_2', name: 'Bo', level: 'read', prefs: {} });
+  const { levels, prefs, ...me } = boot.me;
+  assert.deepEqual(me, { kind: 'person', person: 'p_2', name: 'Bo', level: 'read' });
+  /* BOOT WRITES WHEN SHE OPENED IT, for People to say, and nothing else is kept for her yet. */
+  assert.deepEqual(Object.keys(prefs), ['record.opened']);
   /* AND THE LEVEL ON EACH LIST SHE HOLDS, her record-wide `read` on both (`me.levels`). */
   assert.equal(levels.obligations, 'read', 'boot did not say the level Bo holds on Obligations');
   assert.equal(levels.diary, 'read');
@@ -640,7 +642,8 @@ test("THE PEOPLE LIST THAT NAMES THEM IS THE PEOPLE MODULE'S, not any list someb
     const namesOf = async (ctx: CallContext) => (value<Boot>(await api.boot(ctx)) as Boot & { names?: Record<string, string> }).names;
     assert.deepEqual(await namesOf(owner), { p_2: 'Bo', p_4: 'Di' }, pack);
     for (const id of ['p_2', 'p_4'])
-      assert.deepEqual(await namesOf(held(id)), named ? { p_2: 'Bo', p_4: 'Di' } : undefined, `${id} on a people list owned by ${pack}`);
+      /* AND A NAMELESS OWNER IS SAID BY THE ROLE, to everybody but themselves. */
+      assert.deepEqual(await namesOf(held(id)), named ? { p_1: 'The owner', p_2: 'Bo', p_4: 'Di' } : undefined, `${id} on a people list owned by ${pack}`);
     sql.close();
   }
 });
@@ -662,8 +665,8 @@ test('BOOT NAMES WHO IS ON THE RECORD to the owner and to a member who may read 
 
   assert.ok((await api.kernel.install([PEOPLE_LIST])).ok);
   value(await api.invite({ person: 'p_4', name: 'Di', registers: { people: 'read' } } as never, owner));
-  assert.deepEqual(await namesOf(held('p_2')), { p_2: 'Bo', p_3: 'Cy', p_4: 'Di' }, 'a member who reads the whole record, People with it');
-  assert.deepEqual(await namesOf(held('p_4')), { p_2: 'Bo', p_3: 'Cy', p_4: 'Di' }, 'a member invited to People');
+  assert.deepEqual(await namesOf(held('p_2')), { p_1: 'The owner', p_2: 'Bo', p_3: 'Cy', p_4: 'Di' }, 'a member who reads the whole record, People with it');
+  assert.deepEqual(await namesOf(held('p_4')), { p_1: 'The owner', p_2: 'Bo', p_3: 'Cy', p_4: 'Di' }, 'a member invited to People');
   assert.equal(await namesOf(held('p_3')), undefined, 'a member held to Obligations was named everybody');
   assert.equal(await namesOf(project), undefined, 'a token held to one project was named everybody');
   assert.doesNotMatch(JSON.stringify(value<Boot>(await api.boot(held('p_2')))), /example\.com/u);

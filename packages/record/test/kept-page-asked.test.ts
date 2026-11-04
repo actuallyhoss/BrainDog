@@ -51,13 +51,14 @@ async function record(now: { at: number }) {
   await put(PACK, (doc) => ({
     ...doc,
     version: '2.5.0',
-    declarations: (doc.declarations as Page[]).map((d) => (d.page === 'home-founder' ? { ...d, title: 'Overview', blocks: d.blocks.filter((b) => b.heading !== 'Late') } : d)),
+    declarations: (doc.declarations as Page[]).map((d) => (d.page === 'home-founder' ? { ...d, title: 'Founder home', blocks: d.blocks.filter((b) => b.heading !== 'Late') } : d)),
   }));
   const home = (): Page => JSON.parse(String(api.kernel.declarations().find((d) => d.id === HOME)!.body)) as Page;
   const was = home();
   assert.ok(was.blocks.some((b) => b.heading === 'Lapsing'), 'Home as 2.5.0 had it holds no Lapsing block to move');
+  /* HIS OWN TITLE: the update's new words go in only where his page still says the pack's old ones (`reworded`). */
   const { page: slug, ...rest } = was;
-  value(await api.setDeclaration({ body: { page: slug, ...rest, blocks: [...was.blocks.filter((b) => b.heading === 'Lapsing'), ...was.blocks.filter((b) => b.heading !== 'Lapsing')] } }, owner));
+  value(await api.setDeclaration({ body: { page: slug, ...rest, title: 'Overview', blocks: [...was.blocks.filter((b) => b.heading === 'Lapsing'), ...was.blocks.filter((b) => b.heading !== 'Lapsing')] } }, owner));
   return { api, sql, home };
 }
 

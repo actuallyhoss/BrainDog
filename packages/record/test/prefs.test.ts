@@ -24,7 +24,11 @@ async function record() {
 const prefsOf = async (api: Awaited<ReturnType<typeof record>>['api'], ctx: CallContext) => {
   const out = await api.boot(ctx);
   assert.ok(out.ok, JSON.stringify(out));
-  return out.value.me.prefs;
+  /* LESS WHEN THEY LAST OPENED IT, which `boot` itself writes for People to say (`markOpened`): not one of their choices. */
+  const held = out.value.me.prefs as Record<string, unknown> | undefined;
+  if (held === undefined) return held;
+  const { 'record.opened': _opened, ...prefs } = held;
+  return prefs;
 };
 
 test('A HIDDEN PAGE IS KEPT FOR THE PERSON WHO HID IT, and boot answers it to them and nobody else', async () => {

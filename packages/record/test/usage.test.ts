@@ -121,7 +121,7 @@ test('AT THE LIMIT AN ACTION WAITS UNTIL THE FIRST OF NEXT MONTH, UTC, and the s
   sql.exec("INSERT INTO dir_usage_day (record, day, scope, action, requests) VALUES (?, '2026-12-03', 'studio', 'backfill', ?)", record, ALLOWANCE.hosted!.requests);
   assert.deepEqual(d.mayRun(record, 'stripe balance'), {
     until: Date.UTC(2027, 0, 1),
-    say: 'stripe balance is waiting until 1 January. This BrainDog has used its 150,000 requests for December.',
+    say: 'stripe balance is waiting until 1 January. This BrainDog has used its 150,000 requests for December. Nothing you made is touched, and Settings > Billing has more.',
   });
 
   /* A self-host is counted and never limited. */

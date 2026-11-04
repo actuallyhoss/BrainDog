@@ -350,9 +350,9 @@ let writeFixture: Promise<Fixture> | undefined;
 /** A record of its own for the write tools, so nothing they change reaches a read. */
 const writes = (): Promise<Fixture> => (writeFixture ??= build());
 
-/* EIGHTEEN SINCE THE AGENTS WORK OF 21 OCTOBER: the 16 listed and the 2 folded ones still callable (`FOLDED`). */
-test('MCP: the matrix asks every one of the 18 tools a model can call', () => {
-  assert.equal(TOOL_NAMES.length, 18, TOOL_NAMES.join(', '));
+/* NINETEEN SINCE `instructions` (21 October): the 17 listed and the 2 folded ones still callable (`FOLDED`). */
+test('MCP: the matrix asks every one of the 19 tools a model can call', () => {
+  assert.equal(TOOL_NAMES.length, 19, TOOL_NAMES.join(', '));
 });
 
 for (const tool of TOOL_NAMES) {

@@ -31,12 +31,12 @@ test('A SESSION PROVED MORE THAN FIFTEEN MINUTES AGO CANNOT INVITE ANYBODY OR MI
   assert.deepEqual(refusalOf(await api.invite({ email: 'bo@example.com', level: 'read' }, stale)), {
     code: 'NEEDS_BROWSER_SESSION',
     fix: 'Sign in again to invite somebody or change what they can do. Nothing was changed.',
-    at: 'principal',
+    at: 'proof',
   });
   assert.deepEqual(refusalOf(await api.createToken({ scope: 'read', label: 'an agent' }, stale)), {
     code: 'NEEDS_BROWSER_SESSION',
     fix: 'Sign in again to make a token. Nothing was made.',
-    at: 'principal',
+    at: 'proof',
   });
 });
 

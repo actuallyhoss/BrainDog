@@ -89,14 +89,15 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
      the plan page's eight of one plan (what is late on it, its cancelled parts, what was paid by quarter, and its left, next
      due, after next, parts and parts paid as the page's tiles read them) made it 155, and cash-foreign-share, the share of cash held in other
      currencies, 156, and round 1030's Money and People (net worth with what the add-ons hold, week and year budgets, the
-     waiting lines, accounts open, Stripe below zero, organisations you work with and the rest) made it 182. The number is
+     waiting lines, accounts open, Stripe below zero, organisations you work with and the rest) made it 182, and what the
+     packs have added since, books and their figures among them, 213. The number is
      asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its own. */
-  assert.equal(declared.length, 182);
+  assert.equal(declared.length, 213);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late receivables', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
-     a project's own figures and its monthly series, a book's cash, the day it runs out, its month, its months and what is due to and from it, a category's budget passed and one plan's sixteen since the plan page, one account's five since money-core 3.29.0, and since portfolio 1.19.0 the days since one measure was read, and since portfolio 1.22.0 a project's stages and the shape its plan is kept in, and since money-core 3.32.0 one payee's and one category's weeks. */
-  assert.deepEqual(listed.filter((f) => f.param).map((f) => f.id), ['account-gap', 'account-in-by-month', 'account-lines', 'account-now', 'account-out-by-month', 'book-cash', 'book-in-by-month', 'book-in-month', 'book-lasts-until', 'book-net-by-month', 'book-net-month', 'book-out-by-month', 'book-out-month', 'book-owed-by', 'book-owed-to', 'book-spent-month', 'budget-passed-on', 'kpi-stale', 'paid-to-by-week', 'plan-after-next-by-plan', 'plan-last-due', 'plan-late', 'plan-left', 'plan-left-by-plan', 'plan-next-due', 'plan-next-due-by-plan', 'plan-paid', 'plan-paid-by-quarter', 'plan-parts', 'plan-parts-by-plan', 'plan-parts-cancelled', 'plan-parts-open', 'plan-parts-paid', 'plan-parts-paid-by-plan', 'project-in-by-month', 'project-in-month', 'project-kept-month', 'project-out-by-month', 'project-out-month', 'project-owed', 'project-plan-path', 'project-plan-roadmap', 'project-said', 'project-staged', 'spent-in-category-by-week']);
+     a project's own figures and its monthly series, a book's cash, the day it runs out, its month, its months and what is due to and from it, a category's budget passed and one plan's sixteen since the plan page, one account's five since money-core 3.29.0, and since portfolio 1.19.0 the days since one measure was read, and since portfolio 1.22.0 a project's stages and the shape its plan is kept in, and since money-core 3.32.0 one payee's and one category's weeks, and since then a book's accounts and one filing rule's filings. */
+  assert.deepEqual(listed.filter((f) => f.param).map((f) => f.id), ['account-gap', 'account-in-by-month', 'account-lines', 'account-now', 'account-out-by-month', 'book-accounts', 'book-cash', 'book-in-by-month', 'book-in-month', 'book-lasts-until', 'book-net-by-month', 'book-net-month', 'book-out-by-month', 'book-out-month', 'book-owed-by', 'book-owed-to', 'book-spent-month', 'budget-passed-on', 'filing-rule-filed', 'kpi-stale', 'paid-to-by-week', 'plan-after-next-by-plan', 'plan-last-due', 'plan-late', 'plan-left', 'plan-left-by-plan', 'plan-next-due', 'plan-next-due-by-plan', 'plan-paid', 'plan-paid-by-quarter', 'plan-parts', 'plan-parts-by-plan', 'plan-parts-cancelled', 'plan-parts-open', 'plan-parts-paid', 'plan-parts-paid-by-plan', 'project-in-by-month', 'project-in-month', 'project-kept-month', 'project-out-by-month', 'project-out-month', 'project-owed', 'project-plan-path', 'project-plan-roadmap', 'project-said', 'project-staged', 'spent-in-category-by-week']);
   for (const f of listed) {
     const row = declared.find((d) => d.id === `metric.${f.id}`)!;
     assert.equal(f.pack, row.pack_id, f.id);
@@ -150,8 +151,8 @@ test('SOMEBODY INVITED TO ONE LIST IS LISTED EXACTLY THE FIGURES metric ADMITS T
   /* AND THE CONTROL, so an empty list on both sides cannot pass: she reads the accounts, and the figures over them alone.
      `cash-now` is not one since money-core 3.0.0, because it rolls the balances and transactions too, which she cannot read,
      and `cash-as-of` and `balances-stale` are not since money-core 3.16.0, which reads them off the same roll. Round 1030's
-     accounts open, held beyond cash and Stripe below zero read the accounts alone, so they are hers too. */
-  assert.deepEqual(listed, ['accounts-open', 'card-to-pay', 'card-to-pay-on', 'cash-accounts', 'currencies-held', 'held-beyond-cash', 'stripe-below-zero-count']);
+     accounts open, held beyond cash and Stripe below zero read the accounts alone, so they are hers too, and so does a book's accounts since money-core added it. */
+  assert.deepEqual(listed, ['accounts-open', 'book-accounts', 'card-to-pay', 'card-to-pay-on', 'cash-accounts', 'currencies-held', 'held-beyond-cash', 'stripe-below-zero-count']);
   /* NOR HOW MANY NIGHTS CASH NOW MISSED: a kept line names the lists its figure reads (`figureLists`), so the line of a
      figure held from her is held from her too. Named here because it was listed to her while its line named none. */
   assert.ok(declared.some((d) => d.id === 'metric.nights-missed-30d') && !listed.includes('nights-missed-30d'));
@@ -187,7 +188,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 182);
+  assert.equal(listed.length, 213);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });

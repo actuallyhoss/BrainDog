@@ -188,7 +188,7 @@ test('A TOKEN HELD TO ONE LIST IS REFUSED, reach or no reach: the inbox is the w
   const held: CallContext = { ...agent(), registers: ['obligations'] };
   const out = await api.triage({ arrival: ids[0]!, register: 'obligations' }, held);
   assert.equal(refusal(out)?.code, 'FORBIDDEN', JSON.stringify(refusal(out)));
-  assert.match(refusal(out)?.fix ?? '', /whole record/);
+  assert.match(refusal(out)?.fix ?? '', /all of this BrainDog/);
   assert.doesNotMatch(refusal(out)?.fix ?? '', /Debit|Water bill/, 'the refusal told a held token what the inbox holds');
   assert.equal(await stateOf(api, ids[0]!), 'untriaged');
   assert.deepEqual(await obligations(api), []);

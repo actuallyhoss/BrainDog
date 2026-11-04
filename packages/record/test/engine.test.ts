@@ -30,15 +30,19 @@ const DOWN: EngineHealthRead = {
 const over = (engineHealth?: () => Promise<EngineHealthRead>, who: CallContext = OWNER) =>
   methods({
     scoped: (ctx: CallContext) => (ctx === who ? null : { code: 'FORBIDDEN', fix: 'Ask the owner for read access.' }),
+    guard: (ctx: CallContext) => (ctx === OWNER ? null : { code: 'LEVEL_REQUIRED', fix: 'This is the owner’s.' }),
     ...(engineHealth === undefined ? {} : { engineHealth }),
   } as unknown as RecordDeps);
 
 test("THE HOST'S READ IS THE ANSWER, whole, and a caller who reads nothing is refused before it is asked", async () => {
   let asked = 0;
-  const m = over(async () => (asked++, DOWN), READER);
-  assert.deepEqual(await m.engineHealth(undefined, READER), { ok: true, value: DOWN });
+  const m = over(async () => (asked++, DOWN));
+  assert.deepEqual(await m.engineHealth(undefined, OWNER), { ok: true, value: DOWN });
   assert.equal(asked, 1);
-  const refused = await m.engineHealth(undefined, OWNER);
+  /* IT IS THE OWNER'S: it says the month's model spend and the provider's error text, so anybody else who may read hears no engine. */
+  assert.deepEqual(await over(async () => (asked++, DOWN), READER).engineHealth(undefined, READER), { ok: true, value: null });
+  assert.equal(asked, 1);
+  const refused = await m.engineHealth(undefined, READER);
   assert.equal(refused.ok, false);
   assert.equal(asked, 1);
 });

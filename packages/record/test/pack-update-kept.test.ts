@@ -156,7 +156,7 @@ test('a declaration written in the app that was never the pack’s is still a co
   assert.deepEqual(planned.diff.kept, []);
   const put = refused(await api.installPack({ doc: next, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
   assert.equal(put.code, 'PROVIDES_CONFLICT');
-  assert.match(put.fix, /metric\.fx-spread was written in this record/u);
+  assert.match(put.fix, /metric\.fx-spread was made here/u);
   const filed = refused(await api.propose({ question: 'Update money?', body_kind: 'pack', body: { install: 'money-core' } } as never, agent));
   assert.equal(filed.code, 'PROVIDES_CONFLICT');
   assert.match(filed.fix, /money-core would take over metric\.fx-spread, which \(this record\) holds/u);

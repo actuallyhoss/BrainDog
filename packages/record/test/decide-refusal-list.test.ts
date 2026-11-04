@@ -75,7 +75,7 @@ test('(1) A MEMBER OF ONE LIST IS TOLD THAT DECIDING IS FOR THE WHOLE RECORD, an
   const fix = out.refusal!.fix;
   assert.doesNotMatch(fix, /\bOpen (?:it|one of those)\b/u, `she was told to open the list she has open: ${fix}`);
   assert.doesNotMatch(fix, /^This belongs to all of this BrainDog/u, `she was told a question about Tasks belongs to the whole record: ${fix}`);
-  assert.match(fix, /invited to the whole record/u, `the sentence does not say who decides: ${fix}`);
+  assert.match(fix, /invited to all of this BrainDog/u, `the sentence does not say who decides: ${fix}`);
   assert.match(fix, /Tasks/u, 'and it names the list she was invited to, by its name');
   assert.equal(api.kernel.governanceRow('suggestion', tasks)?.status, 'open', 'and the question is still open');
   sql.close();

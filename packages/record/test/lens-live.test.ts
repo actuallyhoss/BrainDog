@@ -327,7 +327,11 @@ test('OWNER NON-INTERFERENCE: the owner’s access, context and boot are the sam
   const bare = await record();
   const shared = await record();
   const ownerHeld = (api: Api) => JSON.stringify(api.kernel.access('p_1'));
-  const ownerBoot = async (api: Api) => JSON.stringify(value(await api.boot(owner)));
+  /* LESS `names`: the owner's bell names who they share with (`namesOf`), which is the one thing shares may add to it. */
+  const ownerBoot = async (api: Api) => {
+    const { names: _names, ...boot } = value<Record<string, unknown>>(await api.boot(owner));
+    return JSON.stringify(boot);
+  };
 
   const was = ownerHeld(shared.api);
   const booted = await ownerBoot(shared.api);

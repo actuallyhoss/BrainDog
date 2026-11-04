@@ -149,7 +149,7 @@ test('A KEYCHAIN GRANT ASKS A SIGN-IN INSIDE THE KEYCHAIN’S LOCK WINDOW; A LOG
 
   const stale = await r.api.deviceApprove({ user_code: vault.value.user_code }, r.owner(r.now() - 10 * MINUTE));
   assert.equal(r.refusalOf(stale)?.code, 'NEEDS_BROWSER_SESSION');
-  assert.equal(r.refusalOf(stale)?.at, 'principal');
+  assert.equal(r.refusalOf(stale)?.at, 'proof');
   const still = await r.api.devicePoll({ device_code: vault.value.device_code });
   assert.deepEqual(still.ok && still.value, { pending: true, interval: 5 }, 'a sign-in the keychain refuses let a machine into it');
 
