@@ -12,6 +12,8 @@
   A THING THAT WENT WRONG IS ONE FULL-WIDTH LINE WITH "ASK AGAIN", never a sentence lost among the words.
 
   ONE LIVE REGION, `role="log"`, busy while an answer streams, so a screen reader hears each answer once it is whole.
+
+  THE PANEL DRAWS THIS TOO (`SlashThread.svelte`), so a conversation looks the same wherever it is opened.
 -->
 <script lang="ts">
   import { at } from '$lib/at.ts';
@@ -89,6 +91,11 @@
     return true;
   }
 
+  /** Whether a card is waiting on Enter, for the field's hint. */
+  export function waiting(): boolean {
+    return pending !== null || (legacyCard !== null && card !== null && !card.answered());
+  }
+
   /* THE CLOCK THE UNDOS READ, moved on when the next one lapses and not on a timer that ticks for nothing. */
   let tick = $state(Date.now());
   $effect(() => {
@@ -130,6 +137,15 @@
             : { word: words.failed, tone: 'bad' };
 </script>
 
+{#if convo.loading && convo.turns.length === 0}
+  <!-- READING A CONVERSATION BACK: its shape, still, the size of what will come. -->
+  <div class="ghost" aria-label={threadWords.loading} role="status">
+    <span class="ghost-you"></span>
+    <span class="ghost-line"></span><span class="ghost-line short"></span>
+    <span class="ghost-you"></span>
+    <span class="ghost-line"></span>
+  </div>
+{:else}
 <ol class="turns" role="log" aria-live="polite" aria-busy={convo.busy} aria-label={threadWords.label}>
   {#each convo.turns as turn, i (i)}
     {#if turn.role === 'you'}
@@ -240,6 +256,19 @@
 
           {#if turn.legacy?.footer && !turn.streaming}<p class="model">{turn.legacy.footer}</p>{/if}
 
+          {#if turn.legacy && !turn.streaming}
+            <!-- PIN THE ANSWER, loaded only once there is an answer to pin (`PinTo.svelte`). -->
+            {#await import('$lib/palette/PinTo.svelte') then { default: PinTo }}<PinTo reading={turn.legacy.reading} asked={turn.legacy.question} proposal={turn.text ? { text: turn.text, figures: turn.figures } : null} />{/await}
+            <!-- ASKED AGAIN: the widget that answers it, offered from use ("You've asked this 3 times"). -->
+            {#await import('$lib/board/AskedAgain.svelte') then { default: AskedAgain }}<AskedAgain asked={turn.legacy.question} />{/await}
+            <details class="fold">
+              <summary class="tap">{copy.slashFold}</summary>
+              <ul>
+                {#each turn.legacy.fold as line, j (j)}<li>{line}</li>{/each}
+              </ul>
+            </details>
+          {/if}
+
           {#if turn === last && !turn.streaming && rethinkable()}
             <p class="after">
               <button type="button" class="quiet tap" title={words.harderWhy} onclick={() => rethink(base)}><Icon name="refresh" size="s" />{words.harder}</button>
@@ -250,8 +279,55 @@
     {/if}
   {/each}
 </ol>
+{/if}
 
 <style>
+  .ghost {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .ghost span {
+    display: block;
+    border-radius: 9px;
+    background: var(--soft-fill);
+  }
+
+  .ghost-you {
+    align-self: flex-end;
+    inline-size: 40%;
+    block-size: 42px;
+    border-radius: 18px !important;
+    margin-block: var(--sp-3);
+  }
+
+  .ghost-line {
+    inline-size: 86%;
+    block-size: 14px;
+    margin-inline-start: 40px;
+  }
+
+  .ghost-line.short {
+    inline-size: 52%;
+  }
+
+  .fold {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .fold summary {
+    cursor: pointer;
+  }
+
+  .fold ul {
+    margin: var(--sp-1) 0 0;
+    padding: 0;
+    list-style: none;
+    overflow-wrap: anywhere;
+  }
+
   .turns {
     display: flex;
     flex-direction: column;

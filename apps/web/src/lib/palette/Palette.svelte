@@ -10,7 +10,8 @@
   saying where it sits (`Result.svelte`).
 
   TWO MODES IN ONE FIELD. Find (`/`, ⌘K) is everything below; Ask (⌘J, or a question typed into Find) is the
-  conversation with Slash (`SlashThread.svelte`), the field its follow-up field.
+  conversation with Slash (`SlashThread.svelte`), the field its follow-up field, the conversations listed beside it at this
+  width and a step of their own on a phone (`routes/slash/ThreadList.svelte`, the Slash page's list).
 
   WITH NOTHING TYPED IT IS TWO SHORT GROUPS, "Go to" (the five places and Settings) and "Recent" (the last five rows
   changed): it opened on a wall of fifteen figures. A group shows six rows and then "Show all 13". A figure is drawn
@@ -106,7 +107,10 @@
   import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
   import { asksFirst, capLine, inOrder, offersSlash, slashWords } from './slash.ts';
   import SlashThread from './SlashThread.svelte';
-  import { ask as askThread, askingAs, clear as clearThread, convo, open as threadOn, rethink, rethinkable, sentWith } from './thread.svelte.ts';
+  import { MediaQuery } from 'svelte/reactivity';
+  import ThreadList from '../../routes/slash/ThreadList.svelte';
+  import { ask as askThread, askingAs, clear as clearThread, convo, draftKey, open as threadOn, sentWith, wake } from './thread.svelte.ts';
+  import { draftOf, keepDraft, kept as talks, matching } from './conversations.svelte.ts';
   import { threadsKey } from './slash-chat.ts';
   import MentionField from '../mention/MentionField.svelte';
   import { factsOf } from '../record/told-apart.ts';
@@ -234,11 +238,35 @@
    *
    * THE FIELD IS THE FOLLOW-UP FIELD THERE, and keeps the caret: Enter sends what is typed, and with nothing typed Enter
    * does what the waiting card asks and Esc leaves it. A question reached from Find (its row, or Today's three) starts a
-   * new conversation and Esc goes back to Find with the words as they were; ⌘J opens straight into the conversation where
-   * it was left, and Esc there closes. ⌘K moves back to Find. The thread outlives the palette, so it can be reopened.
+   * new conversation and Esc goes back to Find with the words as they were; ⌘J and / open straight into the conversation
+   * where it was left. ⌘K moves back to Find. The thread outlives the palette, so it can be reopened, and what is half
+   * typed in it is that conversation's own (`draftOf`), through a close, a reload or a trip to another.
+   *
+   * THE CONVERSATIONS ARE A LEVEL ABOVE THE ONE OPEN. From 760 wide they sit beside it; under that they are a step of their
+   * own, with a Back from the thread. Up or Down from an empty field goes to them, Enter opens the one the keys are on, and
+   * Esc goes up a level: out of a conversation to the list, and only out of the list closes.
+   *
    * On a host with no model behind Slash there is no Ask, absent rather than refused, and ⌘J opens Find.
    */
   const inAsk = $derived(opener.mode === 'ask' && slashHere);
+  /* WHAT IS HALF TYPED IN THE OPEN CONVERSATION. Find's field is `q`; this one is the conversation's, and stays with it. */
+  const typed = $derived(draftOf(draftKey()));
+  $effect(() => {
+    const d = typed;
+    const at = draftKey();
+    void d.text;
+    void d.mentions;
+    untrack(() => keepDraft(at, d));
+  });
+  /* WIDE, THE LIST IS BESIDE THE THREAD; NARROW, THEY ARE TWO STEPS AND THIS SAYS WHICH. `list` at any width: the keys are on it. */
+  const beside = new MediaQuery('(width >= 760px)', true);
+  let askStep = $state<'thread' | 'list'>('thread');
+  let listQuery = $state('');
+  let listCursor = $state<string | null>(null);
+  let listSearch = $state<HTMLInputElement>();
+  const listShown = $derived(matching(talks.items, listQuery));
+  const listDrawn = $derived(beside.current ? talks.items.length > 0 : askStep === 'list');
+  const threadDrawn = $derived(beside.current || askStep === 'thread');
   /* WHAT FIND'S FIELD SAID WHEN A QUESTION LEFT IT FOR ASK, or `null` when Ask was opened straight. */
   let backTo = $state<string | null>(null);
   /* THE MODE THE PALETTE LAST DREW, so a move made from outside it (⌘K, ⌘J) is told from one made here. */
@@ -297,8 +325,6 @@
   let askTo = $state<{ to: 'slash'; mode: 'quick' | 'deep' } | { to: 'target'; t: Target }>({ to: 'slash', mode: 'quick' });
   let sendTargets = $state<Target[] | null>(null);
   let targetsAsked = false;
-  /** THE ROWS MENTIONED IN THE FIELD (`$lib/mention`): `@Name` in the words, and which row those letters are. */
-  let drafted = $state<Mention[]>([]);
   let mentionField = $state<ReturnType<typeof MentionField> | null>(null);
   const switchable = $derived(sendTargets?.filter((t) => t.kind === 'mac' || t.kind === 'session') ?? []);
   const firstMac = $derived(sendTargets?.find((t) => t.kind === 'mac') ?? null);
@@ -307,7 +333,6 @@
   const behindNow = (): string[] => (behind.row ? [behind.row] : []);
   const lastTurn = $derived(convo.turns.at(-1));
   const routedMac = $derived(lastTurn?.role === 'slash' && !lastTurn.streaming && lastTurn.route === 'mac' && firstMac !== null);
-  const harder = $derived(askTo.to === 'slash' && rethinkable());
 
   $effect(() => {
     if (!inAsk || targetsAsked) return;
@@ -332,7 +357,7 @@
     if (convo.busy) return;
     const { deliver } = await import('../send/convos.svelte.ts');
     const rows = sentWith(mentions, behindNow());
-    convo.turns.push({ role: 'you', text: said, ...(mentions.length > 0 ? { mentions: [...mentions] } : {}) });
+    convo.turns.push({ role: 'you', text: said, local: true, ...(mentions.length > 0 ? { mentions: [...mentions] } : {}) });
     const out = await deliver({ kind: behind.row?.split('#')[0] ?? 'page', target: t.id, label: t.label, targetKind: t.kind, mode: 'auto', note: said, fallback: said, attach: rows, mayChange: false });
     const row = rows.find((r) => /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u.test(r));
     convo.turns.push({
@@ -345,6 +370,7 @@
       error: out.ok ? null : out.text,
       spent: false,
       streaming: false,
+      local: true,
     });
   }
 
@@ -364,19 +390,72 @@
     opener.mode = 'ask';
     clearThread();
     q = '';
-    drafted = [];
+    askStep = 'thread';
     asked(question);
     focusField();
   }
 
-  /** The follow-up field, sent. */
+  /** The follow-up field, sent. Waiting for an answer or for the thread to be read, the words simply stay in the field. */
   function send() {
-    const { text, mentions } = sentOf(q, drafted);
-    if (text === '' || convo.busy) return;
-    q = '';
-    drafted = [];
+    const d = typed;
+    const { text, mentions } = sentOf(d.text, d.mentions);
+    if (text === '' || convo.busy || convo.loading) return;
+    d.text = '';
+    d.mentions = [];
     asked(text, mentions);
   }
+
+  /* THE LIST, FROM THE KEYBOARD. The search field takes the focus, so typing narrows the list. */
+  function toList(move = 0) {
+    askStep = 'list';
+    const rows = listShown;
+    const was = rows.findIndex((t) => t.id === (listCursor ?? convo.id));
+    const next = was < 0 ? 0 : Math.min(Math.max(was + move, 0), rows.length - 1);
+    listCursor = rows[next]?.id ?? null;
+    void tick().then(() => listSearch?.focus());
+  }
+
+  /** Back from a conversation by a press: the list, with no row picked out and no keyboard brought up. */
+  function backToList() {
+    askStep = 'list';
+    listCursor = null;
+  }
+
+  /** A conversation chosen: open at once, the field its own, with the caret. */
+  function pick(id: string) {
+    askStep = 'thread';
+    listCursor = null;
+    listQuery = '';
+    if (id !== convo.id)
+      void threadOn(id, apiBase()).then((ok) => {
+        if (!ok) toasts.push(threadWords.gone, { intent: 'warn' });
+      });
+    focusField();
+  }
+
+  function onListKey(e: KeyboardEvent) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const rows = listShown;
+      if (rows.length === 0) return;
+      const was = rows.findIndex((t) => t.id === listCursor);
+      listCursor = rows[Math.min(Math.max(was + (e.key === 'ArrowDown' ? 1 : -1), 0), rows.length - 1)]!.id;
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const id = listCursor ?? listShown[0]?.id;
+      if (id) pick(id);
+    }
+  }
+
+  /* THE FIRST ROW THAT STILL MATCHES IS THE ONE THE KEYS ARE ON WHILE THE SEARCH NARROWS. */
+  $effect(() => {
+    const rows = listShown;
+    const looking = listQuery !== '';
+    if (askStep !== 'list' || !looking) return;
+    untrack(() => {
+      if (!rows.some((t) => t.id === listCursor)) listCursor = rows[0]?.id ?? null;
+    });
+  });
 
   /** Find's field and Ask's are two elements, so a move between them focuses the one drawn after it. */
   const focusField = (): void => void tick().then(() => input?.focus());
@@ -385,15 +464,20 @@
   function toFind() {
     modeWas = 'find';
     opener.mode = 'find';
+    /* WORDS BROUGHT ACROSS AND NOT SENT GO BACK WITH IT, and are not left waiting in the conversation as well. */
+    if (backTo !== null && backTo.trim() !== '' && typed.text.trim() === backTo.trim()) typed.text = '';
     q = backTo ?? '';
     backTo = null;
     cursor = 0;
     focusField();
   }
 
-  /** Ask, from the button beside Find's field: the words typed stay in the field, to send or to change. */
+  /** Ask, from the button beside Find's field: the words typed go with it, to send or to change. */
   function moveToAsk() {
+    const words = q.trim();
+    if (words !== '') typed.text = typed.text === '' ? words : `${typed.text.trimEnd()} ${words}`;
     backTo = q;
+    q = '';
     modeWas = 'ask';
     opener.mode = 'ask';
     focusField();
@@ -410,9 +494,10 @@
 
   function fresh() {
     clearThread();
-    drafted = [];
-    q = '';
-    input?.focus();
+    askStep = 'thread';
+    listCursor = null;
+    listQuery = '';
+    focusField();
   }
 
   /* A MOVE MADE FROM OUTSIDE (⌘K to Find, ⌘J to Ask) while the palette is open: the field starts empty in the new mode. */
@@ -1069,7 +1154,7 @@
        only on a device that has opened nothing yet. Commands, pages, lists, figures and questions wait for a word. */
     const blank = prefix === null && text.trim() === '';
     /* THE CONVERSATION GOES ON FROM HERE: its first question, one press back into it. */
-    const opening = convo.turns.find((t) => t.role === 'you')?.text;
+    const opening = convo.turns.find((t) => t.role === 'you')?.text ?? talks.items.find((t) => t.id === convo.id)?.title;
     if (blank && opening !== undefined)
       out.push({ id: 'resume', title: threadWords.resume(opening), href: null, group: ASK_TODAY, icon: 'ask', resume: true });
     /* ONLY WITH A MODEL BEHIND THE ASK (audit 31 Oct g, AG5): without one the three were questions nobody answers, and as
@@ -1590,14 +1675,22 @@
       cursor = 0;
       modeWas = opener.mode;
       backTo = null;
-      if (opener.mode === 'ask') q = '';
+      untrack(() => {
+        askStep = 'thread';
+        listCursor = null;
+        listQuery = '';
+      });
       behind = pageOf(page.url.pathname, document.title);
       held = [];
       given = [];
       look = lookNow();
       lookKept = keptNow();
       pageHere = pageMenu() !== null;
-      if (slashHere) warm();
+      if (slashHere) {
+        warm();
+        /* WHICH CONVERSATION WAS OPEN AND WHAT THE RECORD LISTS, READ BEHIND THE FIELD: it is typable from this moment. */
+        untrack(() => wake(apiBase()));
+      }
       /* A QUESTION THE SLASH PAGE'S FIELD ASKED (`askNow`), taken once: asked at once, in a new conversation. */
       const question = untrack(() => opener.question);
       if (question !== '') {
@@ -1822,8 +1915,11 @@
     if (inAsk) {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
-        if (q.trim() !== '') send();
+        if (typed.text.trim() !== '') send();
         else threadView?.enter();
+      } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && typed.text === '' && talks.items.length > 0) {
+        e.preventDefault();
+        toList(e.key === 'ArrowDown' ? 1 : -1);
       }
       return;
     }
@@ -1876,16 +1972,35 @@
   }
 
   /**
-   * ESC, ONE LAYER A PRESS. In Ask: the waiting card first, then the words typed, then back to Find when a question
-   * came from there, and only then closed. In Find it closes, as it always has.
+   * ESC, ONE LAYER A PRESS. In Ask: the waiting card first, then the search over the list, then back to Find when a question
+   * came from there, then out of a conversation to the list, and only then closed. In Find it closes, as it always has.
+   * Words half typed are never what it takes: they stay in the field, the conversation's own.
    */
-  function oncancel(e: Event) {
-    e.preventDefault();
+  function stepBack() {
     if (!inAsk) return dismiss();
-    if (q === '' && threadView?.escape()) return;
-    if (q !== '') return void (q = '');
+    if (askStep === 'thread' && typed.text === '' && threadView?.escape()) return;
+    if (askStep === 'list') {
+      if (listQuery !== '') return void (listQuery = '');
+    } else if (backTo === null && convo.turns.length > 0 && talks.items.length > 0) {
+      return toList();
+    }
     if (backTo !== null) return toFind();
     dismiss();
+  }
+
+  function oncancel(e: Event) {
+    e.preventDefault();
+    stepBack();
+  }
+
+  /* TAKEN AT THE KEY, not left to the dialog's `cancel`: a browser lets a page turn down one close and then closes anyway on
+     the next press unless something was pressed between, so a level or two of steps would have been cut short. What sits
+     inside (the @ list, a row being renamed, a menu) has its own Esc and stops it first. */
+  function onEscape(e: KeyboardEvent) {
+    if (e.key !== 'Escape' || !inAsk || e.defaultPrevented) return;
+    if (e.target instanceof Element && e.target.closest('dialog') !== el) return;
+    e.preventDefault();
+    stepBack();
   }
 
   /**
@@ -1904,6 +2019,8 @@
    */
   function onbackdrop(e: MouseEvent) {
     if (!el || e.detail === 0) return;
+    /* A MENU'S SHEET DRAWN INSIDE THIS ONE, under a thumb, is outside this one's rectangle and is not its backdrop. */
+    if (e.target instanceof Element && e.target.closest('dialog') !== el) return;
     const r = el.getBoundingClientRect();
     const outside =
       e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
@@ -1913,18 +2030,25 @@
 
 <svelte:window onkeydowncapture={heardKey} onpointerdowncapture={heardPointer} />
 
-<dialog bind:this={el} class="palette" aria-label={inAsk ? 'Ask Slash' : 'Search'} data-mode={inAsk ? 'ask' : undefined} onclick={onbackdrop} {oncancel} onclose={() => (open = false)}>
+<dialog bind:this={el} class="palette" aria-label={inAsk ? 'Ask Slash' : 'Search'} data-mode={inAsk ? 'ask' : undefined} onclick={onbackdrop} {oncancel} onkeydown={onEscape} onclose={() => (open = false)}>
   <div class="p-head">
-    <span class="p-field">
-    {#if inAsk}<span class="p-ask-mark" aria-hidden="true"><Icon name="slash" size="m" /></span>{:else}<Icon name="search" size="m" />{/if}
-    {#if inAsk}
+    <span class="p-field" data-plain={inAsk && !threadDrawn ? '' : undefined}>
+    {#if inAsk && !threadDrawn}
+      <span class="p-ask-mark" aria-hidden="true"><Icon name="slash" size="m" /></span>
+      <h2 class="p-ask-title">{threadWords.conversations}</h2>
+    {:else if inAsk}
+      {#if beside.current}
+        <span class="p-ask-mark" aria-hidden="true"><Icon name="slash" size="m" /></span>
+      {:else}
+        <button type="button" class="p-back tap" aria-label={threadWords.backToList} title={threadWords.backToList} onclick={backToList}><Icon name="back" size="m" /></button>
+      {/if}
       <!-- THE FOLLOW-UP FIELD: words, and rows mentioned with @ among them (`$lib/mention`). It grows as Slack's does. -->
       <span class="p-ask-input">
         <MentionField
           bind:this={mentionField}
           bind:field={input}
-          bind:value={q}
-          bind:mentions={drafted}
+          bind:value={typed.text}
+          bind:mentions={typed.mentions}
           label={threadWords.placeholder}
           describedby={waitingCard || asksLeft !== null ? 'palette-ask-foot' : undefined}
           placeholder={convo.turns.length > 0 ? threadWords.followUp : threadWords.placeholder}
@@ -1952,7 +2076,7 @@
     </span>
     {#if inAsk}
       <!-- FIND, ONE PRESS BACK (or ⌘K), and NEW once there is a conversation to start again from. -->
-      {#if convo.turns.length > 0}<button type="button" class="p-mode tap" aria-label={threadWords.freshLabel} onclick={fresh}><Icon name="plus" size="s" /><span>{threadWords.fresh}</span></button>{/if}
+      {#if convo.turns.length > 0 || !threadDrawn}<button type="button" class="p-mode tap" aria-label={threadWords.freshLabel} onclick={fresh}><Icon name="plus" size="s" /><span>{threadWords.fresh}</span></button>{/if}
       <button type="button" class="p-mode tap" aria-label={threadWords.findLabel} onclick={toFind}><Icon name="search" size="s" /><span>{threadWords.find}</span></button>
     {:else if slashHere}
       <!-- ASK, ONE PRESS FROM FIND (or ⌘J), as Find is one press from Ask. What is typed goes with it, not yet sent. -->
@@ -2012,6 +2136,7 @@
   {#if inAsk}
     <!-- WHO IT GOES TO, WHAT IS ATTACHED, AND ONCE AN ANSWER IS WHOLE, THINK HARDER; then, quiet, what Enter does while a
          card waits and the asks left this month once there is a number to say. -->
+    {#if threadDrawn}
     <footer class="p-foot p-ask-foot" id="palette-ask-foot">
       <Menu label={sendWords.sheet}>
         {#snippet trigger()}<span class="p-to">{#if askTo.to === 'target' && askTo.t.live}<span class="p-live" aria-hidden="true"></span>{/if}{askLabel}<Icon name="chevronDown" size="s" /></span>{/snippet}
@@ -2022,12 +2147,21 @@
         {/each}
       </Menu>
       <button type="button" class="p-at tap" aria-label={threadWords.mention} title={threadWords.mention} onmousedown={(e) => e.preventDefault()} onclick={() => mentionField?.typeAt()}>@</button>
-      {#if harder}<button type="button" class="p-harder tap" onclick={() => void rethink(apiBase())}>{sendWords.thinkHarder}</button>{/if}
       {#if routedMac && firstMac}<button type="button" class="p-harder tap" onclick={toMac}>{sendWords.toMac(firstMac.label)}</button>{/if}
       {#if waitingCard}<span class="p-keys-hint">{threadWords.enterDoes}</span>{/if}
       {#if asksLeft !== null}<span class="p-left">{threadWords.left(asksLeft)}</span>{/if}
     </footer>
-    <SlashThread bind:this={threadView} here={behind} base={apiBase()} onask={(question) => asked(question)} onleave={() => (open = false)} />
+    {/if}
+    <div class="p-talk">
+      {#if listDrawn}
+        <aside class="p-talk-list">
+          <ThreadList threads={talks.items} current={convo.id} now={talks.now} label={threadWords.conversations} bind:query={listQuery} bind:search={listSearch} cursor={askStep === 'list' ? listCursor : null} onpick={pick} onkey={onListKey} />
+        </aside>
+      {/if}
+      {#if threadDrawn}
+        <SlashThread bind:this={threadView} here={behind} base={apiBase()} onask={(question, mentions) => asked(question, mentions)} onleave={() => (open = false)} />
+      {/if}
+    </div>
   {:else}
   <div class="p-body">
     <!-- WAITING HAS A SHAPE, NOT A WORD (slash1104): what was kept is drawn at once, and only when nothing kept answers
@@ -2676,6 +2810,61 @@
       max-block-size: calc(100dvh - var(--from-top) - var(--sp-6));
       min-block-size: min(600px, calc(100dvh - var(--from-top) - var(--sp-6)));
     }
+  }
+
+  /* THE CONVERSATIONS AND THE ONE OPEN, side by side from 760 wide, each scrolling on its own; one or the other under that. */
+  .p-talk {
+    display: flex;
+    flex: 1;
+    min-block-size: 0;
+  }
+
+  .p-talk-list {
+    flex: none;
+    inline-size: 256px;
+    padding: var(--sp-3);
+    border-inline-end: 1px solid var(--sep, var(--rule));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  @media (width < 760px) {
+    .p-talk-list {
+      flex: 1;
+      inline-size: auto;
+      min-inline-size: 0;
+      border-inline-end: 0;
+    }
+  }
+
+  .palette[data-mode='ask'] .p-field[data-plain] {
+    align-items: center;
+    background: none;
+  }
+
+  .p-field[data-plain] .p-ask-mark {
+    margin-block-start: 0 !important;
+  }
+
+  .p-ask-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+  }
+
+  .p-back {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: var(--tap);
+    block-size: var(--tap);
+    margin-inline-start: calc(-1 * var(--sp-2));
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+    cursor: pointer;
   }
 
   /* WHO IT GOES TO SITS RIGHT UNDER THE FIELD (the owner, 4 Nov), field and controls as one block with the thread below. */

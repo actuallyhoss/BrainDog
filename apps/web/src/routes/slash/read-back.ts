@@ -12,6 +12,7 @@
 
 import type { LiveAction, LiveTurn } from '$lib/palette/thread.svelte.ts';
 import type { SentMention } from '$lib/mention/mention.ts';
+import { chatWords, figuresOf } from '$lib/palette/slash-chat.ts';
 import { nameOfFields, rowOfRef } from './with.ts';
 
 const REFS = /\{\{ref:([a-z][a-z0-9_]*#[1-9][0-9]*)\}\}/gu;
@@ -19,9 +20,13 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v !== '' ? v : undefined);
 
 /** Each row's name, by its ref, read once each and at most `most` of them. */
-export async function namesOf(base: string, refs: readonly string[], most = 24): Promise<Map<string, string>> {
+export async function namesOf(base: string, refs: readonly string[], most = 24, known?: Map<string, string>): Promise<Map<string, string>> {
   const out = new Map<string, string>();
-  const want = [...new Set(refs)].slice(0, most);
+  const want = [...new Set(refs)].filter((r) => {
+    const name = known?.get(r);
+    if (name !== undefined) out.set(r, name);
+    return name === undefined;
+  }).slice(0, most);
   if (want.length === 0) return out;
   const { createClient } = await import('@braindog/client');
   const client = createClient({ base });
@@ -32,7 +37,10 @@ export async function namesOf(base: string, refs: readonly string[], most = 24):
       try {
         const got = await client.get(row.register, row.seq);
         const name = got.ok && isObj(got.value) ? nameOfFields(isObj(got.value.fields) ? got.value.fields : null) : null;
-        if (name) out.set(ref, name);
+        if (name) {
+          out.set(ref, name);
+          known?.set(ref, name);
+        }
       } catch {
         /* A row that cannot be read keeps its brace's words. */
       }
@@ -69,8 +77,12 @@ function actionOf(a: unknown): LiveAction | null {
   return { ...base, state: 'open' };
 }
 
-/** One conversation read back, its rows named, or `null` when it could not be read. */
-export async function readBack(base: string, id: string): Promise<{ id: string; turns: LiveTurn[] } | null> {
+/**
+ * One conversation read back, its rows named, or `null` when it could not be read. `known` is the names read already, so
+ * reading a conversation again while its answer comes asks for none of them twice. A row an answer named when it landed
+ * was kept with it, so reading a finished conversation back asks for no row at all.
+ */
+export async function readBack(base: string, id: string, known?: Map<string, string>): Promise<{ id: string; turns: LiveTurn[] } | null> {
   let body: unknown;
   try {
     const res = await fetch(`${base}/api/slash/thread/${encodeURIComponent(id)}`);
@@ -81,13 +93,22 @@ export async function readBack(base: string, id: string): Promise<{ id: string; 
   }
   if (!isObj(body) || !Array.isArray(body.turns)) return null;
   const raw = body.turns.filter((t): t is Record<string, unknown> => isObj(t) && (t.role === 'you' || t.role === 'slash') && typeof t.text === 'string');
-  const refs = raw.flatMap((t) => (t.role === 'slash' ? [...(t.text as string).matchAll(REFS)].map((m) => m[1]!) : []));
-  const names = await namesOf(base, refs);
+  const namedAlready = (t: Record<string, unknown>) => figuresOf(t.figures) ?? {};
+  const refs = raw.flatMap((t) => {
+    if (t.role !== 'slash') return [];
+    const had = namedAlready(t);
+    return [...(t.text as string).matchAll(REFS)].map((m) => m[1]!).filter((r) => had[`ref:${r}`] === undefined);
+  });
+  const names = await namesOf(base, refs, 24, known);
   const turns = raw.map((t): LiveTurn => {
     const text = t.text as string;
     if (t.role === 'you') return { role: 'you', text, ...(Array.isArray(t.mentions) ? { mentions: t.mentions.filter(isSent) } : {}) };
     const actions = Array.isArray(t.actions) ? t.actions.flatMap((a) => actionOf(a) ?? []) : [];
-    return { role: 'slash', steps: [], text, figures: figuresFor(text, names), actions, go: [], error: null, spent: false, streaming: false };
+    const steps = Array.isArray(t.steps) ? t.steps.filter((s): s is string => typeof s === 'string') : [];
+    const go = Array.isArray(t.go) ? t.go.flatMap((g) => (isObj(g) && str(g.href) ? [{ href: g.href as string, label: str(g.label) ?? (g.href as string) }] : [])) : [];
+    /* WHAT STOPPED IT, SAID AS IT WAS, and a turn gone quiet partway says that much plainly: part of an answer is not an answer. */
+    const error = str(t.error) ?? (t.stopped === true ? chatWords.broke : null);
+    return { role: 'slash', steps, text, figures: { ...figuresFor(text, names), ...namedAlready(t) }, actions, go, error, spent: false, streaming: t.answering === true, ...(str(t.route) ? { route: t.route as string } : {}) };
   });
   return { id: str(body.id) ?? id, turns };
 }

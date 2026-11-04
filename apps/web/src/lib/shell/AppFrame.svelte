@@ -1566,7 +1566,8 @@
   /** When a key was last typed in a field, in event time: read before any screen's own handler can move the focus. */
   let typedAt = Number.NEGATIVE_INFINITY;
   function ontyped(e: KeyboardEvent) {
-    if (!e.metaKey && !e.ctrlKey && inField(e.target)) typedAt = e.timeStamp;
+    /* ESC IS NOT TYPING: it closes the box, and `/` straight after it should open the panel again. */
+    if (!e.metaKey && !e.ctrlKey && e.key !== 'Escape' && inField(e.target)) typedAt = e.timeStamp;
   }
 
   /* ASK SLASH FROM A KEY: on Slash's own page its field, and anywhere else the palette in Ask. */

@@ -60,7 +60,8 @@ export const SIGNED_OUT_PREFIXES = [
   'braindog.welcomed:',
   /* a board's unsaved arrangement (`Home.svelte`) */
   'bd_board_draft:',
-  /* Slash's threads, one list a person a BrainDog (`slash-chat.ts` `threadsKey`) */
+  /* Slash's threads, one list a person a BrainDog (`slash-chat.ts` `threadsKey`), and under the same key which was open and
+     what is half typed in each (`conversations.svelte.ts`) */
   'bd_slash_threads:',
   /* Today's Tell line and what it last added, one a person a BrainDog (`tell-line.ts`) */
   'bd.tell:',
@@ -70,11 +71,12 @@ export const SIGNED_OUT_PREFIXES = [
 export const LEGACY_PICTURE = /^bd\.drawn\.pic\.[^.]+\.[^.]+\.(?:light|dark)$/u;
 
 /**
- * Keys kept in `sessionStorage`: who this tab sees the record as (`see-as.svelte.ts`), and the words a person made their
- * BrainDog from with what the model drafted from them (`first-drafts.svelte.ts`). Neither is carried to the next session:
- * the drafts are read by the record's address alone, so a colleague signing in on the same tab would have been offered them.
+ * Keys kept in `sessionStorage`: who this tab sees the record as (`see-as.svelte.ts`), the words a person made their
+ * BrainDog from with what the model drafted from them (`first-drafts.svelte.ts`), and how far each Slash conversation was
+ * scrolled (`conversations.svelte.ts`). None is carried to the next session: the drafts are read by the record's address
+ * alone, so a colleague signing in on the same tab would have been offered them.
  */
-export const SIGNED_OUT_SESSION_KEYS = ['braindog.see-as', 'braindog.first.drafts'] as const;
+export const SIGNED_OUT_SESSION_KEYS = ['braindog.see-as', 'braindog.first.drafts', 'bd_slash_scroll'] as const;
 
 type Store = Pick<Storage, 'length' | 'key' | 'removeItem'>;
 

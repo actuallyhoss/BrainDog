@@ -86,6 +86,21 @@ export const threadWords = {
   resume: (q: string) => `Continue: ${q}`,
   left: (n: number) => (n === 1 ? '1 question left this month' : `${n.toLocaleString('en')} questions left this month`),
   enterDoes: 'Enter does it, Esc leaves it',
+  conversations: 'Conversations',
+  backToList: 'Back to conversations',
+  search: 'Search conversations',
+  noneFound: 'Nothing called that.',
+  answering: 'Answering',
+  untitled: 'Untitled',
+  actions: 'Conversation actions',
+  rename: 'Rename',
+  renameLabel: 'Name of this conversation',
+  save: 'Save',
+  remove: 'Delete',
+  removeAsk: 'Delete this conversation?',
+  removeKeep: 'Keep',
+  renameFailed: 'That name could not be saved. Try again in a moment.',
+  removeFailed: 'That conversation could not be deleted. Try again in a moment.',
 } as const;
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -139,7 +154,7 @@ export function eventOf(line: string): ChatEvent | null {
  * The rows an answer named, keyed the way `cite.ts` reads a `{{ref:…}}`. The record sends a list of `{ref, label}`, one
  * per row, and a map already keyed is taken as it stands.
  */
-function figuresOf(raw: unknown): Record<string, unknown> | null {
+export function figuresOf(raw: unknown): Record<string, unknown> | null {
   if (isObj(raw)) return raw;
   if (!Array.isArray(raw)) return null;
   const out: Record<string, unknown> = {};
@@ -298,7 +313,7 @@ export async function threads(base: string): Promise<KeptThread[] | null> {
     return body.threads.flatMap((t): KeptThread[] => {
       if (!isObj(t) || !str(t.id)) return [];
       const at = typeof t.at === 'number' ? t.at : typeof t.at === 'string' ? Date.parse(t.at) : NaN;
-      return [{ id: t.id as string, title: str(t.title) ?? '', at: Number.isFinite(at) ? at : 0 }];
+      return [{ id: t.id as string, title: str(t.title) ?? '', at: Number.isFinite(at) ? at : 0, ...(t.answering === true ? { answering: true } : {}) }];
     });
   } catch {
     return null;
@@ -344,10 +359,10 @@ export function starters(p: PageContext): string[] {
 }
 
 /** One thread kept on this device for the Slash page: its id, the first question and when it was last asked in. */
-export type KeptThread = { id: string; title: string; at: number };
+export type KeptThread = { id: string; title: string; at: number; answering?: boolean };
 
 export const THREADS_KEY = 'bd_slash_threads';
-export const THREADS_CAP = 30;
+export const THREADS_CAP = 200;
 
 /**
  * WHERE ONE PERSON'S THREADS ARE KEPT ON ONE BRAINDOG (sec-follow M4), or `null` where the person is not known, and then

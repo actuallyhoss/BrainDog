@@ -448,8 +448,9 @@ test('THE SUGGESTED ANSWER IS THE RED PRIMARY, IN ITS OWN WORDS, and the others 
 const src = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 test('THE FOUR DRAWS AND THE PALETTE DRAW THIS CARD', () => {
-  for (const path of ['../palette/SlashThread.svelte'])
-    assert.match(src(path), /import DecisionCard from '\$lib\/decide\/DecisionCard\.svelte'/u, `${path} draws a card of its own`);
+  /* THE PALETTE AND THE SLASH PAGE DRAW ONE CONVERSATION, which loads the card once an answer holds one. */
+  assert.match(src('../../routes/slash/Conversation.svelte'), /import\('\$lib\/decide\/DecisionCard\.svelte'\)/u, 'the conversation draws a card of its own');
+  assert.match(src('../palette/SlashThread.svelte'), /import Conversation from/u, 'the palette draws that conversation');
   /* A PAGE'S QUEUE LOADS THE CARD beside its data, rather than ahead of the first paint. */
   for (const path of ['../page/QueueAnswer.svelte']) {
     assert.match(src(path), /import \{ cardNow, loadCard \} from '\$lib\/decide\/card-load\.ts'/u, `${path} draws the card it loads`);

@@ -11,8 +11,9 @@
   question in the field, to send or change.
 
   THE CONVERSATIONS ARE A LIST BESIDE IT AT A DESK, grouped by day, the open one marked; on a phone they are under the
-  composer at rest and a Back away in a conversation. The record lists them (`threads`), so one had on another device is
-  here too; this device's own list fills in when the record cannot be reached.
+  composer at rest and a Back away in a conversation. It is the panel's list (`conversations.svelte.ts`, `ThreadList`), and
+  what is half typed is the panel's too, so a change in either is already in the other. If the panel moves the open
+  conversation while this page is under it, the address follows.
 
   WITH NO MODEL BEHIND SLASH, one line says so with the way to connect one, and the composer waits, greyed.
 
@@ -21,10 +22,12 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { afterNavigate, goto, replaceState } from '$app/navigation';
+  import { tick, untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { apiBase, at } from '$lib/at.ts';
-  import { keptThreads, now as nowLines, pageOf, starters, threadsKey, threadWords, threads as recordThreads, type KeptThread, type NowLine, type PageContext } from '$lib/palette/slash-chat.ts';
-  import { ask, askingAs, clear, convo } from '$lib/palette/thread.svelte.ts';
+  import { now as nowLines, pageOf, starters, threadsKey, threadWords, type NowLine, type PageContext } from '$lib/palette/slash-chat.ts';
+  import { ask, askingAs, clear, convo, open as openThread, wake } from '$lib/palette/thread.svelte.ts';
+  import { draftOf, keepDraft, keepScroll, kept, NEW, scrollOf } from '$lib/palette/conversations.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -33,9 +36,9 @@
   import Composer from './Composer.svelte';
   import Conversation from './Conversation.svelte';
   import ThreadList from './ThreadList.svelte';
-  import { readBack, namesOf } from './read-back.ts';
+  import { namesOf } from './read-back.ts';
   import { withOf } from './with.ts';
-  import type { Mention, SentMention } from '$lib/mention/mention.ts';
+  import type { SentMention } from '$lib/mention/mention.ts';
 
   const words = {
     title: 'Slash',
@@ -50,7 +53,6 @@
     about: 'About',
     needs: 'Slash needs a model to answer. Connect one to ask.',
     connect: 'Connect a model',
-    reading: 'Reading the conversation back',
   } as const;
 
   const base = $derived(apiBase());
@@ -68,27 +70,18 @@
     askingAs(keptAt);
   });
 
-  let threads = $state<KeptThread[]>([]);
-  let now = $state(Date.now());
+  const threads = $derived(kept.items);
+  let listQuery = $state('');
 
-  function loadThreads() {
-    threads = keptThreads(keptAt);
-    now = Date.now();
-    /* ONLY A HOST WITH A MODEL BEHIND SLASH KEEPS CONVERSATIONS: one with none answers the door refused. */
-    if (!modelHere) return;
-    void recordThreads(base).then((kept) => {
-      if (!kept) return;
-      const byId = new Map(keptThreads(keptAt).map((t) => [t.id, t]));
-      for (const t of kept) byId.set(t.id, { ...t, title: t.title || byId.get(t.id)?.title || '' });
-      threads = [...byId.values()].sort((a, b) => b.at - a.at);
-      now = Date.now();
-    });
-  }
-
+  /* ONLY A HOST WITH A MODEL BEHIND SLASH KEEPS CONVERSATIONS: one with none answers the door refused. */
+  let waked = false;
   $effect(() => {
     void keptAt;
-    void modelHere;
-    loadThreads();
+    if (modelHere && !waked) {
+      waked = true;
+      /* NOT THE ONE LEFT OPEN: this address says which, and `/slash` at rest is a new one. */
+      wake(base, false);
+    }
     drew('ready');
   });
 
@@ -99,10 +92,9 @@
     if (path && !/\/slash$/u.test(path)) from = pageOf(path, '');
   });
 
-  /* THE CONVERSATION IN THE ADDRESS, read back once; a new one is drawn here as soon as it is asked. */
+  /* THE CONVERSATION IN THE ADDRESS, opened as the panel opens one; a new one is drawn here as soon as it is asked. */
   const current = $derived(page.url.searchParams.get('t'));
   let live = $state(false);
-  let reading = $state(false);
   let gone = $state(false);
   let shown: string | null = null;
 
@@ -116,35 +108,39 @@
       return;
     }
     live = true;
-    if (convo.id === id && convo.turns.length > 0) return;
-    reading = true;
-    void readBack(base, id).then((t) => {
-      if (shown !== id) return;
-      reading = false;
-      if (!t) {
-        gone = true;
-        return;
-      }
-      clear();
-      convo.id = t.id;
-      convo.turns = t.turns;
-      pinned = true;
-      toEnd();
+    placed = null;
+    void openThread(id, base).then((ok) => {
+      if (shown === id && !ok) gone = true;
     });
   });
 
-  /* A NEW CONVERSATION GETS ITS ADDRESS once the record names it, so a reload or a share opens it again. */
-  let minted = false;
+  /* THE ADDRESS FOLLOWS THE CONVERSATION: one just given its id gets it, so a reload or a share opens it again, and if the
+     panel over this page moved to another, or deleted this one, the page says so. */
   $effect(() => {
     const id = convo.id;
-    if (!minted || !live || id === null || id === current) return;
-    minted = false;
-    shown = id;
-    replaceState(at(`/slash?t=${encodeURIComponent(id)}`), {});
+    const empty = convo.turns.length === 0 && !convo.loading;
+    if (!live || gone || shown !== current) return;
+    if (id !== null && id !== current) {
+      shown = id;
+      replaceState(at(`/slash?t=${encodeURIComponent(id)}`), {});
+    } else if (id === null && empty) {
+      shown = null;
+      live = false;
+      replaceState(at('/slash'), {});
+    }
+  });
+
+  /* A CONVERSATION'S WORDS ARE THE PANEL'S TOO (`draftOf`), and a new one's until the record names it. */
+  const typed = $derived(draftOf(live ? (convo.id ?? NEW) : NEW));
+  $effect(() => {
+    const d = typed;
+    const key = live ? (convo.id ?? NEW) : NEW;
+    void d.text;
+    void d.mentions;
+    untrack(() => keepDraft(key, d));
   });
 
   /* THE ROWS AN ADDRESS ATTACHES (`?with=`): mentions at the head of the sentence, once their names are read. */
-  let mentions = $state<Mention[]>([]);
   let withSeen = '';
   let composer = $state<ReturnType<typeof Composer> | null>(null);
   $effect(() => {
@@ -153,7 +149,7 @@
     if (key === withSeen) return;
     withSeen = key;
     if (refs.length === 0) return;
-    const had = new Set(mentions.map((m) => m.ref));
+    const had = new Set(typed.mentions.map((m) => m.ref));
     const added = refs.filter((r) => !had.has(r));
     queueMicrotask(() => composer?.focus());
     void namesOf(base, added).then((names) => {
@@ -164,7 +160,6 @@
   /* ROWS A STARTER WAS PRESSED WITH: its words do not mention them, so they stay with the conversation by name. */
   let carried: string[] = [];
 
-  let draft = $state('');
   /* A QUESTION AN ADDRESS CARRIES (`?q=`), put in the field to send or change, never sent for him. */
   let qSeen = '';
   $effect(() => {
@@ -172,7 +167,7 @@
     if (q === qSeen) return;
     qSeen = q;
     if (q.trim() === '') return;
-    draft = q.trim().slice(0, 500);
+    typed.text = q.trim().slice(0, 500);
     queueMicrotask(() => composer?.focus());
   });
   let conversation = $state<ReturnType<typeof Conversation> | null>(null);
@@ -182,26 +177,24 @@
 
   /** `sent` is what the field's sentence mentions; a starter has no sentence, and goes with what the field held. */
   async function send(text: string, sent?: readonly SentMention[]) {
-    if (convo.busy) return;
-    if (sent === undefined) carried = [...new Set([...carried, ...mentions.map((m) => m.ref)])];
+    if (convo.busy || convo.loading) return;
+    const d = typed;
+    if (sent === undefined) carried = [...new Set([...carried, ...d.mentions.map((m) => m.ref)])];
     if (!live || gone) {
       clear();
       live = true;
       gone = false;
-      minted = true;
     }
-    draft = '';
-    mentions = [];
+    d.text = '';
+    d.mentions = [];
     pinned = true;
+    placed = null;
     await ask(text, here(), base, { attach: carried, mentions: sent ?? [] });
-    loadThreads();
   }
 
   function fresh() {
     clear();
-    mentions = [];
     carried = [];
-    draft = '';
     withSeen = '';
     void goto(at('/slash')).then(() => composer?.focus());
   }
@@ -214,18 +207,20 @@
     void nowLines(base, stop.signal).then((lines) => (waiting = lines));
     return () => stop.abort();
   });
-  const first = $derived(mentions[0]);
+  const first = $derived(typed.mentions[0]);
   const tries = $derived(
     first
       ? starters({ path: `/r/${first.ref.replace('#', '/')}`, title: first.label, row: first.ref })
       : starters(from ?? { path: '/' }),
   );
 
-  /* THE NEWEST WORDS STAY IN VIEW while they stream, unless he scrolled up to read something older. */
+  /* THE NEWEST WORDS STAY IN VIEW while they stream, unless he scrolled up to read something older; and a conversation
+     opened goes back to where it was left, as the panel's does. */
   let pinned = true;
+  let placed: string | null = null;
   const scroller = (): HTMLElement | null => (document.getElementById('main') as HTMLElement | null) ?? (document.scrollingElement as HTMLElement | null);
   function toEnd() {
-    queueMicrotask(() => {
+    void tick().then(() => {
       const el = scroller();
       if (el && pinned) el.scrollTop = el.scrollHeight;
     });
@@ -235,9 +230,25 @@
     if (!el) return;
     const on = () => {
       pinned = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+      if (live && placed !== null && placed === convo.id) keepScroll('page', placed, pinned ? null : el.scrollTop);
     };
     el.addEventListener('scroll', on, { passive: true });
     return () => el.removeEventListener('scroll', on);
+  });
+  $effect(() => {
+    const id = convo.id;
+    const ready = live && !convo.loading && convo.turns.length > 0;
+    untrack(() => {
+      if (!ready || id === null || id === placed) return;
+      const to = scrollOf('page', id);
+      pinned = to === null;
+      void tick().then(() => {
+        const el = scroller();
+        if (!el || convo.id !== id) return;
+        el.scrollTop = to ?? el.scrollHeight;
+        placed = id;
+      });
+    });
   });
   $effect(() => {
     const t = convo.turns.at(-1);
@@ -261,14 +272,7 @@
   <section class="main">
     {#if live}
       <div class="talk">
-        {#if reading}
-          <div class="ghost" aria-label={words.reading} role="status">
-            <span class="ghost-you"></span>
-            <span class="ghost-line"></span><span class="ghost-line short"></span>
-            <span class="ghost-you"></span>
-            <span class="ghost-line"></span>
-          </div>
-        {:else if gone}
+        {#if gone}
           <p class="gone">{threadWords.gone}</p>
         {:else}
           <Conversation bind:this={conversation} {base} {icons} onretry={(q, sent) => void send(q, sent)} />
@@ -277,10 +281,10 @@
       <div class="dock">
         <Composer
           bind:this={composer}
-          bind:value={draft}
-          bind:mentions
+          bind:value={typed.text}
+          bind:mentions={typed.mentions}
           docked
-          busy={convo.busy}
+          busy={convo.busy || convo.loading}
           disabled={!modelHere}
           needs={modelHere ? null : { label: words.connect, href: at('/settings/agents') }}
           placeholder={modelHere ? words.followUp : words.needs}
@@ -292,8 +296,8 @@
     {:else}
       <Composer
         bind:this={composer}
-        bind:value={draft}
-        bind:mentions
+        bind:value={typed.text}
+        bind:mentions={typed.mentions}
         autofocus
         busy={convo.busy}
         disabled={!modelHere}
@@ -334,7 +338,7 @@
     <aside class="side">
       {#if !desk.current}<h2 class="side-head">{words.list}</h2>{/if}
       {#if live}<button type="button" class="new tap" onclick={fresh}><Icon name="plus" size="s" />{words.freshLabel}</button>{/if}
-      <ThreadList {threads} current={live ? (convo.id ?? current) : null} {now} label={words.list} />
+      <ThreadList {threads} current={live ? (convo.id ?? current) : null} now={kept.now} label={words.list} bind:query={listQuery} />
       <a class="past tap" href={at('/slash?history')}><Icon name="history" size="s" />{words.history}</a>
     </aside>
   {:else if !live}
@@ -542,36 +546,5 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-  }
-
-  /* READING A CONVERSATION BACK: its shape, still, the size of what will come. */
-  .ghost {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-  }
-
-  .ghost span {
-    display: block;
-    border-radius: 9px;
-    background: var(--soft-fill);
-  }
-
-  .ghost-you {
-    align-self: flex-end;
-    inline-size: 40%;
-    block-size: 42px;
-    border-radius: 18px !important;
-    margin-block: var(--sp-3);
-  }
-
-  .ghost-line {
-    inline-size: 86%;
-    block-size: 14px;
-    margin-inline-start: 40px;
-  }
-
-  .ghost-line.short {
-    inline-size: 52%;
   }
 </style>
