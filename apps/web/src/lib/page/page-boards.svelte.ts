@@ -7,8 +7,8 @@
  * declaration, so a page an add-on wrote, or a project's page drawn from one template for every project, keeps taking
  * its updates and each project keeps its own board. Undo puts the arrangement before back, or none.
  *
- * READ FROM `boot` ONCE (`me.prefs`), then this tab's copy, which a write changes at once and puts back if the record
- * refuses.
+ * READ FROM `boot` (`me.prefs`), then this tab's copy once it has written, which a write changes at once and puts back if
+ * the record refuses.
  */
 
 import { page } from '$app/state';
@@ -48,42 +48,43 @@ async function send(value: Record<string, PageBoardKept>): Promise<{ ok: true } 
 const isBoards = (v: unknown): v is Record<string, PageBoardKept> => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 class PageBoards {
-  all = $state.raw<Record<string, PageBoardKept>>({});
+  /**
+   * WHAT THIS TAB WROTE, and until it writes, what `boot` said (4 Nov). `boot`'s answer is read and never copied in: `of`
+   * is called from a `$derived`, where writing state throws, and the catch below read that as "outside a page". So a board
+   * drew until the next load and then was gone from the screen, kept on the record all along, since 4f99a5605.
+   */
+  #written = $state.raw<Record<string, PageBoardKept> | null>(null);
   /** The page just laid out as a board, whose editor opens as it is drawn. */
   fresh = $state<string | null>(null);
-  #adopted = false;
 
-  #ensure(): void {
-    if (this.#adopted) return;
+  get all(): Record<string, PageBoardKept> {
+    if (this.#written !== null) return this.#written;
     try {
-      const prefs = (page.data as { me?: { prefs?: Record<string, unknown> } } | undefined)?.me?.prefs;
-      if (prefs === undefined) return;
-      this.#adopted = true;
-      const v = prefs['boards.pages'];
-      if (isBoards(v)) this.all = v;
+      const v = (page.data as { me?: { prefs?: Record<string, unknown> } } | undefined)?.me?.prefs?.['boards.pages'];
+      return isBoards(v) ? v : {};
     } catch {
       /* Outside a page (a test): nothing was said. */
+      return {};
     }
   }
 
   /** This page's board, or `null` where it is a plain page. */
   of(slug: string): PageBoardKept | null {
-    this.#ensure();
     return this.all[boardSlug(slug)] ?? null;
   }
 
   /** Keep (or, with `null`, take away) this page's board; the answer carries what was there for Undo. */
   async put(slug: string, board: PageBoardKept | null): Promise<{ ok: true; before: PageBoardKept | null } | { ok: false; fix: string }> {
-    this.#ensure();
     const at = boardSlug(slug);
-    const was = this.all;
-    const before = was[at] ?? null;
-    const { [at]: _gone, ...rest } = was;
+    const was = this.#written;
+    const all = this.all;
+    const before = all[at] ?? null;
+    const { [at]: _gone, ...rest } = all;
     const next = board === null ? rest : { ...rest, [at]: board };
-    this.all = next;
+    this.#written = next;
     const out = await send(next);
     if (!out.ok) {
-      this.all = was;
+      this.#written = was;
       return out;
     }
     return { ok: true, before };
