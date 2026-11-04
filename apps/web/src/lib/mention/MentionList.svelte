@@ -169,7 +169,7 @@
     border: 0;
     border-radius: var(--r-pop, 12px);
     background: var(--tile);
-    box-shadow: var(--glass-edge, none), var(--elev-popover, 0 8px 24px rgb(0 0 0 / 0.16));
+    box-shadow: var(--glass-edge), var(--elev-popover);
     color: var(--ink);
     font-size: var(--fs-ctl);
     overflow-x: hidden;

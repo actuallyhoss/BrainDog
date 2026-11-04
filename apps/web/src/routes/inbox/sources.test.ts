@@ -81,7 +81,7 @@ test('the page draws that inbox as one tile, in place of the two tiles and the e
   /* AND THE ONE STEP TO AN ADDRESS, where it is a command to copy: the tile's hero on a self-host (T22), never folded. */
   assert.match(one, /\{#if quiet\.command\}[\s\S]*?<CodeLine text=\{quiet\.command\} \/>[\s\S]*?<Button weight="quiet" href="\/settings\/ingest">\{quiet\.add\}<\/Button>\s*\{:else\}/u, 'the self-host command is not the hero, or the other ways in are not a quiet press under it');
   /* IT WAITS FOR THE TALLY, so the cleared inbox is never drawn first and swapped a moment later. */
-  assert.match(markup, /\{:else if !refused && INBOX\.length === 0 && !tallied\}\s*<Waiting \/>\s*\{:else if !refused && never\}/u);
+  assert.match(markup, /\{:else if !refused && INBOX\.length === 0 && !tallied\}\s*<Waiting shape="inbox" \/>\s*\{:else if !refused && never\}/u);
   assert.match(src, /const never = \$derived\(patterns\.length === 0 && nothingEver\(tally, ways, INBOX\.length\)\);/u);
 });
 

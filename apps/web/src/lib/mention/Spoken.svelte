@@ -9,13 +9,9 @@
 
   let { text, mentions }: { text: string; mentions?: readonly SentMention[] | undefined } = $props();
   const pieces = $derived(sentPieces(text, mentions));
-  const hrefOf = (ref: string): string | null => {
-    const href = hrefOfRef(ref);
-    return href ? at(href) : null;
-  };
 </script>
 
-{#each pieces as p}{#if p.kind === 'text'}{p.text}{:else if hrefOf(p.ref)}<a class="spoken tap" href={hrefOf(p.ref)} dir="auto">{tokenOf(p.text)}</a>{:else}<span class="spoken" dir="auto">{tokenOf(p.text)}</span>{/if}{/each}
+{#each pieces as p}{#if p.kind === 'text'}{p.text}{:else if hrefOfRef(p.ref)}<a class="spoken tap" href={at(hrefOfRef(p.ref) ?? '')} dir="auto">{tokenOf(p.text)}</a>{:else}<span class="spoken" dir="auto">{tokenOf(p.text)}</span>{/if}{/each}
 
 <style>
   /* THE FIELD'S FILL, now with room of its own since nothing has to line up with a textarea. */
