@@ -37,6 +37,10 @@ const namesOf = (...list) => new Map(list.map((name) => [fold(name), { name, kin
 
 /* Read once: the tree is 1,300 files, and four cases stand on the same reading. */
 const reading = read(repo);
+/* What the tree itself finds, for the planted cases: each proves its one fault is found on top of whatever the tree
+   holds. Whether the tree is green is the next test's to say, and a red tree does not hide a planted fault here. */
+const onTheTree = new Set(judge(reading, HELD).findings);
+const beyondTheTree = (findings) => findings.filter((f) => !onTheTree.has(f));
 
 test('with no held list the gate is red on this tree, by more than the unit thought a flood', () => {
   const { findings } = judge(reading, []);
@@ -58,14 +62,14 @@ test("a 'tasks' written under packages/kernel/src turns it red, once, by its lin
   const planted = hitsIn("export const KEY = 1;\nexport const isWork = (list) => list === 'tasks';\n", reading.names);
   assert.deepEqual(planted.map((h) => [h.line, h.key]), [[2, 'tasks']]);
   const hits = [...reading.hits, ...planted.map((h) => ({ ...h, path: 'packages/kernel/src/planted.ts' }))];
-  const { findings } = judge({ ...reading, hits }, HELD);
+  const findings = beyondTheTree(judge({ ...reading, hits }, HELD).findings);
   assert.equal(findings.length, 1, findings.join('\n'));
   assert.match(findings[0], /packages\/kernel\/src\/planted\.ts:2 {2}tasks, a list of /u);
 });
 
 test('a held entry whose name no longer stands turns it red, and so does a file that is gone', () => {
   const gone = { path: 'packages/kernel/src/gone.ts', name: 'tasks', reason: 'planted', unit: 'SHL-A07' };
-  const { findings } = judge(reading, [...HELD, gone]);
+  const findings = beyondTheTree(judge(reading, [...HELD, gone]).findings);
   assert.deepEqual(findings, ['  packages/kernel/src/gone.ts is held for tasks and does not spell it. Take the entry out, so the next one there is seen.']);
   const { status, said } = run(join(gates, 'negative', 'core-names-held-idle'));
   assert.equal(status, 1, said);
