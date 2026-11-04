@@ -156,3 +156,27 @@ test('AN ORGANISATION A MEMBER KEPT PRIVATE IS NOT THERE FOR THE OWNER\'S AGENT,
   const lena = value<{ row: { id: string } }>(await api.meet({ name: 'Lena Berg', email: 'lena@clinic.example', where: 'session in kiln' } as never, agent));
   assert.equal((await fieldsOf(api, lena.row.id)).org, api.kernel.get(hidden.row.id)?.id);
 });
+
+test('A LINK BY NAME TAKES ONLY A ROW THE CALLER SEES: a private row\'s name is refused word for word as a name nobody holds', async () => {
+  const { api } = await studio();
+  const mia: CallContext = { principal: { kind: 'person', id: 'p_mia', level: 'write' } };
+  const refusedFor = async (org: string, ctx: CallContext) => {
+    const out = (await api.create({ register: 'people', fields: { name: `Someone at ${org}`, org } }, ctx)) as unknown as { ok: boolean; refusal?: unknown };
+    assert.equal(out.ok, false, `${org} was taken as a link`);
+    return out.refusal;
+  };
+  /* THE ORACLE: taken for a private name and refused for a made-up one told the agent who is on the list. */
+  assert.deepEqual(await refusedFor('Halden Clinic', agent), await refusedFor('Nobody Ltd', agent));
+
+  /* AND A NAMESAKE IT CANNOT SEE TAKES NOTHING FROM ONE IT CAN: the row it sees is the one row of that name, for it. */
+  const seen = value<{ id: string }>(await api.create({ register: 'organisations', fields: { name: 'Halden Clinic', domain: 'seen.example' } }, owner));
+  const linked = value<{ fields: { org: string } }>(await api.create({ register: 'people', fields: { name: 'Bea Holm', org: 'Halden Clinic' } }, agent));
+  assert.equal(linked.fields.org, seen.id);
+
+  /* WHOSE ROW IT IS STILL SEES IT, and two she sees of one name are not guessed between. */
+  await refusedFor('Halden Clinic', mia);
+  value(await api.update({ register: 'organisations', seq: api.kernel.get(seen.id)!.seq!, patch: { name: 'Halden Seen' } }, owner));
+  const hers = value<{ fields: { org: string } }>(await api.create({ register: 'people', fields: { name: 'Cal Moss', org: 'Halden Clinic' } }, mia));
+  assert.notEqual(hers.fields.org, seen.id);
+  assert.equal(api.kernel.get(hers.fields.org)?.fields.domain, 'clinic.example');
+});

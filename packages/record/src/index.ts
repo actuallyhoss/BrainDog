@@ -8590,10 +8590,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    *   - `title`, on a list whose title field is another (`what` on tasks), is that field, when the call left it empty.
    *   - A field named by its label (`known_by` for "Known by") is that field.
-   *   - A link given by its name (`thing: "Koala"`) is the one live row of that list with that title, by its handle.
+   *   - A link given by its name (`thing: "Koala"`) is the one live row of that list with that title the caller may see,
+   *     by its handle. ONLY ONE THEY MAY SEE, asked as `refsNamed` asks it: read past the caller, the name of a row a member
+   *     kept private was taken where a name nobody holds was refused, so an agent could try names and learn who is there.
    *   - A bare address in a person's keys (`ana@x.com`) is the key `email:ana@x.com`.
    */
-  const plainFields = (register: string, fields: Patch): Patch => {
+  const plainFields = (register: string, fields: Patch, ctx: CallContext): Patch => {
     if (fields === null || typeof fields !== 'object' || Array.isArray(fields)) return fields;
     const decl = kernel.register(register);
     if (!decl) return fields;
@@ -8621,12 +8623,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const to = kernel.register(f.to);
       const field = typeof to?.title === 'string' ? to.title : undefined;
       if (!to || field === undefined || !/^[a-z][a-z0-9_]{0,31}$/u.test(field)) continue;
-      const rows = sql.all<{ seq: number | null }>(
-        'SELECT seq FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, ?))) = lower(trim(?)) LIMIT 2',
-        f.to,
-        `$.${field}`,
-        v,
-      );
+      if (readable(ctx, f.to) !== null || sight.hidden(ctx, f.to).has(field)) continue;
+      const rows = sql
+        .all<{ id: string; seq: number | null }>(
+          'SELECT id, seq FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, ?))) = lower(trim(?)) LIMIT 100',
+          f.to,
+          `$.${field}`,
+          v,
+        )
+        .filter((r) => sight.admits(ctx, { id: r.id, register: f.to! }));
       if (rows.length === 1 && rows[0]!.seq !== null) out[f.id] = `${f.to}#${rows[0]!.seq}`;
     }
     const meets = kernel.meetsList();
@@ -13166,7 +13171,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async create(args: { register: string; fields: Patch; note?: string; op_id?: string; said?: string }, ctx: CallContext): Promise<Result<Entry | Asked>> {
       const missing = named(args);
       if (missing) return { ok: false, refusal: missing };
-      args = { ...args, fields: plainFields(args.register, args.fields) };
+      args = { ...args, fields: plainFields(args.register, args.fields, ctx) };
       const stop = guard(ctx, 'append', args.register);
       if (stop) return { ok: false, refusal: stop };
       /* `deleted_at` IS THE RECORD'S, and a row does not arrive deleted. No register declares it, and
@@ -13313,7 +13318,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ): Promise<Result<Entry | Asked>> {
       const missing = named(args, true);
       if (missing) return { ok: false, refusal: missing };
-      args = { ...args, patch: plainFields(args.register, args.patch) };
+      args = { ...args, patch: plainFields(args.register, args.patch, ctx) };
       const stop = guard(ctx, 'write', args.register);
       if (stop) return { ok: false, refusal: stop };
       /* A ROW SHE MAY NOT WRITE IS ONE THAT IS NOT THERE (`sight.ts`): every check below reads it as missing, and
