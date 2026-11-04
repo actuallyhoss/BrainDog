@@ -71,7 +71,10 @@ test('THE SESSIONS A PERSON HAS, AND SIGNING OUT EVERYWHERE ELSE, read the host 
     { ref: '0f9e8d7c6b5a', current: false, authedAt: 3, activeAt: 4, record: null },
   ];
   const listed = host(() => json(200, { ok: true, value: { sessions: rows } }));
-  assert.deepEqual(await sessions(listed.io), { ok: true, value: rows });
+  /* AN APP'S SESSION SAYS ITS DEVICE (01c7e01cb): a row with no device, from a browser or an older host, is `null`. */
+  assert.deepEqual(await sessions(listed.io), { ok: true, value: rows.map((r) => ({ ...r, device: null })) });
+  const named = host(() => json(200, { ok: true, value: { sessions: [{ ...rows[0]!, device: 'iPhone' }] } }));
+  assert.deepEqual(await sessions(named.io), { ok: true, value: [{ ...rows[0]!, device: 'iPhone' }] });
   assert.deepEqual(listed.sent, [{ path: '/auth/sessions', body: undefined }]);
 
   const ended = host(() => json(200, { ok: true, value: { ended: 2 } }));

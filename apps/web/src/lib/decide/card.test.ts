@@ -303,7 +303,10 @@ test('ONE HARD ANSWER BESIDE A SAFE ONE: the question is a call, and only the ha
 
   /* AND THE CARD DRAWS IT THROUGH THOSE: each button by its own way points at the line under the row that says the care
      (said inside the button it wrapped to two lines at 390). */
-  assert.match(src('./DecisionCard.svelte'), /aria-describedby=\{wayTail\(card, way, primary\) !== '' \? `\$\{uid\}-hard` : undefined\}/u);
+  assert.match(src('./DecisionCard.svelte'), /aria-describedby=\{wayTail\(card, way, primary \?\? leadKey\) !== '' \? `\$\{uid\}-hard` : undefined\}/u);
+  /* THE LINE IS THE SAME ANSWER'S: with no filled answer (500039a70) both ask the lead, or a button points at nothing. */
+  assert.match(src('./DecisionCard.svelte'), /const hardLine = \$derived\(hardSaid\(card, primary, leadKey\)\);/u);
+  assert.match(src('./DecisionCard.svelte'), /id="\{uid\}-hard"/u);
 });
 
 test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the suggested or the first filled', () => {

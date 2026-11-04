@@ -73,7 +73,7 @@ test('the chips a real draft offers are grouped the same way the inspector draws
 });
 
 test('a chip is named by its last part, never by its path', () => {
-  assert.equal(chipWord('trigger.row.amount_due'), 'amount_due');
+  assert.equal(chipWord('trigger.row.amount_due'), 'amount due', 'the last part, as words (05b872c45)');
   assert.equal(chipWord('vars.rate'), 'rate');
 });
 

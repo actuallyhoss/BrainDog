@@ -25,7 +25,7 @@ test('who is asking is the command that was run, on the machine it ran on', () =
 });
 
 test('what it may do is the reach\'s own sentence, as a sentence', () => {
-  assert.equal(canOf('export', null), 'Take one copy of this record, once, in the next ten minutes.');
+  assert.equal(canOf('export', null), 'Take one copy of your BrainDog, once, in the next ten minutes.');
   assert.match(canOf('vault', '*'), /seven days\.$/u);
   assert.match(canOf('vault', 'p_01'), /thirty days\.$/u);
 });

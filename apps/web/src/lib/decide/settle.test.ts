@@ -55,7 +55,7 @@ test('Not now stands in the row with the answers, not at the far end of the form
 test('the question’s own page is two tiles on a wide board: the answers, and beside them why, what it changes and the comments (today F9)', () => {
   const gate = src('../../routes/decide/[id]/+page.svelte');
   /* THE SECOND TILE IS DRAWN WHERE IT HAS SOMETHING TO SAY; who asked is the quiet line over the answers either way. */
-  for (const part of ["<div class=\"gate-grid\" data-aside={aside ? '' : undefined}>", '<Tile class="gate-aside">', '{cardWords.askedBy}', '{gate.whyAsked}', '{gate.changes}'])
+  for (const part of ["<div class=\"gate-grid\" data-aside={aside && asking ? '' : undefined}>", '<Tile class="gate-aside">', 'cardWords.askedByRule : cardWords.askedBy}', '{gate.whyAsked}', '{gate.changes}'])
     assert.ok(gate.includes(part), `the gate no longer draws ${part}`);
   /* TWO THIRDS AND A THIRD FROM 1100px, only where there is a second tile. */
   assert.match(gate, /@media \(width >= 1100px\) \{\n\s+\.gate-grid\[data-aside\] \{\n\s+grid-template-columns: minmax\(0, 8fr\) minmax\(0, 4fr\);/u);

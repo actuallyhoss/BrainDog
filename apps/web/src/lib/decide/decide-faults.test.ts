@@ -118,7 +118,7 @@ test('THE CARE OF A HARD ANSWER IS SAID ONLY ON THE BAND `undo`, and no button i
   /* THE WORDS ARE SAID THROUGH `card.ts` AND NOWHERE ELSE on the card, so no button says them on its own. */
   const drawn = source('./DecisionCard.svelte');
   assert.doesNotMatch(drawn, /queueWords\.hard(Tail)?\b/u, 'the card says the care without asking the band');
-  assert.equal(source('./card.ts').match(/card\.cost === 'undo'/gu)?.length, 2, 'the band is read for the words in one place (`hardOf`), and for one press in `pressOf`');
+  assert.equal(source('./card.ts').match(/card\.cost === 'undo'/gu)?.length, 3, 'the band is read for the words in one place (`hardOf`), for one press in `pressOf`, and for the filled answer in `primaryOf` (ee0f91771)');
 
   /* THE COLOUR: an answering button is the working accent (`--red-fill`) on every card, hard or not. The deeper red is
      for a refusal's words; no button takes it, and none is keyed on the band. */

@@ -47,7 +47,7 @@ export function askerOf(label: string | null, reach: DeviceRow['reach']): string
   return copy.askerOn(agent ?? COMMANDS[reach] ?? CLI, machineSaid(machine));
 }
 
-/** What a grant may do, as a sentence starting with a capital: "Take one copy of this record, once, ...". */
+/** What a grant may do, as a sentence starting with a capital: "Take one copy of your BrainDog, once, ...". */
 export function canOf(reach: DeviceRow['reach'], scope: string | null): string {
   const means = copy.reachMeans[reachKey(reach, scope)] ?? reach;
   const said = `${means.charAt(0).toUpperCase()}${means.slice(1)}.`;

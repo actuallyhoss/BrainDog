@@ -15,6 +15,8 @@ test('a late invoice is a row: what, the amount on its own, how late, and no que
     late: '38 days late',
     asks: '',
     owed: true,
+    kind: 'due',
+    days: -38,
   });
   assert.deepEqual(moneyRowOf('Ledger Post, sending plan was due 4 days ago, £12.50. Did it go through?', ['It went through', 'It stopped']), {
     title: 'Ledger Post, sending plan',
@@ -22,6 +24,8 @@ test('a late invoice is a row: what, the amount on its own, how late, and no que
     late: '4 days late',
     asks: 'Did it go through?',
     owed: false,
+    kind: 'due',
+    days: -4,
   });
   assert.equal(moneyRowOf('Rent was due 1 day ago, $400 USD. Pay it?')?.late, '1 day late');
   /* WORDED ANY OTHER WAY, it is no money row. */

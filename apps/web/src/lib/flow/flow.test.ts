@@ -628,7 +628,9 @@ test('C2: A TREE CONDITION IS HELD IN THE DRAFT WHERE THE CARD CAN SEE IT, and a
   assert.equal(sayStart(typed), 'When an item in bills is added or changed, only when what is Rent', 'and the card says the one filed');
   assert.deepEqual(bodyOf({ ...typed, when: '  ' }).when, bigBills.when, 'the box emptied again, the tree it opened with comes back');
   const deep = draftOf('x', { ...bigBills, when: { any: [{ field: 'amount', gt: 500 }, { field: 'what', is: 'Rent' }] } });
-  assert.equal(sayStart(deep), 'When an item in bills is added or changed, only when the condition holds', 'a tree the builder cannot read is still named');
+  /* A TREE IS SAID IN ITS WORDS NOW (audit 6g, AG3), and one with nothing to say is still named. */
+  assert.equal(sayStart(deep), 'When an item in bills is added or changed, only when Amount is more than 500 or What is Rent');
+  assert.equal(sayStart(draftOf('x', { ...bigBills, when: { all: [] } })), 'When an item in bills is added or changed, only when the condition holds', 'a tree the builder cannot read is still named');
 });
 
 test('A SWITCH AWAY FROM A CHANGE TAKES THE CONDITION WITH IT, both forms, and an edit of the change keeps it', () => {

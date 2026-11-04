@@ -78,7 +78,9 @@ test('THE SHELL HOLDS THE SCREEN while the quiet mark is up, a screen draws what
   const layout = src('../shell/AppFrame.svelte');
   assert.match(layout, /<main id="main" class="body"[^>]*\{@attach holdIn\(\(\) => presses\.held \|\| data\.stale === true\)\}>/u);
   assert.match(layout, /:global\(#main\[data-held\] \[data-held-press\]\) \{[^}]*cursor: default;/u, 'quiet, and in the same box');
-  assert.doesNotMatch(layout.slice(layout.indexOf(':global(#main[data-held]')), /^\s*(display|block-size|inline-size|margin|padding|visibility)\s*:/mu, 'nothing that moves a box');
+  /* THE RULE'S OWN BODY: read to the end of the file this caught every rule after it in the sheet, none of them about holding. */
+  const heldRule = layout.slice(layout.indexOf(':global(#main[data-held]'));
+  assert.doesNotMatch(heldRule.slice(0, heldRule.indexOf('}')), /^\s*(display|block-size|inline-size|margin|padding|visibility)\s*:/mu, 'nothing that moves a box');
   const held = src('./held.svelte.ts');
   assert.match(held, /return holds > 0 \|\| copyMark\.on;/u, 'the quiet mark holds every press under it');
   assert.match(held, /root\.addEventListener\('click', press, true\);/u, 'before any handler hears it');

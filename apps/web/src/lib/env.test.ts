@@ -88,7 +88,8 @@ test('the shell says which deployment it is, and the palette follows it', () => 
      of which are legible to a reader who cannot tell the two accents apart, and both of which are
      visible from outside the window rather than only inside it. */
   const layout = read('./shell/AppFrame.svelte');
-  assert.match(layout, /@braindog\/skin\/house\.css/u, 'the app does not import a palette it can alias');
+  /* THE PALETTE IS THE ROOT LAYOUT'S, so a signed-out screen has it too; the frame keeps the mark. */
+  assert.match(read('../routes/+layout.svelte'), /@braindog\/skin\/house\.css/u, 'the app does not import a palette it can alias');
   assert.match(layout, /mark-alpha\.svg/u, 'the deployment has no favicon of its own');
 
   /* NOT A `doesNotMatch` OVER THE WHOLE FILE, because the comment that replaced the `@import`

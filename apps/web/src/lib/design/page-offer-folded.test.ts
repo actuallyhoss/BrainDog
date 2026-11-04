@@ -141,7 +141,7 @@ test("A DECLARED PAGE DRAWS THE OFFER AFTER ITS BLOCKS, never between its header
   assert.equal(drawn.length, 1, 'the offer is drawn once');
   const at = drawn[0]!.index;
   const head = view.indexOf('</PageHead>');
-  const body = view.indexOf('<PageBody\n      mode="page"');
+  const body = view.search(/<PageBody\n\s+mode="page"/u);
   const bodyEnd = view.indexOf('/>', body);
   assert.ok(head > 0 && body > head && bodyEnd > body, 'the page is still a head and then its blocks');
   assert.ok(at > bodyEnd, "the offer is drawn after the page's blocks");
