@@ -144,6 +144,9 @@
   import { foundChip, knownOf, lastDayOf, meetsOf, metSaid, orgNameSaid, orgRoleOf, orgSaid, PLATFORM_FIELDS, roleFieldOf, roleParts, seenOf, seenWords, timesSaid, whoParts, type FoundChip, type Known, type Named } from '../folk.ts';
   import { PLATFORM_MARKS, type Platform } from '$lib/ui/platform-marks.ts';
 
+  /* ASKED AS THE PAGE OPENS AND NOT ONCE THE ROW HAS LANDED, so the tile is usually here when the row is. */
+  const attachments = import('$lib/attach/Attachments.svelte');
+
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
   /* THE IDS ARE THIS PAGE'S OWN, so the box a pencil opens is found by its id to take the caret. */
@@ -1950,7 +1953,7 @@
 
         <!-- THE FILES PUT ON IT FOR CONTEXT: PDFs, pages saved from Claude, pictures, notes. Loaded with the row, not the app.
              UNDER WHAT THE ROW SAYS (3 Nov): an empty drop zone stood over a task's own fields, the first thing on its page. -->
-        {#if live && row.seq !== null}{#await import('$lib/attach/Attachments.svelte') then { default: Attachments }}<Attachments on="{id}#{row.seq}" tile />{/await}{/if}
+        {#if live && row.seq !== null}{#await attachments}<div class="attach-room" aria-hidden="true"></div>{:then { default: Attachments }}<Attachments on="{id}#{row.seq}" tile />{/await}{/if}
 
         <!-- WHERE A PERSON WAS SEEN: each place once, newest first, with how often and when, in a person's words. ONE PLACE,
              ONCE, WITH NOTHING ABOUT IT is the head's "Met" fact already (3 Nov), so it is not a card as well. -->
@@ -2060,6 +2063,11 @@
 {/if}
 
 <style>
+  /* THE ATTACHMENTS' TILE IS HOLDING ITS PLACE WHILE ITS CODE LOADS: it popped in over what was under it. */
+  .attach-room {
+    min-block-size: 112px;
+  }
+
   /* THE PAGE: the board, full width inside the gutters, its tiles a tile gap apart (16 at a desk, 12 on a phone). */
   .page {
     display: flex;
