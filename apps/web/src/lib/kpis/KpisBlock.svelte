@@ -331,6 +331,19 @@
   let chooserOpen = $state(false);
   let projectNames = $state.raw<ReadonlyMap<string, string>>(new Map());
 
+  let showingToday = $state.raw<readonly string[]>([]);
+  /* WHAT TODAY SHOWS RIGHT NOW, PINNED OR PICKED: asked as Today's own tile is, off the page Today draws, so a project's page marks
+     what Today would. A read that fails leaves the marks to the pins the chooser holds. */
+  async function todayShowing(): Promise<readonly string[]> {
+    const { numbersTile } = await import('$lib/home/default-home.ts');
+    const body = { page: 'today-numbers', title: 'Numbers', blocks: [numbersTile()] };
+    const out = await createClient({ base: apiBase() })
+      .call<{ blocks?: { kpis?: { kpi?: unknown }[] }[] }>('previewPage', { body })
+      .catch(() => null);
+    if (!out?.ok) return [];
+    return (out.value.blocks?.[0]?.kpis ?? []).flatMap((k) => (typeof k.kpi === 'string' ? [k.kpi] : []));
+  }
+
   async function openChooser(): Promise<void> {
     if (!(await ready(true)) || !list) return void toasts.push(copy.kpiNotRead, { intent: 'bad' });
     const projects = projectsOf(list);
@@ -341,6 +354,7 @@
       for (const p of got ?? []) if (p.id) names.set(p.id, String(p.fields[title] ?? ''));
     }
     projectNames = names;
+    showingToday = form === 'today' ? kpis.map((k) => k.kpi ?? '') : await todayShowing();
     chooserOn = true;
     chooserOpen = true;
   }
@@ -450,7 +464,7 @@
 {/if}
 {#if chooserOn && list}
   {#await import('./KpiChooser.svelte') then { default: KpiChooser }}
-    <KpiChooser bind:open={chooserOpen} rows={rows ?? []} names={projectNames} showing={form === 'today' ? kpis.map((k) => k.kpi) : []} onsave={chosen} />
+    <KpiChooser bind:open={chooserOpen} rows={rows ?? []} names={projectNames} showing={showingToday} onsave={chosen} />
   {/await}
 {/if}
 

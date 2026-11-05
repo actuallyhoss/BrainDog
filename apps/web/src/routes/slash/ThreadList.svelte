@@ -126,7 +126,7 @@
       <p class="group caps-label">{NAMES[g.key]}</p>
       <ul>
         {#each g.items as t (t.id)}
-          <li class="t-line" data-cursor={t.id === cursor ? '' : undefined} data-open={t.id === current ? '' : undefined}>
+          <li class="t-line" data-menu-host data-cursor={t.id === cursor ? '' : undefined} data-open={t.id === current ? '' : undefined}>
             {#if renaming === t.id}
               <input class="name tap" bind:this={nameField} bind:value={name} aria-label={threadWords.renameLabel} maxlength="80" onkeydown={(e) => onNameKey(e, t.id)} onblur={() => saveName(t.id)} />
             {:else if asking === t.id}
@@ -147,8 +147,8 @@
               <span class="more">
                 <Menu label={threadWords.actions} align="end">
                   {#snippet trigger()}<span class="more-face"><Icon name="more" size="s" /><span class="sr">{threadWords.actions}</span></span>{/snippet}
-                  <button type="button" role="menuitem" onclick={() => startRename(t)}>{threadWords.rename}</button>
-                  <button type="button" role="menuitem" onclick={() => (asking = t.id, (renaming = null))}>{threadWords.remove}</button>
+                  <button type="button" role="menuitem" onclick={() => startRename(t)}><Icon name="tag" size="s" />{threadWords.rename}</button>
+                  <button type="button" role="menuitem" data-tone="bad" onclick={() => (asking = t.id, (renaming = null))}><Icon name="trash" size="s" />{threadWords.remove}</button>
                 </Menu>
               </span>
             {/if}

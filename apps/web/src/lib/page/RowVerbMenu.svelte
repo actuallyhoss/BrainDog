@@ -85,8 +85,6 @@
         {#if shape.project}
           <button class="mi" role="menuitem" type="button" onclick={() => host.then('project', anchor)}><Icon name="projects" size="s" /><span class="mi-name">{words.fileUnder}</span></button>
         {/if}
-        <hr class="mi-rule" />
-        <button class="mi" role="menuitem" type="button" onclick={() => host.remove(r)}><Icon name="trash" size="s" /><span class="mi-name">{words.delete}</span><Kbd keys="Delete" /></button>
       {/if}
     {:else if m.mode === 'due'}
       {#each daysFor(host.today()) as d (d.day)}
@@ -118,6 +116,13 @@
     <a class="mi" role="menuitem" href={inApp(`/r/${r.register}/${r.seq}`)}><Icon name="arrow" size="s" /><span class="mi-name">{words.open}</span></a>
     <button class="mi" role="menuitem" type="button" onclick={() => void putLink(r.register, r.seq)}><Icon name="link" size="s" /><span class="mi-name">{copy.copyLink}</span></button>
   {/if}
+  {#snippet going()}
+    {#if m?.mode === 'row' && entry && shape && mayWrite}
+      {@const r = m.row}
+      <hr class="mi-rule" />
+      <button class="mi" role="menuitem" type="button" onclick={() => host.remove(r)}><Icon name="trash" size="s" /><span class="mi-name">{words.delete}</span><Kbd keys="Delete" /></button>
+    {/if}
+  {/snippet}
 </RowMenu>
 
 {#if picking}

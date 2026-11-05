@@ -641,6 +641,7 @@
           rename: () => flow.select('trigger'),
           toggle: owner ? () => void switchTo(!row?.enabled) : null,
           remove: owner ? () => (removeSheet = true) : null,
+          tell: () => row && void flipTell(row.id),
         })
       : undefined,
   );

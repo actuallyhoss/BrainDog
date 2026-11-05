@@ -20,10 +20,25 @@
   /** Whether the others are shown under the state it is in; a row in no state yet shows them all. */
   let states = $state(false);
   const folds = $derived(items.some((i) => i.state !== undefined && i.now));
+
+  /* A LINK'S MENU, AND ANY OVER TWELVE, KEEP THE THING'S OWN ACTIONS AND FOLD THE PAGE'S TOOLS UNDER MORE. What goes comes last either way.
+     A list of states that folds counts as its one row. */
+  const MORE = 'more-tools';
+  const MOST = 12;
+  let unfolded = $state(false);
+  const counted = $derived(items.filter((i) => !(folds && i.state !== undefined && !i.now)).length);
+  const linked = $derived(items.some((i) => i.linkVerb));
+  const tools = $derived(linked || counted > MOST ? items.filter((i) => i.tool) : []);
+  const tops = $derived.by((): readonly ThingItem[] => {
+    const fold = tools.length >= 2;
+    const kept = fold ? items.filter((i) => !i.tool) : items;
+    const going = kept.filter((i) => i.tone === 'bad');
+    const rest = kept.filter((i) => i.tone !== 'bad');
+    return [...rest, ...(fold ? [{ id: MORE, label: thingWords.more, icon: VERB_ICONS.more, group: tools[0]!.group }] : []), ...going];
+  });
 </script>
 
-{#each items as it, i (it.id)}
-  {#if i > 0 && items[i - 1]!.group !== it.group}<hr />{/if}
+{#snippet row(it: ThingItem)}
   {#if it.href !== undefined}
     <a role="menuitem" href={at(it.href)} target={it.newTab ? '_blank' : undefined} rel={it.newTab ? 'noopener' : undefined} data-link-verb={it.linkVerb ? '' : undefined} data-verb={it.id}>
       <Icon name={it.icon} size="s" /><span class="mi-name">{it.label}</span>
@@ -55,6 +70,23 @@
     <button type="button" role="menuitem" data-tone={it.tone} data-link-verb={it.linkVerb ? '' : undefined} data-verb={it.id} onclick={() => it.run?.()}>
       <Icon name={it.icon} size="s" /><span class="mi-name">{it.label}</span>{#if it.from}<span class="mi-from">{it.from}</span>{/if}
     </button>
+  {/if}
+{/snippet}
+
+{#each tops as it, i (it.id)}
+  {#if i > 0 && tops[i - 1]!.group !== it.group}<hr />{/if}
+  {#if it.id === MORE}
+    <!-- THE PAGE'S OWN TOOLS, ONE PRESS AWAY, AS THE STATES ARE: a project's link had twenty items and filled the screen. Checkable,
+         so the menu stays open as they unfold. -->
+    <button type="button" role="menuitemcheckbox" aria-checked={unfolded} data-verb="more" onclick={() => (unfolded = !unfolded)}>
+      <Icon name={VERB_ICONS.more} size="s" /><span class="mi-name">{thingWords.more}</span>
+      <span class="mi-on" data-open={unfolded ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
+    </button>
+    {#if unfolded}
+      {#each tools as tool (tool.id)}{@render row(tool)}{/each}
+    {/if}
+  {:else}
+    {@render row(it)}
   {/if}
 {/each}
 {#if status === 'reading'}

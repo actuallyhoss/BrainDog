@@ -47,6 +47,7 @@ import { askPage } from './page-verbs.ts';
 import { askSheet } from './asks.svelte.ts';
 import { dotOf } from './state-dot.ts';
 import { thingOf, type Thing } from './thing.ts';
+import { actorOf, mutedOf, tellsQuietly } from '../../routes/settings/[area]/muted.ts';
 import { VERB_ICONS, linkWords, thingWords, type VerbId } from './verbs.ts';
 
 export type ThingItem = {
@@ -68,6 +69,8 @@ export type ThingItem = {
   from?: string | undefined;
   /** Hidden when the menu already leads with its link's three. */
   linkVerb?: boolean | undefined;
+  /** One of the page's own tools rather than the thing's: folded under More on a link's menu and on a long one. */
+  tool?: boolean | undefined;
 };
 
 /** Where the press was, for what only makes sense there. */
@@ -83,6 +86,7 @@ const item = (id: string, verb: VerbId, label: string, group: number, what: { hr
   ...(what.href === undefined ? {} : { href: what.href }),
   ...(what.run === undefined ? {} : { run: what.run }),
   ...(what.tone === undefined ? {} : { tone: what.tone }),
+  ...(group === G.page || id === 'copyId' ? { tool: true } : {}),
 });
 
 /** The link's own three, what the browser's menu would have given. */
@@ -100,7 +104,7 @@ const client = () => createClient({ base: apiBase() });
 const asked = new Map<string, Promise<void>>();
 
 /** A list's declaration, read if this tab has not yet. */
-async function declOf(list: string): Promise<RegisterDecl | undefined> {
+export async function declOf(list: string): Promise<RegisterDecl | undefined> {
   if (REGISTERS[list] === undefined) await learn(client().schema, list, asked).catch(() => undefined);
   return REGISTERS[list] as RegisterDecl | undefined;
 }
@@ -416,6 +420,13 @@ export async function itemsOf(address: string, shell: Shell, from: ThingFrom, na
       out = [
         item('rename', 'rename', editWords.rename, G.change, { run: () => askPage(t.href, 'rename') }),
         ...(owns ? [item('toggle', rule.enabled ? 'stop' : 'run', rule.enabled ? editWords.turnOff : editWords.turnOn, G.change, { icon: rule.enabled ? 'pause' : 'play', run: () => askPage(t.href, 'toggle') })] : []),
+        ...(tellsQuietly(rule.body)
+          ? [
+              item('tell', 'notify', mutedOf((shell.me as { prefs?: Record<string, unknown> } | undefined)?.prefs?.['notify.muted']).includes(actorOf(rule.id)) ? thingWords.tellAgain : thingWords.stopTelling, G.change, {
+                run: () => askPage(t.href, 'tell'),
+              }),
+            ]
+          : []),
         item('duplicate', 'copy', editWords.duplicate, G.more, { href: `/automations/new?${new URLSearchParams({ from: rule.id }).toString()}` }),
         ...(owns ? [item('remove', 'delete', editWords.remove, G.going, { tone: 'bad', run: () => askPage(t.href, 'remove') })] : []),
       ];
@@ -423,6 +434,7 @@ export async function itemsOf(address: string, shell: Shell, from: ThingFrom, na
     }
     case 'place': {
       /* THE PLACES WITH A "…" OF THEIR OWN. Settings' index, for who may arrange it. */
+      if (t.href === '/inbox') out = [item('select', 'select', copy.select, G.keep, { run: () => askPage('/inbox', 'select') })];
       if (t.href === '/settings' && shell.me?.owner === true) out = [item('reorder', 'move', thingWords.reorder, G.page, { icon: 'edit', run: () => askPage('/settings', 'reorder') })];
       break;
     }

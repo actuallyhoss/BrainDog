@@ -24,7 +24,7 @@
   import { isProject } from '$lib/record/project.ts';
   import { saidRowPages } from '$lib/record/row-href.ts';
   import { isPinnedAt, pinHref, pinWords, togglePin } from '$lib/shell/pin-project.ts';
-  import { VERB_ICONS, linkWords } from '$lib/things/verbs.ts';
+  import { VERB_ICONS, linkWords, thingWords } from '$lib/things/verbs.ts';
 
   let {
     open,
@@ -75,6 +75,16 @@
     /** Share the row with somebody, for an owner or an Admin; absent for anybody else. */
     share?: ((seq: number) => void) | undefined;
   } = $props();
+
+  /* EACH OPENING STARTS FOLDED. */
+  let statesOpen = $state(false);
+  let moreOpen = $state(false);
+  $effect(() => {
+    if (open) {
+      statesOpen = false;
+      moreOpen = false;
+    }
+  });
 
   /* THE ADDRESS A PIN IS KEPT AT, on a row of the list of projects. */
   const projectHref = $derived.by(() => {
@@ -137,27 +147,60 @@
     {#if states.length > 0}
       {@const now = String(rowAt(seq)?.fields[decl.state ?? ''] ?? '')}
       <hr class="mi-rule" />
-      {#each states as state}
+      {@const folds = states.includes(now)}
+      {#if folds}
+        <!-- ITS STATE, SAID, AND THE OTHERS ONE PRESS AWAY, as a thing's menu has them: a list with six states filled a laptop's
+             screen. Checkable, so the menu stays open as they unfold. -->
+        <button class="mi" role="menuitemcheckbox" aria-checked={statesOpen} type="button" onclick={() => (statesOpen = !statesOpen)}>
+          <span class="mi-dot"><StateDot state={dotOf(decl, now)} /></span>
+          <span class="mi-name">{stateName}: {saidInLine(decl?.state ?? '', now)}</span>
+          <span class="mi-on" data-open={statesOpen ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
+        </button>
+      {/if}
+      {#if statesOpen || !folds}
+      {#each states.filter((x) => x !== now) as state}
         {@const word = saidInLine(decl?.state ?? '', state)}
         <button
           class="mi"
           role="menuitemradio"
-          aria-checked={state === now ? 'true' : 'false'}
+          aria-checked="false"
           type="button"
           onclick={() => {
-            if (state !== now) setRowState(seq, state);
+            setRowState(seq, state);
             onclose();
           }}
         >
           <span class="mi-dot"><StateDot state={dotOf(decl, state)} /></span>
-          <span class="mi-name">{state === now ? `${stateName}: ${word}` : copy.setTo(word)}</span>
-          {#if state === now}<span class="mi-on"><Icon name="check" size="s" /></span>{/if}
+          <span class="mi-name">{copy.setTo(word)}</span>
         </button>
       {/each}
+      {/if}
       <hr class="mi-rule" />
     {/if}
     <!-- WHAT AN ADD-ON DOES WITH THIS ROW (`row_actions` in its file), each saying whose it is. -->
     {#if row.id}<AddonRowActions {register} row={row.id} {onclose} />{/if}
+    <button class="mi" role="menuitem" type="button" data-link-verb onclick={() => copyLink(seq)}>
+      <Icon name={VERB_ICONS.copyLink} size="s" />
+      <span class="mi-name">{copy.copyLink}</span><Kbd keys="⇧Y" />
+    </button>
+    {#if share}
+      <button class="mi" role="menuitem" type="button" onclick={() => share?.(seq)}>
+        <Icon name={VERB_ICONS.share} size="s" />
+        <span class="mi-name">{copy.shareOpen}</span>
+      </button>
+    {/if}
+    {#if keepPrivate}
+      <button class="mi" role="menuitem" type="button" onclick={() => keepPrivate?.(seq, row.private !== true)}>
+        <Icon name="lock" size="s" />
+        <span class="mi-name">{row.private === true ? copy.rowShareAgain : copy.rowKeepPrivate}</span>
+      </button>
+    {/if}
+    <button class="mi" role="menuitemcheckbox" aria-checked={moreOpen} type="button" data-verb="more" onclick={() => (moreOpen = !moreOpen)}>
+      <Icon name={VERB_ICONS.more} size="s" />
+      <span class="mi-name">{thingWords.more}</span>
+      <span class="mi-on" data-open={moreOpen ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
+    </button>
+    {#if moreOpen}
     <!-- PREVIEW ONLY WITH A MOUSE: on a phone Open does the same, a screen away. -->
     {#if !rowsAsCards()}
       <button class="mi" role="menuitem" type="button" onclick={() => peek(seq)}>
@@ -176,22 +219,12 @@
       <Icon name="copy" size="s" />
       <span class="mi-name">{copy.copyId}</span><Kbd keys="y" />
     </button>
-    <button class="mi" role="menuitem" type="button" data-link-verb onclick={() => copyLink(seq)}>
-      <Icon name={VERB_ICONS.copyLink} size="s" />
-      <span class="mi-name">{copy.copyLink}</span><Kbd keys="⇧Y" />
-    </button>
-    {#if share}
-      <button class="mi" role="menuitem" type="button" onclick={() => share?.(seq)}>
-        <Icon name={VERB_ICONS.share} size="s" />
-        <span class="mi-name">{copy.shareOpen}</span>
-      </button>
     {/if}
-    {#if keepPrivate}
-      <button class="mi" role="menuitem" type="button" onclick={() => keepPrivate?.(seq, row.private !== true)}>
-        <Icon name="lock" size="s" />
-        <span class="mi-name">{row.private === true ? copy.rowShareAgain : copy.rowKeepPrivate}</span>
-      </button>
-    {/if}
+
+  {/if}
+  {#snippet going()}
+    {#if row}
+      {@const seq = row.seq}
     {#if archive}
       <hr class="mi-rule" />
       <button class="mi" role="menuitem" type="button" data-tone="bad" onclick={() => archive?.(seq)}>
@@ -199,7 +232,8 @@
         <span class="mi-name">{copy.archive}</span><Kbd keys="⌫" />
       </button>
     {/if}
-  {/if}
+    {/if}
+  {/snippet}
 </RowMenu>
 
 <style>

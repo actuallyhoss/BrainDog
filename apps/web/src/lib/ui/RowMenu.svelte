@@ -34,6 +34,7 @@
     onclose,
     hand = null,
     children,
+    going,
   }: {
     open?: boolean;
     /** The focused row's viewport rect. Taken at open, not tracked: a menu that follows a scrolling row is a menu that
@@ -44,6 +45,8 @@
     /** The row the menu is about, its list, and what to do with the row a hand leaves; absent, there is no "Hand to". */
     hand?: Handed | null | undefined;
     children: Snippet;
+    /** What takes the row away: drawn last, under "Hand to". */
+    going?: Snippet | undefined;
   } = $props();
 
   /* ONLY ON A LIST THAT DECLARES `hand:` AND FOR SOMEBODY WHO MAY CHANGE ITS ROWS: a control that cannot act is absent
@@ -71,6 +74,7 @@
       <span class="mi-name">{copy.handTo}</span>
     </button>
   {/if}
+  {@render going?.()}
 </Menu>
 
 {#if handing}

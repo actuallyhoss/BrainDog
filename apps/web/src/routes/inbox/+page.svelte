@@ -60,6 +60,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import ItemMenu from '$lib/ui/ItemMenu.svelte';
   import { ownMenu } from '$lib/ui/context-menu.ts';
+  import { answerVerbs } from '$lib/things/page-verbs.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Stacked from '$lib/viz/Stacked.svelte';
@@ -599,6 +600,8 @@
   /* SELECTING, ON A PHONE: nothing hovers there to reveal the checks, so `Select` shows them at a thumb's size, as
      Needs you does. At a desk the checks are always drawn and `x` picks the cursor's row. */
   let selecting = $state(false);
+  /* ASKED FROM A LINK TO THE INBOX (`things/menu-of.ts`): pressed on a right-click elsewhere, done here. */
+  $effect(() => answerVerbs({ select: () => (selecting = true) }));
   const picking = $derived(picked.size > 0 || selecting);
   function toggle(id: string) {
     const next = new Set(picked);

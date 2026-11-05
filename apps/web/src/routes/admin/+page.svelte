@@ -32,6 +32,8 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { put } from '$lib/clipboard.ts';
+  import Menu from '$lib/ui/Menu.svelte';
+  import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
   import type { IconName } from '$lib/ui/icons.ts';
   import WayIn from './WayIn.svelte';
   import {
@@ -57,6 +59,13 @@
   } from '$lib/admin/ops.ts';
 
   const words = {
+    rowMenu: 'This row',
+    showDetails: 'Show details',
+    hideDetails: 'Hide details',
+    reviewOne: 'Review',
+    copyEmail: 'Copy the address',
+    copyName: 'Copy the name',
+    copyLabel: 'Copy the label',
     title: 'Admin',
     way: 'The way in',
     eightWeeks: 'Last eight weeks',
@@ -166,6 +175,14 @@
   });
 
   /* ── what waits ───────────────────────────────────────────────────────────── */
+
+  type Pointed = { kind: 'app'; app: Application } | { kind: 'plugin'; plugin: Waiting } | { kind: 'report'; key: string; report: Report } | { kind: 'code'; code: Code };
+  let pointed = $state.raw<Pointed | null>(null);
+  let pointedAt = $state.raw<MenuAt | null>(null);
+  const pointAt = (what: Pointed, p: MenuAt): void => {
+    pointed = what;
+    pointedAt = p;
+  };
 
   const waitingApps = $derived(applications.at === 'done' ? applications.value.filter((a) => a.state === 'waiting') : []);
   const decidedApps = $derived(applications.at === 'done' ? applications.value.filter((a) => a.state !== 'waiting') : []);
@@ -383,7 +400,7 @@
   <ul class="a-rows">
     {#each list as r, i (`${r.id} ${r.at} ${i}`)}
       {@const key = `report:${names ? '' : 'sheet:'}${r.id}:${r.at}:${i}`}
-      <li class="a-report" data-open={opened === key ? '' : undefined}>
+      <li class="a-report" data-open={opened === key ? '' : undefined} {@attach ownMenu((p) => pointAt({ kind: 'report', key, report: r }, p))}>
         <button type="button" class="a-press" aria-expanded={opened === key} onclick={() => toggle(key)}>
           <span class="a-top">
             {#if names}<span class="a-name">{reportName(r)}</span>{/if}
@@ -402,7 +419,7 @@
   {@const state = CODE[c.state] ?? { label: c.state, tone: undefined }}
   {@const said = noteSaid(c.note)}
   {@const ends = c.ends_at ? day(c.ends_at) : words.never}
-  <tr>
+  <tr {@attach ownMenu((p) => pointAt({ kind: 'code', code: c }, p))}>
     <td class="c-label">
       <span class="c-said" title={said}>{said}</span>
       <span class="c-sub num">{words.stateMadeEnds(state.label, day(c.made_at), c.ends_at ? ends : ends.toLowerCase())}</span>
@@ -414,6 +431,37 @@
     <td class="c-act">{#if c.state === 'open' || c.state === 'held'}<Button weight="bare" size="sm" disabled={busy === c.ref} onclick={() => void endCode(c)}>{words.end}</Button>{/if}</td>
   </tr>
 {/snippet}
+
+<!-- A ROW'S VERBS AT THE POINTER: what its buttons do, one menu for the page's kinds of row. -->
+<Menu label={words.rowMenu} open={pointed !== null} at={pointedAt} onclose={() => (pointed = null)}>
+  {#if pointed?.kind === 'app'}
+    {@const a = pointed.app}
+    <button type="button" role="menuitem" onclick={() => toggle(a.id)}><Icon name="eye" size="s" />{opened === a.id ? words.hideDetails : words.showDetails}</button>
+    {#if a.state === 'waiting'}
+      <button type="button" role="menuitem" disabled={busy === a.id} onclick={() => void inviteApplication(a)}><Icon name="user-plus" size="s" />{words.invite}</button>
+    {/if}
+    <button type="button" role="menuitem" onclick={() => void put(a.email)}><Icon name="copy" size="s" />{words.copyEmail}</button>
+    {#if a.state === 'waiting'}
+      <hr />
+      <button type="button" role="menuitem" data-tone="bad" disabled={busy === a.id} onclick={() => (declining = a.id)}><Icon name="ban" size="s" />{words.decline}</button>
+    {/if}
+  {:else if pointed?.kind === 'plugin'}
+    {@const w = pointed.plugin}
+    <button type="button" role="menuitem" onclick={() => openPanel(w)}><Icon name="arrow" size="s" />{words.reviewOne}</button>
+    <button type="button" role="menuitem" onclick={() => void put(nameOf(w))}><Icon name="copy" size="s" />{words.copyName}</button>
+  {:else if pointed?.kind === 'report'}
+    {@const p = pointed}
+    <button type="button" role="menuitem" onclick={() => toggle(p.key)}><Icon name="eye" size="s" />{opened === p.key ? words.hideDetails : words.showDetails}</button>
+    <button type="button" role="menuitem" onclick={() => void put(reportName(p.report))}><Icon name="copy" size="s" />{words.copyName}</button>
+  {:else if pointed?.kind === 'code'}
+    {@const c = pointed.code}
+    <button type="button" role="menuitem" onclick={() => void put(noteSaid(c.note))}><Icon name="copy" size="s" />{words.copyLabel}</button>
+    {#if c.state === 'open' || c.state === 'held'}
+      <hr />
+      <button type="button" role="menuitem" data-tone="bad" disabled={busy === c.ref} onclick={() => void endCode(c)}><Icon name="ban" size="s" />{words.end}</button>
+    {/if}
+  {/if}
+</Menu>
 
 <div class="page a-page">
   <!-- THE WAY IN. It draws its steps at once and fills them when the door answers, so a slow funnel moves nothing. -->
@@ -445,7 +493,7 @@
             {#each allApps ? waitingApps : waitingApps.slice(0, TOP) as a (a.id)}
               {@const link = webLink(a.link)}
               {@const open = opened === a.id}
-              <li class="a-app" data-open={open ? '' : undefined}>
+              <li class="a-app" data-open={open ? '' : undefined} {@attach ownMenu((p) => pointAt({ kind: 'app', app: a }, p))}>
                 <button type="button" class="a-press" aria-expanded={open} onclick={() => toggle(a.id)}>
                   <span class="a-top">
                     <span class="a-name">{a.name}</span>
@@ -488,7 +536,7 @@
           <ul class="a-rows a-decided">
             {#each decidedApps as a (a.id)}
               {@const state = APPLIED[a.state] ?? { label: a.state, tone: undefined }}
-              <li class="a-done">
+              <li class="a-done" {@attach ownMenu((p) => pointAt({ kind: 'app', app: a }, p))}>
                 <span class="a-top"><span class="a-name">{a.name}</span><span class="a-meta a-mail">{a.email}</span></span>
                 <span class="a-when num">{day(a.made_at)}</span>
                 {#if state.tone}<Chip label={state.label} tone={state.tone} />{:else}<span class="a-meta">{state.label}</span>{/if}
@@ -509,7 +557,7 @@
         {:else}
           <ul class="a-rows">
             {#each allPlugins ? pending : pending.slice(0, TOP) as w (keyOf(w))}
-              <li>
+              <li {@attach ownMenu((p) => pointAt({ kind: 'plugin', plugin: w }, p))}>
                 <button type="button" class="a-plugin" onclick={() => openPanel(w)}>
                   <span class="a-name">{nameOf(w)}</span>
                   {#if w.version?.version}<span class="a-meta num a-ver">{w.version.version}</span>{/if}

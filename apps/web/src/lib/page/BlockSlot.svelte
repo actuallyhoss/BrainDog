@@ -64,6 +64,9 @@
   import type { Picked } from './picked.svelte.ts';
   import type { DrawnAct, Row, WidgetSize } from 'braindog-render';
   import { refOfHref } from '$lib/send/send.ts';
+  import { listOfBlock, partRow, type FiguredBlock } from '$lib/things/part-row.ts';
+  import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
   import AddStep from './AddStep.svelte';
   import Hole from './Hole.svelte';
   import { foldOf } from './home.ts';
@@ -517,6 +520,25 @@
      `DrawnFrame.svelte`, which arrives with the first block that needs it. Opening one of its rows goes where a row's
      link goes, and only for a row the frame was handed (`drawnAsk`). */
   const sketch = $derived(drawnOf(block, (id) => listNamed(id)));
+  /* A CHART WITH NO "…" OF ITS OWN STANDS FOR THE LIST IT READS, and a bar on a grouped figure for the row it is the bar of. */
+  const barRows = $derived(((block as FiguredBlock).parts?.groups?.length ?? 0) > 0);
+  const chartThing = $derived.by(() => {
+    if (menuOn || !(block.kind === 'lines' || barRows)) return null;
+    const list = listOfBlock(block as FiguredBlock);
+    return list ? `/r/${list}` : null;
+  });
+  let barAt = $state.raw<MenuAt | null>(null);
+  let barHref = $state<string | null>(null);
+  let barName = $state('');
+  const barHost = ownMenu((p) => {
+    const label = document.elementFromPoint(p.x, p.y)?.closest('.prop-row')?.querySelector('.prop-label')?.textContent?.trim() ?? '';
+    void (label ? partRow(block as FiguredBlock, label).catch(() => null) : Promise.resolve(null)).then((href) => {
+      barName = label;
+      barHref = href ?? chartThing ?? (menuOn ? null : `/r/${listOfBlock(block as FiguredBlock) ?? ''}`);
+      if (barHref) barAt = p;
+    });
+  });
+
   function openDrawn(ref: string) {
     const to = rowHref(ref);
     if (to !== null) void goto(inApp(to));
@@ -1077,6 +1099,8 @@
       {@const w = writes}
       {@const shown = w ? w.keptSegment(i, segment, block, runAt(run)) : segment}
       {@const more = fold ? foldOf(segment.kind, shown.rows.length, open) : long ? longFoldOf(segment.kind, shown.rows.length, longShown) : null}
+      {#if barRows}<ItemMenu label={barName} bind:at={barAt} href={barHref} />{/if}
+      <div class="block-holds" data-thing={chartThing ?? undefined} {@attach barRows ? barHost : null}>
       <Block
         cursor={rows?.cursor ?? null}
         onrowfocus={rows?.onrowfocus}
@@ -1092,6 +1116,7 @@
         onmenu={w ? verbs?.onmenu : undefined}
         act={w ? (action, row, value) => w.act(action, row, value, { block, at: i, before: shown.rows }) : undefined}
       />
+      </div>
       {#if more}<button type="button" class="block-more tap" data-long={long && !fold ? '' : undefined} onclick={(e) => (fold ? void unfold(e, more.shown) : longer(e, more.shown))}>{fold ? words.more(more.more) : longWords(more.more)}</button>{/if}
       {#if w && segment.kind === 'steps' && w.stepable(block)}<AddStep {block} writes={w} />{/if}
       <!-- WHAT THE RECORD REFUSED ABOUT A FIELD IS SAID UNDER ITS BLOCK, named by the field's label, until that field is
@@ -1190,6 +1215,10 @@
 {/if}
 
 <style>
+  .block-holds {
+    display: contents;
+  }
+
   /* A `panel: seen` SECTION WHOSE PANEL DREW NOTHING is left out whole, tile and heading. */
   :global(.block-slot:has(> [data-seen-none])) {
     display: none;

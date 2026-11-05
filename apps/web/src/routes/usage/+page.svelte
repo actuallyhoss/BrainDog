@@ -56,6 +56,10 @@
   import { asksOf, byProject, daysSaid, earlierOf, groupName, heatOf, offCloud, projectsSaid, placeOf, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
   import { extraOffered, hostedHere, readBilling, type BillingAnswer } from '../settings/billing.ts';
   import ExtraCap from './ExtraCap.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
+  import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
+  import { saidRowPages } from '$lib/record/row-href.ts';
+  import { put } from '$lib/clipboard.ts';
   import { inIosApp } from '$lib/shell.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
 
@@ -140,11 +144,25 @@
      project it ran in only where the list holds more than one. The bar is the share of the busiest row, one ink. */
   const actionRows = $derived(
     groups
-      .flatMap((g) => g.actions.map((a) => ({ ...a, project: sliced.length > 0 ? '' : placeBeside(placeOf(g), a.name) })))
+      .flatMap((g) => g.actions.map((a) => ({ ...a, scope: g.scope, project: sliced.length > 0 ? '' : placeBeside(placeOf(g), a.name) })))
       .sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name)),
   );
   /* EIGHT ROWS TO A LIST (the owner's 34 scripts were a page of their own); the rest open where they stand. */
   const TOP = 8;
+  const usageMenu = { project: 'Open the project', only: 'Show only its project', copy: 'Copy the name' };
+  /* A ROW'S VERBS AT THE POINTER. A project's row is a link, so its menu leads with that link's three (`context-menu.ts`). */
+  type Pointed = { name: string; page: string | null; slice: string | null };
+  let pointed = $state.raw<Pointed | null>(null);
+  let pointedAt = $state.raw<MenuAt | null>(null);
+  const pointAt = (what: Pointed, p: MenuAt): void => {
+    pointed = what;
+    pointedAt = p;
+  };
+  const pageOfGroup = (g: { name: string }): string | null => {
+    const found = (saidRowPages().pages as readonly { slug: string; title?: string }[]).find((x) => x.title === g.name);
+    return found ? `/p/${found.slug}` : null;
+  };
+
   let allActions = $state(false);
   let allProjects = $state(false);
   let allCounted = $state(false);
@@ -319,6 +337,12 @@
 <!-- THE MONTH SWITCH IS THE SENTENCE ROW'S ACTION ON A DESK (plan F10), not a second row under it; a phone keeps it under
      the sentence, where the bar has no room for three months. -->
 <PageHead icon="chart-bar" title={words.usage} sentence={sentence?.text} needs={sentence?.needs} heldLines={1} actions={wide.current ? months : undefined} below={wide.current ? undefined : months} />
+<Menu label={pointed?.name ?? words.usage} open={pointed !== null} at={pointedAt} onclose={() => (pointed = null)}>
+  {#if pointed?.page}<a role="menuitem" href={at(pointed.page)}><Icon name="arrow" size="s" />{usageMenu.project}</a>{/if}
+  {#if pointed?.slice}<a role="menuitem" href={at(pointed.slice)} data-sveltekit-noscroll><Icon name="filter" size="s" />{usageMenu.only}</a>{/if}
+  <button type="button" role="menuitem" onclick={() => pointed && void put(pointed.name)}><Icon name="copy" size="s" />{usageMenu.copy}</button>
+</Menu>
+
 <div class="page">
   {#if usage.state === 'waiting' || usage.state === 'refused' || usage.state === 'offline'}
     <ReadState state={usage.state} refusal={usage.refusal} onretry={usage.reread} />
@@ -442,7 +466,7 @@
               <div class="section-body use-body">
                 <ul class="ledger use-list use-bars use-projects">
                   {#each projectsShown as g (g.key)}
-                    <li>
+                    <li {@attach ownMenu((p) => pointAt({ name: groupName(g), page: pageOfGroup(g), slice: null }, p))}>
                       <a
                         class="line use-row use-bar-row use-project"
                         data-faint={g.faint ? '' : undefined}
@@ -471,7 +495,7 @@
               {#if sliced.length > 0}<p class="use-why">{countsOf(sliceTotals)}</p>{/if}
               <ul class="ledger use-list use-bars">
                 {#each actionsShown as a, i (`${a.project} ${a.name} ${i}`)}
-                  <li in:lineIn>
+                  <li in:lineIn {@attach ownMenu((p) => pointAt({ name: a.name, page: null, slice: a.project && view ? `/usage?month=${view.month}&project=${encodeURIComponent(a.scope)}` : null }, p))}>
                     <div class="line use-row use-bar-row" data-faint={a.faint ? '' : undefined}>
                       <span class="line-title">{a.name}{#if a.project}<span class="use-in">{` · ${a.project}`}</span>{/if}</span>
                       <span class="use-bar" aria-hidden="true"><span class="use-bar-fill" style:inline-size={`${Math.max(2, (a.runs / mostRuns) * 100)}%`}></span></span>
@@ -506,7 +530,7 @@
             <div class="section-body use-body">
               <ul class="ledger use-list use-counted">
                 {#each countedShown as r (r.key)}
-                  <li>
+                  <li {@attach ownMenu((p) => pointAt({ name: r.name, page: null, slice: null }, p))}>
                     <div class="line use-row use-kind">
                       <Icon name={r.icon} size="s" />
                       <span class="line-title">{r.name}</span>

@@ -24,7 +24,7 @@ export type FactTask = { seq: number; title: string; state: string; by: string |
 export type FactRun = { seq: number; agent: string; doing: string; at: string; started: string; state: string; closedAs: string; next: string; notes: readonly string[]; wrote: number | null; repo: string };
 export type FactService = { seq: number; name: string; provider: string; kind: string; renews: string | null; cost: Money | null; cycle: string; state: string; note: string; href: string };
 export type FactReading = { name: string; value: number | null; amount: Money | null; unit: string; at: string; source: string };
-export type FactRecurring = { what: string; direction: string; amount: Money; every: string; nextDue: string | null; state: string };
+export type FactRecurring = { what: string; direction: string; amount: Money; every: string; nextDue: string | null; state: string; href?: string };
 /** A key number's reading as the record answers it: a value, or an amount as "USD 4,815.00". */
 export type KpiAt = { at: string; value?: number | null | undefined; amount?: string | null | undefined };
 export type FactKpi = {
@@ -534,7 +534,7 @@ export function datesOf(f: FactsIn, most = 6): DateLine[] {
   for (const t of f.tasks) if (!t.done && t.by !== null && ahead(t.by)) out.push({ at: t.by, day: dayChip(t.by), text: t.title, tone: t.by < f.today ? 'late' : 'plain', href: t.href });
   for (const x of nextSplit(f.next, f.now)) if (x.day && x.day >= f.today && ahead(x.day) && !out.some((o) => o.at === x.day && fold(o.text) === fold(x.text))) out.push({ at: x.day, day: dayChip(x.day), text: x.text, tone: 'plain', href: null });
   for (const s of f.services) if (live(s) && s.renews && s.renews >= f.today && ahead(s.renews)) out.push({ at: s.renews, day: dayChip(s.renews), text: `${s.name} renews${s.cost && s.cost.minor > 0 ? `, ${f.format(s.cost.minor, s.cost.currency)}` : ''}`, tone: 'plain', href: s.href });
-  for (const r of f.recurring) if (r.state === 'live' && r.nextDue && r.nextDue >= f.today && ahead(r.nextDue)) out.push({ at: r.nextDue, day: dayChip(r.nextDue), text: `${r.what}, ${f.format(r.amount.minor, r.amount.currency)} ${r.direction === 'in' ? 'in' : 'out'}`, tone: 'plain', href: null });
+  for (const r of f.recurring) if (r.state === 'live' && r.nextDue && r.nextDue >= f.today && ahead(r.nextDue)) out.push({ at: r.nextDue, day: dayChip(r.nextDue), text: `${r.what}, ${f.format(r.amount.minor, r.amount.currency)} ${r.direction === 'in' ? 'in' : 'out'}`, tone: 'plain', href: r.href ?? null });
   for (const k of f.kpis) if (k.targetBy && k.targetBy >= f.today && ahead(k.targetBy)) out.push({ at: k.targetBy, day: dayChip(k.targetBy), text: `${stripName(k.name, f.name)} should reach its target`, tone: 'plain', href: null });
   return out.sort((a, b) => Number(b.tone === 'late') - Number(a.tone === 'late') || a.at.localeCompare(b.at)).slice(0, most);
 }

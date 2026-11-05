@@ -147,13 +147,13 @@ export function readingsIn(part: { rows?: unknown } | null | undefined): FactRea
 }
 
 /** Its repeating money. */
-export function recurringIn(part: { rows?: unknown } | null | undefined): FactRecurring[] {
+export function recurringIn(part: { list?: unknown; rows?: unknown } | null | undefined): FactRecurring[] {
   return rowsIn(part).flatMap((r) => {
     const f = r.fields ?? {};
     const amount = moneyIn(f.amount);
     if (!amount) return [];
     const next = t(f.next_due);
-    return [{ what: t(f.what), direction: t(f.direction), amount, every: t(f.every), nextDue: /^\d{4}-\d{2}-\d{2}/u.test(next) ? next.slice(0, 10) : null, state: t(f.state) || 'live' }];
+    return [{ what: t(f.what), direction: t(f.direction), amount, every: t(f.every), nextDue: /^\d{4}-\d{2}-\d{2}/u.test(next) ? next.slice(0, 10) : null, state: t(f.state) || 'live', ...(typeof part?.list === 'string' && typeof r.seq === 'number' ? { href: `/r/${part.list}/${r.seq}` } : {}) }];
   });
 }
 

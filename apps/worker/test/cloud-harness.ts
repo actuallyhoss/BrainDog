@@ -36,7 +36,15 @@ export function bucket(fail?: (call: 'put' | 'delete', key: string) => boolean) 
     },
     async get(key: string) {
       const object = held.get(key);
-      return object ? { size: object.bytes.length, text: async () => new TextDecoder().decode(object.bytes) } : null;
+      return object
+        ? {
+            size: object.bytes.length,
+            httpMetadata: {},
+            body: new Blob([object.bytes]).stream(),
+            text: async () => new TextDecoder().decode(object.bytes),
+            arrayBuffer: async () => object.bytes.slice().buffer,
+          }
+        : null;
     },
     async head(key: string) {
       const object = held.get(key);
