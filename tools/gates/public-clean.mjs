@@ -38,10 +38,10 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * The words, lower case, put together here so no file in the repository spells them: the first three from the start, and
- * five the history scrub found again at the tip on 5 November, where nothing would have stopped them coming back.
+ * The one word, lower case, put together here so no file in the repository spells it. Every other private name is on the
+ * owner's machine (`privateTermsFile`), because a list of them in a public repository would publish the list.
  */
-export const WORDS = ['ho' + 'ss', 'en' + 'core', 'tam' + 'sin', 'sket' + 'chbook', 'north' + 'wind', 'guide' + 'line', 'coin' + ' purse', 'otters' + '.gg'];
+export const WORDS = ['ho' + 'ss'];
 /** The one spelling that holds the first word and is public: the account the repository lives under. */
 export const ALLOWED_SPELLING = 'actually' + WORDS[0];
 
@@ -193,18 +193,11 @@ export function termHits(text, terms) {
 export const ALLOWED = {};
 
 /**
- * (d)'S FROZEN FILES, EACH WITH ITS LINES THAT HOLD A TERM FROM THE PRIVATE LIST, one entry a line. These are add-on
- * versions already published to the catalogue, and the index line that describes one. A reader holds a published
- * version to the checksum the index gives, so these bytes are never edited, and they keep the card number their
- * examples were first written with. Money watch 1.3.2 says an invented one. A file with more such lines than entries,
- * or one not here, is a finding as before, and this list only shrinks.
+ * (d)'S FROZEN FILES, EACH WITH ITS LINES THAT HOLD A TERM FROM THE PRIVATE LIST, one entry a line. Empty since 5 November,
+ * when the private details in published add-on versions were written out and their checksums set again before the repository
+ * went public. A file that holds a term is a finding.
  */
-export const FROZEN = {
-  'apps/web/static/catalogue/index.json': ["money watch 1.2.0's changes"],
-  'apps/web/static/catalogue/packs/money-watch/1.2.0.pack.json': ['its changes', "twice's note", "repeats' note"],
-  'apps/web/static/catalogue/packs/money-watch/1.3.0.pack.json': ["twice's note", "repeats' note"],
-  'apps/web/static/catalogue/packs/money-watch/1.3.1.pack.json': ["twice's note", "repeats' note"],
-};
+export const FROZEN = {};
 
 /**
  * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned (`52 §5.1` step 3). Nothing here happens on

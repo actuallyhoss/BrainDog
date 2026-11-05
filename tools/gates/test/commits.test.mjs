@@ -277,7 +277,7 @@ test('commit-msg refuses the three messages the scope tries, and lets a sentence
     const stranger = await ask('The rail is flat\n', { author: 'Sam Ortiz', email: 'sam@example.com' });
     assert.match(stranger.said, /is authored by Sam Ortiz/u);
     const { WORDS } = await import('../public-clean.mjs');
-    const word = await ask(`The page for ${WORDS[1]} is gone\n`);
+    const word = await ask(`The page for ${WORDS[0]} is gone\n`);
     assert.match(word.said, /a private word/u);
     assert.equal((await ask('The rail is one flat column\n# a comment git adds\n')).code, 0);
   } finally {

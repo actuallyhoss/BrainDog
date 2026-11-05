@@ -3,8 +3,8 @@
  * never his record). Not his projects, his people, his companies or his handle, in the sources the site's drawings
  * and words are made from, or in the readable text of the pages a stranger lands on.
  *
- * THE NAMES ARE NEVER SPELLED HERE, or anywhere git tracks (`tools/gates/public-clean.mjs`, `shell-words.mjs`). Three
- * come from `public-clean`'s `WORDS`, put together at run time; the rest are `{ hash, length }` in
+ * THE NAMES ARE NEVER SPELLED HERE, or anywhere git tracks (`tools/gates/public-clean.mjs`, `shell-words.mjs`). One
+ * comes from `public-clean`'s `WORDS`, put together at run time; the rest are `{ hash, length }` in
  * `real-names.hashes.json`, salted the way `shell-words`' `hashOf` salts them. A hit says the file, the line and the
  * name's length, and never the name.
  *
@@ -154,7 +154,7 @@ test('the pages a stranger lands on read no name from the owner\'s record', when
 });
 
 test('a planted name fails with its file and line, and the name is never printed', () => {
-  const name = WORDS[1] ?? '';
+  const name = WORDS[0] ?? '';
   const dir = mkdtempSync(join(tmpdir(), 'real-names-'));
   try {
     const file = join(dir, 'planted.ts');

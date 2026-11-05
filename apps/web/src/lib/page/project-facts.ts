@@ -698,7 +698,7 @@ export function happenedOf(f: FactsIn, numbers: Numbers, most = 6): HappenedLine
     const d = day10(r.at);
     if (!d) continue;
     const what = r.notes[0] ?? (r.doing.trim() !== '' && !/ run$/iu.test(r.doing) ? r.doing : null);
-    /* A RUN'S OWN TITLE SAYS NOTHING ("Claude Code in Crumb.gg", with "Claude" under it): it worked on this, and that is the line. */
+    /* A RUN'S OWN TITLE SAYS NOTHING ("Claude Code in Tidepool", with "Claude" under it): it worked on this, and that is the line. */
     const titled = what !== null && what.length < 60 && /\s(?:in|on)\s/u.test(what) && what.toLowerCase().startsWith(agentName(r.agent).toLowerCase());
     const text = titled ? 'Worked on it.' : what ? summarySaid(/[.!?]$/u.test(what) ? what : `${what}.`) : `A run ${endedAs({ state: r.state, closedAs: r.closedAs, handed: r.next !== '' }).said}.`;
     /* IMPORTED RUNS ARE ONE LINE, on the newest of their days: four of "Mara Brain run S87" read as a story of ids. */

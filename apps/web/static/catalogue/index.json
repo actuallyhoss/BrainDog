@@ -6069,7 +6069,7 @@
         },
         {
           "version": "1.3.1",
-          "checksum": "5d2d69d41162871850c96b966dc3c9be9b3b9c8eba9d4481fb968529af4534e5",
+          "checksum": "65974131feedbd7ee33889a57403fd9067229cf9ad2e2b46e982a37758ad69f2",
           "bytes": 46114,
           "published_at": "2026-10-25T20:51:43.807Z",
           "bump": "patch",
@@ -6122,7 +6122,7 @@
         },
         {
           "version": "1.3.0",
-          "checksum": "5f65e37f0c3af70be610de5bc4a88608d0ecea2658f6afe85696db61c9ec5cbb",
+          "checksum": "7956447cd4107b46e041424e20f047e049e1e78cb5647ff19b5ba796765faefa",
           "bytes": 46071,
           "published_at": "2026-10-13T22:34:55.376Z",
           "bump": "patch",
@@ -6175,7 +6175,7 @@
         },
         {
           "version": "1.2.0",
-          "checksum": "32d4e968b9e3a90a0ca23ffffcb4310e10c7c00ab591855964e4208adda5eb6e",
+          "checksum": "710b0e368383ae97c33ea2af33ee1d1a339a799af9c1825cff4943ccfdb9705d",
           "bytes": 42193,
           "published_at": "2026-10-13T19:06:29.355Z",
           "bump": "patch",
@@ -9359,8 +9359,8 @@
       "versions": [
         {
           "version": "1.2.3",
-          "checksum": "ec64d9cd46b51e1faa65bd9b6a5c5a5176983b6b50e19b943af2df54c5a89fd7",
-          "bytes": 51338,
+          "checksum": "9e5bfb303119688930777ecc5e84d40642947881d46d11c621e929f5ed7db15b",
+          "bytes": 51347,
           "published_at": "2026-11-03T20:22:29.313Z",
           "bump": "patch",
           "reach": {
@@ -9411,8 +9411,8 @@
         },
         {
           "version": "1.2.2",
-          "checksum": "13160f7a39321cd56b52643f7aba1c49d2fb60a54b8f0a52599a4c8f188f94e1",
-          "bytes": 51464,
+          "checksum": "c101940d37ad19c30a3449178b4353c083eda6fb722ad8e21730b77aa4cd730e",
+          "bytes": 51473,
           "published_at": "2026-11-02T18:20:28.275Z",
           "bump": "patch",
           "reach": {
@@ -9463,8 +9463,8 @@
         },
         {
           "version": "1.2.1",
-          "checksum": "701b82a49a537aceb84fb96f3601b8c2bfd08ae98a6774800c7175f54083eea5",
-          "bytes": 49473,
+          "checksum": "7bccf3160447eb2f0dc8d22696a82da24fc85cdcfde48e071feacf3c7c6b0371",
+          "bytes": 49482,
           "published_at": "2026-11-02T17:29:06.850Z",
           "bump": "patch",
           "reach": {
@@ -9515,8 +9515,8 @@
         },
         {
           "version": "1.2.0",
-          "checksum": "6df2968dfc383a9ad9302d6b0be53f75da17738cad7a974a25ae04bc82624f0a",
-          "bytes": 48228,
+          "checksum": "d45b771c17c723e6bf600329737a5e682729e2b204d38a6d869e07d94e1c0280",
+          "bytes": 48238,
           "published_at": "2026-11-02T17:16:26.886Z",
           "bump": "patch",
           "reach": {
@@ -9567,8 +9567,8 @@
         },
         {
           "version": "1.1.1",
-          "checksum": "5b04f06ac08b147f0cf5e745db866ea0059032f779d6ecd47baae724a3e1813b",
-          "bytes": 47110,
+          "checksum": "f916f0d0a7cff241aa06c2048a0e79709bc1e85b965ede3c50764fade20848dc",
+          "bytes": 47120,
           "published_at": "2026-11-02T16:20:33.352Z",
           "bump": "patch",
           "reach": {
@@ -9619,8 +9619,8 @@
         },
         {
           "version": "1.1.0",
-          "checksum": "17bde2c6b311f9cdc4971078aa068cfe4b3a85b6591018e601598cff09d51e25",
-          "bytes": 47081,
+          "checksum": "c04cb7eddeef91207480e89f2006dc9528ecb90b0be318759458d6bfbe874157",
+          "bytes": 47091,
           "published_at": "2026-11-02T16:05:15.925Z",
           "bump": "minor",
           "reach": {
@@ -9671,8 +9671,8 @@
         },
         {
           "version": "1.0.1",
-          "checksum": "dce18c6a4f2c532238eaf2cd6f41fe7e3b9c46d7bb6e227b86500c243146757f",
-          "bytes": 40757,
+          "checksum": "e28b425c33c51b84be8530b895c34543e17032aaa15d79c08a65a3044ace461b",
+          "bytes": 40764,
           "published_at": "2026-11-02T15:10:56.941Z",
           "bump": "patch",
           "reach": {
@@ -9723,8 +9723,8 @@
         },
         {
           "version": "1.0.0",
-          "checksum": "8e08d1ffa29b8eb994a66a6c19f2392fb31e3969d262bd0cef1ecf66eabc4483",
-          "bytes": 40711,
+          "checksum": "7ac9c240e1d87ed044ea178bc88f8b8371f698e26a218a6f99b566251cd83356",
+          "bytes": 40718,
           "published_at": "2026-11-02T12:55:31.726Z",
           "bump": null,
           "reach": {

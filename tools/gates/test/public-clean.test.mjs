@@ -18,7 +18,13 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import publicClean, { ALLOWED, ALLOWED_SPELLING, FROZEN, WORDS, licenceFindings, readmeFindings, filesOf, textOf } from '../public-clean.mjs';
+import publicClean, { ALLOWED, ALLOWED_SPELLING, FROZEN, WORDS as HELD, licenceFindings, readmeFindings, filesOf, textOf } from '../public-clean.mjs';
+
+/* THE GATE HOLDS ONE WORD AND READS THE REST FROM THE OWNER'S MACHINE, so the others here are planted the same way. */
+const PLANTED = ['plantedone', 'plantedtwo'];
+const WORDS = [...HELD, ...PLANTED];
+const plantedTerms = join(mkdtempSync(join(tmpdir(), 'public-clean-terms-')), 'terms.txt');
+writeFileSync(plantedTerms, `${PLANTED.join('\n')}\n`);
 
 /* AND NO CALL IN THIS PROCESS READS IT EITHER: `publicClean` called here reads the list from the same variable. */
 process.env.BRAINDOG_PRIVATE_TERMS = join(tmpdir(), 'braindog-no-such-private-list.txt');
@@ -28,7 +34,7 @@ const root = join(gates, '..', '..');
 const planted = join(gates, 'negative', 'public-clean');
 
 /** The gate over `at`, with a private list of the test's own or none. */
-function run(at, terms = join(tmpdir(), 'braindog-no-such-private-list.txt')) {
+function run(at, terms = plantedTerms) {
   const r = spawnSync(process.execPath, [join(gates, 'public-clean.mjs')], {
     encoding: 'utf8',
     env: { ...process.env, BRAINDOG_GATE_ROOT: at, BRAINDOG_PRIVATE_TERMS: terms },
@@ -65,7 +71,9 @@ test('the same tree without the changelog is green', (t) => {
 });
 
 test('(a) each word is found in any case, on its line, and the account name is not', (t) => {
-  const [first, second, third] = WORDS;
+  const first = HELD[0];
+  const second = first;
+  const third = first;
   const at = tree(t, {
     'src/a.ts': `const a = 1;\nconst who = '${first.toUpperCase()}';\n`,
     'src/b.md': `Built for ${second[0].toUpperCase()}${second.slice(1)}.\n`,
@@ -80,12 +88,12 @@ test('(a) each word is found in any case, on its line, and the account name is n
 });
 
 test('(a) a binary file is not read', (t) => {
-  const at = tree(t, { 'img.bin': Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(WORDS[1])]) });
+  const at = tree(t, { 'img.bin': Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(HELD[0])]) });
   assert.equal(run(at).status, 0);
 });
 
 test('(a) the allowance: at or under its number is green, over it is red, under it says so', (t) => {
-  const at = tree(t, { 'x.ts': `// ${WORDS[0]}\n// ${WORDS[1]}\n` });
+  const at = tree(t, { 'x.ts': `// ${HELD[0]}\n// ${HELD[0]}\n` });
   t.mock.method(console, 'log', () => {});
   const said = [];
   t.mock.method(console, 'error', (l) => said.push(l));
@@ -97,7 +105,7 @@ test('(a) the allowance: at or under its number is green, over it is red, under 
 });
 
 test('(a) a file named like a key every object carries is not allowed by it', (t) => {
-  const at = tree(t, { constructor: `// ${WORDS[2]}\n` });
+  const at = tree(t, { constructor: `// ${HELD[0]}\n` });
   t.mock.method(console, 'log', () => {});
   t.mock.method(console, 'error', () => {});
   assert.equal(publicClean(at, {}), 1);
@@ -194,8 +202,7 @@ test('the allowance never grows', () => {
   assert.ok(Object.values(ALLOWED).every((n) => Number.isInteger(n) && n > 0), 'every entry is a count of one or more');
 });
 
-test('EVERY WORD IS A FINDING, the five added after a scrub found them back at the tip among them', (t) => {
-  assert.ok(WORDS.length >= 8);
+test('EVERY WORD IS A FINDING, the one the gate holds and the ones it reads from the owner\'s machine', (t) => {
   for (const word of WORDS) {
     const at = tree(t, { 'x.ts': `// a line naming ${word.toUpperCase()} in passing\n` });
     assert.equal(run(at).status, 1, `a word of ${word.length} letters passed`);
