@@ -209,7 +209,7 @@ test('A RUN STARTS SEEING WHAT WAITS: attach marks it seen at start, context lis
   const now = value<Context>(await api.context({}, ctx));
   assert.ok(typeof now.stamp === 'string' && now.stamp !== '');
   /* NO SETTINGS ROW YET, so the token's own scope is what it may do. */
-  assert.equal(now.may, 'Writes; money, keys and deletes are asked. On their word, passed as said, only money and keys still are.');
+  assert.equal(now.may, 'Writes; money, keys and deletes are asked. On their word, passed as said, only money, keys, new ways in and what leaves BrainDog still are.');
   const still = value<ContextSince>(await api.context({ since: now.stamp! }, ctx));
   assert.deepEqual([still.since.changed, still.since.lines], [false, ['Nothing new.']]);
 

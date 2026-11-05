@@ -1375,6 +1375,18 @@ export const BYPASS_PREF = 'agents.bypass' satisfies PrefKey;
  * token reaches at all.
  */
 export const NEVER_BYPASS: ReadonlySet<string> = new Set(['handOver', 'deleteRecord', 'erase']);
+/**
+ * WHAT NO WORD OPENS: A NEW WAY IN, AND WHAT TAKES THE RECORD OUT. `said` is a string an agent sends, and nothing proves he
+ * said it. MEASURED on 5 November: a key whose run read nothing from outside, sending `said: "yes"`, minted a whole-record
+ * key and read its bearer, invited an address, and exported the record, so one injected session or one stolen key held all of
+ * them, with nobody asked, on a switch that is on until he turns it off. A word stays enough for what stays in the record and
+ * Undo takes back. These take a press in BrainDog, or his own switch `agents.bypass`, which only he sets, in a browser. His word
+ * of 2 November opened them; this narrows it for the word alone, and taking a name off this list reopens it.
+ */
+export const NOT_ON_A_WORD: ReadonlySet<string> = new Set([
+  'createToken', 'createReportKey', 'deviceApprove', 'ingestMint', 'invite', 'removeMember', 'suspendMember', 'share', 'shareOnward',
+  'export', 'import', 'restore', 'installPack', 'setDeclaration', 'setPackConfig', 'fetchShared', 'fetchUseCase', 'gitUpdates', 'setup',
+]);
 /** What a change landed without asking carries in its note, beside the reason, so the log says why nobody was asked. */
 export const BYPASS_NOTE = 'Agents act without asking';
 /** "Agents' suggestions wait apart": the owner's own switch, on unless it is `false` (`apartOn` in the kernel). */
@@ -8641,9 +8653,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const beyondWord = (kinds: readonly { floor: string | null; verb: string }[], body?: unknown): string | null => {
     if (kinds.some((k) => k.floor === 'keys') || callsWithKey(body))
       return 'It is about keys, and a key is granted or opened only by the owner in BrainDog, even on their word. Ask with propose.';
+    /* AND WHAT WOULD CARRY THE RECORD OUT WITH NOBODY LOOKING: a script or a call to a host, with no key as with one. A forged
+       word accepted a script that posted a list to any address it named (`NOT_ON_A_WORD` says why a word is not enough). */
+    if (kinds.some((k) => k.floor === 'outside') || sendsOut(body))
+      return 'It sends things outside BrainDog, which only the owner agrees to, in BrainDog, even on their word. Ask with propose.';
+    /* AN ADD-ON IS CODE AND HOSTS NOBODY HAS READ UNTIL ITS PLAN IS SHOWN, and the press on that plan is the consent. A git address
+       names nothing the question can even show. Turning one he installed off or back on stays a word's to do. */
+    const b = body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+    if (kinds.some((k) => k.floor === 'addons') && b.enable === undefined && b.disable === undefined)
+      return 'It installs or arranges what runs in this BrainDog, which the owner agrees to on the plan it shows, in BrainDog, even on their word. Ask with propose.';
     if (kinds.some((k) => k.floor === 'money' && k.verb !== 'add'))
       return 'It changes an amount of money, which only the owner does in BrainDog, even on their word. Ask with propose.';
     return null;
+  };
+
+  /** Whether a question's body names a host it would call: an automation's or a script's lines, or a pack's, anywhere in it. */
+  const sendsOut = (body: unknown, depth = 0): boolean => {
+    if (depth > 8 || body === null || typeof body !== 'object') return false;
+    if (Array.isArray(body)) return body.some((x) => sendsOut(x, depth + 1));
+    const o = body as Record<string, unknown>;
+    if (Array.isArray(o.egress) && o.egress.length > 0) return true;
+    return Object.values(o).some((x) => sendsOut(x, depth + 1));
   };
 
   /** Whether a question's body sends a key out: an automation's line naming one (`Egress.key`), anywhere in it. */
@@ -19082,7 +19112,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (owner === null && !SAID_OWN.has(name) && given.principal.kind === 'token' && isArgs(sent) && typeof sent.said === 'string') {
           const { said, ...rest } = sent;
           argv[0] = rest;
-          if (!NEVER_BYPASS.has(name)) {
+          if (NOT_ON_A_WORD.has(name)) wordNot = { code: 'FORBIDDEN', fix: 'A word cannot be proved, and this lets somebody in or takes the record out, so the owner does it in BrainDog. Ask with propose, or tell them where.', at: 'said' };
+          else if (!NEVER_BYPASS.has(name)) {
             const base = argv[at] as CallContext;
             const word = ownKeyOf(base) === null ? null : wordOf(base, said);
             if (word === null) wordNot = { code: 'FORBIDDEN', fix: 'Only the owner\'s own key, at write over the whole BrainDog, carries his word. Ask with propose.', at: 'said' };

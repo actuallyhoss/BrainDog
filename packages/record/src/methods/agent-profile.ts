@@ -36,7 +36,7 @@ export type ProfileView = Profile & { effective: Effective; heard_at: string | n
 export const FLOORS = 'money, keys and deletes are asked';
 
 /** What the person's word lifts of the floors, said after them to a key that may act on it (`wordOf` in `index.ts`). */
-export const ON_WORD = 'On their word, passed as said, only money and keys still are.';
+export const ON_WORD = 'On their word, passed as said, only money, keys, new ways in and what leaves BrainDog still are.';
 
 /**
  * What a key may do while its owner's "Let agents do everything without asking" is on (`agents.bypass`, `bypassOf` in

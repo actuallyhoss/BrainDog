@@ -672,16 +672,19 @@ test('AN ENTRY FOR A LIST THE SAME ARRANGEMENT INSTALLS IS TAKEN, read against t
   sql.close();
 });
 
-test("ON HIS WORD AN AGENT ACCEPTS AN ADD-ON (the owner's decision of 27 October), which a token alone never installs", async () => {
+test("AN AGENT ACCEPTS AN ADD-ON ON HIS WORD ONLY WITH HIS SWITCH ON (27 October, amended 5 November): a word alone cannot be proved", async () => {
   const { api, sql } = await record();
   sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_owner', 'owner@vance-studio.example', 'Teodor')");
   sql.exec("INSERT OR REPLACE INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
   /* THE KEY THAT ASKS IS HIS, so what it asked is his to answer on his word (RK1). */
   sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_1', 'p_owner', 'h1', 'propose', 'Claude', '2026-10-01T00:00:00.000Z')");
   /* ANOTHER OF HIS KEYS: the key that asked is never the one that answers (`wordAnswer`, audit 10k AK2). */
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_2', 'p_owner', 'h2', 'write', 'Claude', '2026-10-01T00:00:00.000Z')");
   const writer: CallContext = { principal: { kind: 'token', id: 't_2', scope: 'write', person: 'p_owner', level: 'owner' }, session: { client_id: 'c1', agent: 'claude' } };
   const asked = value<{ id: string }>(await api.propose({ question: 'Add Work?', body_kind: 'pack', body: { install: 'work' } } as never, agent));
   refusal(await api.decide(accept(asked.id), writer));
+  assert.match(refusal(await api.instructionsMine({ answer: asked.id, option: 'accept', said: 'Yes, add Work.' } as never, writer)).fix, /on the plan it shows/u);
+  value(await api.setPref({ key: 'agents.bypass', value: 'on' }, { principal: { kind: 'person', id: 'p_owner', level: 'owner' } } as CallContext));
   value(await api.instructionsMine({ answer: asked.id, option: 'accept', said: 'Yes, add Work.' } as never, writer));
   assert.equal(api.kernel.governanceRow('suggestion', asked.id)?.status, 'resolved');
   assert.ok(value<{ packs: { id: string }[] }>(await api.arrangement({}, agent)).packs.some((p) => p.id === 'work'));

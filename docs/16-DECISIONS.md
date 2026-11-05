@@ -1446,6 +1446,13 @@ offered, a new key from a key his settings hold to part of the record, a replaci
 or the members, or a restore past his last change to any of these. The same holds while his agents act without asking.
 Turning a switch off stays open, except his word's own, which he alone turns.
 
+**Amended 5 November 2026, security pass before going public, for him to veto: no word lets anybody in or takes the record out.**
+His word passed the doors of 2 November on a string an agent sends, on a switch that is on until he turns it off. A run that had
+read nothing marked minted a key and read its bearer, exported the record and invited an address with `said: "yes"`. So
+`NOT_ON_A_WORD` (`packages/record/src/index.ts`) takes those doors, and an answer on a word that installs an add-on or sends things
+outside BrainDog, back to a press in BrainDog. His own switch `agents.bypass`, which only he sets, in a browser, still opens them.
+Taking a name off the list reopens that door to a word.
+
 **Rejected:** an `admin` scope, off by default. A scope that exists can be minted, leaked and
 replayed; a group no token can reach cannot.
 

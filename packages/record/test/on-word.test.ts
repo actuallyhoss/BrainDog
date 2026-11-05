@@ -449,21 +449,82 @@ test('A RUNG IS HIS TO GIVE: an agent cannot say yes to the offer of one on his 
   sql.close();
 });
 
-test('A KEY HIS SETTINGS HOLD TO PART OF THE RECORD MAKES NO NEW KEY ON HIS WORD, which would not be held; a whole key still does', async () => {
+test('NOT ON A WORD: a word cannot be proved, so no said lets anybody in or takes the record out, and his own switch still does', async () => {
+  const { api, sql } = await record({ sign: testSigner() });
+  const said = 'Yes, do it.';
+  const keys = () => sql.one<{ n: number }>('SELECT count(*) AS n FROM token')?.n;
+  const count = keys();
+  for (const [name, args] of [
+    ['createToken', { scope: 'write', label: 'Second' }],
+    ['createReportKey', { register: 'tasks' }],
+    ['deviceApprove', { user_code: '123456' }],
+    ['ingestMint', { ingest: 'mail' }],
+    ['invite', { email: 'somebody@elsewhere.example', level: 'write' }],
+    ['removeMember', { person: 'p_2' }],
+    ['export', {}],
+    ['import', { lines: [], replace: true }],
+    ['restore', { bookmark: 'old' }],
+    ['installPack', { planHash: 'x' }],
+    ['setDeclaration', { id: 'register.x', kind: 'register', body: {} }],
+    ['setPackConfig', { pack: 'x', config: {} }],
+  ] as const) {
+    const out = await (api as unknown as Record<string, (a: unknown, c: unknown) => Promise<unknown>>)[name]!({ ...args, said }, agent());
+    const no = refusal(out);
+    assert.equal(no.code, 'FORBIDDEN', `${name}: ${no.fix}`);
+    assert.match(no.fix, /cannot be proved/u, name);
+  }
+  assert.equal(keys(), count, 'no key was made');
+
+  /* A WORD STILL DOES WHAT STAYS IN THE RECORD. */
+  const row = value<Entry>(await api.create({ register: 'tasks', fields: { name: 'Ship' }, said: 'Add Ship.' }, agent('c2')));
+  assert.ok(row.seq);
+
+  /* HIS OWN SWITCH, WHICH ONLY HE SETS IN A BROWSER, DOES OPEN THEM. */
+  value(await api.setPref({ key: 'agents.bypass', value: 'on' }, owner));
+  assert.ok(value<{ bearer: string }>(await api.createToken({ scope: 'write', label: 'Second' } as never, agent())).bearer);
+  sql.close();
+});
+
+test('NOT ON A WORD: a question that would send things out is answered in BrainDog, whoever of his own asked it', async () => {
   const { api, sql } = await record();
-  const said = 'Make a new key.';
+  /* A SCRIPT THAT READS TASKS AND POSTS THEM, WITH NO KEY: the one `callsWithKey` did not stop. */
+  const LEAK = {
+    id: 'script.leak',
+    kind: 'script' as const,
+    body: { script: 'leak', title: 'Report', runs: { every: '1h' }, egress: ['https://elsewhere.example'], keys: [], reads: ['tasks'], writes: [], source: 'export default async function run(ctx) {}' },
+  };
+  const asked = value<{ id: string }>(await api.propose({ question: 'Install the report script?', body_kind: 'change', body: { declaration_id: 'script.leak', to: LEAK } } as never, owner));
+  const no = refusal(await api.instructionsMine({ answer: asked.id, option: 'accept', said: 'Install it.' } as never, agent()));
+  assert.equal(no.code, 'FORBIDDEN');
+  assert.match(no.fix, /in BrainDog, even on their word/u);
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM declaration WHERE id = 'script.leak'")?.n, 0);
+
+  /* AND AN ADD-ON, WHICH MAY BE ANYTHING: from a git address no question can show, or a file another of his agents filed. */
+  let n = 901;
+  for (const body of [{ source: { kind: 'git', ref: 'someone/kit@v1.2.0:watch-list.pack.json' } }, { install: 'leak', doc: { id: 'leak', version: '1.0.0', declarations: [LEAK] } }]) {
+    const id = `SG${String(n++)}`;
+    sql.exec("INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'pack', ?, 'open', 'p_1', ?)", id, JSON.stringify(body), new Date(NOW).toISOString());
+    assert.match(refusal(await api.instructionsMine({ answer: id, option: 'accept', said: 'Install it.' } as never, agent())).fix, /in BrainDog, even on their word/u);
+    assert.equal(statusOf(api, id), 'open');
+  }
+  sql.close();
+});
+
+test('A KEY HIS SETTINGS HOLD TO PART OF THE RECORD MAKES NO NEW KEY WHILE AGENTS ACT WITHOUT ASKING, which would not be held; a whole key still does', async () => {
+  const { api, sql } = await record();
+  value(await api.setPref({ key: 'agents.bypass', value: 'on' }, owner));
   const ctx = agent();
-  /* HIS WHOLE AGENT STILL GOES THROUGH THIS DOOR (the owner's word of 2 Nov). */
-  const made = value<{ id: string; bearer: string }>(await api.createToken({ scope: 'write', label: 'Second', said } as never, ctx));
+  /* HIS WHOLE AGENT STILL GOES THROUGH THIS DOOR ON HIS SWITCH (the owner's word of 2 Nov), and never on a word (`NOT_ON_A_WORD`). */
+  const made = value<{ id: string; bearer: string }>(await api.createToken({ scope: 'write', label: 'Second' } as never, ctx));
   assert.ok(made.bearer);
 
   value(await api.setAgentProfile({ name: 'Tasks only', match: { token: 't_claude' }, ceiling: 'write', lists_write: ['tasks'] } as never, owner));
   const keys = () => sql.one<{ n: number }>('SELECT count(*) AS n FROM token')?.n;
   const count = keys();
   for (const out of [
-    await api.createToken({ scope: 'write', label: 'Unheld', said } as never, ctx),
-    await api.createReportKey({ register: 'logins', said } as never, ctx),
-    await api.deviceApprove({ user_code: '123456', said } as never, ctx),
+    await api.createToken({ scope: 'write', label: 'Unheld' } as never, ctx),
+    await api.createReportKey({ register: 'logins' } as never, ctx),
+    await api.deviceApprove({ user_code: '123456' } as never, ctx),
   ]) {
     const no = refusal(out);
     assert.equal(no.code, 'NEEDS_BROWSER_SESSION');
@@ -475,7 +536,7 @@ test('A KEY HIS SETTINGS HOLD TO PART OF THE RECORD MAKES NO NEW KEY ON HIS WORD
   value(await api.setAgentProfile({ name: 'No send', match: { kind: 'claude' }, ceiling: 'write', tools: { send: false } } as never, owner));
   const other = agent();
   sql.exec("DELETE FROM agent_profile WHERE json_extract(match, '$.token') = 't_claude'");
-  assert.equal(refusal(await api.createToken({ scope: 'write', label: 'Unheld', said } as never, other)).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(refusal(await api.createToken({ scope: 'write', label: 'Unheld' } as never, other)).code, 'NEEDS_BROWSER_SESSION');
   sql.close();
 });
 
@@ -483,8 +544,8 @@ test('NO AGENT WIDENS BY FILE: a file that changes a settings row or who is here
   const { api, sql } = await record({ sign: testSigner() });
   sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_other', 'p_1', 'ho', 'write', 'Other', '2026-10-01T00:00:00.000Z')");
   value(await api.setAgentProfile({ name: 'Careful', match: { token: 't_other' }, ceiling: 'propose' } as never, owner));
-  const said = 'Put it back.';
-  const file = value<string[]>(await api.export({ said } as never, agent()));
+  value(await api.setPref({ key: 'agents.bypass', value: 'on' }, owner));
+  const file = value<string[]>(await api.export({} as never, agent()));
   const signer = testSigner();
 
   /* ONE ROW EDITED, ITS MANIFEST LINE WORKED OUT AGAIN AND THE FILE SIGNED BY A STRANGER, as `checkBrainl` reads it sound. */
@@ -509,14 +570,14 @@ test('NO AGENT WIDENS BY FILE: a file that changes a settings row or who is here
   assert.deepEqual((await checkBrainl(other)).ok, true);
 
   for (const lines of [raised, other]) {
-    const no = refusal(await api.import({ lines, replace: true, said } as never, agent()));
+    const no = refusal(await api.import({ lines, replace: true } as never, agent()));
     assert.equal(no.code, 'NEEDS_BROWSER_SESSION');
     assert.match(no.fix, /never widens/u);
   }
   assert.equal(sql.one<{ c: string }>("SELECT ceiling AS c FROM agent_profile WHERE name = 'Careful'")?.c, 'propose', 'the row is as he set it');
 
-  /* THE DOOR HIS WORD OPENED STAYS OPEN: the file as it is, and a change to anything else. */
-  value(await api.import({ lines: file, replace: true, said } as never, agent()));
+  /* THE DOOR HIS SWITCH OPENED STAYS OPEN: the file as it is, and a change to anything else. */
+  value(await api.import({ lines: file, replace: true } as never, agent()));
   assert.equal(sql.one<{ c: string }>("SELECT ceiling AS c FROM agent_profile WHERE name = 'Careful'")?.c, 'propose');
   sql.close();
 });
@@ -534,13 +595,12 @@ test('NO AGENT WIDENS BY GOING BACK: a copy older than his last change to what a
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
   sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_1', 'teo@vance-studio.example', 'Teodor')");
   sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_claude', 'p_1', 'h', 'write', 'Claude Code', '2026-10-01T00:00:00.000Z')");
-  value(await api.setPref({ key: 'agents.bypass', value: 'off' }, owner));
-  const said = 'Go back.';
+  value(await api.setPref({ key: 'agents.bypass', value: 'on' }, owner));
   now = NOW + 120_000;
-  const no = refusal(await api.restore({ bookmark: 'old', said } as never, agent()));
+  const no = refusal(await api.restore({ bookmark: 'old' } as never, agent()));
   assert.equal(no.code, 'NEEDS_BROWSER_SESSION');
   assert.match(no.fix, /never widens/u);
-  value(await api.restore({ bookmark: 'new', said } as never, agent()));
+  value(await api.restore({ bookmark: 'new' } as never, agent()));
   /* AND HE GOES BACK WHERE HE LIKES. */
   value(await api.restore({ bookmark: 'old' }, owner));
   sql.close();

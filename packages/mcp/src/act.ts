@@ -14,7 +14,8 @@
  * person for good and giving the BrainDog away (`deleteRecord`, `erase`, `handOver`). A key is deposited with
  * `braindog keys put`, which reads standard input, and nowhere else. Minting a key, an ingest address, letting a device
  * in, an import and a restore go to the record, which lets the owner's own agent make them while he lets agents do
- * everything without asking, or on his word sent as `said`, and refuses anybody else (the owner's word of 2 Nov).
+ * everything without asking, and refuses anybody else (the owner's word of 2 Nov). Never on a `said` alone, which nothing
+ * proves (`NOT_ON_A_WORD` in the record).
  *
  * A CALL ONLY AN OWNER IN A BROWSER MAKES IS ASKED INSTEAD, WHERE ASKING CAN SAY IT: turning an add-on on or off,
  * installing one, its settings, and a declaration, each the `propose` body the app's Decide already applies. Asked, it

@@ -232,11 +232,13 @@ they are. So the controls are about who may, what may never, and what is kept.
 | Control | Kind |
 |---|---|
 | **Agents answer when you say so** (Settings › Agents, `agents.answer_on_word`) is on until the owner turns it off, and only an owner in a browser sets it. Off, every such call is refused, naming the switch | enforced in the record |
-| Only a key whose person owns the record, and whose scope and settings row let it write. A run that read text from outside the record (the ladder's `untrusted`) asks for the rest of it, his word or not, because that text could carry words he never said | enforced in the record |
+| Only a key whose person owns the record, and whose scope and settings row let it write. A run that read text from outside the record or somebody else's words (the ladder's `untrusted`: a row, an edit or a question by a door, a feed, a script, another person or another person's agent, `ownHand`) asks for the rest of it, his word or not, because that text could carry words he never said | enforced in the record |
+| What a session is handed by `context` is only what its own person, the owner or the record wrote (`handedOwn`): somebody else's step, question, task or rule is left out and the briefing says there is something to read, and reading it marks the run. A rule of a colleague's agent is not read as a rule | enforced in the record |
 | `said` must hold words. An empty one is refused at `said` | enforced in the record |
 | A question the agent's own key asked is never answered by it, on any word: the person answers it in BrainDog, or the agent makes the change with `said` (which takes its question back) or withdraws it. Otherwise an agent could ask and then answer itself (audit 10k, AK2) | enforced in the record |
 | A question somebody else opened (another person, a mail or feed, a project key, another person's agent) is answered in BrainDog only. However the question is signed (a person, a key, or the run a key opened), it is read back to the person behind it, and only the owner's own keys and the record's own automations pass | enforced in the record |
 | No word reaches a key (a list of keys, or an automation that calls out with one) or an amount of money set on what is already there | enforced in the record |
+| **The record cannot tell his words from words an agent made up, so no word lets anybody in or takes the record out** (5 November 2026, `NOT_ON_A_WORD`): a new key, a report key or an ingest address, letting a device in, an invitation or a share, removing somebody, an export, an import or a restore, a declaration, an add-on's install, arrangement or settings, and any question that would send things outside BrainDog. Measured before: a run that read nothing from outside, sending `said: "yes"`, minted a key and read its bearer. These take a press in BrainDog, or his own `agents.bypass`. A word stays enough for what stays in the record and Undo takes back | enforced in the record |
 | The answer runs the record's own `decide` as the owner with `onWord` set. `admin` and `vault` refuse `onWord`, so erasing, deleting the record, the keychain, tokens, sharing and billing stay a browser session's. `decide` lets `onWord` alone accept what installs | enforced in the record |
 | No agent widens what agents may do, on his word, while they act without asking, by a file or by going back: his two switches, Answer in chat turned on, a settings row and a yes to the offer of a rung stay his; a key his settings hold to part of the record makes no new key; a replacing import is held to the settings rows and members the record holds; a restore stops at his last change to any of it (`agentBehind`) | enforced in the record |
 | A token still never calls `decide` itself | architectural |
@@ -247,14 +249,14 @@ they are. So the controls are about who may, what may never, and what is kept.
 
 Settings › Agents has one switch for the owner, **Let your agents do everything without asking** (`agents.bypass`,
 `bypassOf` in `packages/record`). Off, agents ask before deletes, money, keys, add-ons and settings, and after reading
-things from outside. On, the owner's own agents act without asking, money and outside reads included; each change
+anything somebody else wrote. On, the owner's own agents act without asking, money and outside reads included; each change
 still names its agent and can be undone.
 
 | Control | Kind |
 |---|---|
 | Only an owner, signed in to the app, sets it. `braindog bypass on` only opens the page; an agent cannot turn it on for itself | enforced in the record |
 | It covers only the owner's own whole-record write tokens. A colleague's agents are never covered, and a colleague who Can decide cannot set it | enforced in the record |
-| `NEVER_BYPASS` (`packages/record/src/index.ts`) holds, switch on or off: the team (`handOver`, `invite`, which is also how a level is changed, `suspendMember`, `removeMember`), the switch itself (`setPref`), new keys and addresses (`createToken`, `createReportKey`, `ingestMint`, `deviceApprove`), and the record as a whole (`deleteRecord`, `erase`, `restore`, `import`, `export`). The owner's agent is refused `NEEDS_BROWSER_SESSION` on each | enforced in the record |
+| `NEVER_BYPASS` (`packages/record/src/index.ts`) holds, switch on or off: giving the ownership away (`handOver`), deleting the whole BrainDog (`deleteRecord`) and erasing a person (`erase`). Everything else his switch opens, since his word of 2 November, and it is the only thing that opens `NOT_ON_A_WORD` to an agent (5.2) | enforced in the record |
 | Still a browser session's, as in 5.2: the Keychain and paying | enforced in the record |
 | The switch's own lines (`apps/web/src/lib/agents/bypass.ts`) and the agent's May line (`BYPASS_SAYS`) say the same list | copy |
 
