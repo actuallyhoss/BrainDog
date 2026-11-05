@@ -113,9 +113,9 @@
   }
   .matrix-wrap {
     overflow-x: auto;
-    /* THE BOX SCROLLS AND THE PAGE DOES NOT: without this the table's width held the column open, and at 900 to 940 the
-       whole document scrolled sideways. */
-    contain: inline-size;
+    /* THE BOX SCROLLS AND THE PAGE DOES NOT: the words for a screen reader in each cell are absolutely placed, and with no
+       positioned box round them they escaped the scroller, so at 900 to 940 the whole document scrolled sideways. */
+    position: relative;
     border-radius: var(--r-ctl);
   }
   .matrix {

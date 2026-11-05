@@ -409,9 +409,14 @@
   }
 
   /* AT 320 THE LINE TAKES TWO: nine characters of time and the word "to" outran it by 13px. */
-  @media (width < 340px) {
+  @media (width < 360px) {
     .quiet-pickers.quiet-pickers {
       flex-wrap: wrap;
+    }
+
+    .quiet-pickers.quiet-pickers > .quiet-time,
+    .quiet-pickers.quiet-pickers > .quiet-to {
+      flex: 1 1 100%;
     }
   }
 
