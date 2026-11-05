@@ -67,6 +67,8 @@ async function setup() {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   value((await applyMigrations(sql, clock)).result);
+  /* ONLY AN OWNER APPROVES A GRANT, AND ONLY AN OWNER KEEPS ONE STANDING (`APPROVER_STANDING`). */
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES (?, '*', 'owner')", OWNER);
   let n = 0;
   /* BUILT PER CALL, so each call reads the clock as it now stands. Ids are twenty-six characters, as a ULID is, since a
      job's id is checked for that shape. */
@@ -254,4 +256,14 @@ test('A JOB PLACED ON A MACHINE OR A PROFILE GOES ONLY TO A RUNNER THERE, and th
   assert.equal(took.job.seat, null);
   const ran = value(await listJobs(deps(), {})).jobs.find((j) => j.id === plain.id);
   assert.deepEqual([ran?.machine, ran?.seat, ran?.ran_on], [null, null, 'build-box']);
+});
+
+test('A RUNNER STANDS ONLY WHILE ITS APPROVER IS AN OWNER: made less than one, or taken off, it is not a runner', async () => {
+  const { sql, deps, enrol } = await setup();
+  const { bearer } = await enrol('Studio laptop');
+  assert.ok((await runnerGrant(deps(), bearer)).ok);
+  sql.exec("UPDATE member SET level = 'decide' WHERE person_id = ?", OWNER);
+  assert.equal((await runnerGrant(deps(), bearer)).ok, false);
+  sql.exec('DELETE FROM member WHERE person_id = ?', OWNER);
+  assert.equal((await runnerGrant(deps(), bearer)).ok, false);
 });

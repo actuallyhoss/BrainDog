@@ -145,6 +145,17 @@ const cutOffMs = (validFrom: string | undefined): number | null => {
 export const cutOffReadable = (validFrom: string | undefined): boolean => !Number.isNaN(cutOffMs(validFrom) ?? 0);
 
 /**
+ * The joins that say where a standing device grant's approver stands now: `person` for whether they are suspended, and
+ * `member` for whether they still hold the whole record at owner. Read as `FROM device_grant d ${APPROVER_STANDING}`.
+ *
+ * ONLY AN OWNER APPROVES A GRANT, AND ONLY AN OWNER KEEPS ONE STANDING. A machine let into the keychain or enrolled as a
+ * runner holds what its approver held. The checks read `suspended_at` alone, so an owner taken off the record, or made
+ * a viewer, left their machine able to open every key for up to thirty days (`leaving-ends-bearers.test.ts`).
+ */
+export const APPROVER_STANDING = `LEFT JOIN person p ON p.id = d.approved_by
+     LEFT JOIN member m ON m.person_id = d.approved_by AND m.register = '*' AND m.level = 'owner'`;
+
+/**
  * Whether the operator's cut-off (`TOKENS_VALID_FROM`, `53 §5.11` (c) step 3) ends a credential made at `made`.
  *
  * MADE BEFORE THE INSTANT IS ENDED, AND MADE AT IT IS NOT. An operator who sets it to the moment a compromise began

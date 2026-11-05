@@ -32,6 +32,8 @@ async function setup() {
   const clock = fixedClock(NOW);
   await applyMigrations(sql, clock);
   sql.exec("INSERT INTO person (id, email, name) VALUES (?, 'ada@example.com', 'Ada')", OWNER);
+  /* ONLY AN OWNER APPROVES A GRANT, AND ONLY AN OWNER KEEPS ONE STANDING (`APPROVER_STANDING`). */
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES (?, '*', 'owner')", OWNER);
   let n = 0;
   const deps = (): TokenDeps => ({
     sql,
@@ -112,4 +114,12 @@ test('NO OTHER GRANT IS A SHAPE GRANT, and a revoked one, a stranger and a suspe
   assert.deepEqual(await shapeGrant(deps(), grant.bearer), stranger, 'a revoked grant was admitted');
   const listed = (await deviceList(deps())).find((r) => r.handle === grant.handle)!;
   assert.deepEqual({ reach: listed.reach, status: listed.status }, { reach: 'shape', status: 'revoked' });
+});
+
+test('A SHAPE GRANT STANDS ONLY WHILE ITS APPROVER IS AN OWNER', async () => {
+  const { sql, deps } = await setup();
+  const { bearer } = await approved(deps);
+  assert.ok((await shapeGrant(deps(), bearer)).ok);
+  sql.exec('DELETE FROM member WHERE person_id = ?', OWNER);
+  assert.equal((await shapeGrant(deps(), bearer)).ok, false);
 });

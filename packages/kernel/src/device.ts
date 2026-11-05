@@ -17,7 +17,7 @@ import type { Refusal, Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
-import { DEFAULT_DAYS, createToken, endedByCutOff, revokeToken, type TokenDeps } from './token.ts';
+import { APPROVER_STANDING, DEFAULT_DAYS, createToken, endedByCutOff, revokeToken, type TokenDeps } from './token.ts';
 
 /**
  * `device_grant.reach`, as migration 33's CHECK has it.
@@ -493,8 +493,8 @@ export async function renameDevice(deps: TokenDeps, handle: string, label: strin
 /**
  * A keychain-grant bearer, checked. INTERNAL: the host calls it before it opens a key for an agent.
  *
- * The same one sentence for every way it fails, as `verifyToken` does, and the approver's suspension
- * stops the grant with them.
+ * The same one sentence for every way it fails, as `verifyToken` does. The approver's suspension stops the grant with
+ * them, and so does their leaving the owners (`APPROVER_STANDING`).
  */
 export async function keychainGrant(deps: TokenDeps, bearer: string): Promise<Result<KeychainGrant>> {
   const cut = typeof bearer === 'string' ? bearer.indexOf('.') : -1;
@@ -510,14 +510,15 @@ export async function keychainGrant(deps: TokenDeps, bearer: string): Promise<Re
     approved_at: string | null;
     expires: string;
     suspended_at: string | null;
+    still_owner: string | null;
   }>(
     `SELECT d.id AS id, d.scope AS scope, d.approved_by AS approved_by, d.approved_at AS approved_at, d.expires AS expires,
-            p.suspended_at AS suspended_at
-     FROM device_grant d LEFT JOIN person p ON p.id = d.approved_by
+            p.suspended_at AS suspended_at, m.person_id AS still_owner
+     FROM device_grant d ${APPROVER_STANDING}
      WHERE d.token_hash = ? AND d.reach = 'vault' AND d.status = 'active'`,
     await deps.digest(secret),
   );
-  if (!row || !row.scope || !row.approved_by || row.suspended_at || row.expires <= instant(deps.nowMs)) return wrong;
+  if (!row || !row.scope || !row.approved_by || !row.still_owner || row.suspended_at || row.expires <= instant(deps.nowMs)) return wrong;
   /* THE OPERATOR'S CUT-OFF, in the same sentence as every other failure (`verifyToken`). */
   if (endedByCutOff(deps.validFrom, row.approved_at)) return wrong;
 
@@ -531,8 +532,8 @@ export async function keychainGrant(deps: TokenDeps, bearer: string): Promise<Re
  *
  * STANDING, NOT SPENT. Unlike an operation grant it is read again and again for its ninety days, and each read writes
  * `last_used`, so the sweep's fourteen silent days count from the last copy taken. The same one sentence for every way it
- * fails, as `keychainGrant` gives it: another record, another reach, past its life, an approver since suspended, or approved
- * before the operator's cut-off.
+ * fails, as `keychainGrant` gives it: another record, another reach, past its life, an approver since suspended or no longer
+ * an owner, or approved before the operator's cut-off.
  */
 export async function shapeGrant(deps: TokenDeps, bearer: string): Promise<Result<ShapeGrant>> {
   const cut = typeof bearer === 'string' ? bearer.indexOf('.') : -1;
@@ -541,13 +542,14 @@ export async function shapeGrant(deps: TokenDeps, bearer: string): Promise<Resul
   const wrong = no<ShapeGrant>('FORBIDDEN', 'That shape grant is not known here.', { at: 'shape' });
   if (!record || !secret || record !== deps.recordId()) return wrong;
 
-  const row = deps.sql.one<{ id: string; approved_by: string | null; approved_at: string | null; expires: string; suspended_at: string | null }>(
-    `SELECT d.id AS id, d.approved_by AS approved_by, d.approved_at AS approved_at, d.expires AS expires, p.suspended_at AS suspended_at
-     FROM device_grant d LEFT JOIN person p ON p.id = d.approved_by
+  const row = deps.sql.one<{ id: string; approved_by: string | null; approved_at: string | null; expires: string; suspended_at: string | null; still_owner: string | null }>(
+    `SELECT d.id AS id, d.approved_by AS approved_by, d.approved_at AS approved_at, d.expires AS expires, p.suspended_at AS suspended_at,
+            m.person_id AS still_owner
+     FROM device_grant d ${APPROVER_STANDING}
      WHERE d.token_hash = ? AND d.reach = 'shape' AND d.status = 'active'`,
     await deps.digest(secret),
   );
-  if (!row || !row.approved_by || row.suspended_at || row.expires <= instant(deps.nowMs)) return wrong;
+  if (!row || !row.approved_by || !row.still_owner || row.suspended_at || row.expires <= instant(deps.nowMs)) return wrong;
   if (endedByCutOff(deps.validFrom, row.approved_at)) return wrong;
 
   deps.sql.exec('UPDATE device_grant SET last_used = ? WHERE id = ?', instant(deps.nowMs), row.id);

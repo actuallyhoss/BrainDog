@@ -43,6 +43,8 @@ const sha256 = async (text: string): Promise<string> =>
 async function setup(sql: NodeSql = openSqlite()) {
   const clock = fixedClock(NOW);
   if (!sql.one("SELECT 1 AS hit FROM sqlite_master WHERE name = 'device_grant'")) await applyMigrations(sql, clock);
+  /* ONLY AN OWNER APPROVES A GRANT, AND ONLY AN OWNER KEEPS ONE STANDING (`APPROVER_STANDING`). */
+  sql.exec("INSERT OR IGNORE INTO member (person_id, register, level) VALUES (?, '*', 'owner')", OWNER);
   let n = 0;
   /* THE DEPS ARE BUILT PER CALL, so each call reads the clock as it now stands. */
   const deps = (): TokenDeps => ({
@@ -328,4 +330,18 @@ test('A CODE IS NEVER SHARED BY TWO WAITING DEVICES: a draw that matches one is 
   fresh = true;
   assert.equal(value(await deviceApprove(deps(), OWNER, { user_code: second.user_code })).label, 'my terminal');
   assert.equal((value(await devicePoll(deps(), { device_code: stranger.device_code })) as { pending?: boolean }).pending, true);
+});
+
+test('A KEYCHAIN GRANT STANDS ONLY WHILE ITS APPROVER IS AN OWNER: made less than one, or taken off, it opens nothing', async () => {
+  const { sql, deps } = await setup();
+  const started = value(await deviceStart(deps(), { reach: 'vault', scope: '*', label: 'test-box' }));
+  value(await deviceApprove(deps(), OWNER, { user_code: started.user_code }));
+  const bearer = (value(await devicePoll(deps(), { device_code: started.device_code })) as Exchanged).bearer;
+  assert.ok((await keychainGrant(deps(), bearer)).ok);
+
+  sql.exec("UPDATE member SET level = 'decide' WHERE person_id = ?", OWNER);
+  assert.equal(refusalOf(await keychainGrant(deps(), bearer)).code, 'FORBIDDEN');
+
+  sql.exec('DELETE FROM member WHERE person_id = ?', OWNER);
+  assert.equal(refusalOf(await keychainGrant(deps(), bearer)).code, 'FORBIDDEN');
 });

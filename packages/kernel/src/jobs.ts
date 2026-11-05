@@ -39,7 +39,7 @@ import { no, ok } from '@braindog/ports';
 
 import { instant, isCurrencyCode, looksLikeCredential } from './coerce.ts';
 import { MACHINE_NAME, SEAT_NAME } from './instruction.ts';
-import { createToken, endedByCutOff, revokeToken, type TokenDeps } from './token.ts';
+import { APPROVER_STANDING, createToken, endedByCutOff, revokeToken, type TokenDeps } from './token.ts';
 
 /** How long a claim holds a job with no word from its runner. Every event and every `readCancel` renews it. */
 export const JOB_LEASE_MS = 60_000;
@@ -935,7 +935,7 @@ export function jobEvents(deps: TokenDeps, args: { id?: unknown; after?: unknown
  * A runner's bearer, checked: the machine it names, or one sentence for every way it is not one.
  *
  * AS `keychainGrant` CHECKS ITS OWN (`device.ts`): the record the bearer names, an active grant of reach `runner` holding its
- * hash, an approver still on the record and not suspended, a grant not past its time, and one approved after the
+ * hash, an approver still an owner of the record and not suspended (`APPROVER_STANDING`), a grant not past its time, and one approved after the
  * operator's cut-off. The use is written, so a machine that keeps asking is never swept as silent.
  */
 export async function runnerGrant(deps: TokenDeps, bearer: string): Promise<Result<RunnerGrant>> {
@@ -952,15 +952,16 @@ export async function runnerGrant(deps: TokenDeps, bearer: string): Promise<Resu
     approved_at: string | null;
     expires: string;
     suspended_at: string | null;
+    still_owner: string | null;
   }>(
     `SELECT d.id AS id, d.label AS label, d.approved_by AS approved_by, d.approved_at AS approved_at, d.expires AS expires,
-            p.suspended_at AS suspended_at
-     FROM device_grant d LEFT JOIN person p ON p.id = d.approved_by
+            p.suspended_at AS suspended_at, m.person_id AS still_owner
+     FROM device_grant d ${APPROVER_STANDING}
      WHERE d.token_hash = ? AND d.reach = 'runner' AND d.status = 'active'`,
     await deps.digest(secret),
   );
   const now = instant(deps.nowMs);
-  if (!row || !row.approved_by || row.suspended_at || row.expires <= now) return wrong;
+  if (!row || !row.approved_by || !row.still_owner || row.suspended_at || row.expires <= now) return wrong;
   if (endedByCutOff(deps.validFrom, row.approved_at)) return wrong;
 
   deps.sql.exec('UPDATE device_grant SET last_used = ? WHERE id = ?', now, row.id);

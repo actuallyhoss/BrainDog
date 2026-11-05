@@ -35,6 +35,8 @@ async function setup() {
   const clock = fixedClock(NOW);
   await applyMigrations(sql, clock);
   sql.exec("INSERT INTO person (id, email, name) VALUES (?, 'ada@example.com', 'Ada')", OWNER);
+  /* ONLY AN OWNER APPROVES A GRANT, AND ONLY AN OWNER KEEPS ONE STANDING (`APPROVER_STANDING`). */
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES (?, '*', 'owner')", OWNER);
   let n = 0;
   /* BUILT PER CALL, so each call reads the clock as it now stands and carries the cut-off it was asked with. */
   const deps = (validFrom?: string): TokenDeps => ({
