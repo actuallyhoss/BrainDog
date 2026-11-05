@@ -260,6 +260,13 @@ public struct SignInView: View {
 
                 if !flow.saidOfPasskey { said }
 
+                Link(destination: Server.origin.appending(path: "signup")) {
+                    Text(Words.newHere)
+                        .font(Typeface.body)
+                        .foregroundStyle(Palette.ink2)
+                        .frame(maxWidth: .infinity)
+                }
+
                 HStack(spacing: Space.s3) {
                     Hairline()
                     Text(Words.or).font(Typeface.meta).foregroundStyle(Palette.ink3)

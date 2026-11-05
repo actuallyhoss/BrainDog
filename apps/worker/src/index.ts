@@ -106,6 +106,11 @@ import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, a
 import { HEALTHZ, healthz, type Night } from './health.ts';
 import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
 import { NOT_A_PERSON, turnstilePassed, turnstileSiteKey } from './turnstile.ts';
+
+/** The address Apple's reviewer signs in with, on a record of its own holding the invented demo data. */
+const APP_REVIEW_EMAIL = 'review@brain.dog';
+/** A BrainDog app's PKCE challenge, as `identity.ts` takes it: the base64url of a SHA-256. */
+const APP_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 import { cookieDomain, withSignedIn } from './signed-in.ts';
 import { bearerSent, operatorEmails, operatorOf, type OperatorSeen } from './operator.ts';
 import { applyDoor, notHere, opsApplications, opsInvite, type OpsApplyDeps } from './apply.ts';
@@ -253,6 +258,11 @@ type Env = {
    * `/auth/methods` says `not-configured` and every other `/auth` route is 404. Changing it signs everybody out.
    */
   SESSION_SECRET?: string;
+  /**
+   * Six digits Apple's reviewer signs in with, as `review@brain.dog`, while a version waits for review. A secret, set only
+   * for that long: `wrangler secret delete APP_REVIEW_CODE --env production` once it is approved (`identity.ts`, `review`).
+   */
+  APP_REVIEW_CODE?: string;
   /**
    * The operator's fleet-wide cut-off, a secret: an ISO instant such as 2026-09-25T12:00:00Z before which every agent
    * token and device grant is refused (53 §5.11). Unset is the epoch; unreadable refuses every bearer (`cut-off.ts`).
@@ -2861,6 +2871,7 @@ export class Directory$ extends DurableObject<Env> {
             mac,
             ...(passkeys ? { rp: passkeys } : {}),
             magic: Boolean(this.env.AUTH_MAIL_FROM && this.env.EMAIL),
+            ...(/^\d{6}$/.test(this.env.APP_REVIEW_CODE ?? '') ? { review: { email: APP_REVIEW_EMAIL, code: this.env.APP_REVIEW_CODE ?? '' } } : {}),
             /* The reason a sign-in failed, for the operator's tail. A flow and a word, never who or with what. */
             /* A COOKIE THAT NAMES NO LIVE SESSION IS NO FAULT (`why: 'session'`): it ran out or was signed out, it is told to clear itself, and the person signs in. */
             log: (line) => op({ op: 'auth', flow: line.flow, ok: false, why: line.reason }, line.reason === 'session' ? 'info' : 'error'),
@@ -5365,7 +5376,11 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
   const ip = request.headers.get('cf-connecting-ip') ?? '';
   if (request.method === 'POST' && signupPath === '/auth/magic/start') {
     const body = botCheckKeyed(env) ? ((await request.clone().json().catch(() => null)) as Record<string, unknown> | null) : null;
-    if (!(await turnstilePassed(env, body?.['turnstile'], ip, 'magic')))
+    /* A BRAINDOG APP HAS NO PAGE TO DRAW THE WIDGET ON, so with the check on no iPhone or Mac could ever sign in. Its
+       request carries a PKCE challenge instead, and the Directory holds those to a tighter count per mailbox
+       (`APP_LETTERS`), on top of the per-address limit. A letter only ever goes to somebody who already has an account. */
+    const fromApp = typeof body?.['app'] === 'string' && APP_CHALLENGE.test(body['app']);
+    if (!fromApp && !(await turnstilePassed(env, body?.['turnstile'], ip, 'magic')))
       return signupRefused(403, { code: 'FORBIDDEN', fix: NOT_A_PERSON, at: 'turnstile' });
   }
   const served = await serveAuth(request, {

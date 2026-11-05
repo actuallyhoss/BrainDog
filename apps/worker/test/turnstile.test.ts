@@ -144,6 +144,10 @@ test('SIGN-IN LINK: REFUSED WITHOUT A GOOD ANSWER WHEN KEYED, METHODS HANDS THE 
     assert.equal(((await bad.json()) as Out).refusal?.at, 'turnstile');
     assert.ok((await send({ turnstile: GOOD })).status < 400);
     assert.deepEqual(site.asked, [{ secret: SECRET, response: GOOD, remoteip: '198.51.100.9' }]);
+    /* A BRAINDOG APP CANNOT DRAW THE WIDGET: its PKCE challenge stands in, and only a real one's shape does. */
+    assert.ok((await send({ app: 'c'.repeat(43) })).status < 400);
+    assert.equal((await send({ app: 'short' })).status, 403);
+    assert.equal(site.asked.length, 1);
   } finally {
     await keyed.close();
   }

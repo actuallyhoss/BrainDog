@@ -9,6 +9,7 @@ public enum Words {
     public static let signInTitle = "Sign in to BrainDog"
     public static let signInLede = "Email or a passkey."
     public static let withPasskey = "Use a passkey"
+    public static let newHere = "New here? Create your account"
     public static let waitingForPasskey = "Waiting for your passkey"
     public static let passkeyCancelled = "Sign-in was cancelled. Nothing changed."
     public static let emailLabel = "Email"

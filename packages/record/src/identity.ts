@@ -69,6 +69,12 @@ export type AuthConfig = {
   mac: Uint8Array;
   rp?: { id: string; origin: string; origins?: readonly string[] };
   magic: boolean;
+  /**
+   * APPLE'S REVIEWER HAS NO MAILBOX TO READ. Only while the host sets this (`APP_REVIEW_CODE`, a secret, removed once a
+   * version is approved), a BrainDog app asking to sign in as this one address gets these six digits instead of random
+   * ones and no letter goes out. Everything else is the sign-in everyone has: the PKCE verifier, ten minutes, five tries.
+   */
+  review?: { email: string; code: string };
   key?: { serverKey: string };
   log?: (line: { flow: Flow; reason: Reason }) => void;
   admits?: (record: string, person: string) => boolean | Promise<boolean>;
@@ -141,6 +147,11 @@ const APP_LABEL = 'BrainDog app';
 export type Rule = { most: number; window: number };
 /** A way in, or sending a link: ten in fifteen minutes (`49 §5.5`, amended below). */
 const SIGN_IN: Rule = { most: 10, window: WINDOW };
+/**
+ * LETTERS ONE MAILBOX CAN BE SENT FROM A BRAINDOG APP, which cannot draw the bot check the web's sign-in sits behind, so
+ * its request carries a PKCE challenge in place of a Turnstile answer. Anyone can send a challenge, so this is tighter.
+ */
+const APP_LETTERS: Rule = { most: 6, window: 60 * MINUTE };
 /** Minting a passkey challenge: thirty a minute from one address, `chal:<ip>`. */
 const CHALLENGES: Rule = { most: 30, window: MINUTE };
 /**
@@ -1078,7 +1089,8 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         const email = text(call.email).trim();
         const linkToken = fresh();
         const challenge = typeof call.app === 'string' && CHALLENGE.test(call.app) ? call.app : null;
-        const appCode = challenge === null ? null : sixDigits();
+        const forReview = challenge !== null && config.review !== undefined && email.toLowerCase() === config.review.email;
+        const appCode = challenge === null ? null : forReview && config.review ? config.review.code : sixDigits();
         const [hash, codeMac] = await Promise.all([hmac('l:', linkToken), appCode === null ? null : hmac('a:', `${challenge}.${appCode}`)]);
         const stop = reserve(flow, `mint:${ipBucket(text(call.ip))}`, now);
         if (stop) return stop;
@@ -1090,7 +1102,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           return { status: 200, body: {} };
         }
         /* `reserve` has told the log why (`locked`, or `reserve` when the table failed); either way nothing is sent. */
-        if (reserve(flow, mailKey(person.email), now)) return { status: 200, body: {} };
+        if (reserve(flow, mailKey(person.email), now, challenge === null ? SIGN_IN : APP_LETTERS)) return { status: 200, body: {} };
         sql.transactionSync(() => {
           sql.exec('DELETE FROM dir_link WHERE expires <= ?', now);
           sql.exec('INSERT INTO dir_link (hash, person, purpose, expires) VALUES (?, ?, ?, ?)', hash, person.id, 'magic', now + MAGIC_LIFE);
@@ -1106,6 +1118,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
             );
           }
         });
+        if (forReview) return { status: 200, body: {} };
         return { status: 200, body: {}, mail: { to: person.email, linkToken, ...(appCode === null ? {} : { appCode }) } };
       }
 
