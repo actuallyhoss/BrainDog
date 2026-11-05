@@ -52,3 +52,34 @@ test('a queue\'s "N more" is said and not linked where only links away are drawn
   assert.match(html, /<p class="queue-more">/u);
   assert.match(toHTML([block]), /<a class="queue-more" href="\/r\/suggestion">/u);
 });
+
+test('WORDS THAT READ AS ANOTHER ADDRESS ARE DRAWN AS WHERE THE LINK GOES, so a record\'s text cannot promise one host and send a press to another', async () => {
+  const { linkMisleads } = await import('./inline.ts');
+  const shown = (t: string) => {
+    const [link] = inline(t);
+    assert.equal(link?.type, 'link');
+    return (link as { body: { text?: string }[] }).body[0]?.text;
+  };
+  for (const [words, to] of [
+    ['https://yourbank.com', 'https://evil.example/?d=secret'],
+    ['yourbank.com', 'https://evil.example/'],
+    ['www.yourbank.com/login', 'https://yourbank.com.evil.example/'],
+    ['pаypal.com', 'https://paypal.com/'], // a Cyrillic а: a different host, whatever it looks like
+    ['ceo@yourbank.com', 'mailto:someone@evil.example'],
+  ] as const) {
+    assert.equal(linkMisleads(words, to), true, words);
+    assert.equal(shown(`[${words}](${to})`), to, words);
+  }
+  for (const [words, to] of [
+    ['the plan', 'https://example.com/'],
+    ['Renew now', 'https://example.com/'],
+    ['example.com', 'https://example.com/x'],
+    ['www.example.com', 'https://example.com/'],
+    ['example.com', 'https://docs.example.com/'],
+    ['https://docs.example.com/a', 'https://example.com/'],
+    ['report.pdf', 'https://files.example/report.pdf'],
+    ['ada@example.com', 'mailto:Ada@example.com?subject=hi'],
+    ['v1.2', 'https://example.com/'],
+  ] as const) assert.equal(linkMisleads(words, to), false, words);
+  assert.equal(shown('[the plan](https://example.com/)'), 'the plan');
+});

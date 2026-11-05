@@ -164,6 +164,44 @@ export function safeHref(href: string): string | null {
   return null;
 }
 
+/** A name that reads as somebody's address: `https://…`, `www.…` or a host under a common ending, never `report.pdf`. */
+const READS_AS_HOST = /^(?:(?:https?:\/\/)(?:[^\s/@]+@)?|www\.)?((?:[\p{L}\p{N}-]+\.)+[\p{L}\p{N}-]+)(?:[:/?#]\S*)?$/iu;
+const COMMON_ENDINGS = /\.(?:com|net|org|io|co|app|dev|gov|edu|bank|info|biz|xyz|online|site|shop|uk|us|eu|de|fr|ca|au|in|eg|ae|sa|br|jp|cn|ru)$/iu;
+const SCHEMED = /^(?:https?:\/\/|www\.)/iu;
+const READS_AS_MAIL = /^(?:mailto:)?([^\s@]+@[^\s@]+)$/iu;
+
+/**
+ * Whether a link's words name an address it does not go to: `[https://yourbank.com](https://evil.example/?d=x)`.
+ *
+ * WORDS THAT READ AS AN ADDRESS ARE A PROMISE ABOUT WHERE A PRESS GOES, and a record's text is written by agents, doors
+ * and strangers. So such a link is drawn as where it really goes (see `tokens`). A subdomain either way is the same place;
+ * ordinary words, however they read, promise nothing, and `report.pdf` is a file's name and not a host. A host written in
+ * another alphabet to look like a known one counts as its own host, so it is never the same as the Latin one.
+ */
+export function linkMisleads(label: string, href: string): boolean {
+  const said = label.trim();
+  const mail = READS_AS_MAIL.exec(said);
+  if (mail) return !/^mailto:/iu.test(href) || href.slice('mailto:'.length).split('?')[0]!.toLowerCase() !== mail[1]!.toLowerCase();
+  const named = READS_AS_HOST.exec(said);
+  if (!named || (!SCHEMED.test(said) && !COMMON_ENDINGS.test(named[1]!))) return false;
+  if (!/^https:\/\//iu.test(href)) return true;
+  let to: string;
+  try {
+    to = new URL(href).hostname.toLowerCase();
+  } catch {
+    return true;
+  }
+  /* AS THE BROWSER WILL READ IT, so a look-alike in another alphabet is its punycode, which equals no Latin host. */
+  let host: string;
+  try {
+    host = new URL(`https://${named[1]!}`).hostname.toLowerCase();
+  } catch {
+    return true;
+  }
+  const bare = (h: string): string => h.replace(/^www\./u, '');
+  return !(bare(to) === bare(host) || to.endsWith(`.${bare(host)}`) || host.endsWith(`.${bare(to)}`));
+}
+
 /** A safe address as `opts` draw it: `null` for one that stays in the record where only links away are drawn (`links`). */
 export const drawnLink = (href: string | null, opts: Pick<InlineOptions, 'links'>): string | null =>
   href !== null && opts.links === 'away' && !/^(?:https:\/\/|mailto:)/iu.test(href) ? null : href;
@@ -458,7 +496,8 @@ function tokens(text: string, opts: InlineOptions, held = false): Inline[] {
           const href = drawnLink(safe, opts);
           push();
           // A link the host cannot resolve is plain text, not a dead anchor (36 §13 D16).
-          if (href) out.push({ type: 'link', href, body: tokens(label, opts, held) });
+          // Words that read as another address are drawn as the address it goes to (`linkMisleads`).
+          if (href) out.push({ type: 'link', href, body: linkMisleads(label, href) ? [{ type: 'text', text: href }] : tokens(label, opts, held) });
           // A path into the record where only links away are drawn is its words, as the author wrote them (`links`).
           else if (safe) out.push(...tokens(label, opts, held));
           else out.push({ type: 'text', text: label });
