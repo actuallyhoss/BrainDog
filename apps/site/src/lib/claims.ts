@@ -106,7 +106,7 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'text-before-signup', said: 'This text is published here before sign-up opens.', where: 'legal.pending', state: 'not-yet' },
   { id: 'terms-meta', said: 'and its Terms of Service and Privacy Policy', where: 'meta.legal.description', state: 'true', flag: 'legal' },
   { id: 'support-before-signup', said: 'The support address is published here before sign-up opens.', where: 'support.mail.pending', state: 'not-yet' },
-  { id: 'issues-on-github', said: 'Report a fault as an issue, or ask in Discussions', where: 'support.github.body', state: 'true', flag: 'repo' },
+  { id: 'issues-on-github', said: 'Report a fault as an issue', where: 'support.github.body', state: 'true', flag: 'repo' },
   { id: 'no-shared-table', said: "apart from everyone else's", where: 'security.kept.facts.0.text', state: 'true' },
   { id: 'sealed-copies', said: 'Every night a copy is sealed to a key kept elsewhere', where: 'security.kept.facts.2.text', state: 'true' },
   { id: 'no-password', said: 'There is no password to steal.', where: 'security.kept.facts.3.text', state: 'true' },

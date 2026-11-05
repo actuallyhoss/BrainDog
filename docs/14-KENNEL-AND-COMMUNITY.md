@@ -117,15 +117,14 @@ Community is not a forum. It is the set of places a person can get unstuck and b
 | Surface | Where | Job | Cost |
 |---|---|---|---|
 | **GitHub Issues** | the repo | bugs, and the only place that promises a response | free |
-| **GitHub Discussions** | the repo | "how do I model X", pack ideas, show-and-tell. Searchable by Google, unlike Discord | free |
-| **The Kennel** | `app.brain.dog/api/kennel/v1/` (§1) | pack submissions and the operator's review; the conversation about one belongs in Discussions | free |
+| **The Kennel** | `app.brain.dog/api/kennel/v1/` (§1) | pack submissions and the operator's review; the conversation about one belongs in an issue | free |
 | **A changelog** | `brain.dog/changelog` | the single highest-leverage community artefact for a solo product: proof of life | a file |
 | Discord | later, if asked | real-time support is a commitment to be present. **Do not open one until there is somebody to talk to** | a real cost |
 
 ### Two community features inside the product
 
 **1 · Show-and-tell is a pack.** "Here is how I model my landlord business" is a `.pack.yaml` in
-a Discussions post. The community's artefacts are the product's extension format — that is the
+a Kennel submission. The community's artefacts are the product's extension format — that is the
 whole design paying off.
 
 **2 · A shared read-only link doubles as a landing page.** Tier 1 collaboration (a signed token
@@ -139,7 +138,7 @@ attacks the actual bottleneck.
 |---|---|
 | A forum we host | a support obligation and a spam surface, before there are users |
 | In-app social — profiles, follows, feeds | this is a private business record. The instinct to socialise it is wrong |
-| Public pack comments | Discussions already exists and is indexed by Google |
+| Public pack comments | GitHub Issues already exist and are indexed by Google |
 | A Discord before launch | an empty Discord is worse than none, and a busy one is a job |
 
 ---

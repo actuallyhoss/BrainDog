@@ -3,7 +3,7 @@
 
   EVERY CHANNEL HERE IS ONE THAT IS READ. The address is `SUPPORT_EMAIL`, which stays empty until the
   owner routes it to an inbox, and while it is empty the page says when it
-  arrives instead of printing an address nobody reads. GitHub's Issues and Discussions answer 404
+  arrives instead of printing an address nobody reads. GitHub's Issues answer 404
   while the repository is private, so they are listed only once `LAUNCH.repo` is on, last and the board's whole
   width, so the address and the checklist beside it stay a pair.
 
@@ -38,7 +38,6 @@
             body: [s.github.body],
             links: [
               { label: s.github.issues, href: `${repo}/issues` },
-              { label: s.github.discussions, href: `${repo}/discussions` },
             ],
           },
         ]),

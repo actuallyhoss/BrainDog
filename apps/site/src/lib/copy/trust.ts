@@ -63,9 +63,8 @@ export const trust = {
     /* Shown only when `LAUNCH.repo`: while the repository is private these addresses answer 404. */
     github: {
       title: 'On GitHub',
-      body: 'Report a fault as an issue, or ask in Discussions so the answer helps the next person too.',
+      body: 'Report a fault as an issue, and the answer helps the next person too.',
       issues: 'Open an issue',
-      discussions: 'Ask in Discussions',
     },
     report: {
       title: 'What to put in a report',
