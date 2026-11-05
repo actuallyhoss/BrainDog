@@ -722,7 +722,7 @@
       onclick={() => press(way)}
       >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span class="own-dir"
         ><span class="dc-btn-name">{amount !== null && way.key === primary ? amountAnswer(way.label, amount) : way.label}</span></span
-      >{#if way.recommended}<span class={lead && !compact ? 'dc-rec-in' : 'dc-sr'}>{queueWords.suggestedSaid}</span>{/if}</button
+      >{#if way.recommended}{#if lead && !compact}<span class="dc-rec-in">{queueWords.suggested}</span>{:else}<span class="dc-sr">{queueWords.suggestedSaid}</span>{/if}{/if}</button
     >
   {/each}
 {/snippet}

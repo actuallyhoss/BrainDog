@@ -2026,7 +2026,10 @@
     const r = el.getBoundingClientRect();
     const outside =
       e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
-    if (outside) dismiss();
+    if (outside) return dismiss();
+    /* A PRESS ON THE PANEL'S EMPTY PART KEEPS THE FIELD: it took focus to the dialog, and what was typed next went nowhere. */
+    const on = e.target instanceof Element ? e.target : null;
+    if (!on?.closest('button, a, input, textarea, select, summary, label, [role="menu"], [role="option"], [tabindex], [contenteditable]')) focusField();
   }
 </script>
 

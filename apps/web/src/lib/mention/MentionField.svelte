@@ -467,6 +467,7 @@
     aria-describedby={describedby}
     enterkeyhint="send"
     autocomplete="off"
+    {...{ autocorrect: 'off' }}
     spellcheck="true"
     {onkeydown}
     {onbeforeinput}

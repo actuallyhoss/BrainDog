@@ -523,6 +523,8 @@
   /* A CHART WITH NO "…" OF ITS OWN STANDS FOR THE LIST IT READS, and a bar on a grouped figure for the row it is the bar of. */
   const barRows = $derived(((block as FiguredBlock).parts?.groups?.length ?? 0) > 0);
   const chartThing = $derived.by(() => {
+    /* TODAY'S MONEY TILES STAND FOR MONEY: a right-click on Cash ahead's figure got WebKit's Look Up and Translate. */
+    if (!menuOn && (block.key === 'cash' || block.key === 'week-money')) return '/p/money';
     if (menuOn || !(block.kind === 'lines' || barRows)) return null;
     const list = listOfBlock(block as FiguredBlock);
     return list ? `/r/${list}` : null;
