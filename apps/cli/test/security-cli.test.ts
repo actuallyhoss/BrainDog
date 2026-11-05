@@ -130,7 +130,7 @@ test('update: a move from https to http is refused before that address is asked 
   const get = (async (url: string | URL, init?: RequestInit) => {
     asked.push(String(url));
     assert.equal(init?.redirect, 'manual', 'fetch was left to follow a move by itself');
-    return new Response(null, { status: 302, headers: { location: 'http://plain.example/braindog.mjs.build' } });
+    return new Response(null, { status: 302, headers: { location: 'http://insecure.example/braindog.mjs.build' } });
   }) as typeof fetch;
   const u = updateIo(dir, get);
   assert.equal(await update([], u.io), 1);

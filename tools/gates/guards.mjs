@@ -145,7 +145,8 @@ const SCOPED = ['guard', 'scoped'];
  * admits the runner principal every other guard refuses.
  */
 const IMPLIES = {
-  ADMIN: ['admin', 'team'],
+  /* `approvesDevice` is `admin` with the credential and the fresh proof a device needs on top of it. */
+  ADMIN: ['admin', 'team', 'approvesDevice'],
   KEYCHAIN: ['keychain'],
   JOBS: ['keychain', 'admin', 'runner'],
   'READ+': SCOPED,
@@ -268,7 +269,7 @@ export default function guards(
   /** The first authorisation call in a body, ignoring the comments that explain why it is that one. */
   const guardOf = (body) => {
     const stripped = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-    return /\b(admin|team|keychain|guard|scoped|runner)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
+    return /\b(admin|team|keychain|guard|scoped|runner|approvesDevice)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
   };
 
   /* ONE SENTENCE FOR AN ABSENT SURFACE, NOT EIGHTY-TWO. Without the file every route would land on
