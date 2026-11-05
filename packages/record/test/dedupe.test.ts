@@ -90,8 +90,14 @@ test('THE KEY A DECLARATION WRITES IS `dedupe:`, and the same event twice is one
   /* A KEY THAT NAMES NOTHING IS NOT A KEY — `§5.7` step 1 over an empty list, and `07 §3`'s
      `on_conflict: new` by construction. */
   assert.deepEqual(
-    await states(undefined, sms('EGP 1,250.00', 'BEANS COFFEE', '29/08/26', '88213'), sms('EGP 1,250.00', 'BEANS COFFEE', '29/08/26', '88213')),
+    await states(undefined, sms('EGP 1,250.00', 'BEANS COFFEE', '29/08/26', '88213'), sms('EGP 1,250.00', 'BEANS COFFEE', '29/08/26', '88214')),
     ['matched', 'matched'],
+  );
+
+  /* BUT THE SAME WORDS OF MONEY AGAIN ARE HELD FOR A PERSON, KEY OR NO KEY, and nothing is written (`heardBefore`). */
+  assert.deepEqual(
+    await states(undefined, sms('EGP 1,250.00', 'BEANS COFFEE', '29/08/26', '88213'), sms('EGP 1,250.00', 'BEANS COFFEE', '29/08/26', '88213')),
+    ['matched', 'review'],
   );
 });
 

@@ -556,6 +556,62 @@ export type IngestDeps = {
  */
 export { INBOX_RAW } from '@braindog/where';
 
+/** How long the same words from one sender are held to be the same message. A printed day makes it longer: see `heardBefore`. */
+const HEARD_WITHIN_MS = 30 * 86_400_000;
+
+/**
+ * WHEN THE SAME WORDS CAME BEFORE FROM THE SAME SENDER, for an arrival about to write money, or `null`.
+ *
+ * NEW BYTES CAN BE THE SAME MESSAGE. `UNIQUE (channel, sha256)` knows only the bytes: a signed bank alert stays signed when
+ * it is sent on, and its new envelope is a new hash; an SMS door hears whatever the holder of its token posts. The row's own
+ * `dedupe` holds those while the row stands and only when the pattern keys on a day the words print. So a debit he deleted
+ * as wrong came back on the next copy, and a text with no day in it was a new payment each time.
+ *
+ * MONEY ONLY, AND HELD RATHER THAN DROPPED. Elsewhere the same words twice are ordinary (a build that failed again), and two
+ * real payments can read the same where a bank prints no day, so a person looks and nothing is lost. SENDER AND WORDS, with
+ * white space taken out: a mail by its `From:` address, a door's text by its channel, since a text has no sender this could
+ * read (the token proves only who posted). What nobody verified never counts, so a forgery sent first cannot hold the real
+ * one back. A held arrival run again by a person is `stored`, and never reaches this. New words are a new message: a real
+ * alert somebody else received, with other words, is not stopped here.
+ */
+function heardBefore(deps: IngestDeps, arrival: Arrival, body: string, headers: Record<string, string>, register: string, extracted: Record<string, unknown>): string | null {
+  /* WHAT A STRANGER CAN SEND. A pull is this record asking, and a figure that has not moved reads the same each hour. */
+  if (arrival.channel !== 'email' && arrival.channel !== 'webhook') return null;
+  const fields = deps.schemaOf(register)?.fields ?? {};
+  if (!Object.keys(extracted).some((f) => fields[f]?.type === 'money')) return null;
+  const since = instant(deps.nowMs - HEARD_WITHIN_MS);
+  const bare = (words: string): string => words.replace(/[ \t\r\n]/gu, '');
+  if (arrival.channel === 'webhook') {
+    const blank = "replace(replace(replace(replace(body, ' ', ''), char(9), ''), char(10), ''), char(13), '')";
+    return (
+      deps.sql.one<{ ts: string }>(`SELECT ts FROM inbox_raw WHERE channel = ? AND ts >= ? AND state <> 'untriaged' AND ${blank} = ? ORDER BY ts DESC LIMIT 1`, arrival.channel, since, bare(body))?.ts ?? null
+    );
+  }
+  /* A MAIL IS STORED WHOLE, so its words are what follows its headers, and the two envelopes differ. */
+  const message = (raw: string): string => {
+    const end = /\r?\n\r?\n/u.exec(raw);
+    return bare(end === null ? raw : raw.slice(end.index + end[0].length));
+  };
+  const address = senderOf(headers.from).address.toLowerCase();
+  if (address === '') return null;
+  const words = message(body);
+  const same = deps.sql.all<{ ts: string; headers: string | null; body: string | null }>(
+    "SELECT ts, headers, body FROM inbox_raw WHERE channel = 'email' AND ts >= ? AND state <> 'untriaged' AND instr(lower(headers), ?) > 0 ORDER BY ts DESC LIMIT 200",
+    since,
+    address,
+  );
+  for (const row of same) {
+    let from: unknown;
+    try {
+      from = (JSON.parse(row.headers ?? '{}') as { from?: unknown }).from;
+    } catch {
+      continue;
+    }
+    if (typeof from === 'string' && senderOf(from).address.toLowerCase() === address && message(row.body ?? '') === words) return row.ts;
+  }
+  return null;
+}
+
 /**
  * The row an extraction is ABOUT, if the register already holds one. `43 §4.1`'s dedupe key.
  *
@@ -1430,6 +1486,17 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
       store('skipped', reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'skipped', { field: 'repeats', from: existing.id });
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason, repeats: existing.id });
+    }
+
+    /* THE SAME WORDS AGAIN, WITH NO ROW LEFT TO SAY SO (`heardBefore`): held for a person, and nothing written. */
+    if (!existing && !already) {
+      const before = heardBefore(deps, arrival, body, headers, register, extracted);
+      if (before !== null) {
+        const reason = `The same words from this sender came on ${before.slice(0, 10)}, so this waits to be looked at and is not filed again.`;
+        store('review', reason);
+        note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'review');
+        return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason, confidence: 'needs-review' });
+      }
     }
 
     /**

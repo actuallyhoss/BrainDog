@@ -161,3 +161,78 @@ test('A WEBHOOK DOOR IS NOT ASKED: ITS TOKEN NAMES ITS ONE SENDER', async () => 
   assert.equal(lastInbox(sql).state, 'matched');
   assert.equal(ledger(sql).length, 1);
 });
+
+/**
+ * THE SAME ALERT AGAIN. A signed mail stays signed when it is sent on, so a new envelope is new bytes and the arrival's hash
+ * does not know it, and an SMS door hears whatever the token's holder posts. While the row stands the dedupe holds. These
+ * are the ways round it: the row was deleted, and a pattern that keys on no day the words hold.
+ */
+test('THE SAME WORDS FROM THE SAME SENDER ARE HELD, NOT FILED AGAIN, THOUGH THE ROW THEY MADE IS GONE', async () => {
+  const { api, sql, post } = await stand();
+  const bank = await keyed('bank.example');
+  await post(bank, 'Bank <alerts@bank.example>', CHARGE('12.00', 'FIRST SHOP'));
+  const [asked] = openQuestions(sql);
+  said(await api.decide({ id: asked!.id, decide: { option: 'accept' } } as never, owner));
+  assert.equal(ledger(sql).length, 1);
+
+  /* NEW BYTES, THE ROW STILL THERE: as ever, the row's own dedupe sets it aside. */
+  await post(bank, 'Bank <alerts@bank.example>', CHARGE('12.00', 'FIRST SHOP'));
+  assert.equal(lastInbox(sql).state, 'skipped');
+  assert.equal(ledger(sql).length, 1);
+
+  /* HE DELETED IT AS WRONG, AND IT COMES AGAIN, spaced differently: nothing goes back on the ledger, and it waits to be looked at. */
+  sql.exec("UPDATE entry SET deleted_at = '2026-09-20T12:00:00.000Z' WHERE register = 'transactions'");
+  await post(bank, 'Bank <alerts@bank.example>', ` ${CHARGE('12.00', 'FIRST SHOP')}\r\n\r\n`);
+  assert.equal(lastInbox(sql).state, 'review');
+  assert.match(lastInbox(sql).reason ?? '', /same words from this sender/u);
+  assert.deepEqual(ledger(sql), []);
+
+  /* ANOTHER ADDRESS SAYING THE SAME WORDS IS NOT A REPEAT, and is asked about as any new address is. Nor is another amount. */
+  await post(bank, 'Bank <someone-else@bank.example>', CHARGE('12.00', 'FIRST SHOP'));
+  assert.equal(lastInbox(sql).state, 'proposed');
+  await post(bank, 'Bank <alerts@bank.example>', CHARGE('12.50', 'FIRST SHOP'));
+  assert.equal(lastInbox(sql).state, 'matched');
+  assert.equal(ledger(sql).length, 1);
+});
+
+test('A TEXT PASTED AGAIN AT THE SMS DOOR IS HELD; ONE NOBODY VERIFIED MAKES NO REPEAT OF THE REAL ONE; PAST THE WINDOW IT IS NEW', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
+  sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_1', 'owner@owner.example', 'The owner')");
+  sql.exec("INSERT OR REPLACE INTO member (person_id, register, level) VALUES ('p_1', '*', 'owner')");
+  for (const id of FIRST_PARTY) await put(api, firstPartyDocument(id));
+  said(api.kernel.create('accounts', { name: 'Company card', kind: 'card', balance: { amount: 0, currency: 'GBP' }, as_of: '2026-09-20', liquid: false } as never, { actor: 'p_1', principal: { kind: 'person' } } as never));
+  /* A BANK WHOSE TEXT HOLDS NO DAY AND A PATTERN WITH NO KEY, so nothing but the words can tell. A person's own pattern can be this. */
+  await put(api, {
+    pack: 'plain-bank',
+    version: '1.0.0',
+    title: 'Plain bank',
+    author: 'Nobody',
+    license: 'MIT',
+    summary: 'Texts with no day in them.',
+    declarations: [
+      {
+        ingest: 'plain-bank-sms',
+        channel: 'webhook',
+        verify: { kind: 'path' },
+        match: { field: 'body', contains: 'spent' },
+        extract: { what: { text: { after: ' at ' } }, amount: { money: { after: 'spent ', currency: 'GBP' } } },
+        writes: { register: 'transactions', confidence: 'exact', set: { direction: 'out', state: 'cleared', on: '2026-09-20', account: 'accounts#1' } },
+        on_conflict: 'new',
+      },
+    ],
+  });
+  const text = 'You spent GBP 40.00 at A SHOP';
+  const arrive = async (sha256: string, verified = true) =>
+    said<{ state: string; wrote: unknown[] }>(await api.arrive({ channel: 'webhook', ingest: 'plain-bank-sms', body: text, sha256, verified } as never));
+  /* A FORGERY FIRST: stored, read by nobody, and the genuine text after it still files. */
+  assert.equal((await arrive('a'.repeat(64), false)).state, 'untriaged');
+  const first = await arrive('b'.repeat(64));
+  assert.ok(first.state !== 'untriaged' && first.state !== 'review', JSON.stringify(first));
+  const before = ledger(sql).length;
+  assert.equal((await arrive('c'.repeat(64))).state, 'review');
+  assert.equal(ledger(sql).length, before, 'a repeat writes nothing');
+  clock.advance(31 * 86_400_000);
+  assert.notEqual((await arrive('d'.repeat(64))).state, 'review');
+});
