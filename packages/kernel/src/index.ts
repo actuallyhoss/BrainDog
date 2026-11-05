@@ -865,6 +865,7 @@ export {
 } from './script-run.ts';
 export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEY_OPENED_UNATTENDED, KEY_OPENED_UNATTENDED_PASSPHRASE, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, grantChosen, heldHost, hostOpened, keyOutOfScope, keyScopeOf, originsOf, reserveFor, type KeyOutOfScope } from './actions.ts';
 export { pinHost } from './keychain.ts';
+import { pinHost as holdKeyToHost } from './keychain.ts';
 /* RUN NOW (`nudge.ts`): an action's waiting run moved to now, at most once a minute an action and twenty an hour a record. */
 export { nudgeAction, nudgeRate, NUDGE_ACTION_MS, NUDGE_RECORD_MOST, NUDGE_RECORD_MS, NUDGE_FIELD, type NudgeDeps, type Nudged } from './nudge.ts';
 export type {
@@ -11493,6 +11494,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * `null` for fine, otherwise the code and the sentence. The row is looked at, never its bytes.
      */
     keyReady: (name: string, paged = false): KeyNotReady | null => keyReady(sql, name, paged),
+    /** Hold a key whose entry names no host to the host a press just approved, in the caller's transaction (`pinHost`). */
+    pinHost: (label: string, host: string, actor: string): Result<{ id: string; host: string; pinned: boolean }> => holdKeyToHost(sql, label, host, clock.now(), actor),
 
     /** A row by its title, for a row id or spoken id: how a plan names the project an action runs for. */
     titleOfRow: (ref: string): string | null => titleOfRow(ref),

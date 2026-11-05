@@ -830,6 +830,11 @@ export type Host = {
    * either, so it says which and what to do about it.
    */
   keyReady?: (name: string, paged: boolean) => { code: 'REQUIRED_MISSING' | 'OUT_OF_BOUNDS'; fix: string } | null;
+  /**
+   * Hold a key whose entry names no host to the host this press approved, inside the install's transaction (the kernel's
+   * `pinHost`). An entry that names one is left as it is. Absent on a host with no keychain.
+   */
+  pinKey?: (label: string, host: string) => void;
 };
 
 /* ── reading the document ────────────────────────────────────────────────── */
@@ -4229,6 +4234,10 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
 
       /* THE SKILLS IT GIVES, after the plan named them: each into Skills unless the record holds one by that name. A host
          that cannot write one skips it, and the install goes on. */
+      /* WHAT THE LINE PROMISED, "This key will be sent to X only from now on", in the press that approved it. Decide's
+         `change` and `pattern` did this and an install did not, so the entry kept its words and the next add-on could carry
+         the key elsewhere. A script's line makes no such promise: a key that names no host goes nowhere from a script. */
+      for (const c of diff.calls_out) if (c.change !== 'same' && c.channel !== 'script' && c.grant !== null && c.host !== null) host.pinKey?.(c.grant, c.host);
       let skillsGiven = 0;
       for (const skill of filled.manifest.skills ?? []) if (host.giveSkill?.(skill, pack.manifest.pack) === true) skillsGiven += 1;
 

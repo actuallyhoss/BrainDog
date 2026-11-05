@@ -3975,6 +3975,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
     claimed: (pack) => kernel.packClaims(pack),
     keyReady: (name, paged) => kernel.keyReady(name, paged),
+    pinKey: (label, host) => {
+      kernel.pinHost(label, host, actorOf(ctx));
+    },
   });
 
   /** After an install or a switch-on by `ctx`: each add-on with a part waiting, planned again once (`arrange.ts` `planAgain`). */
