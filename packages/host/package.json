@@ -13,6 +13,7 @@
     "./infer": "./src/infer.ts",
     "./abuse": "./src/abuse.ts",
     "./limits": "./src/limits.ts",
+    "./log-floor": "./src/log-floor.ts",
     "./model-jobs": "./src/model-jobs.ts",
     "./oauth": "./src/oauth.ts",
     "./script": "./src/script.ts",

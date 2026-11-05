@@ -74,7 +74,7 @@ test("A HANDLER'S EXCEPTION IS IN THE LOG AND NOT IN THE ANSWER", async () => {
   assert.equal(line.op, 'crash');
   assert.equal(line.ref, ref, 'the log line is found by the reference the caller was given');
   assert.equal(line.where, '/api/boot');
-  assert.match(String(line.error), /SQLITE_AUTH: not authorized, row alice@example\.com/);
+  assert.match(String(line.error), /SQLITE_AUTH: not authorized, row \[an address\]/);
 });
 
 test('crashed MINTS A NEW REFERENCE EACH TIME AND WRITES THE LINE TO THE LOG IT IS GIVEN', () => {

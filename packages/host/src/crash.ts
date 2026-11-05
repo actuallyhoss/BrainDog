@@ -13,6 +13,10 @@
  * values out of log lines and a driver's sentence can hold one. Until it is settled, the default is the one built here: the sentence is the one thing that diagnoses a crash, so it is logged, and
  * it is never answered.
  *
+ * THE REASON GOES THROUGH THE FLOOR (`log-floor.ts`), which settles what follows from the open question above for keys
+ * and addresses: the sentence stays, and what is shaped like either does not. This is the one line in the tree that is
+ * built to hold whatever was thrown, so it holds it through the floor even on a host that has not installed it.
+ *
  * ONE FUNCTION FOR EVERY DOOR. `serveApi` calls it here; the Worker's router and the self-host's outer catch are the
  * other two places a crash is answered, and the reason this module exists apart from `index.ts` is that
  * three doors answering a crash three ways is the drift `index.ts`'s header is about.
@@ -22,26 +26,13 @@
  * would be a second clock that can disagree with theirs.
  */
 
+import { reasonOf } from './log-floor.ts';
+
 /** Where a crash's line goes. `console.error` unless a test hands in its own. */
 export type CrashLog = (line: string) => void;
 
 /** The 500's body: the envelope every answer has, with a sentence the caller can quote and nothing else. */
 export type Crashed = { ok: false; refusal: { code: 'INTERNAL'; fix: string } };
-
-/**
- * The thrown thing, as a line of text, and never a throw of its own.
- *
- * `String(e)` CAN THROW: an object whose `toString` throws is a value a handler can throw, and this runs inside the
- * last catch before the socket, where anything that escapes is the hung request `serveApi`'s header describes.
- */
-function reasonOf(e: unknown): string {
-  try {
-    if (e instanceof Error) return `${e.name}: ${e.message}`;
-    return String(e);
-  } catch {
-    return `a thrown ${typeof e} that could not be turned into text`;
-  }
-}
 
 /**
  * Log a crash under a new reference, and answer the envelope that carries only the reference.

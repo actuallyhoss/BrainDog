@@ -90,8 +90,12 @@ marketing site), always with `--env production` for the live deployment.
 A log line carries the code, the id and the shape, never a field value, a credential, a prompt or a payload (12 §8;
 35 §2). Every line the Worker writes is one JSON object with `op` first, written by `op()` in
 `apps/worker/src/oplog.ts`, which also replaces anything shaped like an address and cuts a string at 300 characters, so
-a caller who slips cannot publish a person's words. Workers Logs keeps them (`observability.enabled` in
-`apps/worker/wrangler.jsonc`). The lines an operator reads:
+a caller who slips cannot publish a person's words. Under that, `installLogFloor` (`packages/host/src/log-floor.ts`)
+takes every console line either host writes, whoever wrote it, and strikes what is shaped like a key, an address, a query
+string or a regular expression a runtime quoted, and cuts it at 2,000 characters; `crashed` and the ops mail read through
+the same floor, and an alarm or a cron that throws is thrown on with its words floored, because the platform logs what
+escapes. No list of shapes is every key, so a line still carries no value on purpose. Workers Logs keeps them
+(`observability.enabled` in `apps/worker/wrangler.jsonc`). The lines an operator reads:
 
 | `op` | Emitted | Fields |
 |---|---|---|

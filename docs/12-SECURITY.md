@@ -431,7 +431,8 @@ FOR" is structural rather than remembered.
    anything itself — it has no outbound calls — so it reminds you, with a link to the dashboard
    that can.
 5. **Secrets never enter a log, a telemetry blob, a push payload or a model prompt.** Asserted by
-   a test that greps every write path.
+   a test that greps every write path. And a floor under every console line on both hosts (`log-floor.ts`), because
+   the line that once carried a key's bytes to the logs named no key: it was a runtime's sentence quoting a pattern.
 6. **Ciphertext stays ciphertext in exports.** `grant` rows travel sealed by default; `--redact-grants`
    drops them — [03-DOG-FORMAT](03-DOG-FORMAT.md) §5 and §8 below.
 7. **The Keychain is its own RPC group.** `listGrants` · `openGrant` · `bindGrant` · `revokeGrant` are the

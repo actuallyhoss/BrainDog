@@ -37,6 +37,7 @@ import { argv, env, exit, stderr } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { deriveSessionKey } from '@braindog/host/auth';
+import { installLogFloor } from '@braindog/host/log-floor';
 
 import { createRecordApi } from '@braindog/record';
 import { createDirectory } from '@braindog/record/directory';
@@ -953,6 +954,10 @@ function help(): void {
  * own message is the first line of it, which is the part somebody can act on.
  */
 const [, , command = 'serve', ...rest] = argv;
+/* EVERY LINE THE SERVER WRITES THROUGH THE CONSOLE (`log-floor.ts`). `say` writes this command's own sentences, a first run's
+   link among them, past it and on purpose. */
+installLogFloor();
+
 try {
   /* AN IMAGE THAT CARRIES A SECRET DOES NOT START (`baked.ts`): a backup, a key file or a token in a layer is in every
      copy of the image, and serving from it would make it look fine. Its own data folder is never counted. */

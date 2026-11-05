@@ -152,7 +152,11 @@ import { opsPlan, type OpsPlanDeps } from './ops-plan.ts';
 import { stripeOf } from './stripe.ts';
 /* TELEMETRY: one Analytics Engine point per request, when `TELEMETRY` is bound. */
 import { telemetry } from './telemetry.ts';
+import { flooredError, installLogFloor, reasonOf } from '@braindog/host/log-floor';
 import { readSetup } from '@braindog/slash/propose';
+
+/* FIRST THING THE ISOLATE DOES, so no line any code here writes misses it, a library's and a thrown sentence's included (`log-floor.ts`). */
+installLogFloor();
 
 /** What a record answers between arming a restore and being reset: the gap between `51 D15`'s two calls. */
 const RESTORING: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'BrainDog is restoring a copy. Try again in a minute.', at: 'record' };
@@ -885,7 +889,13 @@ export class Record$ extends DurableObject<Env> {
    * record live here and nowhere the sandbox can reach, and a run id this object did not open answers with a refusal.
    */
   async script(run: string, call: ScriptCall): Promise<ScriptReply> {
-    return this.#scripts.answer(run, call);
+    /* NOTHING THROWN HERE CROSSES AS IT WAS SAID. What this answers reaches a person's script, which may read it and send it
+       on, and a throw past it goes in the logs, and the host's own code held a key a moment ago (`log-floor.ts`). */
+    try {
+      return await this.#scripts.answer(run, call);
+    } catch (e) {
+      return { error: reasonOf(e) };
+    }
   }
 
   #record(): Promise<RecordApi> {
@@ -1228,6 +1238,9 @@ export class Record$ extends DurableObject<Env> {
     this.#alarming = true;
     try {
       await this.#alarmPass();
+    } catch (e) {
+      /* STILL THROWN, SO IT IS STILL RETRIED, with its words floored: the platform logs what an alarm throws. */
+      throw flooredError(e);
     } finally {
       this.#alarming = false;
     }
@@ -3864,7 +3877,10 @@ export default {
     } catch (e) {
       op({ op: 'door', swept: false, error: e instanceof Error ? e.message : String(e) }, 'error');
     }
-    await nightly(env);
+    /* A NIGHT THAT THROWS IS STILL RED, with its words floored: the platform logs what a cron throws. */
+    await nightly(env).catch((e: unknown) => {
+      throw flooredError(e);
+    });
   },
 
   /**

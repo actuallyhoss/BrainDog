@@ -20,6 +20,8 @@
  * hand it an object literal for the binding.
  */
 
+import { floored } from '@braindog/host/log-floor';
+
 import { MAIL_PALETTE } from './mail-palette.ts';
 import { op, type OpValue } from './oplog.ts';
 
@@ -1002,7 +1004,8 @@ export async function opsAlert(
       op({ op: 'mail', kind: `ops.${kind}`, ok: false, why: binding === null ? 'no-binding' : 'no-sender' }, 'error');
       return false;
     }
-    const said = OPS_FIELDS.flatMap((key) => (fields[key] == null ? [] : [`${key}: ${String(fields[key]).slice(0, 200)}`]));
+    /* THROUGH THE FLOOR, BECAUSE A MAIL IS A LOG THAT LEAVES (`log-floor.ts`): `why` can be a thrown sentence. */
+    const said = OPS_FIELDS.flatMap((key) => (fields[key] == null ? [] : [`${key}: ${floored(String(fields[key])).slice(0, 200)}`]));
     const text = [
       `The app Worker wrote an op: ${kind} line.`,
       '',
