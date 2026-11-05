@@ -122,6 +122,12 @@ Target: `master`. Enforcement: active.
       can read repository state.
 - [ ] **Fork pull requests get no secrets.** This is GitHub's default; confirm nothing has changed
       it, and confirm no workflow uses `pull_request_target`.
+- [ ] **Actions off at the repository level until there is a reason to run them.** A workflow file disabled by name
+      does not stop a new one: a fork's pull request can add a file and run it once approved. *Settings → Actions →
+      General → Disable actions*, or `gh api -X PUT repos/<owner>/<repo>/actions/permissions -F enabled=false`. When they
+      come back on, `ci.yml` and `codeql.yml` are the two a fork may reach, and `tools/gates/public-repo.mjs` holds what
+      those may do.
+- [ ] **Require actions pinned to a full commit sha** at the setting too, not only in the files.
 - [ ] **Artifact and log retention: 30 days.** Screenshots are artefacts for a human, and a
       failure's screenshots stop being useful long before ninety days.
 
@@ -130,6 +136,8 @@ Target: `master`. Enforcement: active.
 - [ ] **A `production` environment exists**, and `deploy.yml` names it.
 - [ ] **Deployment branch policy: `master` only.**
 - [ ] **Required reviewer on `production`.** One click before anything reaches customers' records.
+- [ ] **No deploy secret on GitHub while deploys run from a machine.** A token nothing here reads is a token that can
+      only leak. Delete it, and set it again the day a workflow deploys.
 - [ ] **`CLOUDFLARE_API_TOKEN` is an *environment* secret on `production`**, not a repository secret.
       A repository secret is readable by any workflow that asks; an environment secret is readable by
       a job that named the environment and passed its rules.
@@ -144,6 +152,9 @@ Target: `master`. Enforcement: active.
 
 ## 9 · Publishing
 
+- [ ] **Both names held on npm before the repository is public.** The README and the seed say `braindog` and
+      `braindog-render` out loud, and a name nobody holds goes to whoever publishes first. Publish `0.0.0` from the
+      maintainer's account, with two-factor on, then set trusted publishing.
 - [ ] **npm trusted publishing configured** for `braindog-render` and `braindog`, bound to this
       repository and to `tag.yml`. Provenance is then automatic and needs no `--provenance` flag.
 - [ ] **No classic npm token exists** on the maintainer's npm account. Delete any that do; a token

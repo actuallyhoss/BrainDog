@@ -27,9 +27,10 @@ const green = () => ({
   } },
   '/rules/branches/master': { status: 200, body: [{ type: 'deletion' }, { type: 'non_fast_forward' }] },
   '/private-vulnerability-reporting': { status: 200, body: { enabled: true } },
-  '/actions/variables/CI_RUNNER': { status: 200, body: { name: 'CI_RUNNER', value: 'ubuntu-latest' } },
+  '/actions/permissions': { status: 200, body: { enabled: true, allowed_actions: 'selected', sha_pinning_required: true } },
+  '/actions/permissions/workflow': { status: 200, body: { default_workflow_permissions: 'read', can_approve_pull_request_reviews: false } },
   '/actions/runners?per_page=1': { status: 200, body: { total_count: 0, runners: [] } },
-  '/environments/production': { status: 200, body: { name: 'production', protection_rules: [{ type: 'branch_policy' }] } },
+  '/environments/production': { status: 200, body: { name: 'production', protection_rules: [{ type: 'branch_policy' }], deployment_branch_policy: { custom_branch_policies: true } } },
   '/dependabot/alerts?state=open&severity=high,critical&per_page=100': { status: 200, body: [] },
 });
 
@@ -52,14 +53,14 @@ const lineOf = (out, says) => out.split('\n').find((l) => l.includes(says)) ?? '
 test('a repository as decided is green, one line a setting', async () => {
   const { code, lines, out } = await run(green());
   assert.equal(code, 0, out);
-  assert.equal(lines.filter((l) => /^\s+ok\s/.test(l)).length, 12, out);
+  assert.equal(lines.filter((l) => /^\s+ok\s/.test(l)).length, 14, out);
   assert.ok(!/MISS|WAIT/.test(out), out);
   assert.match(out, /0 missed, 0 waiting/);
 });
 
 test('every question is a GET to api.github.com, the token in one header, a redirect refused', async () => {
   const { sent } = await run(green());
-  assert.equal(sent.length, 7);
+  assert.equal(sent.length, 8);
   for (const { url, init } of sent) {
     assert.equal(new URL(url).origin, 'https://api.github.com');
     assert.equal(init.method, 'GET');
@@ -78,8 +79,11 @@ const drifts = [
   ['push protection off', (t) => { t[''].body.security_and_analysis.secret_scanning_push_protection = { status: 'disabled' }; }, 'push protection is on', 'GitHub says disabled'],
   ['validity checks off', (t) => { t[''].body.security_and_analysis.secret_scanning_validity_checks = { status: 'disabled' }; }, 'validity checks are on', 'GitHub says disabled'],
   ['private reporting off', (t) => { t['/private-vulnerability-reporting'].body.enabled = false; }, 'private vulnerability reporting is on', 'GitHub says it is off'],
-  ['CI_RUNNER lost', (t) => { delete t['/actions/variables/CI_RUNNER']; }, 'CI_RUNNER is ubuntu-latest', 'fall back to self-hosted'],
-  ['CI_RUNNER changed', (t) => { t['/actions/variables/CI_RUNNER'].body.value = 'self-hosted'; }, 'CI_RUNNER is ubuntu-latest', 'it is self-hosted'],
+  ['every action allowed', (t) => { t['/actions/permissions'].body.allowed_actions = 'all'; }, 'Actions are off, or take', 'allowing all'],
+  ['pinning not required', (t) => { t['/actions/permissions'].body.sha_pinning_required = false; }, 'Actions are off, or take', 'pinning not required'],
+  ['the token writes', (t) => { t['/actions/permissions/workflow'].body.default_workflow_permissions = 'write'; }, 'the workflow token defaults to read', 'it defaults to write'],
+  ['the token approves', (t) => { t['/actions/permissions/workflow'].body.can_approve_pull_request_reviews = true; }, 'the workflow token defaults to read', 'approving allowed'],
+  ['any branch may deploy', (t) => { t['/environments/production'].body.deployment_branch_policy = null; }, 'chosen branches only', 'any branch may name it'],
   ['a runner registered', (t) => { t['/actions/runners?per_page=1'].body.total_count = 1; }, 'no runner is registered', '1 registered'],
   ['the wiki on', (t) => { t[''].body.has_wiki = true; }, 'the wiki is off', 'GitHub says it is on'],
   ['Discussions on', (t) => { t[''].body.has_discussions = true; }, 'Discussions is off', 'GitHub says it is on'],
@@ -130,7 +134,7 @@ test('private, a setting not marked public is still red', async () => {
 test('the token is in no printed line, even when GitHub echoes it back', async () => {
   const table = green();
   table[''].body.description = `echo ${TOKEN}`;
-  table['/actions/variables/CI_RUNNER'].body.value = TOKEN;
+  table['/actions/permissions'].body.allowed_actions = TOKEN;
   const { out } = await run(table);
   assert.ok(!out.includes(TOKEN), out);
   assert.match(out, /\*\*\*/);
@@ -159,7 +163,7 @@ test("the README's first heading is the description, and the expected file asks 
   assert.equal(readmeLine('no heading here'), '');
   assert.ok(readmeLine(readFileSync(`${ROOT}README.md`, 'utf8')).length > 0);
   assert.deepEqual(EXPECTED.description, { from: 'README.md' });
-  const down = Object.fromEntries(['info', 'rules', 'reporting', 'runner', 'runners', 'production', 'alerts'].map((k) => [k, { status: 500 }]));
+  const down = Object.fromEntries(['info', 'rules', 'reporting', 'actions', 'workflowToken', 'runners', 'production', 'alerts'].map((k) => [k, { status: 500 }]));
   assert.ok(compare(EXPECTED, down, README).every((l) => l.state === 'miss'), 'a GitHub that answers nothing is red on every line');
 });
 
@@ -168,4 +172,12 @@ test('a repository name is owner/name and nothing else', () => {
   assert.throws(() => repoInput('../../evil'));
   assert.throws(() => repoInput('a/b?x=1'));
   assert.throws(() => repoInput(''));
+});
+
+test('Actions switched off is green whatever else they would allow', async () => {
+  const table = green();
+  table['/actions/permissions'].body = { enabled: false };
+  const { code, out } = await run(table);
+  assert.equal(code, 0, out);
+  assert.match(lineOf(out, 'Actions are off, or take'), /^\s+ok\s/);
 });

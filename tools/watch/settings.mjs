@@ -5,9 +5,9 @@
  *   node tools/watch/settings.mjs --repo owner/name   another repository, the same questions
  *
  * WHAT WAS DECIDED IS `.github/settings.expected.json`: the rules on master, secret scanning, push protection, validity
- * checks, private vulnerability reporting, `CI_RUNNER`, no registered runner, the wiki and Discussions off, the
- * description the README's first heading, the production environment's reviewers, and no open high or critical
- * alert. One line a setting, every miss printed under its line, never the first only.
+ * checks, private vulnerability reporting, Actions off or taking only chosen actions pinned to a commit, the workflow
+ * token's default, no registered runner, the wiki and Discussions off, the description the README's first heading, the
+ * production environment's reviewers and branches, and no open high or critical alert. One line a setting, every miss printed under its line, never the first only.
  *
  * `at: public` IS A SETTING FREE ONLY ONCE THE REPOSITORY IS PUBLIC. While it is private and the setting is
  * off, the line reads `waits on going public` and is not red. The day it is public, the same line off is a miss.
@@ -95,16 +95,17 @@ async function get(ask, token, path, ms) {
 export async function readRepository({ repo, token, branch, severity, ask = fetch, ms = ASK_MS }) {
   const base = `/repos/${repo}`;
   const ask1 = (path) => get(ask, token, `${base}${path}`, ms);
-  const [info, rules, reporting, runner, runners, production, alerts] = await Promise.all([
+  const [info, rules, reporting, actions, token_, runners, production, alerts] = await Promise.all([
     ask1(''),
     ask1(`/rules/branches/${encodeURIComponent(branch)}`),
     ask1('/private-vulnerability-reporting'),
-    ask1('/actions/variables/CI_RUNNER'),
+    ask1('/actions/permissions'),
+    ask1('/actions/permissions/workflow'),
     ask1('/actions/runners?per_page=1'),
     ask1('/environments/production'),
     ask1(`/dependabot/alerts?state=open&severity=${severity.join(',')}&per_page=100`),
   ]);
-  return { info, rules, reporting, runner, runners, production, alerts };
+  return { info, rules, reporting, actions, workflowToken: token_, runners, production, alerts };
 }
 
 const ok = (says, note = '') => ({ says, state: 'ok', note, miss: null });
@@ -151,10 +152,20 @@ export function compare(expected, got, readme) {
   out.push(judged('private vulnerability reporting is on', expected.private_reporting, pvr === expected.private_reporting.want, '',
     pvr === undefined ? unread(got.reporting) : 'GitHub says it is off'));
 
-  const runner = got.runner.status === 200 ? String(got.runner.body?.value ?? '') : null;
-  out.push(runner === expected.ci_runner ? ok(`CI_RUNNER is ${expected.ci_runner}`)
-    : miss(`CI_RUNNER is ${expected.ci_runner}`, got.runner.status === 404 ? 'it is not set, so the workflows fall back to self-hosted'
-      : runner === null ? unread(got.runner) : `it is ${runner}`));
+  /* OFF IS AS GOOD AS CHOSEN. A public repository with Actions on and every action allowed runs a stranger's new workflow
+     file on the first approved pull request, so this is either switched off or held to a list and to whole commits. */
+  const actions = got.actions.status === 200 ? got.actions.body ?? {} : null;
+  const actionsSays = 'Actions are off, or take only chosen actions pinned to a commit';
+  const chosen = expected.actions.off_or;
+  out.push(judged(actionsSays, expected.actions,
+    actions !== null && (actions.enabled === false || (actions.allowed_actions === chosen.allowed_actions && actions.sha_pinning_required === chosen.sha_pinning_required)), '',
+    actions === null ? unread(got.actions) : `they are on, allowing ${actions.allowed_actions ?? 'nothing said'}, pinning ${actions.sha_pinning_required ? 'required' : 'not required'}`));
+
+  const tokenSays = `the workflow token defaults to ${expected.workflow_token.default} and ${expected.workflow_token.can_approve ? 'may' : 'may not'} approve a pull request`;
+  const tok = got.workflowToken.status === 200 ? got.workflowToken.body ?? {} : null;
+  out.push(tok && tok.default_workflow_permissions === expected.workflow_token.default && tok.can_approve_pull_request_reviews === expected.workflow_token.can_approve
+    ? ok(tokenSays)
+    : miss(tokenSays, tok ? `it defaults to ${tok.default_workflow_permissions}, approving ${tok.can_approve_pull_request_reviews ? 'allowed' : 'refused'}` : unread(got.workflowToken)));
 
   const count = got.runners.status === 200 ? Number(got.runners.body?.total_count) : NaN;
   const runnersSays = expected.runners === 0 ? 'no runner is registered' : `${expected.runners} runners are registered`;
@@ -183,6 +194,10 @@ export function compare(expected, got, readme) {
     const n = Array.isArray(rule?.reviewers) ? rule.reviewers.length : 0;
     out.push(n === most ? ok(says) : miss(says, `GitHub says ${n}`));
   }
+
+  /* A BRANCH POLICY, because an environment with none hands its secrets to a job on any branch that names it. */
+  const branchesSays = 'the production environment deploys from chosen branches only';
+  if (got.production.status === 200) out.push(judged(branchesSays, expected.production_branches, Boolean(got.production.body?.deployment_branch_policy), '', 'any branch may name it'));
 
   const alerts = got.alerts.status === 200 && Array.isArray(got.alerts.body) ? got.alerts.body : null;
   const sev = expected.open_alerts.severity.join(' or ');
