@@ -37,7 +37,7 @@
  * and because the import writes through `create` and so will the bank door after the cut-over: one build serves both.
  */
 
-import type { Refusal, Sql } from '@braindog/ports';
+import type { Param, Refusal, Sql } from '@braindog/ports';
 import { compile, evaluate, type Predicate, type Schema } from '@braindog/where';
 
 import { isCurrencyCode } from './coerce.ts';
@@ -726,6 +726,40 @@ export function windowSql(p: Pairing): { day: string; size: string } | null {
 }
 
 /**
+ * THE LIST'S DECLARED INDEX ON THE DAY, NAMED, when a window can use it: with no statistics SQLite reads a window through
+ * `entry_state` and every row of the list (8 ms a window on 20,000 rows, 800 windows in one alarm on the bench), against
+ * 0.04 ms through the day's index. Asked of the schema each time, so a redeclared list cannot leave a name that is gone.
+ *
+ * NOT WHILE A PASS HOLDS ITS OWN INDEX ON THE LIST, THE SIZE AND THE DAY (`settleRedeclared`, `entry_settle_<list>`), which
+ * answers a window better still, and is found only by the statement as it was (`register = ?`).
+ */
+const LIST_ID = /^[a-z][a-z0-9_]{0,31}$/u;
+function dayIndexOf(p: Pairing): string | null {
+  const date = dateField(p.pairs, p.fields);
+  if (date === null || !LIST_ID.test(p.register)) return null;
+  /* `indexName` as `declare.ts` writes it: `declare.ts` imports this file, so the name is said here. */
+  const name = `entry_i_${p.register}__${date}`;
+  const held = p.sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'index' AND name IN (?, ?)", name, `entry_settle_${p.register}`).map((r) => r.name);
+  return held.length === 1 && held[0] === name ? name : null;
+}
+
+/**
+ * The live rows of a list that `tail` keeps, read through the day's index where the list has one (`dayIndexOf`). THE LIST
+ * IS WRITTEN IN, because a partial index is used only where the statement shows it holds that list, and its id is the
+ * grammar's, checked first. A statement SQLite will not plan that way (an index of another shape) is asked as it was.
+ */
+function windowRows(p: Pairing, tail: string, ...params: Param[]): LegRow[] {
+  const index = dayIndexOf(p);
+  if (index !== null)
+    try {
+      return p.sql.all<LegRow>(`SELECT ${LEG_COLUMNS} FROM entry INDEXED BY ${index} WHERE register = '${p.register}' AND deleted_at IS NULL AND ${tail}`, ...params);
+    } catch {
+      /* Asked below as it always was. */
+    }
+  return p.sql.all<LegRow>(`SELECT ${LEG_COLUMNS} FROM entry WHERE register = ? AND deleted_at IS NULL AND ${tail}`, p.register, ...params);
+}
+
+/**
  * `candidatesOf`, and how near the nearest row that mirrors `leg` and is `waiting` stands (`Infinity` for none): one
  * query over the window answers both.
  *
@@ -749,17 +783,7 @@ function around(p: Pairing, leg: Leg, ledger: Ledger | null = null): { near: { l
   if (ledger === null) {
     const toDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
     const { day, size } = window;
-    rows = p.sql
-      .all<LegRow>(
-        `SELECT ${LEG_COLUMNS} FROM entry WHERE register = ? AND deleted_at IS NULL AND id <> ?
-           AND ${day} BETWEEN ? AND ? AND ${size} = ?`,
-        p.register,
-        leg.id,
-        toDay(lo),
-        toDay(hi),
-        shape.amount.size,
-      )
-      .map(legOf);
+    rows = windowRows(p, `id <> ? AND ${day} BETWEEN ? AND ? AND ${size} = ?`, leg.id, toDay(lo), toDay(hi), shape.amount.size).map(legOf);
   } else rows = inWindow(ledger.bySize.get(shape.amount.size) ?? [], lo, hi).filter((other) => other.id !== leg.id);
   const out: { leg: Leg; gap: number }[] = [];
   let waitsAt = Infinity;
@@ -1280,17 +1304,7 @@ function crossAround(p: Pairing, leg: Leg, windows: Windows): ReturnType<typeof 
   let rows: Leg[];
   if (ledger === null) {
     const toDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-    rows = p.sql
-      .all<LegRow>(
-        `SELECT ${LEG_COLUMNS} FROM entry WHERE register = ? AND deleted_at IS NULL AND id <> ?
-           AND ${window.day} BETWEEN ? AND ? AND json_extract(fields, '$.${sizedField(p)}.currency') <> ?`,
-        p.register,
-        leg.id,
-        toDay(lo),
-        toDay(hi),
-        shape.amount.currency,
-      )
-      .map(legOf);
+    rows = windowRows(p, `id <> ? AND ${window.day} BETWEEN ? AND ? AND json_extract(fields, '$.${sizedField(p)}.currency') <> ?`, leg.id, toDay(lo), toDay(hi), shape.amount.currency).map(legOf);
   } else rows = inWindow(ledger.all, lo, hi).filter((other) => other.id !== leg.id);
   for (const other of rows) {
     const far = crossGap(p, leg, other, read, windows);
