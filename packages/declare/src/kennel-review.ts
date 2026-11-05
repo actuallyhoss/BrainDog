@@ -76,7 +76,8 @@ export function unreadable(text: string, what: 'script' | 'view'): string | null
   if (hexNames >= 3) return 'it names things like _0x1a2b, the way an obfuscator writes code';
   const escapes = plain.match(/\\x[0-9a-f]{2}|\\u[0-9a-f]{4}/giu)?.length ?? 0;
   if (escapes >= 24) return 'it writes its text as escape codes, which hides what it says';
-  if (/\beval\s*\(|\bnew\s+Function\s*\(|(?<![\w.])Function\s*\(\s*['"`]/u.test(plain)) return 'it builds code from text while it runs (eval or Function), so what it does cannot be read here';
+  /* THE SAME DONE AROUND THE NAME: `(0, eval)(text)`, `globalThis['eval'](text)`, `(() => {}).constructor(text)`. */
+  if (/\beval\s*\(|\beval\s*\)\s*\(|\[\s*['"`]eval['"`]\s*\]|\.constructor\s*\(|\bnew\s+Function\s*\(|(?<![\w.])Function\s*\(\s*['"`]/u.test(plain)) return 'it builds code from text while it runs (eval or Function), so what it does cannot be read here';
   if (what === 'script' && new RegExp(`[A-Za-z0-9+/=_-]{${String(ENCODED_MOST)},}`, 'u').test(plain)) return `it carries a run of more than ${String(ENCODED_MOST)} characters of encoded text`;
   return null;
 }
@@ -168,6 +169,16 @@ export function reachAdded(before: Reach | null, after: Reach): string[] {
   const use = (u: { id: string; writes: boolean }): string => `${u.writes ? 'changes' : 'reads'} ${u.id}`;
   const was = new Set((before.uses ?? []).flatMap((u) => (u.writes ? [use(u), use({ ...u, writes: false })] : [use(u)])));
   say('Of yours, now', (after.uses ?? []).map(use).filter((u) => !was.has(u)));
+  /* AND WHAT IT MAY DO BEYOND ROWS. Each of these is a line the store and the plan show, and none was compared here, so a
+     trusted publisher's update that started sending notices, spending the model or giving agents a tool that changes
+     rows listed at once with nobody looking. */
+  say('May now', added(before.may, after.may));
+  const tool = (t: { says: string; writes: boolean }): string => `${t.says}${t.writes ? ' (changes rows)' : ''}`;
+  say('Gives agents a tool', added((before.tools ?? []).map(tool), (after.tools ?? []).map(tool)));
+  say('Adds to the command bar', added(before.commands, after.commands));
+  const action = (a: { list: string; title: string }): string => `${a.title} on ${a.list}`;
+  say('Adds a row action', added((before.row_actions ?? []).map(action), (after.row_actions ?? []).map(action)));
+  say('Adds Today cards', added(before.widgets, after.widgets));
   return out;
 }
 
