@@ -498,14 +498,18 @@ type Mail = {
  * add-on whose list has that word (`event`), else `none`.
  */
 export function mailBody(m: Mail, zone: string, said: { event?: boolean } = {}): string {
+  /* A STRANGER'S WORDS STAY ON THEIR OWN LINE, AND SAY NOTHING ABOUT THE LINES AFTER THEM. The Gmail door reads each field
+     from the first place its name stands, so a subject "gmail.person= yes" made a stranger's mail a person's, and "gmail.reply=
+     yes" made it one waiting on a reply. */
+  const theirs = (text: string): string => text.replace(/[\r\n]+/gu, ' ').replace(/gmail\.(?=[a-z]+\s*=)/giu, 'gmail ');
   return [
     'BrainDog Gmail 1',
     `gmail.message= ${m.id}`,
     `gmail.thread= ${m.thread}`,
     `gmail.direction= ${m.out ? 'sent' : 'received'}`,
-    `gmail.name= ${m.name}`,
-    `gmail.address= ${m.address}`,
-    `gmail.subject= ${m.subject}`,
+    `gmail.name= ${theirs(m.name)}`,
+    `gmail.address= ${theirs(m.address)}`,
+    `gmail.subject= ${theirs(m.subject)}`,
     `gmail.day= ${wallIn(m.at, zone).day}`,
     `gmail.at= ${new Date(m.at).toISOString()}`,
     `gmail.unread= ${m.unread ? 'yes' : 'no'}`,
@@ -513,7 +517,7 @@ export function mailBody(m: Mail, zone: string, said: { event?: boolean } = {}):
     `gmail.person= ${m.person ? 'yes' : 'no'}`,
     `gmail.kind= ${m.event && said.event === true ? 'event' : m.kind}`,
     `gmail.link= ${m.link}`,
-    `gmail.snippet= ${m.snippet}`,
+    `gmail.snippet= ${theirs(m.snippet)}`,
     'gmail.end',
     '',
   ].join('\n');
@@ -1173,7 +1177,9 @@ const OWN_LISTS = ['gmail_mail', 'events'] as const;
  * RECORD'S OBJECT, so the one the alarm runs is the one `node --test` runs (`test/google-people.test.ts`).
  */
 export function googleWriter(api: RecordApi): Writer {
-  const sys: CallContext = { principal: { kind: 'system', id: 'google' } };
+  /* SIGNED AS A DOOR, BECAUSE IT IS ONE: a calendar invite's title and a contact's name are anybody's words, and every read
+     that marks a turn for words from outside reads `ingest:`. As `google` an invite read as the owner's own. */
+  const sys: CallContext = { principal: { kind: 'system', id: 'ingest:google' } };
   const events = api.kernel.register('events');
   const hasField = (id: string): boolean => events?.fields.some((f) => f.id === id) === true;
   const hex = async (text: string): Promise<string> =>

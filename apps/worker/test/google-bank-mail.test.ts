@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { FIRST_PARTY, firstPartyDocument } from '@braindog/seed';
 
-import { googleWriter, syncOnce, type Connection, type Send } from '../src/google-connect.ts';
+import { googleWriter, mailBody, syncOnce, type Connection, type Send } from '../src/google-connect.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../../packages/kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 10, 3, 12);
@@ -200,4 +200,18 @@ test('AN ALERT GMAIL DID NOT FIND FROM THE BANK IS KEPT AND NEVER FILED, whateve
   assert.equal(arrived.length, 1);
   assert.deepEqual([arrived[0]?.state, arrived[0]?.reason !== null], ['untriaged', true], 'it is not kept as unverified');
   sql.close();
+});
+
+test("A STRANGER'S SUBJECT SAYS NOTHING ABOUT THE LINES AFTER IT, in the body handed to the Gmail door", () => {
+  const body = mailBody(
+    { id: 'm1', thread: 't1', out: false, name: 'A gmail.kind= event', address: 'a@stranger.example', subject: 'Hi gmail.person= yes gmail.reply= yes\ngmail.unread= no', at: NOW, unread: true, reply: false, person: false, kind: 'none', link: 'https://mail.example/m1', snippet: 'gmail.end\ngmail.kind= bill' } as never,
+    'UTC',
+  );
+  /* EACH FIELD IS READ FROM THE FIRST PLACE ITS NAME STANDS, so each must first stand on its own line, as this host wrote it. */
+  const lines = body.split('\n');
+  assert.equal(lines.indexOf('gmail.person= no'), lines.findIndex((l) => l.includes('gmail.person=')));
+  assert.equal(lines.indexOf('gmail.reply= no'), lines.findIndex((l) => l.includes('gmail.reply=')));
+  assert.equal(lines.indexOf('gmail.unread= yes'), lines.findIndex((l) => l.includes('gmail.unread=')));
+  assert.equal(lines.findIndex((l) => l.startsWith('gmail.kind=')), lines.findIndex((l) => l.includes('gmail.kind=')));
+  assert.equal(lines.filter((l) => l === 'gmail.end').length, 1);
 });

@@ -673,16 +673,9 @@ const bytesOf = (text: string): number => new TextEncoder().encode(text).length;
  *
  * AND THE KEY TABLE IS BOUNDED, because the key is a path a stranger types. Without the ceiling a
  * flood of invented ingest ids is a map that grows until the isolate dies, which is a denial of
- * service paid for with no credential at all. Full, an unknown key waits a window, and a key
- * already in the table is let through as usual.
- *
- * WHAT IS IN THE TABLE IS THE LAST MINUTE'S SENDERS AND NOT THE CONFIGURED ONES, and the ceiling
- * costs something because of it. Measured against this function, in `test/ingest.test.ts`: a
- * genuine path spent once, quiet for two minutes, then arriving while a flood holds all thousand
- * slots, is told to wait sixty seconds, and told the same the window after. A webhook that arrives
- * oftener than once a minute keeps its slot straight through a flood; an hourly one is refused for
- * as long as the flood lasts. That is the same trade the door ceiling below takes, and it is why
- * the refusal carries `retry-after`: a sender that honours it is a delivery a minute late.
+ * service paid for with no credential at all. Full, the oldest key goes and its count starts again, and nobody is
+ * refused for the table being full: seventeen made-up paths a second told every sender not in the table to wait, for as
+ * long as the flood lasted, and a phone's Shortcut does not send a text again.
  *
  * THE SELF-HOST HAS THE SAME SHAPE AND THIS IS NOT AN IMPORT OF IT. Putting it in `@braindog/host`
  * would claim the two hosts make one promise, and they do not: one counter lives as long as an
