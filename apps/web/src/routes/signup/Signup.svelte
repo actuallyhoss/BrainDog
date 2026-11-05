@@ -960,6 +960,20 @@
     }
   });
 
+  /**
+   * TAKES A PERSON WHO HAS A BRAINDOG TO IT, and answers whether it did. A plan pressed on the site opens Billing, where a
+   * plan is changed; anything else opens the BrainDog. Somebody signed in with none stays: this page is how they make one.
+   */
+  async function sendHome(me: Who): Promise<boolean> {
+    const account = await billing();
+    const owned = account.ok ? account.value.records : [];
+    const own = owned.find((r) => r.record === me.record) ?? owned.find((r) => r.state === 'active') ?? owned[0];
+    if (own === undefined && me.record === null) return false;
+    if (own === undefined) location.replace(`${BASE}/`);
+    else location.replace(at(planOf(location.search) === 'free' ? '/' : '/settings/billing', `${BASE}/${own.slug}/`));
+    return true;
+  }
+
   async function ask(): Promise<void> {
     step = 'loading';
     /* WHO MAY SIGN UP IS ASKED ONLY OF A HOST THAT SERVES SIGN-UP (`signup` on `/auth/methods`): a self-host has no such
@@ -967,6 +981,9 @@
        the closed page; one nobody reached is still asked, so it says "did not answer" as it did. */
     /* ASKED AS THE PAGE DREW, WHERE IT WAS (`early.ts`), so the field does not wait two more round trips after the page. */
     const { who, named } = await (takeEarly() ?? askFirst());
+    /* SOMEBODY ALREADY IN WITH A BRAINDOG HAS NOTHING TO SIGN UP FOR, whatever the host says of sign-up (5 Nov, the owner). */
+    const me = who.ok ? who.value.me : null;
+    if (me !== null && (await sendHome(me))) return;
     if (named === null) {
       step = 'closed';
       return;
