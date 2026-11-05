@@ -860,7 +860,7 @@ test('A SALARY OR A PENSION THAT NAMES WHO GETS IT IS ASKED, NEVER MONEY IN (RN1
 
 test('A TRAILING NAME THE RECORD KEEPS AS A PROJECT OR A COMPANY IS NOBODY NEW (RN2)', () => {
   const roomy = { ...founder, titled: { things: [{ seq: 4, name: 'Nook' }] } };
-  const fix = tellRead('Fix the login bug, Roomy', roomy).rows;
+  const fix = tellRead('Fix the login bug, Nook', roomy).rows;
   assert.ok(!fix.some((r) => r.register === 'people'));
   assert.deepEqual(fix.map((r) => [r.register, r.fields.what, r.fields.thing, r.fields.owner]), [['tasks', 'Fix the login bug', 'things#4', undefined]]);
   /* An organisation tasks do not link to stays in the title. */

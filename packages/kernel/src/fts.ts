@@ -119,7 +119,7 @@ export function ftsQuery(q: string): string | null {
 }
 
 /**
- * The same words as one phrase at the very start of a row's text: `^"bake gg"*`, which finds `crumb.gg` and `Crumb.gg` and
+ * The same words as one phrase at the very start of a row's text: `^"crumb gg"*`, which finds `crumb.gg` and `Crumb.gg` and
  * not `Servers, Crumb.gg`. `null` for a query with no words.
  */
 export function startQuery(q: string): string | null {

@@ -18731,7 +18731,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A HIT'S RANK IS ITS PLACE AMONG THE HITS SHE IS SHOWN (leak matrix N3), never `bm25`'s score, which reads the
          whole index's statistics and moved when a row she cannot see was written. The order is still the words'. */
       /* A ROW NAMED EXACTLY WHAT WAS ASKED LEADS, then the words' order: `crumb.gg` is the project and the domain before any
-         row that only says it. Folded as the index folds, so `Crumb.gg` and `bake gg` are one name. */
+         row that only says it. Folded as the index folds, so `Crumb.gg` and `crumb gg` are one name. */
       const nameKey = (t: unknown): string => String(t ?? '').normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
       const askedName = nameKey(args.q);
       const named = (row: { register: string; fields: Record<string, unknown> }): boolean => {

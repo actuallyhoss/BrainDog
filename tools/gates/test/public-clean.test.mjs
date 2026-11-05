@@ -193,3 +193,11 @@ test('the allowance never grows', () => {
   assert.ok(lines <= 0, `ALLOWED holds ${lines} lines, over the ceiling of 0`);
   assert.ok(Object.values(ALLOWED).every((n) => Number.isInteger(n) && n > 0), 'every entry is a count of one or more');
 });
+
+test('EVERY WORD IS A FINDING, the five added after a scrub found them back at the tip among them', (t) => {
+  assert.ok(WORDS.length >= 8);
+  for (const word of WORDS) {
+    const at = tree(t, { 'x.ts': `// a line naming ${word.toUpperCase()} in passing\n` });
+    assert.equal(run(at).status, 1, `a word of ${word.length} letters passed`);
+  }
+});

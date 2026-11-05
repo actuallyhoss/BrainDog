@@ -5,7 +5,7 @@
  *   node tools/gates/public-clean.mjs [root]
  *
  * FOUR PARTS, over every file git tracks (or, on a planted tree with no repository of its own, every file under it):
- *   (a) none of the three private words, read case-blind, where the one allowed spelling is the account name the
+ *   (a) none of the private words, read case-blind, where the one allowed spelling is the account name the
  *       repository lives under (`ALLOWED_SPELLING`);
  *   (b) `LICENSE` and `apps/cli/LICENSE` are Apache-2.0 and name Quartz Apps LLC, `packages/render/LICENSE` is MIT and
  *       names it, `LICENSING.md` credits Lucide, and the root holds no `NOTICE` and no `CHANGELOG.md`;
@@ -37,8 +37,11 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** The three words, lower case, put together here so no file in the repository spells them. */
-export const WORDS = ['ho' + 'ss', 'en' + 'core', 'tam' + 'sin'];
+/**
+ * The words, lower case, put together here so no file in the repository spells them: the first three from the start, and
+ * five the history scrub found again at the tip on 5 November, where nothing would have stopped them coming back.
+ */
+export const WORDS = ['ho' + 'ss', 'en' + 'core', 'tam' + 'sin', 'sket' + 'chbook', 'north' + 'wind', 'guide' + 'line', 'coin' + ' purse', 'otters' + '.gg'];
 /** The one spelling that holds the first word and is public: the account the repository lives under. */
 export const ALLOWED_SPELLING = 'actually' + WORDS[0];
 

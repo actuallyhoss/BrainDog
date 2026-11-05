@@ -1004,6 +1004,8 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   record that lost them takes them back on its next night.
  * - money-core 3.38.6 (4 Nov, test triage): `categories.correction` and `transactions.corrects` read "A correction and
  *   not spending". A comma ends a clause, so the record could not read a sentence about the name it prints.
+ * - money-core 3.38.7 (5 Nov, going public): a script's comments and notes say an invented bill and an invented plan where
+ *   they named real ones. Nothing a record does changes.
  * - people 4.7.0 (fin-people1104, 3 Nov, the owner: "instead of just long text, i want them to be parsed as fields ... his
  *   name should be a field, discord username a field"): `register.people` gains a field for each fact a note used to
  *   say (`legal_name`, `goes_by`, `relation`, `titles`, `about`, `nationality`, `country`, `city`, `timezone`, `birthday`,
@@ -1030,7 +1032,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.31.2',
   people: '4.7.2',
-  'money-core': '3.38.6',
+  'money-core': '3.38.7',
   estate: '2.8.1',
   work: '1.26.2',
 };
