@@ -137,7 +137,8 @@ struct MainWindow: View {
 enum Links {
     static func open(_ url: URL) {
         let model = MacModel.shared
-        if url.path == "/signin" {
+        /* THE MAILED LINK, AS A UNIVERSAL LINK ONLY (`EmailLink.isSignInLink`): `braindog://` is any page's or app's to open. */
+        if url.scheme != "braindog", url.path == "/signin" {
             Task { await SignInFlow.shared.open(link: url) }
             return
         }
@@ -160,7 +161,7 @@ enum Links {
         let path: String? = url.scheme == "braindog"
             ? URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "path" })?.value
             : url.path + (url.query.map { "?\($0)" } ?? "")
-        guard let path, path.hasPrefix("/"), !path.hasPrefix("//"), !path.hasPrefix("/api/"), !path.hasPrefix("/auth/") else { return }
+        guard let path = path.flatMap(WebGate.appPath) else { return }
         model.go(path)
     }
 

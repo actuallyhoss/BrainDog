@@ -474,7 +474,7 @@ final class AppModel {
             guard (try? await Calls.open(record)) != nil else { return }
             await reopened()
         }
-        if let path = info["open"] as? String, path.hasPrefix("/") { open(path) } else { select(Place.needs.href, toRoot: true) }
+        if let path = (info["open"] as? String).flatMap(WebGate.appPath) { open(path) } else { select(Place.needs.href, toRoot: true) }
     }
 
     // MARK: Handoff (M5)

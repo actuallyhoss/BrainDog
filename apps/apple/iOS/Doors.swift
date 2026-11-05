@@ -161,7 +161,7 @@ enum Spotlight {
 
     /// A Spotlight result pressed: its page.
     static func continued(_ activity: NSUserActivity) {
-        guard let path = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String, path.hasPrefix("/") else { return }
+        guard let path = (activity.userInfo?[CSSearchableItemActivityIdentifier] as? String).flatMap(WebGate.appPath) else { return }
         AppModel.shared.open(path)
     }
 }

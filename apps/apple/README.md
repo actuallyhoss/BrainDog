@@ -119,7 +119,7 @@ screen's own control calls; a Release build has none of it.
   the Mac with no App-Bound Domains); a first load that reaches nothing and has nothing kept says so with Try again.
   Today's last picture covers the page at launch until it has drawn, as on the iPhone.
 - **Links**: `braindog://open?path=`, `braindog://tell`, `braindog://quick`, and universal links on app.brain.dog (the
-  same addresses as the iPhone app's, `apps/worker/src/apple.ts`) open in the window; the sign-in link signs in.
+  same addresses as the iPhone app's, `apps/worker/src/apple.ts`) open in the window; the sign-in link signs in, only as a universal link on the app's own origin (`braindog://` is any page's to open and never signs in), never over a session already here, and after a press when this app did not ask for that link (`Web/WebGate.swift`, `SignInFlow.open`).
 - **Updates** (`Mac/Updates.swift`): Sparkle 2, pinned, reading `https://brain.dog/mac/appcast.xml`
   (`apps/site/static/mac/appcast.xml`, empty). Off until a build is signed by the team and carries `SUPublicEDKey`; until
   then Settings says why and Check for Updates… is dimmed. Making the key: Sparkle's `generate_keys` once on this Mac

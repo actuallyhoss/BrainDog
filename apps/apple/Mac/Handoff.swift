@@ -12,7 +12,7 @@ struct MacHandoff: ViewModifier {
         content
             .onChange(of: model.desk.title, initial: true) { _, title in Handoff.advertise(path: model.desk.here, title: title) }
             .onContinueUserActivity(Handoff.type) { activity in
-                guard let path = activity.userInfo?["path"] as? String, path.hasPrefix("/") else {
+                guard let path = (activity.userInfo?["path"] as? String).flatMap(WebGate.appPath) else {
                     if let url = activity.webpageURL { Links.open(url) }
                     return
                 }

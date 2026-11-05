@@ -19,6 +19,8 @@ public final class SignInFlow {
     public private(set) var saidIsRefusal = false
     /// Whether that sentence is about the passkey, so it is said under the passkey's button and not the email's.
     public private(set) var saidOfPasskey = false
+    /// A mailed link this app did not ask for, waiting for the person to say it is theirs.
+    public private(set) var unasked: URL?
 
     @ObservationIgnored let passkey = Passkey()
 
@@ -71,8 +73,32 @@ public final class SignInFlow {
     }
 
     /// The mailed link, opened on this device as a universal link.
+    ///
+    /// A LINK NEVER CHANGES WHO THE APP IS SIGNED IN AS, AND A LINK THIS APP DID NOT ASK FOR ASKS FIRST. Anyone can mail or
+    /// post a link of their own, and whoever is signed in by it would write their words into that person's record.
     public func open(link url: URL) async {
-        guard EmailLink.isSignInLink(url) else { return }
+        guard EmailLink.isSignInLink(url), !Session.shared.signedIn else { return }
+        guard EmailLink.askedHere(url) else {
+            unasked = url
+            say(nil)
+            return
+        }
+        await spend(url)
+    }
+
+    /// "Sign in" on a link this app did not ask for.
+    public func useUnasked() async {
+        guard let url = unasked else { return }
+        unasked = nil
+        await spend(url)
+    }
+
+    /// "Not me": the link is forgotten, unspent.
+    public func dropUnasked() {
+        unasked = nil
+    }
+
+    private func spend(_ url: URL) async {
         busy = .link
         say(nil)
         defer { busy = nil }
@@ -149,9 +175,13 @@ public struct SignInView: View {
                     }
                 }
 
-                switch flow.step {
-                case .ask: ask
-                case .sent(let email): sent(email)
+                if flow.unasked != nil {
+                    unasked
+                } else {
+                    switch flow.step {
+                    case .ask: ask
+                    case .sent(let email): sent(email)
+                    }
                 }
 
                 Text(Words.privacy)
@@ -170,6 +200,33 @@ public struct SignInView: View {
         .background(Ground())
         .animation(.easeOut(duration: 0.18), value: flow.step)
         .task { await flow.offerAutofill() }
+    }
+
+    // MARK: a link this app did not ask for
+
+    private var unasked: some View {
+        Tile(padding: Space.s4) {
+            VStack(alignment: .leading, spacing: Space.s4) {
+                Text(Words.linkUnasked)
+                    .font(Typeface.body)
+                    .foregroundStyle(Palette.ink2)
+                    .leading(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    Haptic.press.play()
+                    Task { await flow.useUnasked() }
+                } label: {
+                    Text(Words.linkUnaskedYes)
+                }
+                .buttonStyle(.primary)
+                Button {
+                    flow.dropUnasked()
+                } label: {
+                    Text(Words.linkUnaskedNo)
+                }
+                .buttonStyle(.quietOnTile)
+            }
+        }
     }
 
     // MARK: asking

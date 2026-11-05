@@ -64,16 +64,24 @@ enum EmailLink {
         keychain.delete("pkce")
     }
 
-    /// Whether a URL is a sign-in link this app asked for: `/signin?app=<challenge>#magic=<token>`.
+    /// Whether a URL is the mailed sign-in link, on the app's own origin: `/signin?app=<challenge>#magic=<token>`.
     static func isSignInLink(_ url: URL) -> Bool {
-        url.path == "/signin" && url.fragment?.hasPrefix("magic=") == true
+        WebGate.isSignInLink(url, origin: Server.origin)
+    }
+
+    /// Whether this app asked for this link: its `?app=` is the challenge of the pair kept here. Nobody else knows that.
+    static func askedHere(_ url: URL) -> Bool {
+        guard let pair = pending else { return false }
+        return URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "app" })?.value == pair.challenge
     }
 
     /// The mailed link, opened on this device: handed back with a challenge, then swapped with its verifier.
     ///
-    /// A LINK ASKED FOR SOMEWHERE ELSE STILL SIGNS IN HERE, as an app session. Its `?app=` is another app's challenge (the
-    /// Mac's, or a request this app has since replaced), so this app seals it to a pair of its own instead: handing off
-    /// asks for nothing the holder of the link does not already have, since the link alone signs in wherever it is spent.
+    /// A LINK ASKED FOR SOMEWHERE ELSE STILL SIGNS IN HERE, as an app session, once the person has said so
+    /// (`SignInFlow.open`): it may be someone else's, sent to sign this app in as them. Its `?app=` is another app's
+    /// challenge (the Mac's, or a request this app has since replaced), so this app seals it to a pair of its own instead:
+    /// handing off asks for nothing the holder of the link does not already have, since the link alone signs in wherever
+    /// it is spent.
     static func finish(link url: URL) async throws(CallFailure) {
         guard let token = url.fragment?.split(separator: "=", maxSplits: 1).last.map(String.init), !token.isEmpty
         else { throw CallFailure.refused(Refusal(code: "LINK", fix: Words.linkNotForApp, at: "link")) }
