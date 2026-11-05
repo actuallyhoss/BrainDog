@@ -46,7 +46,7 @@
 
   let client: ReturnType<typeof createClient> | null = null;
   const clientOf = (): ReturnType<typeof createClient> => (client ??= createClient({ base: apiBase(), fetch: (url, init) => fetch(url, init) }));
-  const approve = (typed: string) => approverOf(clientOf())(typed);
+  const approve = (typed: string, handle?: string) => approverOf(clientOf())(typed, handle);
 
   /* ── who is waiting ─────────────────────────────────────────────────── */
 

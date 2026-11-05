@@ -44,6 +44,7 @@
     id = 'user-code',
     size = 'inline',
     autofocus = false,
+    looking = $bindable(false),
   }: {
     /** One send of what was typed, a look or a press of Approve (`code-form.ts` `approverOf`). */
     approve: Approve;
@@ -57,6 +58,8 @@
     size?: 'lead' | 'inline';
     /** Focus the field once drawn, where the field is the reason the page was opened. */
     autofocus?: boolean;
+    /** True while the sheet is up, so the page around it can step back and leave the question alone on the screen. */
+    looking?: boolean;
   } = $props();
 
   let typed = $state('');
@@ -67,6 +70,10 @@
   /* WHAT THE CODE NAMES, once it has been looked at: drawn in place of the boxes until Approve or Not this one. */
   let looked = $state<DeviceLooked | null>(null);
   let sheetHead = $state<HTMLHeadingElement | undefined>();
+
+  $effect(() => {
+    looking = looked !== null;
+  });
 
   $effect(() => {
     if (looked !== null) sheetHead?.focus();
@@ -212,8 +219,9 @@
   {/if}
 </form>
 {#if looked !== null}
-  <section class="code-sheet" aria-labelledby="{id}-sheet">
-    <h2 class="code-sheet-title" id="{id}-sheet" tabindex="-1" bind:this={sheetHead}>{copy.confirmTitle}</h2>
+  <section class="code-sheet" data-keys={looked.reach === 'vault' ? '' : undefined} aria-labelledby="{id}-sheet">
+    <h2 class="code-sheet-title" id="{id}-sheet" tabindex="-1" bind:this={sheetHead}>{looked.reach === 'vault' ? copy.confirmKeysTitle : copy.confirmTitle}</h2>
+    {#if looked.reach === 'vault'}<p class="code-warn">{copy.confirmKeysWarn}</p>{/if}
     <dl class="code-facts">
       <div class="code-fact">
         <dt>{copy.confirmMachine}</dt>
@@ -250,7 +258,7 @@
     </dl>
     <p class="code-self">{copy.confirmSelf}</p>
     <div class="code-sheet-acts">
-      <Button weight="primary" disabled={approving} aria-busy={approving || undefined} onclick={() => void pressed()}>{approving ? copy.codeChecking : copy.confirmApprove}</Button>
+      <Button weight="primary" disabled={approving} aria-busy={approving || undefined} onclick={() => void pressed()}>{approving ? copy.codeChecking : looked.reach === 'vault' ? copy.confirmKeysApprove : copy.confirmApprove}</Button>
       <Button weight="quiet" disabled={approving} onclick={() => void notThis()}>{copy.confirmNot}</Button>
     </div>
   </section>
@@ -290,6 +298,19 @@
     /* focus-ok: the heading takes focus only by script, so a reader is told and an Enter still held presses nothing; it is
        never in the tab order, and a ring there would read as a control. */
     outline: none;
+  }
+
+  /* A KEYCHAIN REQUEST SAYS SO FIRST: it hands over secrets, not a sign-in, so the sheet leads with the warm tint the app
+     uses for a warning, in the body ink, and the heading above it is the question in the keys' own words. */
+  .code-warn {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--warn-tint);
+    border-radius: var(--r-pop);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    text-wrap: pretty;
   }
 
   .code-facts {

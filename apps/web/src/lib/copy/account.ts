@@ -319,6 +319,9 @@ export const account = {
   approveTitle: 'Approve a machine',
   /* The sheet after the six digits, the only place a machine is let in from. */
   confirmTitle: 'Is this what you started?',
+  confirmKeysTitle: 'Let this machine open your keys?',
+  confirmKeysWarn: 'This is more than signing in. It lets that machine read the real values of these keys, not just their names, and use them until the time is up.',
+  confirmKeysApprove: 'Let it open the keys',
   confirmMachine: 'Machine',
   confirmClient: 'Client',
   confirmCan: 'What it will be able to do',
