@@ -73,7 +73,7 @@ test('A HOST WRITTEN AS A PRIVATE ADDRESS IS REFUSED BEFORE THE PLATFORM IS ASKE
 });
 
 test('WHAT A SCRIPT POSTS IS READ UP TO THE CAP AND NO FURTHER', async () => {
-  const post = (body: BodyInit): Request => new Request('https://a.example/', { method: 'POST', body });
+  const post = (body: string | ReadableStream<Uint8Array>): Request => new Request('https://a.example/', { method: 'POST', body });
   assert.equal(await textWithin(post('héllo'), 100), 'héllo');
   assert.equal(await textWithin(post('x'.repeat(101)), 100), OVER);
   let pulled = 0;

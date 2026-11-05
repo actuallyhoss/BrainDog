@@ -8957,7 +8957,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     };
     const rowOwn = (spoken: string): boolean => {
       const row = kernel.get(spoken);
-      if (row === null) return true;
+      /* A ROW THIS CALLER CANNOT SEE WAS NEVER HANDED TO THEM, and its log is not looked at. */
+      if (row === null || !sight.admits(ctx, row)) return true;
       return sql.all<{ actor: string }>('SELECT DISTINCT actor FROM event WHERE target = ?', `entry:${row.id}`).every((e) => own(e.actor));
     };
     const askedOwn = (id: string): boolean => {
@@ -19118,7 +19119,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const mine = (r: unknown): boolean => {
           const name = r !== null && typeof r === 'object' ? (r as { spoken?: unknown; id?: unknown }).spoken ?? (r as { id?: unknown }).id : null;
           const row = typeof name === 'string' ? kernel.get(name) : null;
-          return row === null || sql.all<{ actor: string }>('SELECT DISTINCT actor FROM event WHERE target = ?', `entry:${row.id}`).every((e) => ownHand(e.actor, person, true));
+          return row === null || !sight.admits(ctx, row) || sql.all<{ actor: string }>('SELECT DISTINCT actor FROM event WHERE target = ?', `entry:${row.id}`).every((e) => ownHand(e.actor, person, true));
         };
         return { ok: true, value: { ...out.value, rows: out.value.rows.filter(mine) } };
       };

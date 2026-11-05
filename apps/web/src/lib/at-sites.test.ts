@@ -79,6 +79,7 @@ const RENDERED_HREF = new Map([
 
 /** The files that read the bare origin on purpose, and what for. Anything else reading it is a record call gone to the root. */
 const BARE_ORIGIN = new Map([
+  ['lib/attach/AttachmentViewer.svelte', 'a message to the holding frame is addressed to this origin alone, and is no address'],
   ['lib/clipboard.ts', 'a copied link is absolute, and `at()` adds the record'],
   ['lib/ui/WebhookDoors.svelte', 'a door is `/in/…` at the root, which a stranger posts to'],
   ['lib/ui/NewAction.svelte', 'the same door mint as `WebhookDoors.svelte`, shown once while the sheet is still open'],
