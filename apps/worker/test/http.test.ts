@@ -1,9 +1,9 @@
 /**
  * What the Worker's adapter holds that the platform does not.
  *
- * ONE ADAPTER'S `PrivateRange` IS THE OTHER'S PLATFORM. Cloudflare will not route a Worker's
- * `fetch` to a private address, so the three names left are the three this file asserts — and the
- * point of asserting them is that `47 §5.1` turns each into a different repair.
+ * ONE ADAPTER'S RESOLVED `PrivateRange` IS THE OTHER'S PLATFORM. Cloudflare will not route a Worker's `fetch` to a
+ * private address, so this file asserts the three names left, and a host WRITTEN as a private address, which the
+ * Worker can see for itself. `47 §5.1` turns each into a different repair.
  */
 
 import { test } from 'node:test';
@@ -60,4 +60,13 @@ test('a body under the cap comes through whole', async () => {
   const send: Send = () => Promise.resolve(new Response('{"items":[1,2,3]}', { status: 200 }));
   const res = await httpFor(send).fetch(AT, INIT);
   assert.equal(await res.text(), '{"items":[1,2,3]}');
+});
+
+test('A HOST WRITTEN AS A PRIVATE ADDRESS IS REFUSED BEFORE THE PLATFORM IS ASKED, in every spelling', async () => {
+  for (const at of ['https://169.254.169.254/latest', 'https://127.0.0.1/', 'https://2130706433/', 'https://[::ffff:7f00:1]/', 'https://metadata.google.internal/', 'https://foo.localhost/']) {
+    let sent = 0;
+    const http = httpFor(async () => (sent++, new Response('')));
+    await assert.rejects(http.fetch(new URL(at), { method: 'GET', headers: {}, timeoutMs: 1000 }), (e: Error) => e.name === 'PrivateRange', at);
+    assert.equal(sent, 0, `${at} was sent`);
+  }
 });

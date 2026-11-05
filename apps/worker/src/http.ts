@@ -1,11 +1,11 @@
 /**
  * The `Http` port, on the Worker. `37 §2.2`, `33 §1` port 7, `47 §8`.
  *
- * THE SAME FOUR CONSTRAINTS AND ONE OF THEM IS THE PLATFORM'S. Cloudflare does not route a
- * Worker's `fetch` to a private or link-local address, so `PrivateRange` is a name this adapter
- * declares and never raises — which is exactly why the check belongs to the adapter and not to
- * `@braindog/connect`: the self-host has to do the lookup itself, and the caller cannot know which
- * machine it is on. Two adapters, one port, one meaning.
+ * THE SAME FOUR CONSTRAINTS AND ONE OF THEM IS HALF THE PLATFORM'S. Cloudflare does not route a
+ * Worker's `fetch` to a private or link-local address, so this adapter raises `PrivateRange` only for a host written
+ * as one, as `sendAction` does, and leaves what a name resolves to to the platform. Which is
+ * why the check belongs to the adapter and not to `@braindog/connect`: the self-host has to do the lookup itself, and
+ * the caller cannot know which machine it is on. Two adapters, one port, one meaning.
  *
  * REDIRECTS ARE NOT FOLLOWED, A BODY IS COUNTED AS IT STREAMS, AND THE TIMEOUT IS THE CALLER'S.
  * None of the three is a flag `HttpInit` could turn off. A connector that followed a redirect would
@@ -13,6 +13,7 @@
  * check does not cover (`47 §8`).
  */
 
+import { refusedHost } from '@braindog/host/actions';
 import type { Http, HttpInit } from '@braindog/ports';
 
 import type { Send } from './actions.ts';
@@ -20,7 +21,7 @@ import type { Send } from './actions.ts';
 /** `47 §4.1`: the row and BLOB ceiling, and the cap the caller may not raise. */
 const RESPONSE_BYTES = 2_000_000;
 
-const fault = (name: 'TooLarge' | 'Timeout' | 'Network', say: string): Error => {
+const fault = (name: 'PrivateRange' | 'TooLarge' | 'Timeout' | 'Network', say: string): Error => {
   const e = new Error(say);
   e.name = name;
   return e;
@@ -68,6 +69,10 @@ export function httpFor(send: Send = (url, init) => fetch(url, init)): Http {
          another scheme here is this repository's bug and is reported as one. */
       if (url.protocol !== 'https:')
         throw new Error(`A connector may only call https, and this asked for ${url.protocol}//.`);
+      /* A HOST WRITTEN AS A PRIVATE OR LOCAL ADDRESS, the one thing a Worker can see for itself, as `sendAction` refuses it.
+         This port went straight to `fetch`, so a connector named `https://169.254.169.254` was sent wherever the platform
+         sends it. What a name resolves to is the platform's. */
+      if (refusedHost(url) !== null) throw fault('PrivateRange', `${url.host} is a private or local address, so nothing was sent.`);
 
       const abort = new AbortController();
       const rang = setTimeout(() => { abort.abort(); }, init.timeoutMs);
