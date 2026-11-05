@@ -300,6 +300,9 @@
     untrack(() => {
       if (sameFilter(f, filtered)) return;
       filtered = f;
+      /* A CHIP THIS TAB HAS ALREADY READ IS DRAWN AT ONCE, and asked again behind it. */
+      const was = reader?.kept(slug, f);
+      if (was) answered(slug, was);
       void reread();
     });
   });

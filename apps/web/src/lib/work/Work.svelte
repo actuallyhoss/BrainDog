@@ -95,14 +95,14 @@
     const at = opened();
     const key = workKey(apiBase(), asked);
     const version = live.version;
-    if (blank) {
-      const was = keptAnswer<Opened>(WORK_PAGE, key, version);
-      if (was !== null && was.got.ok) {
-        got = was.got.value;
-        painted(WORK_PAGE, 'memory');
-        if (was.fresh) return closed(true, at);
-        blank = false;
-      }
+    /* AND A CHIP PRESSED AGAIN IS THIS TOO: it only looked here on a first read, so going back to a chip just pressed asked
+       the record again. */
+    const was = keptAnswer<Opened>(WORK_PAGE, key, version);
+    if (was !== null && was.got.ok) {
+      got = was.got.value;
+      painted(WORK_PAGE, 'memory');
+      if (was.fresh) return closed(true, at);
+      blank = false;
     }
     if (blank) got = null;
     reader ??= pageReader(apiBase());

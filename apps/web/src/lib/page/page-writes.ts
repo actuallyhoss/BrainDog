@@ -158,6 +158,12 @@ export function pageWrites(deps: WritesDeps) {
     }
   }
 
+  /* A NEW CHOICE IN THE PAGE'S FILTER: what it brings in was on the page all along, so nothing of it is marked as arrived. */
+  function forFilter() {
+    deps.arrivals?.forget();
+    runsOf.clear();
+  }
+
   /**
    * THE WRITE MODULE, FETCHED BEFORE THE FIRST GESTURE NEEDS IT. A tick is drawn the moment it is pressed only when the
    * module that holds the row is already here; on a page's first tick it was a chunk away. `PageView` calls this once the
@@ -996,7 +1002,7 @@ export function pageWrites(deps: WritesDeps) {
   /* THE PAGE READ AGAIN, for a host panel that changed the record from beside a block (a run put back). */
   const reread = (): Promise<void> => deps.reread();
 
-  return { forPage, warm, keptSegment, heldDone, arrivedTable, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep, act, reread };
+  return { forPage, forFilter, warm, keptSegment, heldDone, arrivedTable, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep, act, reread };
 }
 
 /**

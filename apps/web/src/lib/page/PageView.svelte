@@ -105,7 +105,7 @@
   import { blockKeys } from './recompose.ts';
   import { heldOrder } from './hold-order.ts';
   import { wroteAt } from '@braindog/client';
-  import { ms, play, still } from '$lib/motion/index.ts';
+  import { hush } from '$lib/motion/index.ts';
   import { pageBoards } from './page-boards.svelte.ts';
   import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
   import Icon from '$lib/ui/Icon.svelte';
@@ -531,26 +531,29 @@
   const filters = $derived(live ? filtersOf(live.page.page) : []);
   const chosen = $derived(filterOf(route.url.searchParams));
 
-  /* A FILTER'S ANSWER SETTLES IN (skills pass 2 Nov): a chip pressed on the Ledger swapped 142 lines for 33 in one frame,
-     the whole list teleporting under the eye. The answer that lands for a new choice comes up from 40% over `--d-enter`
-     on the arrival curve, opacity alone, so nothing moves and nothing waits: near enough to still for a control pressed
-     tens of times a session, and none of it under reduced motion. Only a filter's choice, not the head's search, which
-     answers every keystroke, and not the page's lead, whose sentence hands over on its own (`recompose.ts`) and whose
-     strip holds the chip just pressed. The page's other motion still slides what changed size. */
+  /* A FILTER'S ANSWER IS DRAWN AT ONCE, AS ANSWERS. It came through the same "the page recomposes" as the record moving: the
+     blocks faded up over 320ms from nothing, the rows lit up as just arrived for 1.5s, and every count ran down to its
+     new figure, when nothing had arrived and nothing had changed but what the reader asked to see. So the look before
+     a new choice is no baseline for what lands (`forFilter`), the figures say their number outright (`hush`), and
+     `answerTurn` tells the body this draw plays no plan. Only a choice in the strip: a Swap on `?view=` still plays. */
+  const FILTER_HUSH_MS = 400;
   let refiltered = false;
   let filterSeen: string | null = null;
+  let answerTurn = $state(0);
   $effect.pre(() => {
     const now = JSON.stringify(chosen);
     if (filterSeen !== null && filterSeen !== now) refiltered = true;
     filterSeen = now;
   });
-  $effect(() => {
-    if (!live || !refiltered || mode !== 'page') return;
-    refiltered = false;
-    if (still()) return;
-    const main = document.getElementById('main');
-    for (const el of main?.querySelectorAll<HTMLElement>('.block-slot:not([data-lead])') ?? [])
-      play(el, { opacity: [0.4, 1] }, { duration: ms('--d-enter', 110), easing: getComputedStyle(el).getPropertyValue('--ease-out').trim() || 'ease-out' });
+  $effect.pre(() => {
+    void got;
+    untrack(() => {
+      if (!refiltered) return;
+      refiltered = false;
+      answerTurn += 1;
+      writes.forFilter();
+      hush(FILTER_HUSH_MS);
+    });
   });
   function onfilter(field: string, value: string | null) {
     void goto(`?${filterQuery(route.url.searchParams, field, value)}`, { keepFocus: true, noScroll: true });
@@ -1368,6 +1371,7 @@
         opens={about && !shapeBox.hold && !placed ? (waiting ?? null) : null}
         page={placed ? withoutLayout(bodyPage ?? live!.page.page) : (bodyPage ?? live!.page.page)}
         {blocks}
+        {answerTurn}
         held={counted}
         now={live!.now}
         {writes}

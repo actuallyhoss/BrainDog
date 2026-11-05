@@ -65,6 +65,7 @@
     mode,
     page,
     blocks: given,
+    answerTurn = 0,
     held = null,
     now,
     writes,
@@ -101,6 +102,8 @@
     page: LivePageDecl;
     /** Every block the page draws, declared then added, each at the index its slot keeps. */
     blocks: readonly LiveBlock[];
+    /** Goes up as the answer to a new filter lands: that draw is the reader's choice, drawn at once with no plan (`PageView`). */
+    answerTurn?: number;
     /**
      * The scheduled actions the page's panel would draw, counted by the page before it is judged (`panels.ts`,
      * `PageView.svelte`): a list, of none where the project has none, or `null` where nobody counted.
@@ -648,6 +651,8 @@
   const sized = $derived(workWidth !== null);
   /** What each drawn headline said when the page was last drawn, by key. */
   let saidWas = new Map<string, string>();
+  /** The filter answer the page was last drawn with. */
+  let turnWas = 0;
   $effect.pre(() => {
     void spans;
     void narrow;
@@ -660,12 +665,13 @@
     const cut = flowSplit.after.length;
     untrack(() => {
       const el = pageEl;
-      const same = drewFor === on && wasArranging === moving && wasSized === isSized && wasCut === cut;
+      const same = drewFor === on && wasArranging === moving && wasSized === isSized && wasCut === cut && turnWas === answerTurn;
       const swap = same ? rewritten(saidWas, said) : new Set<string>();
       drewFor = on;
       wasArranging = moving;
       wasSized = isSized;
       wasCut = cut;
+      turnWas = answerTurn;
       saidWas = said;
       if (mode === 'preview' || !el || !same) return motion.stop();
       const play = motion.before(el, shown, swap);
