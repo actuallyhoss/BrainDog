@@ -125,6 +125,8 @@
        * control somebody arrived wanting.
        */
       if (caret) el.querySelector<HTMLElement>('.sheet-body input, .sheet-body select, .sheet-body textarea')?.focus();
+      /* A MENU'S ROWS ARE OUT OF THE TAB ORDER, SO A LONG ONE WOULD FOCUS ITS SCROLLING BOX and wear a ring across the sheet. */
+      if (kind === 'menu') el.querySelector<HTMLElement>('[role^="menuitem"]')?.focus({ preventScroll: true });
       /* The slide starts past the edge, so one that waits too long for its first frame is ended in place. */
       unstall(el);
     } else if (!open && el.open) {
@@ -681,6 +683,7 @@
   }
 
   .sheet[data-kind='menu'] .sheet-body {
+    outline: none;
     padding: 0 var(--sp-2) var(--sp-2);
   }
 
