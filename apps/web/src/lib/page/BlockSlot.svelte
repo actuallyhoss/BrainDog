@@ -885,8 +885,7 @@
        is not a second heading: a screen reader heard a hidden "Late 7" beside the tile's "Late and urgent 6" (audit Q11). -->
   <!-- ON A BOARD, PROJECT CARDS WEAR THE TILE'S HEADING (1 Nov): their lane bar is no name, and a one-row frame hides it,
        so Maya's "Projects in play" stood with no heading at all. The lanes stay under it where the frame has room. -->
-  <!-- A SECTION DRAWS ITS OWN HEADING ROW (`html.ts` `section`, `captioned`), with its count and Show or Hide: with the bar over it too, a fold read its name twice ("Suggested by agents · 1" on two lines). -->
-  {@const titled = !arranging && (block.kind === 'section' || (projectCards && (board || (lanes.length > 1 && widget === null))) || desk !== null || parts !== null)}
+  {@const titled = !arranging && ((projectCards && (board || (lanes.length > 1 && widget === null))) || desk !== null || parts !== null)}
   <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || titled ? '' : undefined}>
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
@@ -1101,7 +1100,7 @@
       {@const shown = w ? w.keptSegment(i, segment, block, runAt(run)) : segment}
       {@const more = fold ? foldOf(segment.kind, shown.rows.length, open) : long ? longFoldOf(segment.kind, shown.rows.length, longShown) : null}
       {#if barRows}<ItemMenu label={barName} bind:at={barAt} href={barHref} />{/if}
-      <div class="block-holds" data-thing={chartThing ?? undefined} {@attach barRows ? barHost : null}>
+      {#snippet drawnBlock()}
       <Block
         cursor={rows?.cursor ?? null}
         onrowfocus={rows?.onrowfocus}
@@ -1117,7 +1116,9 @@
         onmenu={w ? verbs?.onmenu : undefined}
         act={w ? (action, row, value) => w.act(action, row, value, { block, at: i, before: shown.rows }) : undefined}
       />
-      </div>
+      {/snippet}
+      <!-- ONLY A BLOCK WHOSE ROWS HAVE A MENU OF THEIR OWN IS WRAPPED. EVERY OTHER STAYS THE SLOT'S OWN CHILD: the page's and each screen's rules are written against `.block-slot > .block`, and wrapped they all stopped matching at once, on 5 Nov: folds read their name twice and lost their one-line look. -->
+      {#if barRows || chartThing}<div class="block-holds" data-thing={chartThing ?? undefined} {@attach barRows ? barHost : null}>{@render drawnBlock()}</div>{:else}{@render drawnBlock()}{/if}
       {#if more}<button type="button" class="block-more tap" data-long={long && !fold ? '' : undefined} onclick={(e) => (fold ? void unfold(e, more.shown) : longer(e, more.shown))}>{fold ? words.more(more.more) : longWords(more.more)}</button>{/if}
       {#if w && segment.kind === 'steps' && w.stepable(block)}<AddStep {block} writes={w} />{/if}
       <!-- WHAT THE RECORD REFUSED ABOUT A FIELD IS SAID UNDER ITS BLOCK, named by the field's label, until that field is
