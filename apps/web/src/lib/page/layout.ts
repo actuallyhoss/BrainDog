@@ -457,3 +457,9 @@ export function areasWithFlow<T>(main: readonly T[], at: number): { beside: T[];
  * closed from its first layout, and is not laid out tall and then again short (Money, 2098 then 1394 tall).
  */
 export const keptFlow = new Map<string, number>();
+
+/**
+ * THE WORK COLUMN'S WIDTH AS LAST MEASURED, for the width of the window it was measured in: a page opened again in the same
+ * window draws its first layout at the right width, and is not laid out once at no width and again a moment later.
+ */
+export const keptWidth: { window: number; px: number | null } = { window: 0, px: null };

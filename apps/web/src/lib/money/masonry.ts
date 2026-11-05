@@ -46,11 +46,15 @@ function rowsOf(tiles: readonly HTMLElement[], heights: ReadonlyMap<HTMLElement,
 /** An attachment for Money's page host: packs `.page`'s tiles while it has more than one column. */
 export function masonry(host: HTMLElement): () => void {
   let page: HTMLElement | null = null;
-  let frame = 0;
   /* A TILE THAT GREW IS PACKED BEFORE IT IS PAINTED, in the observer's own turn: a frame later, as a read's answer filled
      a tile, every tile under it stood over its neighbour for a frame. Packing changes where a tile stands, not its size. */
-  const sized = new ResizeObserver(() => {
-    cancelAnimationFrame(frame);
+  const sized = new ResizeObserver(() => lay());
+  /* AND SO IS A TILE THAT CAME: a newly watched box answers once after the frame's layout and before its paint, so Money
+     opening was never seen unpacked, 700px taller for a frame with two tiles on the wrong side. */
+  let due = false;
+  const before = new ResizeObserver(() => {
+    before.unobserve(host);
+    due = false;
     lay();
   });
   const watched = new Set<Element>();
@@ -58,7 +62,6 @@ export function masonry(host: HTMLElement): () => void {
   const tiles = (p: HTMLElement): HTMLElement[] => [...p.children].filter((c): c is HTMLElement => c instanceof HTMLElement);
 
   function lay(): void {
-    frame = 0;
     const p = host.querySelector<HTMLElement>(':scope .page');
     if (p !== page) {
       page?.removeAttribute('data-packed');
@@ -78,6 +81,10 @@ export function masonry(host: HTMLElement): () => void {
       }
       return;
     }
+    /* THE PLACE BACK TO WHICH BACK BROUGHT HIM IS KEPT, read before anything here changes: while the rows are being measured
+       the page is one row a tile for a moment, too short to stand scrolled, and the browser put him at the top for a frame. */
+    const pane = p.closest('main');
+    const place = pane?.scrollTop ?? 0;
     const gap = parseFloat(p.style.getPropertyValue('--money-gap')) || parseFloat(cs.rowGap) || 16;
     if (!p.hasAttribute('data-packed')) {
       p.style.setProperty('--money-gap', `${gap}px`);
@@ -107,10 +114,13 @@ export function masonry(host: HTMLElement): () => void {
         if (heights.get(t)! < most) t.style.setProperty('min-block-size', `${most}px`);
       }
     }
+    if (pane && pane.scrollTop !== place) pane.scrollTop = place;
   }
 
   function schedule(): void {
-    if (frame === 0) frame = requestAnimationFrame(lay);
+    if (due) return;
+    due = true;
+    before.observe(host);
   }
 
   /* TILES COME AND GO as a page reads (a `when:` met, a fold opened), so the page's children are watched too. */
@@ -120,7 +130,7 @@ export function masonry(host: HTMLElement): () => void {
   schedule();
 
   return () => {
-    cancelAnimationFrame(frame);
+    before.disconnect();
     sized.disconnect();
     changed.disconnect();
     window.removeEventListener('resize', schedule);

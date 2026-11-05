@@ -39,7 +39,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
-  import { areaOf, areasWithFlow, boxesOf, flowAfterRail, keptFlow, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, railDrawn, slotOf, snapped, splitAreas, sticks, widened, type Measured, type Run } from './layout.ts';
+  import { areaOf, areasWithFlow, boxesOf, flowAfterRail, keptFlow, keptWidth, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, railDrawn, slotOf, snapped, splitAreas, sticks, widened, type Measured, type Run } from './layout.ts';
   import { FOLD_LINES, foldOf, foldWords, linesOf, mayFold } from './fold.ts';
   import { arranged, emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
@@ -302,7 +302,7 @@
    * written, and not in a preview.
    */
   /** The work column's width, measured below (`twoUp`); declared here, as the questions' place reads it. */
-  let workWidth = $state<number | null>(null);
+  let workWidth = $state<number | null>(untrack(() => (mode === 'page' && typeof innerWidth === 'number' && keptWidth.window === innerWidth ? keptWidth.px : null)));
   const asks = $derived.by(() => {
     if (placed) return { order: blocks.map((_, i) => i), rail: new Set<number>(), compact: new Set<number>(), spans: new Map<number, number>() };
     if (mode !== 'page' || arranging) return { order: looked, rail: new Set<number>(), compact: new Set<number>(), spans: new Map<number, number>() };
@@ -545,6 +545,10 @@
     const take = (w: number) => {
       const px = Math.round(w);
       if (px !== workWidth) workWidth = px;
+      if (mode === 'page') {
+        keptWidth.window = innerWidth;
+        keptWidth.px = px;
+      }
     };
     /* THE FIRST WIDTH IS THE RESIZEOBSERVER'S FIRST ANSWER, TAKEN AT ONCE (speed5): it comes after the browser's own
        layout of the frame and before its paint, so the page is still measured before it is first seen, and nothing makes
