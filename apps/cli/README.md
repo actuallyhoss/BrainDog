@@ -58,6 +58,22 @@ prints first), and writes `dist/braindog.mjs.sha256` beside it, and `dist/braind
 publishes both at `https://brain.dog/cli/`, next to the two install scripts, whose sources are in
 `apps/site/static/cli/`.
 
+**A release is signed.** `tools/ship/cli-sign.mjs` writes `dist/braindog.mjs.sig` at deploy, an ed25519 signature over the
+sum and the build, with a key kept under the label `braindog-cli-signing-key`. Once its public half is pinned
+(`src/release-key.ts`, and `PIN` in both install scripts), `braindog update` and the scripts refuse a build with no
+signature or another key's before it runs. With nothing pinned they hold to the sum, so a command from before the pin
+keeps working until it updates. Make the key once:
+
+```
+braindog login <your BrainDog's address> --keychain '*'
+node tools/ship/cli-key.mjs
+git add apps/cli/src/release-key.ts apps/site/static/cli/install.sh apps/site/static/cli/install.ps1
+```
+
+`node tools/ship/cli-key.mjs --again` adds a second key beside the first, and the last two stay pinned, so a key can be
+moved over one release. The scripts come from the site too, so the pin only holds against somebody who can rewrite the
+site if you compare it with the key published here.
+
 In a checkout, `node apps/cli/src/main.ts` runs the same command from its TypeScript sources, and says its build is
 `dev+0000000`. The tests run those sources directly (`pnpm --filter braindog-cli test`).
 

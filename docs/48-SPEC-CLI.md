@@ -335,13 +335,13 @@ for `mcp`; `hooks.ts` (the two hooks and the session file), `brief.ts` (the brie
 hooks; `keys.ts` for the key doors; `skills.ts` and `tools.ts` for the sync, the scan and the write; and
 `hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Setup sync adds `sealer.ts`,
 `secret-store.ts`, `carry.ts`, `sync-record.ts`, `sync-join.ts`, `sync-push.ts`, `sync-pull.ts` and `sync-patches.ts`
-(§5.20). Published artefact: `dist/braindog.mjs`, one file, with `dist/braindog.mjs.sha256` and `dist/braindog.mjs.build` (the one
-line `braindog update` reads, §5.17) beside it, built by
+(§5.20). Published artefact: `dist/braindog.mjs`, one file, with `dist/braindog.mjs.sha256`, `dist/braindog.mjs.sig` (made at deploy by
+`tools/ship/cli-sign.mjs`) and `dist/braindog.mjs.build` (the one line `braindog update` reads, §5.17) beside it, built by
 `scripts/bundle.mjs` (`pnpm --filter braindog-cli build`): esbuild with `src/main.ts --bundle --platform=node
 --format=esm --target=node24 --define:__BUILD__="<yyyy.mm.dd>+<sha7>" --outfile=dist/braindog.mjs`, keeping the
 entry's own hashbang in place of a banner, the build taken from `BRAINDOG_BUILD` or else the UTC date and
 `git rev-parse --short=7 HEAD`. The deploy serves both at `https://brain.dog/cli/`, beside `install.ps1` and
-`install.sh`, which check the SHA-256, put the file at `~/.braindog/bin/braindog.mjs` and write a `braindog` shim on
+`install.sh`, which check the SHA-256 and, once a release key is pinned (`src/release-key.ts`), the ed25519 signature in `dist/braindog.mjs.sig` before running it, put the file at `~/.braindog/bin/braindog.mjs` and write a `braindog` shim on
 the user's PATH. `tsc --noEmit` type-checks; tests run
 the `.ts` sources directly under Node 24.13 (`node --test`). esbuild is a devDependency only (§13 D4).
 

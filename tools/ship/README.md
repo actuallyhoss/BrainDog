@@ -23,6 +23,10 @@ A full run with nothing red, on a clean tree whose HEAD did not move, writes `.s
 
 ## `pnpm ship:deploy` (`node tools/ship/deploy.mjs`)
 
+**It signs the CLI before it publishes (`tools/ship/cli-sign.mjs`), and stops at that step, saying what to run, until a release
+key exists** (`node tools/ship/cli-key.mjs`, `apps/cli/README.md`). The key comes from `braindog keys exec`, so this machine's
+`braindog` must hold Keychain access (`braindog login <address> --keychain '*'`, seven days). A dry run checks a key is pinned and opens nothing.
+
 Runs `deploy.yml`'s `deploy` job, step by step in its order. It refuses, with nothing deployed, when:
 
 - the tree has changes;
