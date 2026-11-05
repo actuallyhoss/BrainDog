@@ -18,20 +18,27 @@
  * written to `.notes/apps-dev-letter.txt` under the main checkout (gitignored), for a script to read the code from.
  */
 
+import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createContext, runInContext } from 'node:vm';
 
-import { startCloud } from '../../worker/test/cloud-serve.ts';
+import { OPERATOR, startCloud } from '../../worker/test/cloud-serve.ts';
 
-const PERSON = 'mina@the-studio.example';
+/* `--demo`: Maya's record instead (`apps/cli/scripts/demo-record.mjs`), the full one, for store pictures. */
+const DEMO = process.argv.includes('--demo');
+const PERSON = DEMO ? 'maya@brain.dog' : 'mina@the-studio.example';
 const PORT = Number(process.env.BRAINDOG_DEV_PORT ?? 8787);
 const notes = join(homedir(), 'Developer', 'braindog', '.notes');
 
 const running = await startCloud({ port: PORT });
-const person = await running.provision(PERSON, { slug: 'the-studio', name: 'The Studio', tz: 'Europe/London' });
+const person = await running.provision(PERSON, DEMO ? { slug: 'maya-demo', name: 'Maya', tz: 'America/New_York' } : { slug: 'the-studio', name: 'Mina Hale', tz: 'Europe/London' });
 
+if (DEMO) {
+  const made = spawn(process.execPath, [join(import.meta.dirname, '..', '..', 'cli', 'scripts', 'demo-record.mjs'), 'make', '--host', running.base, '--slug', 'maya-demo', '--email', PERSON, '--reviewer', 'none', '--again'], { env: { ...process.env, PROVISION_KEY: OPERATOR }, stdio: 'inherit' });
+  await new Promise((done) => made.on('exit', done));
+} else {
 const send = async (name, body) => {
   const said = await fetch(`${running.base}/api/${name}`, { method: 'POST', headers: { 'content-type': 'application/json', cookie: person.cookie }, body: JSON.stringify(body) })
     .then((r) => r.json())
@@ -64,6 +71,7 @@ for (const [question, context, options] of [
   ['Keep the photo shoot in the spring launch?', 'It is the biggest cost in the plan.', [option('keep', 'Keep it', 'The launch leans on new pictures.'), option('drop', 'Drop it', 'Last year’s pictures still work.')]],
 ]) {
   await send('propose', { question, body_kind: 'options', body: { options, context } });
+}
 }
 
 console.log(`The Cloud is on ${running.base}, as ${running.origin}. Sign in as ${PERSON}.`);
