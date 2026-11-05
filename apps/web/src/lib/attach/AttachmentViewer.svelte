@@ -7,8 +7,9 @@
     libraries load from the artifact CDNs and nothing else, with no network at all (`connect-src 'none'`). It says it is
     ready from its own window and is posted the page once; nothing it says back is acted on. A line over it says so.
   - A PDF by the browser's own viewer, from a `blob:` the app makes with the type `application/pdf` and no other, so a
-    blob here is never a page. "Open full screen" opens the same blob in a tab of its own, which is how a phone shows
-    every page of it.
+    blob here is never a page, inside the hosts' holding frame (`/drawn-frame/hold`), the one document that may hold a
+    blob, so a page in the frame above has no blob to navigate itself to. "Open full screen" opens the same blob in a tab
+    of its own, which is how a phone shows every page of it.
   - A PICTURE by `<img>` from the file door, where an SVG's script never runs.
   - TEXT as text, never as markup.
   - Anything else: no preview, and Download.
@@ -40,9 +41,11 @@
 
   const uid = $props.id();
   const SRC = `${BASE}/drawn-frame/file`;
+  const HOLD = `${BASE}/drawn-frame/hold`;
 
   let el = $state<HTMLDialogElement>();
   let frame = $state<HTMLIFrameElement>();
+  let holder = $state<HTMLIFrameElement>();
   let held = false;
   let lift: (() => void) | null = null;
 
@@ -140,6 +143,11 @@
   /* THE FRAME SAYS IT IS READY FROM ITS OWN WINDOW, and is handed the page once. Nothing else it says is read. */
   $effect(() => {
     const listen = (e: MessageEvent) => {
+      /* AND THE HOLDING FRAME IS TOLD WHICH PDF, ON THIS ORIGIN ALONE. */
+      if (holder && e.source === holder.contentWindow && pdf !== null && (e.data as { braindog?: unknown } | null)?.braindog === 'ready') {
+        holder.contentWindow?.postMessage({ braindog: 'hold', kind: 'pdf', src: pdf, title: shown?.name ?? name }, location.origin);
+        return;
+      }
       if (!frame || e.source !== frame.contentWindow || written || doc === null) return;
       const m = e.data as { braindog?: unknown } | null;
       if (m && typeof m === 'object' && m.braindog === 'ready') {
@@ -209,7 +217,7 @@
       {/key}
     {:else if shown.kind === 'pdf' && pdf !== null}
       {#key drawn}
-        <iframe class="a-frame a-pdf" src={pdf} title={shown.name}></iframe>
+        <iframe bind:this={holder} class="a-frame a-pdf" src={HOLD} title={shown.name} referrerpolicy="no-referrer"></iframe>
       {/key}
       <p class="a-foot"><a class="a-link" href={pdf} target="_blank" rel="noopener noreferrer">{words.openPdf}</a></p>
     {:else if shown.kind === 'picture'}

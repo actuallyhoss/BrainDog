@@ -138,19 +138,90 @@ export function fileFrameHeaders(): Headers {
   return headers;
 }
 
-/** Whether a path is one of the two frames, so a host answers it before it reads the path as a record's name. */
-export const isDrawnFrame = (pathname: string): boolean => pathname === DRAWN_FRAME_PATH || pathname === FILE_FRAME_PATH;
+/* ── the frame that holds another site's frame or a PDF ─────────────────── */
+
+/**
+ * Where a provider's player and an attached PDF are drawn: this document, and inside it their own frame.
+ *
+ * WHY THEY DO NOT STAND IN THE PAGE. A frame may be navigated to whatever the page HOLDING it lets it hold, so every source
+ * in the app's `frame-src` was a place a drawn component, a visual or an attached page could send itself, with what it
+ * read in the address, and no policy of its own could stop it. Measured with five providers and `blob:` there: `location =
+ * 'https://www.google.com/...?' + row` left the browser, and Google fetches a name it is asked about (`/s2/favicons?domain=`),
+ * which puts the row in a stranger's DNS log; in a WKWebView the navigation reached the delegate, where the desktop app
+ * opens anything off its own origin in the person's browser with no press; and a `blob:` document, which a guard is never
+ * written into, ran a peer connection. So the app's `frame-src` names `'self'` alone, and those sources are named here, on a
+ * document no author's code ever runs in, for a frame only the page that holds it can ask for.
+ *
+ * WHAT IT DOES: says it is ready, takes ONE `hold` from its parent on this origin, and puts one frame in itself, sandboxed
+ * as a provider's always was, or a PDF from a `blob:` of this origin. A sandboxed frame that navigates itself here gets
+ * nothing, because the page holding it never sends `hold` to it. NOT SANDBOXED ITSELF, since a `blob:` of this origin opens
+ * only from this origin, so it stays a constant with nothing typed into it: its script and style are by hash, not inline.
+ */
+export const HOLD_FRAME_PATH = '/drawn-frame/hold';
+
+/** The origins of `EMBED_PROVIDERS` in `braindog-render`, which `apps/web/test/csp.test.ts` holds equal to these. */
+export const HOLD_ORIGINS = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://www.google.com'] as const;
+
+/** Its script and its style, the two things its policy names by hash (`test/drawn-frame.test.ts` holds the hashes). */
+export const HOLD_FRAME_SCRIPT = `(function () {
+  if (parent === window) return;
+  function first(e) {
+    if (e.source !== parent || e.origin !== location.origin) return;
+    var m = e.data;
+    if (!m || m.braindog !== 'hold' || typeof m.src !== 'string') return;
+    var pdf = m.kind === 'pdf';
+    if (pdf ? m.src.indexOf('blob:' + location.origin + '/') !== 0 : m.src.indexOf('https://') !== 0) return;
+    removeEventListener('message', first);
+    var f = document.createElement('iframe');
+    if (!pdf) {
+      f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation allow-popups');
+      f.setAttribute('allow', 'fullscreen; picture-in-picture');
+      f.referrerPolicy = 'no-referrer';
+    }
+    if (typeof m.title === 'string') f.title = m.title;
+    f.src = m.src;
+    document.body.appendChild(f);
+  }
+  addEventListener('message', first);
+  parent.postMessage({ braindog: 'ready' }, location.origin);
+})();`;
+export const HOLD_FRAME_STYLE = 'html,body,iframe{display:block;margin:0;padding:0;border:0;width:100%;height:100%}';
+
+/** Its policy: nothing but the hashes above and the frames it may hold. */
+export const HOLD_FRAME_POLICY = [
+  "default-src 'none'",
+  "script-src 'sha256-6VaAM6e2Fm5A9z079rH+POEMb3lsVIJ0FkvAZ9h875I='",
+  "style-src 'sha256-j4Sm/mbg57bqvvckBtK/sPluZoQb/2CQt9aM43I3VAc='",
+  `frame-src blob: ${HOLD_ORIGINS.join(' ')}`,
+  "object-src 'none'",
+  "form-action 'none'",
+  "base-uri 'none'",
+  "frame-ancestors 'self'",
+].join('; ');
+
+export const HOLD_FRAME_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Held</title><style>${HOLD_FRAME_STYLE}</style></head><body><script>${HOLD_FRAME_SCRIPT}</script></body></html>`;
+
+/** The headers the holding frame is answered with: the drawn frame's, under its own policy, with no sandbox. */
+export function holdFrameHeaders(): Headers {
+  const headers = drawnFrameHeaders();
+  headers.set('content-security-policy', HOLD_FRAME_POLICY);
+  return headers;
+}
+
+/** Whether a path is one of the frames, so a host answers it before it reads the path as a record's name. */
+export const isDrawnFrame = (pathname: string): boolean => pathname === DRAWN_FRAME_PATH || pathname === FILE_FRAME_PATH || pathname === HOLD_FRAME_PATH;
 
 /**
  * The frame, for a GET or a HEAD; any other method is refused, as it is for every page of the app. `pathname` picks the
- * attached page's frame; the same document, under its own policy.
+ * attached page's frame, the same document under its own policy, or the holding frame, a document of its own.
  */
 export function drawnFrame(method: string, pathname: string = DRAWN_FRAME_PATH): Response {
-  const headers = pathname === FILE_FRAME_PATH ? fileFrameHeaders() : drawnFrameHeaders();
+  const hold = pathname === HOLD_FRAME_PATH;
+  const headers = hold ? holdFrameHeaders() : pathname === FILE_FRAME_PATH ? fileFrameHeaders() : drawnFrameHeaders();
   if (method !== 'GET' && method !== 'HEAD') {
     headers.set('allow', 'GET, HEAD');
     headers.set('cache-control', 'no-store');
     return new Response(null, { status: 405, headers });
   }
-  return new Response(method === 'HEAD' ? null : DRAWN_FRAME_HTML, { status: 200, headers });
+  return new Response(method === 'HEAD' ? null : hold ? HOLD_FRAME_HTML : DRAWN_FRAME_HTML, { status: 200, headers });
 }

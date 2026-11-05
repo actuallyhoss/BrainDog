@@ -179,7 +179,7 @@ export { CALENDAR_DAY, CALENDAR_MONTHS_MOST, CALENDAR_NONE, CALENDAR_TODAY, CALE
 export { LANES_NONE, LANES_NOW, LANES_WINDOW, lanesFault, lanesInstant, lanesMore, lanesOutside, lanesPlan, lanesSentence, lanesSince, lanesSkipped, type Lane, type LanesPlan, type LanesTick } from './lanes.ts';
 export { LINK_ADDRESS, LINKS_NONE, linkFault, linkHost, linkHref, linkPlan, type LinkLine } from './links.ts';
 export { GALLERY_NONE, PICTURE_MIMES, fileRef, galleryPlan, isPictureMime, pictureSrc, type GalleryTile } from './gallery.ts';
-export { EMBED_ASPECTS, EMBED_NONE, EMBED_PROVIDERS, embedAspect, embedFault, embedLoad, embedOf, embedOpen, embedPlan, type EmbedAspect, type EmbedPlan, type EmbedProvider } from './embed.ts';
+export { EMBED_ASPECTS, EMBED_HOLD_PATH, EMBED_NONE, EMBED_PROVIDERS, embedAspect, embedFault, embedLoad, embedOf, embedOpen, embedPlan, type EmbedAspect, type EmbedPlan, type EmbedProvider } from './embed.ts';
 export {
   INPUT_TYPES,
   INPUTS_NONE,

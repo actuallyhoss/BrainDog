@@ -18,7 +18,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { EMBED_PROVIDERS } from 'braindog-render';
+import { EMBED_HOLD_PATH, EMBED_PROVIDERS } from 'braindog-render';
+import { HOLD_FRAME_PATH, HOLD_ORIGINS } from '../../../packages/host/src/drawn-frame.ts';
 
 /* A PATH IN A VARIABLE, so `svelte-check` does not ask for a declaration file for a config written in JavaScript. */
 const CONFIG = '../svelte.config.js';
@@ -39,12 +40,15 @@ function directives(policy: string): Map<string, string[]> {
   return out;
 }
 
-test('THE POLICY FRAMES EXACTLY ITS OWN DRAWN FRAME, THE EMBED PROVIDERS AND TURNSTILE, AND ITS ONE INLINE EXCEPTION IS A STYLE ATTRIBUTE', async () => {
+test('THE POLICY FRAMES ONLY THE HOSTS' OWN FRAMES AND TURNSTILE, AND ITS ONE INLINE EXCEPTION IS A STYLE ATTRIBUTE', async () => {
   const { default: config } = (await import(CONFIG)) as { default: { kit?: { csp?: Csp } } };
   const d = config.kit?.csp?.directives ?? {};
-  /* `'self'` FOR THE DRAWN BLOCK'S FRAME ALONE, which both hosts serve under its own policy (`@braindog/host/drawn-frame`).
-     `blob:` FOR AN ATTACHED PDF ALONE (07d611b46), and the two checks under this one are what keep it that. */
-  assert.deepEqual(d['frame-src'], ['self', 'blob:', ...EMBED_PROVIDERS.map((p) => p.origin), TURNSTILE], "frame-src is not 'self', blob:, EMBED_PROVIDERS and Turnstile");
+  /* `'self'` FOR THE HOSTS' FRAME DOCUMENTS ALONE (`@braindog/host/drawn-frame`). A frame may be navigated to anything the
+     page holding it may hold, so a provider or `blob:` here is a place a drawn component can send a row: measured, one
+     sent a row in an address to `www.google.com`, and a `blob:` document with no guard in it ran a peer connection. */
+  assert.deepEqual(d['frame-src'], ['self', TURNSTILE], "frame-src names something a frame could navigate itself to");
+  assert.deepEqual([...HOLD_ORIGINS], EMBED_PROVIDERS.map((p) => p.origin), 'the holding frame and the providers differ');
+  assert.equal(EMBED_HOLD_PATH, HOLD_FRAME_PATH);
   assert.equal(config.kit?.csp?.mode, 'hash');
   assert.deepEqual(d['style-src-attr'], ['unsafe-inline']);
   assert.deepEqual(d['form-action'], ['self'], 'a form on the page could post to any host: default-src does not cover form-action');
@@ -52,16 +56,16 @@ test('THE POLICY FRAMES EXACTLY ITS OWN DRAWN FRAME, THE EMBED PROVIDERS AND TUR
     assert.ok(!(d[name] ?? []).some((s) => s === 'unsafe-inline' || s === 'unsafe-eval'), `${name} allows inline or eval`);
 });
 
-test('A BLOB IN A FRAME IS ONLY EVER A PDF: the one file that frames a blob types it as one, and no other file that makes a blob draws a frame', () => {
+test('A BLOB IN THE HOLDING FRAME IS ONLY EVER A PDF: the one file that hands it a blob types it as one, and no other file that makes a blob draws a frame', () => {
   const src = fileURLToPath(new URL('../src/', import.meta.url));
   const viewer = 'lib/attach/AttachmentViewer.svelte';
   const makes = (readdirSync(src, { recursive: true }) as string[])
     .filter((f) => f.endsWith('.svelte') || f.endsWith('.ts'))
     .filter((f) => !f.endsWith('.test.ts') && readFileSync(join(src, f), 'utf8').includes('createObjectURL'));
-  assert.ok(makes.includes(viewer), 'the viewer no longer makes a blob, so frame-src no longer needs blob:');
+  assert.ok(makes.includes(viewer), 'the viewer no longer makes a blob, so the holding frame no longer needs blob:');
   for (const file of makes) {
     if (file === viewer) continue;
-    assert.doesNotMatch(readFileSync(join(src, file), 'utf8'), /<iframe\b/u, `${file} makes a blob and draws a frame, and frame-src lets a blob in`);
+    assert.doesNotMatch(readFileSync(join(src, file), 'utf8'), /<iframe\b/u, `${file} makes a blob and draws a frame, and the holding frame lets a blob in`);
   }
   const text = readFileSync(join(src, viewer), 'utf8').replace(/<!--[\s\S]*?-->/gu, '');
   assert.deepEqual(

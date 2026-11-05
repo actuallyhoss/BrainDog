@@ -17,16 +17,16 @@ const inlineHashes = (tag) =>
     (m) => /** @type {`sha256-${string}`} */ (`sha256-${createHash('sha256').update(m[1] ?? '').digest('base64')}`),
   );
 
-/* EVERY FRAME A PAGE MAY HOLD. The embeds are the origins of `EMBED_PROVIDERS` in `packages/render/src/embed.ts`,
-   which the kernel copies and refuses any other against, and `test/csp.test.ts` holds this list equal to that one.
-   Turnstile's origin is here for its script and its frame, and the hosts take it out of every page but `/signup` and `/signin`
-   (`asPage` in `apps/worker/src/route.ts`); the self-host has no sign-up, so it takes it out everywhere.
-   `'self'` IS FOR ONE DOCUMENT, the frame a drawn block is drawn in (`@braindog/host/drawn-frame`), which both hosts serve
-   under its own sandboxing policy. Not `srcdoc`: a `srcdoc` frame takes this page's policy, which runs no inline script,
-   so a component written into one would never run. Every other page of this origin sends `frame-ancestors 'none'`, so
-   naming `'self'` here frames nothing else. */
+/* EVERY FRAME A PAGE MAY HOLD, AND A FRAME MAY BE NAVIGATED TO ANY OF THEM, so nothing here is a place a drawn component
+   could use to send a row. `'self'` IS FOR THE HOSTS' OWN FRAME DOCUMENTS (`@braindog/host/drawn-frame`), served under
+   sandboxing policies of their own; every other page of this origin sends `frame-ancestors 'none'`, so naming it frames
+   nothing else. A provider's player and an attached PDF stand inside the holding frame, whose own `frame-src` names them
+   (`HOLD_FRAME_POLICY`), and never here. Not `srcdoc`: a `srcdoc` frame takes this page's policy, which runs no inline
+   script, so a component written into one would never run.
+   Turnstile's origin is here for its script and its frame, and the hosts take it out of every page but `/signup` and
+   `/signin` (`asPage` in `apps/worker/src/route.ts`), which hold no drawn frame; the self-host has no sign-up, so it takes
+   it out everywhere. */
 const TURNSTILE = 'https://challenges.cloudflare.com';
-const EMBEDS = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://www.google.com'];
 
 /* THE APP LIVES AT THE ROOT OF `app.brain.dog`, AND ITS FILES AT THE ROOT OF `build/`. It was built under `/app` while
    it shared `brain.dog` with the marketing site, and the site is its own Worker on its own name now, so nothing else
@@ -97,9 +97,7 @@ export default {
         'script-src': ['self', ...inlineHashes('script'), TURNSTILE],
         'style-src-elem': ['self', ...inlineHashes('style')],
         'style-src-attr': ['unsafe-inline'],
-        /* `blob:` FOR AN ATTACHED PDF ONLY, which the browser's own viewer draws from a `blob:` the app makes with the type
-           `application/pdf` and no other (`lib/attach/AttachmentViewer.svelte`), so a blob in a frame is never a page. */
-        'frame-src': ['self', 'blob:', ...EMBEDS, TURNSTILE],
+        'frame-src': ['self', TURNSTILE],
         'object-src': ['none'],
         'base-uri': ['none'],
         /* NO FORM OF THE APP POSTS ANYWHERE: every one is sent by `fetch`. `default-src` does not cover this directive, so a form

@@ -3,10 +3,11 @@
  * pages, and writing only what its parent hands it.
  */
 
+import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DRAWN_FRAME_HTML, DRAWN_FRAME_PATH, DRAWN_FRAME_POLICY, drawnFrame, isDrawnFrame } from '../src/drawn-frame.ts';
+import { DRAWN_FRAME_HTML, DRAWN_FRAME_PATH, DRAWN_FRAME_POLICY, HOLD_FRAME_HTML, HOLD_FRAME_PATH, HOLD_FRAME_POLICY, HOLD_FRAME_SCRIPT, HOLD_FRAME_STYLE, HOLD_ORIGINS, drawnFrame, isDrawnFrame } from '../src/drawn-frame.ts';
 
 const directives = (policy: string): Map<string, string> =>
   new Map(policy.split(';').map((d) => d.trim().split(/\s+/u)).map(([name, ...rest]) => [name ?? '', rest.join(' ')]));
@@ -49,4 +50,24 @@ test('THE FRAME ITSELF TAKES THE PEER CONNECTION AWAY BEFORE IT WRITES ANYTHING,
   assert.ok(guard > 0 && guard < write, 'the frame writes a document before it takes away what its policy cannot hold');
   assert.match(DRAWN_FRAME_HTML, /configurable: false/u);
   assert.ok(DRAWN_FRAME_HTML.indexOf('MutationObserver') < write, 'a frame an attached page makes has constructors of its own');
+});
+
+test('THE HOLDING FRAME NAMES WHAT IT MAY HOLD, RUNS ONLY ITS OWN SCRIPT, AND TAKES ONE HOLD FROM ITS PARENT ON THIS ORIGIN', async () => {
+  const hash = (t: string): string => `'sha256-${createHash('sha256').update(t).digest('base64')}'`;
+  const d = directives(HOLD_FRAME_POLICY);
+  assert.equal(d.get('script-src'), hash(HOLD_FRAME_SCRIPT), 'its script changed and its hash did not');
+  assert.equal(d.get('style-src'), hash(HOLD_FRAME_STYLE), 'its style changed and its hash did not');
+  assert.equal(d.get('frame-src'), `blob: ${HOLD_ORIGINS.join(' ')}`);
+  assert.equal(d.get('default-src'), "'none'");
+  assert.equal(d.get('frame-ancestors'), "'self'");
+  assert.ok(!HOLD_FRAME_POLICY.includes('unsafe'), 'the one unsandboxed frame document runs something inline');
+  assert.ok(HOLD_FRAME_HTML.includes(`<script>${HOLD_FRAME_SCRIPT}</script>`) && HOLD_FRAME_HTML.includes(`<style>${HOLD_FRAME_STYLE}</style>`));
+  assert.match(HOLD_FRAME_SCRIPT, /e\.source !== parent \|\| e\.origin !== location\.origin/u, 'it answers somebody other than the page holding it');
+  assert.match(HOLD_FRAME_SCRIPT, /removeEventListener\('message', first\)/u, 'it would hold a second thing');
+  assert.equal(isDrawnFrame(HOLD_FRAME_PATH), true);
+  const got = drawnFrame('GET', HOLD_FRAME_PATH);
+  assert.equal(got.headers.get('content-security-policy'), HOLD_FRAME_POLICY);
+  assert.equal(got.headers.get('x-frame-options'), 'SAMEORIGIN');
+  assert.equal(await got.text(), HOLD_FRAME_HTML);
+  assert.equal(drawnFrame('POST', HOLD_FRAME_PATH).status, 405);
 });

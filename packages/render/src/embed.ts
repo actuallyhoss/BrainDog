@@ -12,7 +12,8 @@
  * small. An address is admitted only when it is one of the shapes below, and the frame is pointed at the provider's
  * own embed address rather than at what was typed: a YouTube page is framed through `youtube-nocookie.com`, which
  * sets no cookie until the video is played. `EMBED_PROVIDERS` is copied into the kernel, which refuses any other
- * address at install, and a host that sends a content security policy names exactly these origins in `frame-src`.
+ * address at install, and the hosts' holding frame names exactly these origins in its `frame-src` and the page names none,
+ * because a frame may be navigated to anything the page holding it may hold (`HOLD_FRAME_PATH` in `@braindog/host`).
  *
  * NOTHING IS FRAMED UNTIL A READER ASKS. Both drawers draw a facade (the title, the provider, a link to the original);
  * the Svelte drawer adds a Load button, and only a press puts the frame on the page. A page that loaded every embed
@@ -37,6 +38,9 @@ export const EMBED_PROVIDERS: readonly EmbedProvider[] = [
 /** How tall a frame stands against its width. The first is what a row that says nothing gets. */
 export const EMBED_ASPECTS = ['16:9', '4:3', '1:1', '9:16'] as const;
 export type EmbedAspect = (typeof EMBED_ASPECTS)[number];
+
+/** The hosts' document a player stands inside (`HOLD_FRAME_PATH` in `@braindog/host/drawn-frame`), which a test holds equal. */
+export const EMBED_HOLD_PATH = '/drawn-frame/hold';
 
 /** The words the drawers write that no author did, here because this package cannot import the app's copy. */
 export const EMBED_NONE = 'Nothing to show here.';

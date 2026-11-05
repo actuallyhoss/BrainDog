@@ -13,13 +13,28 @@
 -->
 <script lang="ts">
   import { hrefFor, inline, text, type Block, type RenderOptions } from '../src/index.ts';
-  import { EMBED_NONE, embedLoad, embedOpen, embedPlan } from '../src/embed.ts';
+  import { EMBED_HOLD_PATH, EMBED_NONE, embedLoad, embedOpen, embedPlan } from '../src/embed.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
   const plan = $derived(embedPlan(block.rows));
   let loaded = $state<string | null>(null);
+  let frame = $state<HTMLIFrameElement | undefined>();
+  const title = $derived(plan ? text(inline(plan.title, opts)) || plan.provider.name : '');
+
+  /* THE FRAME SAYS IT IS READY FROM ITS OWN WINDOW, AND IS TOLD WHAT TO HOLD, ON THIS ORIGIN ALONE. */
+  $effect(() => {
+    if (loaded === null || !frame) return;
+    const src = loaded;
+    const named = title;
+    const listen = (e: MessageEvent) => {
+      if (e.source !== frame?.contentWindow || (e.data as { braindog?: unknown } | null)?.braindog !== 'ready') return;
+      frame.contentWindow?.postMessage({ braindog: 'hold', kind: 'embed', src, title: named }, location.origin);
+    };
+    addEventListener('message', listen);
+    return () => removeEventListener('message', listen);
+  });
 </script>
 
 {#if !plan}
@@ -28,9 +43,10 @@
   <div class="embed" data-provider={plan.provider.id} data-aspect={plan.aspect}>
     {#if loaded === plan.src}
       <iframe
+        bind:this={frame}
         class="embed-frame"
-        src={plan.src}
-        title={text(inline(plan.title, opts)) || plan.provider.name}
+        src={EMBED_HOLD_PATH}
+        {title}
         sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
         referrerpolicy="no-referrer"
         loading="lazy"

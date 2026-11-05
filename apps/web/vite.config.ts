@@ -218,8 +218,9 @@ const layoutCssPlugin: Plugin = {
  */
 /* `/drawn-frame` IS THE HOSTS' TOO: the frame a drawn block is drawn in is answered from code under its own policy
    (`@braindog/host/drawn-frame`), and Vite would answer it with the shell, which in that sandbox posts nothing. So is
-   `/drawn-frame/file`, where the attachment viewer loads a page saved from Claude: Vite drew the app there, blank. */
-const PROXY = { '/api': API, '/auth': API, '/account': API, '/oauth': API, '/catalogue': API, '^/drawn-frame(/file)?$': API, '^/[a-z][a-z0-9-]{0,30}[a-z0-9]/api/': API };
+   `/drawn-frame/file`, where the attachment viewer loads a page saved from Claude: Vite drew the app there, blank; and
+   `/drawn-frame/hold`, which holds a provider's player or an attached PDF. */
+const PROXY = { '/api': API, '/auth': API, '/account': API, '/oauth': API, '/catalogue': API, '^/drawn-frame(/file|/hold)?$': API, '^/[a-z][a-z0-9-]{0,30}[a-z0-9]/api/': API };
 
 /**
  * `virtual:own-words` IS THE SET OF TEXTS THE COPY FILES TYPE WHOLE, which is what screenshot mode needs
