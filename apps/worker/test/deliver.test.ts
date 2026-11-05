@@ -180,6 +180,9 @@ test('A WEBHOOK GOES TO AN HTTPS ADDRESS ON A PUBLIC HOST, and the check is here
     assert.equal(postable(url), null, `${url} was allowed`);
 
   // And the ones that look private and are not, because a refusal that is wrong is a feature broken.
+  /* EACH OF THESE PASSED THE COPY THIS FILE KEPT OF THE LIST. */
+  for (const url of ['https://100.100.100.200/latest', 'https://[64:ff9b::a9fe:a9fe]/', 'https://[2002:a9fe:a9fe::]/', 'https://[::a9fe:a9fe]/', 'https://224.0.0.1/', 'https://198.18.0.1/'])
+    assert.equal(postable(url), null, `${url} was allowed`);
   assert.ok(postable('https://172.32.0.1/x'));
   assert.ok(postable('https://11.0.0.1/x'));
 

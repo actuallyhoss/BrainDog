@@ -22,6 +22,7 @@
  */
 
 import { grantAad, grantKey, openSealed } from '@braindog/host';
+import { refusedHost } from '@braindog/host/actions';
 import type { LeasedSeal, OutboxKind, OutboxRow } from '@braindog/kernel';
 import { fixOf, type Result } from '@braindog/ports';
 
@@ -196,27 +197,12 @@ export function postable(raw: string): string | null {
   }
   if (url.protocol !== 'https:') return null;
 
-  /* THE TRAILING DOT IS THE SAME NAME. `localhost.` and `metadata.google.internal.` are the fully
-     qualified forms of the two names this function exists to block, and a string compare that did
-     not strip it blocked neither. */
-  const host = url.hostname.toLowerCase().replace(/\.$/, '');
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal')) return null;
-  /* The literal forms of "this machine" and "the network next door". A name that RESOLVES to one of
-     these is not caught here and cannot be: the platform's own egress rules are the layer for that,
-     and pretending otherwise would be a check that reads as a guarantee. */
-  if (/^(?:127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host)) return null;
-  if (/^172\.(?:1[6-9]|2\d|3[01])\./.test(host)) return null;
-  /* AND AN IPv6 LITERAL IS NORMALISED BEFORE IT IS COMPARED. `[::ffff:127.0.0.1]` reaches loopback
-     and is not the string `[::1]`; `[::]` routes there on most stacks. Any literal that is
-     unspecified, loopback, or a v4-mapped address goes nowhere. */
-  if (host.startsWith('[')) {
-    const inner = host.slice(1, -1);
-    if (inner === '::1' || inner === '::' || inner === '') return null;
-    const mapped = /^::ffff:([0-9a-f:.]+)$/.exec(inner)?.[1];
-    if (mapped) return null;
-    /* Link-local `fe80::/10` and the retired site-local `fec0::/10` together are `fe80::/9`, and `fc00::/7` is unique-local. */
-    if (/^(?:fe[89a-f][0-9a-f]:|fc|fd)/.test(inner)) return null;
-  }
+  /* ONE LIST OF WHAT IS PRIVATE, THE ONE EVERY OTHER SEND HOLDS (`refusedHost`). This kept a copy that had fallen behind:
+     carrier-grade NAT, where Alibaba's metadata service answers at 100.100.100.200, a metadata address carried inside IPv6
+     as NAT64 `[64:ff9b::a9fe:a9fe]`, 6to4 `[2002:a9fe:a9fe::]` or compatible `[::a9fe:a9fe]`, multicast and the reserved
+     ranges all passed it. A name that RESOLVES to one of these is not caught here and cannot be: the platform's egress
+     rules are the layer for that, and pretending otherwise would be a check that reads as a guarantee. */
+  if (refusedHost(url) !== null) return null;
   return url.toString();
 }
 
