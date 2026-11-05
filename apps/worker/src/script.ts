@@ -196,7 +196,9 @@ export class ScriptOutbound extends WorkerEntrypoint<Wired, Linked> {
       address: request.headers.get(ADDRESS_HEADER),
     });
     if ('error' in reply) {
-      console.info(`script fetch: ${reply.error}`);
+      /* NEVER ITS WORDS: the refusal quotes what the script wrote, a host or a URL it chose, and this line goes to the
+         operator's logs, which hold a code and never a value (`12-SECURITY` §8). The run keeps the sentence. */
+      console.info('script fetch refused');
       return new Response(reply.error, { headers: { [REFUSED_HEADER]: '1', 'cache-control': 'no-store' } });
     }
     return Response.json(reply.ok);

@@ -6,6 +6,7 @@
  * Worker can see for itself. `47 §5.1` turns each into a different repair.
  */
 
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -79,4 +80,9 @@ test('WHAT A SCRIPT POSTS IS READ UP TO THE CAP AND NO FURTHER', async () => {
   const endless = new ReadableStream<Uint8Array>({ pull(c) { pulled++; c.enqueue(new Uint8Array(1_000)); } });
   assert.equal(await textWithin(new Request('https://a.example/', { method: 'POST', body: endless, duplex: 'half' } as RequestInit), 2_000), OVER);
   assert.ok(pulled < 10, `it kept reading: ${pulled} pulls`);
+});
+
+test("THE GATEWAY'S LOG LINE HOLDS NONE OF A SCRIPT'S WORDS: a refusal quotes the URL it wrote, and a URL can carry a row", () => {
+  const source = readFileSync(new URL('../src/script.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /console\.\w+\([^)]*reply\.error/u);
 });
