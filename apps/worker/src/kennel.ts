@@ -124,6 +124,15 @@ export type KennelDeps = {
    * check before the day's cap is counted. Left out, nothing is limited.
    */
   spend?: (request: Request) => Promise<Response | null>;
+  /** The operator's key held to ten wrong tries from one place (`operatorKeyHeld`): `null` to go on, or its 429. Left out, nothing is limited. */
+  operatorHeld?: (request: Request) => Promise<Response | null>;
+  /**
+   * A signed submission from nobody signed in, counted by the place it came from: `null` to go on, or its 429.
+   *
+   * A KEY IS FREE TO MAKE, SO THE DAY'S CAP PER PUBLISHER HOLDS NOBODY. Two hundred fresh keys filled the review queue
+   * (`PENDING_MOST`), turned everybody else away for days, and each cost a scratch install and a model note on the way.
+   */
+  keySubmit?: (request: Request) => Promise<Response | null>;
   /**
    * The empty record every submission is installed into before it is listed or waits, and the modules it requires
    * (`kennel-scratch.ts`). Left out, the door answers as it did and says once in its log that no scratch ran.
@@ -817,6 +826,10 @@ async function submit(request: Request, deps: KennelDeps, now: () => Date): Prom
     /* THE SESSION IS READ BESIDE A SIGNATURE, never in its place, so a person's key may claim an id that person
        published unsigned (`packages/declare/src/kennel.ts` `mayTake`). Nobody signed in is a key alone, as before. */
     const who = await personOf(request, deps);
+    if ('refused' in who) {
+      const over = await deps.keySubmit?.(request);
+      if (over) return over;
+    }
     identity = { kind: 'key', signature, name, ...('refused' in who ? {} : { person: who.person }) };
     if (!('refused' in who)) cookie = who.cookie;
   } else {
@@ -984,6 +997,8 @@ async function operated(request: Request, deps: KennelDeps, ask: 'review' | 'ver
     if (ask !== 'publisher' && (request.headers.get('authorization') ?? '').trim() === '')
       return refusedWith(404, { code: 'ROUTE_UNKNOWN', fix: 'Nothing is here.' });
     if (deps.operator === undefined || deps.operator === '') return refusedWith(501, NO_OPERATOR);
+    const over = await deps.operatorHeld?.(request);
+    if (over) return over;
     if (!(await isOperator(request, deps.operator))) return refusedWith(401, OPERATOR);
   }
   const blobs = deps.blobs;

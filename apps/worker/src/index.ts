@@ -2993,6 +2993,10 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /** One more hit in a counted window, and whether it is within `most` (`abuseHit` in the Directory; the table is `@braindog/host/abuse`). */
+  abuseClear(key: string): void {
+    this.#directory().abuseClear(key);
+  }
+
   abuseHit(key: string, seconds: number, most: number, cost: number): { ok: boolean; retryAfter: number } {
     return this.#directory().abuseHit(key, seconds, most, cost);
   }
@@ -3780,6 +3784,23 @@ async function abuseWait(env: Env, name: AbuseName, who: string, cost = 1): Prom
   }
 }
 
+/**
+ * The operator's key, held to ten wrong tries from one place, for the doors that take it as a bearer: `null` to go on, or
+ * the 429. Reserved before anything is compared and cleared by the right key, as `operated` in `auth.ts` does for `/auth/*`,
+ * and counted in the Directory so every isolate shares the count. A bearer that is the operator's while the place is locked
+ * waits too: `cf-connecting-ip` is not a header anybody else can write for them.
+ */
+async function operatorKeyHeld(request: Request, env: Env): Promise<Response | null> {
+  const key = (env.PROVISION_KEY ?? '').trim();
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
+  if (key === '' || bearer === '') return null;
+  const place = addressOf(request);
+  const over = await abusive(env, 'operatorKey', place);
+  if (over !== null) return over;
+  if (await sameKey(bearer, key)) await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).abuseClear(`rl:operatorKey:${place}`);
+  return null;
+}
+
 /** The address Cloudflare wrote, which a caller cannot choose: an IPv6 one as its /64 (`ipBucket`), the most one person can be told from. */
 const addressOf = (request: Request): string => ipBucket(request.headers.get('cf-connecting-ip') ?? '');
 
@@ -4143,6 +4164,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
         assets: env.ASSETS,
         operator: env.PROVISION_KEY,
         byOperator: seen.operator,
+        operatorHeld: (asked) => operatorKeyHeld(asked, env),
+        keySubmit: (asked) => abusive(env, 'kennelKey', addressOf(asked)),
         origin: `https://${env.PUBLIC_HOST ?? ''}`,
         session: (sid) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).auth({ flow: 'session', sid }) as unknown as Promise<AuthResult<Who>>,
         bearer: bearerDeps(env),
@@ -4939,6 +4962,10 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
   /* THE ADMIN PAGE'S DOORS OPEN TO THE OPERATOR'S OWN SESSION AS WELL AS TO THE KEY (`operator.ts`). Asked once, here,
      and only for them; a rotation the Directory made while reading the session rides back on the answer. */
   const path = new URL(request.url).pathname;
+  if (OPS_ANY.test(path)) {
+    const held = await operatorKeyHeld(request, env);
+    if (held !== null) return held;
+  }
   const seen = OPS_ME.test(path) || OPS_INVITE.test(path) || OPS_APPLICATIONS.test(path) || OPS_FUNNEL.test(path) ? await operatorSeen(request, env) : NOBODY;
   if (OPS_ME.test(path)) return withCookie(await opsMe(request, env, seen), seen.cookie);
   if (OPS_INVITE.test(path)) return withCookie(await opsInvite(request, opsApplyDeps(env, seen)), seen.cookie);
@@ -5042,6 +5069,9 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     ...billingDoors(env, billing),
   });
 }
+
+/** Every operator door under `/account/ops`, which `operatorKeyHeld` stands in front of. */
+const OPS_ANY = /^\/+account\/+ops(?:\/|$)/;
 
 /** The operator's door to the sign-up codes, with the slashes every other door here forgives. */
 const OPS_INVITE = /^\/+account\/+ops\/+invite\/*$/;

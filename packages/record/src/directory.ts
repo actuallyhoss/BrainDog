@@ -2983,6 +2983,11 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
      * no lockout reads it. Past the window the next hit starts a new one. The total is capped at `most + cost` so a flood
      * stores one small number, and a refusal does not extend the wait. Rows past their window are swept on each call.
      */
+    /** A count of `abuseHit`'s forgotten: the right operator key clears the wrong ones before it, as a sign-in clears its address. */
+    abuseClear: (key: string): void => {
+      if (key.startsWith('rl:')) sql.exec('DELETE FROM dir_fail WHERE key = ?', key);
+    },
+
     abuseHit: (key: string, seconds: number, most: number, cost: number): { ok: boolean; retryAfter: number } => {
       const bad = (n: number) => !Number.isSafeInteger(n) || n < 1;
       if (key.length === 0 || key.length > 200 || bad(seconds) || bad(most) || bad(cost)) return { ok: false, retryAfter: 60 };

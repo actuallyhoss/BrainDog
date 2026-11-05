@@ -324,3 +324,13 @@ test('a private add-on of the bundled catalogue is never in the public index, an
   assert.deepEqual(index.entries.map((e) => e.id), ['pad']);
   assert.equal((await serveKennel(get('packs/bank-x/1.0.0.pack.json'), deps)).status, 200);
 });
+
+test('A SIGNED SUBMISSION FROM NOBODY SIGNED IN IS COUNTED BY ITS PLACE: a key is free to make, so the cap per publisher holds nobody', async () => {
+  let asked = 0;
+  const over = new Response(JSON.stringify({ ok: false, refusal: { code: 'RATE_LIMITED', fix: 'Later.' } }), { status: 429 });
+  const deps = { ...depsOf(bucket().blobs), keySubmit: async () => (asked++, over) };
+  const key = await newAuthorKey('Halden');
+  const refused = await serveKennel(post('submit', await signedSubmission(addon('1.0.0'), key)), deps);
+  assert.equal(refused.status, 429);
+  assert.equal(asked, 1);
+});

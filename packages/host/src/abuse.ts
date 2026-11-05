@@ -27,6 +27,8 @@ export const ABUSE = {
   apply: { most: 5, seconds: 3600, by: 'ip', why: 'An application goes to the owner to read; five an hour is a person who mistyped.' },
   signup: { most: 10, seconds: 3600, by: 'ip', why: 'A start and a verify per try, with a bot check each; ten an hour is a shared office.' },
   seen: { most: 120, seconds: 60, by: 'ip', why: 'A page view beacon; two a second is a fast reader, more is a script padding the funnel.' },
+  operatorKey: { most: 10, seconds: 900, by: 'ip', why: 'Each wrong operator key costs one, and the right key clears them: ten in fifteen minutes is a script with a stale key, more is a guess.' },
+  kennelKey: { most: 20, seconds: 86_400, by: 'ip', why: 'A signed submission from nobody signed in; a key is free to make, and twenty a day is an author with two packs and a bad afternoon.' },
   oauthToken: { most: 60, seconds: 900, by: 'ip', why: 'One exchange per connected app; sixty in fifteen minutes is a team connecting at once.' },
   /* `/oauth/register` and `/oauth/authorize` keep the Directory count in `packages/record/src/oauth.ts` (ten in fifteen minutes). */
 
