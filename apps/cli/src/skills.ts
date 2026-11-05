@@ -377,8 +377,9 @@ function writeText(path: string, text: string, top: string | null): boolean {
 
 /** Whether a skill's text runs something by itself once it is on this machine (see the top). */
 export function skillRuns(text: string): boolean {
-  const front = FRONT.exec(text)?.[1] ?? '';
-  return /^(?:hooks|allowed-tools|allowedTools)\s*:/mu.test(front) || /!`[^`\n]+`/u.test(text) || /^\s*```+!/mu.test(text);
+  /* AS A YAML READER READS IT: a key may be quoted, indented or after a byte-order mark, and a fence may be tildes or spaced. */
+  const front = FRONT.exec(text.replace(/^\uFEFF/u, '').trimStart())?.[1] ?? '';
+  return /^\s*["']?(?:hooks|allowed[-_]tools|allowedTools)["']?\s*:/mu.test(front) || /!`[^`\n]+`/u.test(text) || /^[ \t]*(?:`{3,}|~{3,})[ \t]*!/mu.test(text);
 }
 
 /** How many skills one page of the list read asks for: under the hundred a long read has been cut at. */
