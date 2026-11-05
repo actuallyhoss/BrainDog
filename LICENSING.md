@@ -27,6 +27,15 @@ Lucide (https://lucide.dev), ISC License, Copyright (c) 2026 Lucide Icons and Co
 few glyphs from Feather, MIT, Copyright (c) 2013-present Cole Bemis. The full notices are in
 `packages/render/src/glyphs/NOTICE`.
 
+**Third-party fonts.** The fonts the apps and the site ship are under the SIL Open Font License 1.1 and stay under it;
+neither licence above relicenses them. The licence text is `OFL-GeistMono.txt` in
+`apps/apple/Packages/BrainDogKit/Sources/BrainDogKit/Resources/Fonts/`, with `OFL-PlusJakartaSans.txt` beside it.
+
+- Geist and Geist Mono: Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font)
+- Plus Jakarta Sans: Copyright 2020 The Plus Jakarta Sans Project Authors (https://github.com/tokotype/PlusJakartaSans)
+- Lexend: Copyright 2018 The Lexend Project Authors (https://github.com/googlefonts/lexend)
+- IBM Plex Sans Arabic: Copyright 2017 IBM Corp., with Reserved Font Name "Plex"
+
 ## Applying the notice
 
 Source files under `packages/render` carry `// SPDX-License-Identifier: MIT`. Everything else is
