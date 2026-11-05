@@ -441,13 +441,13 @@ function placeOf(said: string): { where: string; kind: Seen['kind']; about: stri
   return words ? { where: words.charAt(0).toUpperCase() + words.slice(1), kind: 'other', about: null } : null;
 }
 
-/* A MONTH AND A YEAR, OR A YEAR, AT THE END OF AN IMPORT'S LINE: ", Oct 2026" of "Arrived in Roomy creator outreach
+/* A MONTH AND A YEAR, OR A YEAR, AT THE END OF AN IMPORT'S LINE: ", Oct 2026" of "Arrived in Ferncroft creator outreach
    mail, Oct 2026". And the verb an import starts its line with, which "Met" says already. */
 const WHEN_AT_END = /,?\s*((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{4}|\d{4})\s*$/iu;
 const ARRIVED = /^(?:arrived|came|met|found|added|joined)\s+(?:in|via|from|through|at|by|on)\s+/iu;
 
 /**
- * WHERE THEY WERE FIRST MET, as one small fact: "Met Oct 2026 · Roomy creator outreach mail", "Met 29 Oct · by mail",
+ * WHERE THEY WERE FIRST MET, as one small fact: "Met Oct 2026 · Ferncroft creator outreach mail", "Met 29 Oct · by mail",
  * "Met at Onboarding". The oldest place `seenOf` read (its list is newest first, undated last), its when from the line's
  * own end or its day, and no day at all when it is the day the head already says they were last in touch.
  */
@@ -642,8 +642,8 @@ export const seenWords = {
   more: (n: number): string => `${n} more`,
   people: (n: number): string => (n === 1 ? '1 person' : `${n} people`),
   lastInTouch: (day: string): string => `Last in touch ${day}.`,
-  /* THE HEAD'S SMALL FACTS (3 Nov, the owner): "Last in touch 2 Nov" and "Met Oct 2026 · Roomy creator outreach mail", each
-     on its own, where the head glued them into "Last in touch 2 Nov, at Arrived in Roomy creator outreach mail, Oct 2026." */
+  /* THE HEAD'S SMALL FACTS (3 Nov, the owner): "Last in touch 2 Nov" and "Met Oct 2026 · Ferncroft creator outreach mail", each
+     on its own, where the head glued them into "Last in touch 2 Nov, at Arrived in Ferncroft creator outreach mail, Oct 2026." */
   inTouch: (day: string): string => `Last in touch ${day}`,
   metWhen: (when: string, where: string): string => `Met ${when} · ${where}`,
   metHow: (how: string): string => `Met ${how}`,
@@ -757,7 +757,7 @@ export function foundChip(platform: string, value: unknown, discordId: string | 
 }
 
 /**
- * A ROLE AS SAID, "CPO at Quartz", split at its last " at ", so the page can open Quartz where the record holds a project
+ * A ROLE AS SAID, "CPO at Ashgrove", split at its last " at ", so the page can open Ashgrove where the record holds a project
  * or an organisation of that name. A role with no " at " is all title.
  */
 export function roleParts(said: string): { title: string; at: string | null } {

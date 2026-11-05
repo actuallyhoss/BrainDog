@@ -539,7 +539,7 @@ test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT
   assert.ok(quill.ok && !('asked' in quill.value), JSON.stringify(quill));
   /* A KEY ANOTHER PERSON HOLDS IS NOT OFFERED, and neither is anything in a note an agent wrote. */
   assert.ok((await r.api.create({ register: 'people', fields: { name: 'Sam Reyes', note: 'Copies jo@okonkwo.example on every invoice.' } }, OWNER)).ok);
-  assert.ok(r.api.kernel.create('people', { name: 'Pyxel', note: 'Pyxel writes from pyxel@reef.example, GitHub: pyxeldev' }, { actor: 'agent:claude' }).ok);
+  assert.ok(r.api.kernel.create('people', { name: 'Pixie', note: 'Pixie writes from pixie@reef.example, GitHub: pixiedev' }, { actor: 'agent:claude' }).ok);
 
   const out = serveOffers(r.kernel, { store, now: () => T0, log: () => {} });
   assert.deepEqual(out, { ran: true, asked: 2 });

@@ -6,7 +6,7 @@
  *   node apps/apple/tools/app-icon.mjs           write it
  *   node apps/apple/tools/app-icon.mjs --check   fail if it is not what the mark and the palette make now
  *
- * FLAT, AS THE PLAN SAYS AND ROOMY SHOWED WORKS: one layer, glass off, specular off, no shadow, no translucency. iOS 26
+ * FLAT, AS THE PLAN SAYS AND ANOTHER APP OF THIS TEAM SHOWED WORKS: one layer, glass off, specular off, no shadow, no translucency. iOS 26
  * puts its own edge on every icon; this asks for nothing more. The dark look keeps the white mark on the dark frame's
  * red, and the tinted look lets the system draw the mark in its tint over its own ground ("automatic").
  *

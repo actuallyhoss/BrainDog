@@ -710,7 +710,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
 /** Does this row look the way the rule says? Compiled, so a rule and a list read the same rows. */
 /**
  * Whether a rule's `when` still holds for a row: what takes back a question the rule asked about it once the row moves
- * past it (`settleRuleAsks` in `index.ts`), so "Paola is waiting on a reply" leaves Needs you when the reply is sent.
+ * past it (`settleRuleAsks` in `index.ts`), so "Rhea is waiting on a reply" leaves Needs you when the reply is sent.
  */
 export function stillMatches(deps: Pick<RulesDeps, 'sql' | 'ctx'>, schema: Schema, rule: RuleDecl, entry: Entry): boolean {
   return matches(deps as RulesDeps, schema, rule, entry);

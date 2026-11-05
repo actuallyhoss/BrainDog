@@ -89,7 +89,7 @@
      page of their own. `null` until read, and a read that fails keeps the tile the rail's pages make. */
   let projects = $state.raw<Place[] | null>(null);
   const projectNames = $derived(new Set((projects ?? []).map((p) => p.title.trim().toLowerCase())));
-  /* A THING NAMED AS A PROJECT, IN ANOTHER SECTION, SAYS WHAT IT IS: "Quartz (book)" under Money beside Quartz the
+  /* A THING NAMED AS A PROJECT, IN ANOTHER SECTION, SAYS WHAT IT IS: "Ashgrove (book)" under Money beside Ashgrove the
      project, by the one word of the list its row is in. */
   const twinOf = (p: Place): Place => {
     if (!projectNames.has(p.title.trim().toLowerCase())) return p;

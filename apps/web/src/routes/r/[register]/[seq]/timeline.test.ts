@@ -50,7 +50,7 @@ test('THE FIRST LINE SAYS WHO ADDED THE ROW, "added this", and any other note is
 test('A NOTE THAT OPENS ON ITS VERB READS ON FROM THE NAME, and any other is said as noted', () => {
   assert.equal(noteSaid('Imported again from Kiln Notes.'), 'imported this from Kiln Notes');
   assert.equal(noteSaid('Imported again from Mara Brain'), 'imported this from your old notes');
-  assert.equal(noteSaid('Partner on Koala. Runs Mainichi JP.'), 'noted: Partner on Koala. Runs Mainichi JP.');
+  assert.equal(noteSaid('Partner on Marrow. Runs a paper in Osaka.'), 'noted: Partner on Marrow. Runs a paper in Osaka.');
   assert.equal(noteSaid('Imported from Kiln Notes.'), 'imported this from Kiln Notes');
   assert.equal(noteSaid('Halden sent this.'), 'noted: Halden sent this.');
   assert.equal(noteSaid('Based in Osaka.'), 'noted: Based in Osaka.');

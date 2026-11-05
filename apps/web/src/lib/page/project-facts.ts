@@ -612,7 +612,7 @@ export type HappenedLine = { at: string; day: string; text: string; by: string |
 /** A run's own title, "Mara Brain run S87": a source and a run id, never words for a person (Q14 of 29 October). */
 const RUN_TITLE = /^(?:[\p{L}\p{N}][\p{L}\p{N}.-]*(?: [\p{L}\p{N}][\p{L}\p{N}.-]*)*) run(?: S[1-9][0-9]*)?\.?$/u;
 
-/** A path to a file or a folder (`bake/site/docs/reviews/x.md`, `~/Developer/koala`): kept under Show the data, never said. */
+/** A path to a file or a folder (`bake/site/docs/reviews/x.md`, `~/Developer/marrow`): kept under Show the data, never said. */
 const PATH = /(?:(?:~\/|\.{1,2}\/|(?<![\w.])\/)(?:[\w.-]+\/)*[\w.-]+|(?:[\w.-]+\/){2,}[\w.-]+)\/?/gu;
 
 /**
@@ -637,8 +637,8 @@ export function happenedSaid(text: string): string {
 const SUMMARY_MOST = 180;
 
 /**
- * A RUN'S WORDS AS ONE SUMMARY LINE (Q14 of 29 October): Buff's Drafts drew a run's whole handoff, three thousand words of
- * env codes (`NODE_USE_ENV_PROXY`), commits and paths, as one line of What happened, and Koala's Agents tile ended on
+ * A RUN'S WORDS AS ONE SUMMARY LINE (Q14 of 29 October): a project drew a run's whole handoff, three thousand words of
+ * env codes (`NODE_USE_ENV_PROXY`), commits and paths, as one line of What happened, and Marrow's Agents tile ended on
  * `~/Developer/koala`. The first sentence, said as `happenedSaid` says it, with a setting's code as "a setting" and
  * no code marks, cut at a word past `SUMMARY_MOST`. The whole stays on the run, under Show the data.
  */

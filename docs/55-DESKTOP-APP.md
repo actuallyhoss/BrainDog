@@ -21,7 +21,7 @@ Settings root**.
 - **Tauri v2 mobile and Capacitor** are one web view each: no native tab bar or stack without fighting the framework,
   and both read as a wrapped site to App Review (4.2).
 - **Expo / React Native** gives native tabs but reuses none of the Svelte UI: Today, Money and every declared page would
-  be rewritten, or shown in a web view inside a JavaScript shell. Roomy chose it for a WebGPU renderer; BrainDog's
+  be rewritten, or shown in a web view inside a JavaScript shell. One app of this team chose it for a WebGPU renderer; BrainDog's
   product is the declared-page web app.
 - **SwiftUI with WKWebView** keeps every declared page as it is, makes widgets, share, notification and intents
   first-class targets sharing one Swift package, gives `ASAuthorization` passkeys and a Keychain shared with the
@@ -40,7 +40,7 @@ Settings root**.
 - Ids: iPhone `dog.brain.app` (+ `.widgets`, `.share`, `.notify`); Mac `dog.brain.desktop` (+ `.widgets`, `.share`).
   App Group `group.dog.brain` (team-prefixed on the Mac); Keychain group `$(AppIdentifierPrefix)dog.brain.shared`.
 - iOS 26 at least (Liquid Glass, the tab bar accessory, the search tab), macOS 14 at least.
-- The team is Quartz Apps LLC, `MG86668Z52`, the one Roomy uses. Its App Store Connect key and APNs key are team-wide.
+- The team is Quartz Apps LLC, `MG86668Z52`, shared with other apps of the same team. Its App Store Connect key and APNs key are team-wide.
 - **Generated, never by hand**: colours from `packages/theme` (`tools/tokens.mjs`, colour sets and
   `Tokens.generated.swift`), glyphs from `lib/ui/icons.ts` (`tools/icons.mjs`), the app icon from the mark
   (`tools/app-icon.mjs`, an Icon Composer document, flat, glass and specular off), and `tell-core.js` from the web's
@@ -97,7 +97,7 @@ sign-in page never shows in an app. The `/auth/desktop` routes are kept for the 
 
 ## Push, offline, Tell everywhere, widgets
 
-- **Push**: APNs straight from the Worker (a port of Roomy's sender) beside Web Push, content-free through Apple; the
+- **Push**: APNs straight from the Worker (a port of a sender this team already runs) beside Web Push, content-free through Apple; the
   notification service extension reads the question over TLS with the app session and writes its real line and up to
   two answers. Asked for natively the first time Needs you holds something.
 - **Offline**: read-only, nothing queued, as `lib/data/offline.ts` says. Tell offline keeps the typed text as a draft.

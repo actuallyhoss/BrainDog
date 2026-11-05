@@ -9,7 +9,7 @@
  *      whichever identifiers it was missing. Nothing it already holds is overwritten, because what an agent saw in a
  *      commit is weaker than what a person typed. The last day in touch moves forward, never back.
  *   2. A NAME ALONE NEVER MAKES A ROW. Two people share a name often enough that joining on it would fold strangers
- *      together, and making a row for every bare name made the owner's record five "Fofo"s and two of himself. It is
+ *      together, and making a row for every bare name made the owner's record five "Bo"s and two of himself. It is
  *      kept as a mention (`entity_mention`), and the caller is told to give an address or a handle.
  *   3. THE STRONG RULES, written by the record as one undoable batch: the same name of two or more words (a name or an
  *      alias), plus the same personal handle: an email local part or a login of five or more characters, read without
@@ -823,7 +823,7 @@ function filledIn(
  * be, and the lists the caller fills from the same source (`skip`). Their address or their full name in a row's words (a
  * task, a project, a ledger line; an organisation's row by address only, since a card named like a company is the
  * company's), the record shared with their address, or their full name said in the work and kept as a mention (one
- * an arrival left says nothing). A name of one word names nobody: "Mom", "Fofo".
+ * an arrival left says nothing). A name of one word names nobody: "Mom", "Bo".
  */
 function namedIn(deps: PeopleDeps, list: DeclaredList<MeetsFields>, name: string | undefined, addresses: readonly string[], skip: readonly string[]): boolean {
   const words = (text: string): string => text.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, ' ').split(/\s+/).filter(Boolean).join(' ');

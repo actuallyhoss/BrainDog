@@ -3,7 +3,7 @@
 # THE .xcodeproj IS GENERATED AND NEVER COMMITTED: `xcodegen generate` in this folder makes it, so builders in
 # worktrees never meet over a pbxproj. `node tools/build.mjs` generates it before every build.
 #
-# SIGNING. The team is Quartz Apps LLC, MG86668Z52 (the one Roomy uses). Until Xcode is signed in to it, builds run
+# SIGNING. The team is Quartz Apps LLC, MG86668Z52 (a team of its own, shared with other apps). Until Xcode is signed in to it, builds run
 # unsigned (`CODE_SIGNING_ALLOWED=NO`) or signed to run locally (`-`), which `tools/build.mjs` passes; the restricted
 # entitlements (associated domains, app groups, keychain sharing, push) are only in the Release files.
 

@@ -41,8 +41,8 @@ export const noteSaid = (note: string, line?: Pick<Event, 'field'> & { from?: un
   const imported = /^imported (?:again )?from (.+?)\.?$/iu.exec(said);
   if (imported) return OLD_NAME.test(imported[1]!) ? 'imported this from your old notes' : `imported this from ${imported[1]!}`;
   if (VERB_FIRST.test(said) && !DESCRIBES.test(said) && !PASSIVE.test(said)) return `${said[0]!.toLowerCase()}${said.slice(1)}`;
-  /* A NOTE THAT DOES NOT OPEN ON WHAT WAS DONE IS WHAT THE WRITER PUT DOWN: "An agent Partner on Koala." is "An agent
-     noted: Partner on Koala.", and a note that is a sentence of its own ("Halden sent this.", "Based in Osaka.") is
+  /* A NOTE THAT DOES NOT OPEN ON WHAT WAS DONE IS WHAT THE WRITER PUT DOWN: "An agent Partner on Marrow." is "An agent
+     noted: Partner on Marrow.", and a note that is a sentence of its own ("Halden sent this.", "Based in Osaka.") is
      quoted the same way, since put after a name it read "An agent Halden sent this." (Q38, recheck of 30 October). */
   if (/^[\p{Lu}\p{N}]/u.test(said)) return `noted: ${said}`;
   return said;
