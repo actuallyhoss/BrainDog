@@ -17,6 +17,7 @@
 
 import type { Refusal } from '@braindog/ports';
 
+import { ipBucket } from '@braindog/record/directory';
 import { MCP_PER_MINUTE, tooManyLine } from './abuse.ts';
 import { ROUTES } from './index.ts';
 
@@ -82,7 +83,7 @@ export type LimitDoor = {
  * NO DOOR AT ALL is a request the host could not attribute to anybody, and the address is all it has.
  */
 export function limitKey(door: LimitDoor | null, ip: string): string {
-  if (door === null) return `ip:${ip}`;
+  if (door === null) return `ip:${ipBucket(ip)}`;
   const { kind, id } = door.ctx.principal;
   return `${kind}:${id}`;
 }

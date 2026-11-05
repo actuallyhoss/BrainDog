@@ -124,6 +124,11 @@ export const UNBOUND_REFUSED =
 
 type Stored = Omit<DeviceRow, 'handle' | 'ended_by'> & { id: string; code_hash: string; token_hash: string | null };
 
+/** How many devices may wait for an approval on one record at once. */
+const WAITING_MOST = 200;
+/** How long a grant nobody approved stays to be read after it lapsed. */
+const UNAPPROVED_KEPT_MS = 7 * 86_400_000;
+
 const VISIBLE = 'id, status, reach, scope, label, ua, tries, expires, approved_by, approved_at, last_used';
 
 const b64url = (bytes: Uint8Array): string => {
@@ -202,7 +207,9 @@ export async function deviceStart(
   let scope = args.scope ?? null;
   if (reach === 'vault') {
     if (!scope) return no('REQUIRED_MISSING', 'A keychain grant names the project whose keys it opens, or * for the keys of none.', { at: 'scope' });
-    if (scope !== '*' && !isProject(deps, scope)) return no('REF_UNKNOWN', `${scope} is not a project here.`, { at: 'scope' });
+    /* WHETHER IT NAMES A PROJECT IS ASKED AT APPROVAL AND NOT HERE. Nothing here is signed in, and a different answer for a
+       row that exists told a stranger which rows a record holds. */
+    if (typeof scope !== 'string' || scope.length > 200) return no('OUT_OF_BOUNDS', 'A keychain grant names one project.', { at: 'scope' });
   } else if (scope !== null) {
     return no('OUT_OF_BOUNDS', 'Only a keychain grant carries a scope.', { at: 'scope' });
   }
@@ -223,7 +230,11 @@ export async function deviceStart(
   /* A CODE NO OTHER PENDING GRANT HOLDS: anyone may start a grant, so a code shared with a stranger's would hand them
      the approval the owner gave their own terminal. */
   const now = instant(deps.nowMs);
+  /* NOBODY SIGNED IN WRITES THESE ROWS, so they are bounded here: what nobody approved goes a week after it lapsed, and only
+     so many may wait at once. Every start hashes every waiting row, and the owner's page lists them. */
+  deps.sql.exec("DELETE FROM device_grant WHERE approved_by IS NULL AND status IN ('pending', 'expired', 'denied') AND expires <= ?", instant(deps.nowMs - UNAPPROVED_KEPT_MS));
   const others = deps.sql.all<{ id: string; code_hash: string }>("SELECT id, code_hash FROM device_grant WHERE status = 'pending' AND expires > ?", now);
+  if (others.length >= WAITING_MOST) return no('RATE_LIMITED', 'Too many devices are waiting to be approved. Try again in a few minutes.');
   let userCode = sixDigits(deps.random);
   for (let tries = 0; tries < 20; tries++) {
     let taken = false;
@@ -286,6 +297,8 @@ export async function deviceApprove(
   if (hit) {
     const stop = held?.(hit.reach) ?? null;
     if (stop) return { ok: false, refusal: stop };
+    if (hit.reach === 'vault' && hit.scope !== '*' && !isProject(deps, hit.scope ?? ''))
+      return no('REF_UNKNOWN', `${hit.scope} is not a project here.`, { at: 'scope' });
     const at = instant(deps.nowMs);
     deps.sql.exec(
       "UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ? AND status = 'pending'",

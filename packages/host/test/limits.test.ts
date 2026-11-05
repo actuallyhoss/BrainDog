@@ -166,3 +166,8 @@ test('A POLL WITH NO RL_POLL BOUND SPENDS RL_READ, AND WITH ONE BOUND SPENDS THA
   await limits.bindingLimiter({ read: binding('RL_READ'), poll: binding('RL_POLL') }).limit('person:p_1', 'poll');
   assert.deepEqual(asked, ['RL_READ', 'RL_POLL']);
 });
+
+test('A REQUEST WITH NO DOOR IS COUNTED BY ITS PLACE: one IPv6 network is one budget', () => {
+  assert.equal(limits.limitKey(null, '2001:db8:0:1::5'), limits.limitKey(null, '2001:db8:0:1::6'));
+  assert.notEqual(limits.limitKey(null, '2001:db8:0:1::5'), limits.limitKey(null, '2001:db8:0:2::5'));
+});

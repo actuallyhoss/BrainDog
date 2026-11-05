@@ -903,3 +903,11 @@ test('A SELF-HOST AT A FLY.DEV ADDRESS IS REFUSED, and the sentence says the ref
     (e: Error) => e.message === sentence,
   );
 });
+
+test('A /64 IS ONE PLACE: walking the addresses of one IPv6 network does not buy more tries', async () => {
+  const { d } = setup();
+  const hextet = (i: number) => i.toString(16);
+  let last = 0;
+  for (let i = 1; i <= 11; i++) last = (await keyIn(d, { ip: `2001:db8:0:1::${hextet(i)}`, key: 'wrong' })).status;
+  assert.equal(last, 429, 'each address of the network counted as a new one');
+});

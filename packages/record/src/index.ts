@@ -19,6 +19,7 @@ import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import { keptRound, pagesCleanReading, ROUND_HOLDER, ROUND_KEPT, roundBegun, roundEnded, roundOf, roundPartOf, roundStep, ROUND_MS, unworded, type RoundPart } from './page-lint.ts';
 import { TICK_PAGES, UNBOUNDED, type TickBudget } from './tick-budget.ts';
+import { ipBucket } from './signup-keys.ts';
 import { SIGNS_KEPT, SIGNS_MOVED_MS, SIGNS_REKEEP_MS, agentSaid, clientName, fileRecordSigns, keptNow, keptSigns, readArrivedSign, type KeptSign } from './signs.ts';
 import { APPEND_READ_AT, appendReadRefusal } from './append-refusal.ts';
 import { trialsLeft } from './script-try-cap.ts';
@@ -17997,7 +17998,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * from, counted before anything is written, and the approval a person gives elsewhere.
      */
     async deviceStart(args: { reach: string; label: string; ua?: string; scope?: string; binds?: string }, ip: string): Promise<Result<DeviceCode> | Limited> {
-      const wait = counted(`device:${ip}`);
+      /* AN IPV6 ADDRESS AS ITS /64 (`ipBucket`), since one household holds more of them than this counter could ever see. */
+      const wait = counted(`device:${ipBucket(ip)}`);
       if (wait !== null) return { ok: false, retryAfter: wait };
       /* A PROJECT IS NAMED THE WAY A PERSON SAYS IT, `things#3`, and the grant holds its row id, which is what a
          key's `project` field holds, so the door compares like with like. */

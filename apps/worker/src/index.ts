@@ -48,7 +48,7 @@ import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
 import { teamsOn } from '@braindog/record/plans';
-import { TEAMS_HELD_SAID, FREE_JOIN_REFUSED, FREE_ONE_PERSON, createDirectory, leavesAsked, leftBy, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
+import { TEAMS_HELD_SAID, FREE_JOIN_REFUSED, FREE_ONE_PERSON, createDirectory, ipBucket, leavesAsked, leftBy, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall, SeenAnswers, SeenCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
@@ -3780,8 +3780,8 @@ async function abuseWait(env: Env, name: AbuseName, who: string, cost = 1): Prom
   }
 }
 
-/** The address Cloudflare wrote, which a caller cannot choose. */
-const addressOf = (request: Request): string => request.headers.get('cf-connecting-ip') ?? '';
+/** The address Cloudflare wrote, which a caller cannot choose: an IPv6 one as its /64 (`ipBucket`), the most one person can be told from. */
+const addressOf = (request: Request): string => ipBucket(request.headers.get('cf-connecting-ip') ?? '');
 
 /**
  * The `/auth/*` doors a stranger can spend mail or a bot check on, by address, on top of the write budget and the

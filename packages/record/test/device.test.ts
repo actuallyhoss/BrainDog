@@ -159,3 +159,13 @@ test('A KEYCHAIN GRANT ASKS A SIGN-IN INSIDE THE KEYCHAIN’S LOCK WINDOW; A LOG
   const fresh = await r.api.deviceApprove({ user_code: vault.value.user_code }, r.owner(r.now() - 4 * MINUTE));
   assert.ok(fresh.ok, JSON.stringify(fresh));
 });
+
+test('A /64 IS ONE PLACE TO THE DEVICE DOOR: walking one IPv6 network does not buy more starts', async () => {
+  const r = await record();
+  let limited = false;
+  for (let i = 1; i <= 200 && !limited; i++) {
+    const out = await r.api.deviceStart({ reach: 'login', label: 'test-box' }, `2001:db8:0:1::${i.toString(16)}`);
+    limited = !out.ok && 'retryAfter' in out;
+  }
+  assert.ok(limited, 'every address of the network counted as a new one');
+});

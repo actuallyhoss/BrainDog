@@ -892,7 +892,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
       case 'key.exchange': {
         if (!config.key || !wanted) return off();
         const [presented, next, given, expected] = await Promise.all([hashOf(call.sid), minted(), digest(call.serverKey), wanted]);
-        const strike = `ip:${text(call.ip)}`;
+        const strike = `ip:${ipBucket(text(call.ip))}`;
         const stop = reserve(flow, strike, now);
         if (stop) return stop;
         if (persons() > 1)
@@ -992,7 +992,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!rp) return off();
         const challenge = fresh();
         const hash = await hmac('c:', challenge);
-        const stop = reserve(flow, `chal:${text(call.ip)}`, now, CHALLENGES);
+        const stop = reserve(flow, `chal:${ipBucket(text(call.ip))}`, now, CHALLENGES);
         if (stop) return stop;
         if (!store(hash, 'assert', null, now)) {
           say(flow, 'full');
@@ -1007,7 +1007,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!rp) return off();
         const [presented, next] = await Promise.all([hashOf(call.sid), minted()]);
         const app = call.app === undefined ? null : appLabel(call.app);
-        const strike = `ip:${text(call.ip)}`;
+        const strike = `ip:${ipBucket(text(call.ip))}`;
         const stop = reserve(flow, strike, now);
         if (stop) return stop;
         const cred = asserted(call.credential);
@@ -1074,7 +1074,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         const challenge = typeof call.app === 'string' && CHALLENGE.test(call.app) ? call.app : null;
         const appCode = challenge === null ? null : sixDigits();
         const [hash, codeMac] = await Promise.all([hmac('l:', linkToken), appCode === null ? null : hmac('a:', `${challenge}.${appCode}`)]);
-        const stop = reserve(flow, `mint:${text(call.ip)}`, now);
+        const stop = reserve(flow, `mint:${ipBucket(text(call.ip))}`, now);
         if (stop) return stop;
         const person = email.includes('@')
           ? sql.one<Person>('SELECT id, email FROM dir_person WHERE lower(email) = lower(?) AND suspended_at IS NULL', email)
@@ -1125,7 +1125,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           minted(),
           typeof token === 'string' && MINTED.test(token) ? hmac('l:', token) : null,
         ]);
-        const strike = `ip:${text(call.ip)}`;
+        const strike = `ip:${ipBucket(text(call.ip))}`;
         const stop = reserve(flow, strike, now);
         if (stop) return stop;
         if (hash === null) return rejected(flow, 'shape');
@@ -1163,7 +1163,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         const typed = text(call.code).replace(/[\s-]/g, '');
         const [presented, next, challenge] = await Promise.all([hashOf(call.sid), minted(), challengeOf(call.verifier)]);
         const given = challenge !== null && /^\d{6}$/.test(typed) ? await hmac('a:', `${challenge}.${typed}`) : null;
-        const strike = `ip:${text(call.ip)}`;
+        const strike = `ip:${ipBucket(text(call.ip))}`;
         const stop = reserve(flow, strike, now);
         if (stop) return stop;
         if (challenge === null || given === null) return rejected(flow, 'shape');
@@ -1226,7 +1226,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         const claim = 'claimToken' in call;
         const token = 'claimToken' in call ? call.claimToken : call.linkToken;
         const hash = typeof token === 'string' && MINTED.test(token) ? await hmac('l:', token) : null;
-        const strike = `ip:${text(call.ip)}`;
+        const strike = `ip:${ipBucket(text(call.ip))}`;
         const stop = lockedNow(flow, strike, now);
         if (stop) return stop;
         const miss = (reason: Reason): AuthResult => reserve(flow, strike, now) ?? rejected(flow, reason);
@@ -1800,7 +1800,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           minted(),
           typeof token === 'string' && MINTED.test(token) ? hmac('p:', token) : null,
         ]);
-        const strike = `ip:${text(call.ip)}`;
+        const strike = `ip:${ipBucket(text(call.ip))}`;
         const stop = reserve(flow, strike, now);
         if (stop) return stop;
         if (hash === null) return rejected(flow, 'shape');

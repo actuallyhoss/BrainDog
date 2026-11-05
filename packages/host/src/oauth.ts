@@ -894,7 +894,7 @@ async function deny(request: Request, deps: OAuthDeps): Promise<Response> {
  */
 async function token(request: Request, deps: OAuthDeps): Promise<Response> {
   /* PER ADDRESS BEFORE THE BODY IS READ (`ABUSE.oauthToken`): a code is single use, so a guesser needs many tries. */
-  const wait = await deps.store({ op: 'count', key: `token:${deps.address ?? 'unknown'}`, most: ABUSE.oauthToken.most });
+  const wait = await deps.store({ op: 'count', key: `token:${ipBucket(deps.address ?? '') || 'unknown'}`, most: ABUSE.oauthToken.most });
   if (wait !== null) return tooMany(wait);
   const body = await bodyOf(request);
   if (body === null) return oauthError(400, 'invalid_request', `The token endpoint takes a form of at most ${BODY_MOST_BYTES} bytes.`);

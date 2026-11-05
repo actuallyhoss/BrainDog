@@ -253,7 +253,10 @@ test('A KEYCHAIN GRANT NAMES ITS SCOPE, mints no token, and its bearer is checke
 
   assert.equal(refusalOf(await deviceStart(deps(), { reach: 'vault', label: 'box' })).code, 'REQUIRED_MISSING');
   assert.equal(refusalOf(await deviceStart(deps(), { reach: 'login', label: 'box', scope: '*' })).code, 'OUT_OF_BOUNDS');
-  assert.equal(refusalOf(await deviceStart(deps(), { reach: 'vault', label: 'box', scope: 'not-a-project' })).code, 'REF_UNKNOWN');
+  /* NOBODY IS SIGNED IN AT THE START, so a name that is no project reads as one that is, and only the approval says so. */
+  const stranger = value(await deviceStart(deps(), { reach: 'vault', label: 'box', scope: 'not-a-project' }));
+  assert.equal(refusalOf(await deviceApprove(deps(), OWNER, { user_code: stranger.user_code })).code, 'REF_UNKNOWN');
+  value(await deviceRevoke(deps(), OWNER, (await deviceList(deps()))[0]!.handle));
   assert.equal(refusalOf(await deviceStart(deps(), { reach: 'admin', label: 'box' })).code, 'ENUM_VALUE_UNKNOWN');
 
   const scoped = value(await deviceStart(deps(), { reach: 'vault', label: 'box', scope: project.id }));
@@ -344,4 +347,13 @@ test('A KEYCHAIN GRANT STANDS ONLY WHILE ITS APPROVER IS AN OWNER: made less tha
 
   sql.exec('DELETE FROM member WHERE person_id = ?', OWNER);
   assert.equal(refusalOf(await keychainGrant(deps(), bearer)).code, 'FORBIDDEN');
+});
+
+test('STRANGERS CANNOT FILL THE TABLE: only so many wait at once, and what nobody approved goes a week after it lapsed', async () => {
+  const { sql, clock, deps } = await setup();
+  for (let i = 0; i < 200; i++) value(await deviceStart(deps(), { reach: 'login', label: `box ${i}` }));
+  assert.equal(refusalOf(await deviceStart(deps(), { reach: 'login', label: 'one more' })).code, 'RATE_LIMITED');
+  clock.advance(8 * DAY);
+  value(await deviceStart(deps(), { reach: 'login', label: 'a week on' }));
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM device_grant')?.n, 1);
 });
