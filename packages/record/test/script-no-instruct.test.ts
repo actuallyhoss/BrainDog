@@ -114,3 +114,13 @@ test('A RULE DOES NOT WRITE A RUN: the write door refuses it by who is writing',
   assert.equal((out as { refusal?: { code: string } }).refusal?.code, 'FORBIDDEN', JSON.stringify(out));
   sql.close();
 });
+
+test('NO RULE TAKES THE RECORD’S OWN NAME: the one rule that writes a run is the record’s own, and a declared one cannot be called that', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  for (const name of ['backfill', 'ladder', 'additive', 'update', 'handled']) {
+    const put = await api.kernel.install([NOTES, { id: `rule.${name}`, kind: 'rule' as const, body: { rule: name, once_per: ['row'], on: { written: { register: 'notes', op: ['create'] } }, steps: [{ notify: { say: 'x' } }] } as never }]);
+    assert.equal(put.ok, false, `${name} was taken`);
+  }
+  sql.close();
+});

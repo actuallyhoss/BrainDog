@@ -4599,6 +4599,8 @@ const REPEAT_READ = ['freq', 'interval', 'count', 'until', 'workday', 'bymonthda
 const HAND_PARTS = ['person', 'agent', 'taken'] as const;
 
 /** The parts of `AGENT_ROLES` only a personal list may play: one person's profiles, and what carries between his machines. */
+/** The rule names the kernel itself writes as (`rule:<name>`), which no declared rule may take. */
+const OWN_RULE_NAMES: readonly string[] = ['backfill', 'ladder', 'additive', 'update', 'handled'];
 const PERSONAL_ROLES = ['profiles', 'carry'] as const;
 
 /** The most columns a list's `table:` names: the nine fields a list opens on at most when the app derives them. */
@@ -5621,6 +5623,12 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
      write to that register raise a `TypeError` out of the rules pass, out of `create`, out of the
      transaction. A declaration's shape is checked where it lands or it is checked by a customer. */
   if (decl.kind === 'rule') {
+    /* THE NAMES THE RECORD SIGNS ITS OWN WORK WITH. A rule writes as `rule:<name>`, so one called `backfill` could write a
+       run's row, and one called `handled` or `ladder` folds in the feed as the record's own and reads back as no person's. */
+    const named = (decl.body as { rule?: unknown }).rule;
+    if (typeof named === 'string' && OWN_RULE_NAMES.includes(named))
+      return { code: 'DECLARATION_INVALID', fix: `${decl.id} is named ${named}, which is a name the record signs its own work with. Give it another name.`, at: 'rule' };
+
     /* A PATTERN THAT REACHES A PLATFORM CEILING IS A PREDICATE THAT ANSWERS DIFFERENTLY IN TWO
        PLACES, which is the failure `where`'s own comment names and then measures on the wrong
        string. `04 §5` gives it a code of its own and a fix that is a different operator. */

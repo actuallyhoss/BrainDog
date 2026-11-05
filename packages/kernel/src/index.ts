@@ -358,7 +358,7 @@ import { profileById, profileFor as profileMatching, readProfiles, setProfile as
 import { agentsDataSteps } from './migrations/0042_agents.ts';
 import { ASKED_KEY, agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, ownerIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, undoStaged as stageUndo, type UndoApplied, type UndoDeclared, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
-import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
+import { BACKFILL_ACTOR, understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
 import { foldPlan as planFold, isFold as foldMade, type FoldDeps, type FoldPlan } from './undo-fold.ts';
 import {
   FINISHED,
@@ -4851,7 +4851,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* A RUN'S ROW IS THE RUN'S. Its `next`, `tried` and `notes` are handed to the next session as what the last one left, so
          a script or a rule writing them speaks to every future agent in another agent's voice. Measured: `writes:
          ['session']` set a live run's `next`, and nothing on the install sheet said so. */
-      if (register === SESSION && /^(?:script|rule):/u.test(w.actor)) return no<Entry>('FORBIDDEN', "A run's row is its own, and a script or a rule does not write it.", { at: 'register' });
+      if (register === SESSION && (w.actor.startsWith('script:') || (w.actor.startsWith('rule:') && w.actor !== BACKFILL_ACTOR)))
+        return no<Entry>('FORBIDDEN', "A run's row is its own, and a script or a rule does not write it.", { at: 'register' });
       /* AND A VERSION IS A WHOLE NUMBER. `version: "4"` never equals 4, so a client that sent its version as
          text was told its row had moved on every attempt, and re-reading could never cure it. */
       if (w.version !== undefined && !Number.isSafeInteger(w.version))
