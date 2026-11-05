@@ -826,7 +826,7 @@ export { AUTOMATION_INSIDE, AUTOMATION_REACHES, kindOfAutomationChange, stepsDif
 /* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, fileAsSecond, patternReport, resolve as extractOutcome, senderOf, shapeOf, tailCause } from './ingest.ts';
-export { SIGNALS, WINDOWS, analyse, brakeOf, findingsFrom, mayPropose, observe, slashBrake } from './observe.ts';
+export { OBSERVE_COUNT, OBSERVE_COUNT_WHO, SIGNALS, WINDOWS, analyse, brakeOf, findingsFrom, mayPropose, observe, slashBrake } from './observe.ts';
 /* WHAT A CARD SAYS OF AN AMOUNT AND OF WHERE A RUN STANDS: the kernel's own two readings, so the briefing writes neither again. */
 export { moneyText } from './ingest.ts';
 export { MONEY_MASK, maskMoneyText } from './mail-read.ts';

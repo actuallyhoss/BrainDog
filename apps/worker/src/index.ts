@@ -72,6 +72,7 @@ import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/h
 import { alarmScheduler } from './alarm.ts';
 import { fileModelSignMoved } from '@braindog/host/sign-model';
 import { ALARM_SLICE_UNITS, ASIDE_MS, breathe, pace, type Pace } from './alarm-pace.ts';
+import { OBSERVED_LATER_MS, observedLater, type ObservedLater } from './observed-later.ts';
 import { slashDue, slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
 import { PLAN_AGENTS, PLAN_FILES, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
 import { fallbackWire, includedCandidates, includedInference, kennelNoteModel } from './slash.ts';
@@ -931,7 +932,14 @@ export class Record$ extends DurableObject<Env> {
        model, its automations' answers and its model jobs. `api` is read when a call fails, by which time it is made. */
     const onFail = (fail: ModelFail) => this.#modelFailed(api, fail);
     const slashModel = workerSlashModel(this.env, () => api, { store: () => sql, onFail });
-    const sql = guardedSql(this.ctx.storage);
+    /* A READ'S COUNTERS WAIT A FEW SECONDS AND GO TOGETHER (`observed-later.ts`): a read was a write, and its answer waited
+       for it. Never once the record is deleted or a restore is armed. */
+    this.#observed = observedLater(
+      guardedSql(this.ctx.storage),
+      (flush) => void setTimeout(flush, OBSERVED_LATER_MS),
+      () => !this.#gone && !this.#armed,
+    );
+    const sql = this.#observed.sql;
     /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SLASH, off the same endpoint and the same key path as `slashModel`, so
        `answersSlash` below and `/api/version`'s `slash` are one fact. The storage is this object's own, the one the door's
        engine is handed, so the two engines count one `ask_cap`. Before this line a Worker with a model said `slash: true`
@@ -1278,6 +1286,9 @@ export class Record$ extends DurableObject<Env> {
   #alarming = false;
   #wakeOwed: 'soon' | 'look' | null = null;
 
+  /** The record's `Sql`, and the counters it holds back from it (`observed-later.ts`). */
+  #observed: ObservedLater | undefined;
+
   /** Who is calling while the alarm runs, and whether it is standing aside for them (`alarm-pace.ts`). */
   #pace: Pace = pace();
 
@@ -1287,6 +1298,7 @@ export class Record$ extends DurableObject<Env> {
   async #alarmPass(): Promise<void> {
     this.#pace.began();
     const api = await this.#record();
+    this.#observed?.flush();
     /* THE DOORS FIRST, AND ON A LAPSED RECORD TOO: a step that waited behind the lapse would keep asking for the alarm. */
     await this.#doors(api);
     /* A LAPSED RECORD RUNS THE DRAIN AND NOTHING ELSE: its reminders still land, and no
