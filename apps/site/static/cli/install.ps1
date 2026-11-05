@@ -34,7 +34,7 @@
   [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
   $base = 'https://brain.dog/cli'
-  $pin = ''
+  $pin = 'KO5elmVCY0qrMP33qBHbPiKr-0vj58zCmV-4cnXFoZ0'
   $dir = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.braindog\bin'
   $say = { param([string]$line) [Console]::Out.WriteLine($line) }
   $fail = { param([string]$line) [Console]::Error.WriteLine($line) }

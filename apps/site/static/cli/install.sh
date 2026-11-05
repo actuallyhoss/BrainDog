@@ -27,7 +27,7 @@
 set -eu
 
 BASE='https://brain.dog/cli'
-PIN=''
+PIN='KO5elmVCY0qrMP33qBHbPiKr-0vj58zCmV-4cnXFoZ0'
 
 say() { printf '%s\n' "$*"; }
 die() {

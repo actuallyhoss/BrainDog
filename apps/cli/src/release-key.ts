@@ -30,7 +30,7 @@
 
 import { verify } from 'node:crypto';
 
-export const RELEASE_KEYS: readonly string[] = [];
+export const RELEASE_KEYS: readonly string[] = ['KO5elmVCY0qrMP33qBHbPiKr-0vj58zCmV-4cnXFoZ0'];
 
 /** The generic password item the signing key is kept as, in the login keychain of the Mac that releases. */
 export const RELEASE_LABEL = 'braindog-cli-release';

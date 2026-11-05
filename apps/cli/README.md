@@ -72,7 +72,7 @@ change the site can change the `PIN` in them too. This list is in the repository
 and compare its `PIN` line with these. A command already installed needs no such check, since its pin is inside it.
 
 <!-- release-keys -->
-None yet.
+- `KO5elmVCY0qrMP33qBHbPiKr-0vj58zCmV-4cnXFoZ0`
 <!-- /release-keys -->
 
 **If this Mac's key is lost.** A command believes the keys its own build pinned, so what it costs depends on whether a second key was
