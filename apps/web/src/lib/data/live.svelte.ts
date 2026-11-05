@@ -97,8 +97,8 @@ function end(said: string): void {
 
 /* ── a newer build ── */
 
-/** The build this tab runs, the deploy's tuple (`vite.config.ts`), or `''` in a build without one. */
-const OWN_BUILD = typeof __BRAINDOG_BUILD__ === 'string' ? __BRAINDOG_BUILD__ : '';
+/** The build this tab runs, the deploy's tuple in the shell (`app.html`, `vite.config.ts`), or `''` in a build without one. */
+const OWN_BUILD = typeof document === 'undefined' ? '' : (document.querySelector('meta[name="braindog-build"]')?.getAttribute('content') ?? '');
 /** Where the tab keeps the last build change it reloaded for, so each one is tried once (`newerBuild`). */
 const TRIED = 'braindog.build-tried';
 const tried = (): string | null => {
@@ -126,6 +126,24 @@ function newer(key: string, drop: boolean): void {
   void (drop ? dropShell() : Promise.resolve()).catch(() => undefined).then(() => {
     if (!touched) globalThis.location.reload();
     else document.body.setAttribute('data-sveltekit-reload', '');
+  });
+}
+
+/* A CHUNK THAT WILL NOT LOAD IS A TAB OLDER THAN THE DEPLOY (its file has gone): it reloads onto the new build, once. Twice in a
+   minute is something else, and the error goes on to the page that says so. A file keeps its name when it has not changed
+   (`svelte.config.js`), so nothing else here would notice. */
+const RELOADED = 'braindog.chunk-reload';
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (e) => {
+    try {
+      const at = Number(sessionStorage.getItem(RELOADED));
+      if (Date.now() - at < 60_000) return;
+      sessionStorage.setItem(RELOADED, String(Date.now()));
+    } catch {
+      return;
+    }
+    e.preventDefault();
+    globalThis.location.reload();
   });
 }
 

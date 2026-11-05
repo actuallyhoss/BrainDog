@@ -82,7 +82,11 @@ export default {
        The file is still built to `service-worker.js` either way, because building it follows the file and
        not this flag. */
     serviceWorker: { register: false },
-    version: { pollInterval: 0 },
+    /* A FIXED NAME, SO AN UNCHANGED FILE KEEPS ITS NAME ACROSS A DEPLOY. By default Kit names the version with the clock, and
+       that lands in one chunk and renames every chunk above it: 232 of 690 files on two builds of the same source, so every
+       deploy sent about 680 KB nobody had changed. Kit's own reload on a failed chunk reads this name, so the tab does
+       that itself (`vite:preloadError`, `live.svelte.ts`). */
+    version: { name: 'braindog', pollInterval: 0 },
     /* A CONTENT SECURITY POLICY WITH NO INLINE SCRIPT BUT THE SHELL'S OWN (12 §8). A record draws strangers' text, so
        `script-src` is the backstop behind escaping: nothing injected into a page can run. `mode: 'hash'` because the
        shell is static and a nonce would be the same for every visitor. SvelteKit writes the policy into the shell's
