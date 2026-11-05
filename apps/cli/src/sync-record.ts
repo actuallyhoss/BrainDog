@@ -316,13 +316,23 @@ export function bundlesIn(files: readonly Sealed[]): Map<string, BundleRef[]> {
 /* ── a bundle's manifest ───────────────────────────────────────────────── */
 
 /** One thing in a bundle: its number in Carry, its name and kind then, the sealed file it is in, and what it held. */
-export type BundleRow = { seq: number; name: string; kind: CarryKind; key: string; sha256: string; files: number; size: number; runs: boolean };
+export type BundleRow = { seq: number; name: string; kind: CarryKind; key: string; sha256: string; files: number; size: number; runs: boolean; places?: Partial<Record<System, string>> };
 
 /** What one bundle holds, sealed itself, so a host cannot change what a machine is told to place. */
 export type Manifest = { v: 1; id: string; machine: string; system: System; at: string; rows: BundleRow[] };
 
 const SYSTEMS = new Set(['mac', 'windows', 'linux']);
 const KINDS = new Set(['files', 'env', 'patches', 'memory', 'sign_ins']);
+
+/**
+ * Where the machine that sealed a thing said it goes, each system's place as Carry held it then. A bundle from before
+ * it was sealed has none, and its places are Carry's alone, as they always were.
+ */
+const sealedPlaces = (x: unknown): { places?: Partial<Record<System, string>> } => {
+  if (!isObject(x)) return {};
+  const places = Object.fromEntries(Object.entries(x).filter(([system, place]) => SYSTEMS.has(system) && typeof place === 'string')) as Partial<Record<System, string>>;
+  return { places };
+};
 
 /** A manifest read, or `null` for anything out of shape. */
 export function readManifest(x: unknown): Manifest | null {
@@ -331,7 +341,7 @@ export function readManifest(x: unknown): Manifest | null {
   for (const r of x.rows) {
     if (!isObject(r) || typeof r.seq !== 'number' || typeof r.name !== 'string' || !KINDS.has(String(r.kind)) || typeof r.key !== 'string' || typeof r.sha256 !== 'string') return null;
     if (!r.key.startsWith(`carry/${String(r.seq)}/`)) return null;
-    rows.push({ seq: r.seq, name: r.name, kind: r.kind as CarryKind, key: r.key, sha256: r.sha256, files: typeof r.files === 'number' ? r.files : 0, size: typeof r.size === 'number' ? r.size : 0, runs: r.runs === true });
+    rows.push({ seq: r.seq, name: r.name, kind: r.kind as CarryKind, key: r.key, sha256: r.sha256, files: typeof r.files === 'number' ? r.files : 0, size: typeof r.size === 'number' ? r.size : 0, runs: r.runs === true , ...sealedPlaces(r.places) });
   }
   return { v: 1, id: x.id, machine: x.machine, system: x.system as System, at: x.at, rows };
 }

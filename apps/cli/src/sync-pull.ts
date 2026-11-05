@@ -17,6 +17,10 @@
  *     shown, and not placed.
  *   - SOMEBODY ELSE'S ACCOUNT. A thing Carry says belongs to another person is asked about by their name, with the
  *     advice to sign in again here instead, since an account may tie a sign-in to the machine it was made on.
+ *   - A PLACE THAT MOVED. Carry is the record's, and a host or anybody who may write to it can change it; the bundle's
+ *     manifest is sealed. So what a thing is and whether it runs is what the sealing machine said as well as what Carry
+ *     says, whichever asks more, and a place on this system that is not the one sealed is asked about by where it would go:
+ *     a host could otherwise lay a `.env` in a folder that is published, or a carried script over `~/.zshrc`.
  *   - TOOL SIGN-INS, which move and are never live on two machines (SCOPE §5): placed only from a machine that is
  *     retired, never over sign-ins this machine already holds, and written to their own item or file alone, never to
  *     an agent app's login item (`secret-store.ts`).
@@ -219,7 +223,7 @@ async function pull(how: PullHow, io: SyncIo): Promise<number> {
       failed = true;
       continue;
     }
-    if (c.kind === 'patches') {
+    if (c.kind === 'patches' || b.kind === 'patches') {
       io.out(`  ${name}: unpushed work is applied with braindog sync patches.`);
       continue;
     }
@@ -246,8 +250,27 @@ async function pull(how: PullHow, io: SyncIo): Promise<number> {
     }
     const place = placed.place;
 
+    /* ── a place that is not the one sealed: asked by where it would go, and never taken on a --yes-data ── */
+    const sealedPlace = b.places === undefined ? undefined : (b.places[r.system] ?? null);
+    if (sealedPlace !== undefined && sealedPlace !== c.places[r.system]) {
+      const rooted = place.kind === 'path' ? got.map((e) => targetIn(place.path, e.path, loose)) : [];
+      if (rooted.length === 0 || !rooted.every((t, i) => t !== null && holds(t, got[i]!.bytes))) {
+        const going = oneLine(place.kind === 'path' ? shown(place.path, io.home) : `the Keychain item ${place.item.service}`);
+        const sealedSaid = sealedPlace === null ? `no place on ${SYSTEM_SAID[r.system]}` : oneLine(sealedPlace);
+        if (!canAsk) {
+          notAsked(`  ${name}: Carry now puts it at ${going}, and ${from} sealed it for ${sealedSaid}, so it is asked about at a terminal first. Send it again from ${from} if the new place is yours.`);
+          continue;
+        }
+        if ((await ask(`${c.name}: Carry now puts it at ${going}, and ${from} sealed it for ${sealedSaid}. Place it there? [y/N] `)) !== true) {
+          io.out(`  ${name}: not placed, as you said, because its place is not the one ${from} sealed.`);
+          left = true;
+          continue;
+        }
+      }
+    }
+
     /* ── tool sign-ins: moved from a retired machine alone, into their own item or file ── */
-    if (c.kind === 'sign_ins') {
+    if (c.kind === 'sign_ins' || b.kind === 'sign_ins') {
       const only = got.length === 1 ? got[0] : undefined;
       if (only === undefined || only.path !== '') {
         io.out(`  ${name}: tool sign-ins are one item or one file, and this is not, so it is not placed.`);
@@ -338,7 +361,7 @@ async function pull(how: PullHow, io: SyncIo): Promise<number> {
       }
       const there = isThere(target);
       /* A PROGRAM: a file of a thing that runs one, or any file whose mode lets it run, whatever its thing says. */
-      if (c.runs || (e.mode & 0o111) !== 0) {
+      if (c.runs || b.runs || (e.mode & 0o111) !== 0) {
         const entry = { sha256: sha256(e.bytes), mode: e.mode };
         const sha = pinOf('carry', where, entry);
         if (pins?.[sha] === undefined) {
@@ -367,7 +390,7 @@ async function pull(how: PullHow, io: SyncIo): Promise<number> {
           pins = keepPin(file, sha, { name: where, kind: 'carry', profile: c.name, now });
         }
       }
-      if (there && c.kind === 'env') {
+      if (there && (c.kind === 'env' || b.kind === 'env')) {
         said.push(`    ${where} differs here, so it was left as it is. Delete it and pull again to take ${from}'s.`);
         left = true;
         continue;

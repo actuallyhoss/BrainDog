@@ -427,6 +427,12 @@ async function patches(from: string | undefined, host: string | undefined, dryRu
       failed = failed || (placed !== null && 'refused' in placed);
       continue;
     }
+    /* THE PLACE THE SEALING MACHINE SAID, as a pull holds it (`sync-pull.ts`): work is not applied in a folder a host named. */
+    if (b.places !== undefined && (b.places[r.system] ?? null) !== (row?.places[r.system] ?? null)) {
+      io.out(`${oneLine(b.name)}: Carry now names another folder than the one ${oneLine(source.manifest.machine)} sealed it for, so its work is not applied. Send it again from there if the new folder is yours.`);
+      failed = true;
+      continue;
+    }
     const got = await sealedGet(r.call, r.to.key, b.key, b.sha256);
     if (isFail(got)) {
       io.say(got.said);

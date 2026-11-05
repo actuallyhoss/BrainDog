@@ -574,6 +574,70 @@ test('A HOST CANNOT CHANGE WHAT IS PLACED: a changed sealed file is not placed, 
 
 /* ── the drill ─────────────────────────────────────────────────────────── */
 
+test('A HOST CANNOT SAY A SEALED PROGRAM IS NOT ONE: Carry turned to runs off still shows it whole and asks', async () => {
+  const record = fakeRecord();
+  const a = await joined(record, 'Studio Mac');
+  const b = await joined(record, 'Field Laptop');
+  const row = record.add('carry', { name: 'Shell setup', kind: 'files', ...everywhere('~/.config/shellrc'), runs: true, state: 'on' });
+  /* NO RUN BIT, so the sealed word is all that says it is a program. */
+  text(join(a.home, '.config', 'shellrc', 'startup.sh'), 'echo starting\n', 0o644);
+  assert.equal(await syncPush([], a.io), 0, a.all());
+
+  row.fields.runs = false;
+  const placed = join(b.home, '.config', 'shellrc', 'startup.sh');
+  assert.equal(await syncPull([], b.io), 1, b.all());
+  assert.equal(existsSync(placed), false, 'a program went in with no question');
+  assert.match(b.asked.join('\n'), /It runs a program/u);
+});
+
+test('A HOST CANNOT TURN TOOL SIGN-INS INTO PLAIN FILES: the live machine keeps them, whatever Carry now says they are', async () => {
+  const record = fakeRecord();
+  const a = await joined(record, 'Studio Mac');
+  const b = await joined(record, 'Field Laptop');
+  const row = record.add('carry', { name: 'Tool sign-ins', kind: 'sign_ins', ...everywhere('~/.ccenv/shared/mcp-auth.json'), state: 'on' });
+  text(join(a.home, '.ccenv', 'shared', 'mcp-auth.json'), SIGN_INS);
+  assert.equal(await syncPush([], a.io), 0, a.all());
+
+  row.fields.kind = 'files';
+  assert.equal(await syncPull([], b.io), 1, b.all());
+  assert.equal(existsSync(join(b.home, '.ccenv', 'shared', 'mcp-auth.json')), false, 'sign-ins moved off a live machine');
+  assert.match(b.out.join('\n'), /stays on Studio Mac while it is live/u);
+});
+
+test('A HOST CANNOT MOVE WHERE A THING IS PLACED: a place that is not the sealed one is asked about by where it goes, and --yes-data does not take it', async () => {
+  const record = fakeRecord();
+  const a = await joined(record, 'Studio Mac');
+  const b = await joined(record, 'Field Laptop');
+  const row = record.add('carry', { name: 'Project keys', kind: 'files', ...everywhere('~/work/keys'), state: 'on' });
+  text(join(a.home, 'work', 'keys', 'zshrc'), 'export LOOK=here\n');
+  assert.equal(await syncPush([], a.io), 0, a.all());
+
+  row.fields.linux = '~/public-site';
+  const moved = join(b.home, 'public-site', 'zshrc');
+  /* A NO LEAVES IT, AND IT SAYS WHERE. */
+  b.answers.push(false);
+  assert.equal(await syncPull([], b.io), 1, b.all());
+  assert.equal(existsSync(moved), false, 'placed where the host said with no question');
+  assert.match(b.asked.join('\n'), /Carry now puts it at .*public-site.*sealed it for ~\/work\/keys/u);
+
+  /* NO TERMINAL AND --yes-data: STILL NOT. */
+  const cold = machine(record);
+  cold.typed.push(PASSPHRASE);
+  assert.equal(await syncJoin(['--name', 'Third'], cold.io), 0, cold.all());
+  cold.io.terminal = false;
+  assert.equal(await syncPull(['--yes-data'], cold.io), 1, cold.all());
+  assert.equal(existsSync(join(cold.home, 'public-site', 'zshrc')), false, '--yes-data took a place the host moved');
+
+  /* A YES PLACES IT, AND THE SAME PLACE SENT AGAIN ASKS NOTHING. */
+  b.clear();
+  b.answers.push(true);
+  assert.equal(await syncPull([], b.io), 0, b.all());
+  assert.equal(readFileSync(moved, 'utf8'), 'export LOOK=here\n');
+  b.clear();
+  assert.equal(await syncPull([], b.io), 0, b.all());
+  assert.deepEqual(b.asked, []);
+});
+
 test('A DRILL OPENS THE NEWEST BUNDLE INTO A SCRATCH FOLDER, checks every file, places nothing, and keeps the outcome in Drills', async () => {
   const record = fakeRecord();
   const a = await joined(record, 'Studio Mac');

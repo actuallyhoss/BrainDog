@@ -270,7 +270,7 @@ async function push(host: string | undefined, dryRun: boolean, auto: boolean, io
       }
     }
     for (const line of [...extra, ...left]) io.out(line);
-    bundled.push({ seq: c.seq, name: c.name, kind: c.kind, key: k, sha256: sha, files: g.entries.length, size: g.size, runs: c.runs });
+    bundled.push({ seq: c.seq, name: c.name, kind: c.kind, key: k, sha256: sha, files: g.entries.length, size: g.size, runs: c.runs, places: c.places });
   }
 
   /* ── the bundle, or the Checked time when nothing changed ── */
