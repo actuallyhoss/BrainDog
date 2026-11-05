@@ -39,6 +39,7 @@
     type Methods,
     type Said,
     type Who,
+    forgetIfOther,
   } from '$lib/auth.ts';
   import { opens } from '$lib/motion/open.ts';
   import { at, BASE } from '$lib/at.ts';
@@ -392,9 +393,12 @@
       /* No channel in this browser: the waiting tab asks the account on its own clock instead. */
     }
     forgetRead();
-    entered = { who, via };
-    link = null;
-    step = { at: 'idle' };
+    /* NOT DRAWN FOR THEM IF IT WAS SOMEBODY ELSE'S (`forgetIfOther`), so what is kept has gone before this screen goes on. */
+    void forgetIfOther(who.person).finally(() => {
+      entered = { who, via };
+      link = null;
+      step = { at: 'idle' };
+    });
   };
 
   const withPasskey = () => void run('passkey', () => passkeySignIn(), enter('passkey'));

@@ -23,6 +23,8 @@ import {
   requestLink,
   signOut,
   signOutAndLeave,
+  forgetIfOther,
+  forgetLapsed,
   support,
   takeLink,
   type Io,
@@ -386,4 +388,70 @@ test("the frame's Sign out ends the session first and only then loads the sign-i
   const kept: string[] = [];
   assert.equal((await signOutAndLeave('/signin', (to) => kept.push(to), down.io)).ok, false);
   assert.deepEqual(kept, [], 'a session that did not end leaves the page where it is');
+});
+
+/* ─── a shared computer: what is kept goes however the session ended (sec-web, 5 Nov) ─── */
+
+/** A browser's two stores, as far as a sign-out touches them, and which caches were deleted. */
+function browserHeld(entries: Record<string, string>): { held: Map<string, string>; gone: string[]; done: () => void } {
+  const held = new Map(Object.entries(entries));
+  const gone: string[] = [];
+  const g = globalThis as Record<string, unknown>;
+  const was = { localStorage: g.localStorage, caches: g.caches };
+  const store = {
+    get length() {
+      return held.size;
+    },
+    key: (i: number) => [...held.keys()][i] ?? null,
+    getItem: (k: string) => held.get(k) ?? null,
+    setItem: (k: string, v: string) => void held.set(k, v),
+    removeItem: (k: string) => void held.delete(k),
+  };
+  Object.defineProperty(g, 'localStorage', { value: store, configurable: true, writable: true });
+  Object.defineProperty(g, 'caches', { value: { delete: async (n: string) => (gone.push(n), true) }, configurable: true, writable: true });
+  return {
+    held,
+    gone,
+    done: () => {
+      Object.defineProperty(g, 'localStorage', { value: was.localStorage, configurable: true, writable: true });
+      Object.defineProperty(g, 'caches', { value: was.caches, configurable: true, writable: true });
+    },
+  };
+}
+
+test('A SIGN-OUT PRESSED ANYWHERE TAKES THE WORKER\'S COPY AND THE OUTLINES, not only a press in the menu', async () => {
+  const b = browserHeld({ 'bd_tr:w:/search?q=private+words': '{}', bd_answers_out: '[]', 'braindog.boot-copy': '{}', bd_look_fix: 'stays' });
+  try {
+    const { io } = host({ '/auth/session': () => ok(WHO), '/auth/logout': () => ok({}) });
+    assert.equal((await signOut(io)).ok, true);
+    assert.deepEqual([...b.held.keys()], ['bd_look_fix']);
+    assert.ok(b.gone.includes('braindog-copy'), 'the copy Today is painted from stayed through a sign-out in Settings');
+  } finally {
+    b.done();
+  }
+});
+
+test('A SESSION ENDED ELSEWHERE TAKES THE WORKER\'S COPY AT THE SIGN-IN SCREEN, which answers nothing the worker would see as a 401', async () => {
+  const b = browserHeld({ 'braindog.boot-copy': '{}' });
+  try {
+    await forgetLapsed({ ok: true, value: { passkey: true, magic: true, key: false, open: false, me: null } });
+    assert.deepEqual([...b.held.keys()], []);
+    assert.ok(b.gone.includes('braindog-copy'));
+  } finally {
+    b.done();
+  }
+});
+
+test('ANOTHER PERSON SIGNING IN WITH NO SIGN-OUT BETWEEN TAKES WHAT WAS KEPT, and the same person keeps it', async () => {
+  const b = browserHeld({ 'braindog.last-reader': JSON.stringify({ person: 'p_1' }), 'braindog.boot-copy': '{}' });
+  try {
+    await forgetIfOther('p_1');
+    assert.equal(b.held.has('braindog.boot-copy'), true);
+    assert.deepEqual(b.gone, []);
+    await forgetIfOther('p_2');
+    assert.equal(b.held.has('braindog.boot-copy'), false);
+    assert.ok(b.gone.includes('braindog-copy'));
+  } finally {
+    b.done();
+  }
 });

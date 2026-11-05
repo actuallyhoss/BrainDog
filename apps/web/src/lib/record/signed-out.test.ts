@@ -43,6 +43,20 @@ test('A SIGN-OUT DROPS EVERY KEY OF WHAT THE PERSON READ, and keeps what is the 
     bd_money_lines_view: 'ledger',
     'braindog.macNotifications': 'on',
     'bd.list-default:r:p_1:tasks': '{}',
+    /* AN ADDRESS IS WORDS: `/search?q=` names what somebody looked for, and it was the key of a page's outline. */
+    'bd_tr:w:/search?q=private+words': '{}',
+    'bd_tr:p:/r/tasks': '{}',
+    bd_tr_i: '[]',
+    'bd_tr_shell:w': '{}',
+    bd_answers_out: '[{"id":"q","t":"the question in words"}]',
+    bd_wrote_at: '1',
+    bd_today_at: '1',
+    bd_shapes: '{}',
+    bd_tab_use: '["/r/private-list"]',
+    bd_reads: 'https://x.test/acme/api/boot',
+    bd_add_only: 'https://x.test/acme/api/boot',
+    bd_add_only_said: '{}',
+    'bd.operator': 'p_1',
     /* A DRAWN WIDGET'S PICTURE IS KEPT under who it was drawn for and where (`drawn-pictures.ts`, sec-follow M3), so it
        stays through a sign-out and is drawn to that person alone. */
     'bd.drawn.pics': '["w1.abc.page.light"]',
@@ -84,6 +98,15 @@ test('EACH KEY IS THE ONE ITS OWN MODULE KEEPS, so a renamed key is not left beh
   const src = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
   const owners: Record<string, string> = {
     'braindog.boot-copy': './boot-copy.ts',
+    bd_answers_out: './answers-out.ts',
+    bd_wrote_at: './wrote-mark.ts',
+    bd_today_at: './wrote-mark.ts',
+    bd_shapes: '../ui/shape.ts',
+    bd_tab_use: '../shell/tab-use.ts',
+    bd_reads: '../../routes/+layout.ts',
+    bd_add_only: '../../routes/+layout.ts',
+    bd_add_only_said: '../../routes/+layout.ts',
+    'bd.operator': '../admin/operator.svelte.ts',
     'braindog.side-copy': '../shell/side-copy.ts',
     'braindog.find-copy': './search-kept.ts',
     'braindog.find-names': './search-kept.ts',
@@ -106,7 +129,7 @@ test('EACH KEY IS THE ONE ITS OWN MODULE KEEPS, so a renamed key is not left beh
   assert.ok(src('../home/Home.svelte').includes('`bd_board_draft:${apiBase()}`'));
   assert.ok(src('../palette/slash-chat.ts').includes('`${THREADS_KEY}:${base}:${person}`'));
   assert.ok(src('../home/tell-line.ts').includes('`bd.tell:${base || \'/\'}:${person}`'));
-  assert.deepEqual([...SIGNED_OUT_PREFIXES], ['braindog.seen.', 'braindog.welcomed:', 'bd_board_draft:', 'bd_slash_threads:', 'bd.tell:']);
+  assert.deepEqual([...SIGNED_OUT_PREFIXES], ['braindog.seen.', 'braindog.welcomed:', 'bd_board_draft:', 'bd_slash_threads:', 'bd.tell:', 'bd_tr']);
   assert.ok(src('../sharing/see-as.svelte.ts').includes(`'${SIGNED_OUT_SESSION_KEYS[0]}'`));
   assert.ok(src('../start/first-drafts.svelte.ts').includes(`'${SIGNED_OUT_SESSION_KEYS[1]}'`));
 });
@@ -114,9 +137,30 @@ test('EACH KEY IS THE ONE ITS OWN MODULE KEEPS, so a renamed key is not left beh
 test('EVERY WAY A SESSION ENDS DROPS THEM: sign-out, signing out here too, a session the record no longer knows, access ended, an account closed', () => {
   const src = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
   const auth = src('../auth.ts');
-  assert.match(auth, /const out = await done\(call\(io, '\/auth\/logout', \{\}\)\);\n  if \(out\.ok\) \{\n    forgetSignedOut\(\);/u);
-  assert.match(auth, /if \(ended !== null && keep === 'none'\) \{\n    forgetSignedOut\(\);/u);
+  assert.match(auth, /async function forgetLeaving[^\n]*\n  forgetSignedOut\(\);/u);
+  assert.match(auth, /const out = await done\(call\(io, '\/auth\/logout', \{\}\)\);\n  if \(out\.ok\) await forgetLeaving\(person\);/u);
+  assert.match(auth, /if \(ended !== null && keep === 'none'\) await forgetLeaving\(person\);/u);
   const live = src('../data/live.svelte.ts');
   assert.equal(live.match(/forgetSignedOut\(\);/gu)?.length, 2);
-  assert.match(src('../../routes/settings/[area]/areas/Identity.svelte'), /forgetSignedOut\(\);\n\s+await forgetOwn\(leaving\);\n\s+closedNow = true;/u);
+  assert.match(src('../../routes/settings/[area]/areas/Identity.svelte'), /await forgetLeaving\(leaving\);\n\s+closedNow = true;/u);
+});
+
+test('THE WORKER\'S COPY NAMED BY THE SIGN-IN SCREEN IS THE COPY, since it spells it to load no module for a stranger', () => {
+  const auth = readFileSync(new URL('../auth.ts', import.meta.url), 'utf8');
+  const offline = readFileSync(new URL('../data/offline.ts', import.meta.url), 'utf8');
+  const copy = /export const COPY = '([^']+)'/u.exec(offline)?.[1];
+  assert.ok(copy);
+  assert.ok(auth.includes(`caches?.delete('${copy}')`), 'forgetLapsed no longer deletes the copy Today is painted from');
+});
+
+test('NO ADDRESS OF WHAT SOMEBODY TYPED OR A DEVICE SHOWED IS A KEY OF A PAGE\'S OUTLINE', async () => {
+  const frame = readFileSync(new URL('../shell/first-frame.ts', import.meta.url), 'utf8');
+  const TYPED = new RegExp(/const TYPED = \/(.*)\/u;/u.exec(frame)?.[1] ?? 'never', 'u');
+  const kept = (address: string): string => (TYPED.test(address) ? address.slice(0, address.indexOf('?')) : address);
+  assert.equal(kept('/search?q=private+words'), '/search');
+  assert.equal(kept('/settings/agents?code=654321'), '/settings/agents');
+  assert.equal(kept('/connect?view=x&code=654321'), '/connect');
+  assert.equal(kept('/r/tasks?q=words'), '/r/tasks');
+  assert.equal(kept('/r/tasks?view=open'), '/r/tasks?view=open');
+  assert.equal(kept('/r/tasks'), '/r/tasks');
 });

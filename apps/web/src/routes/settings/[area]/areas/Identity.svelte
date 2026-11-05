@@ -14,8 +14,7 @@
   import { ROLES } from '$lib/sharing/roles.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { isProof, NOT_CONFIRMED, provingFetch } from '$lib/reauth/ask.ts';
-  import { forgetOwn, renamePasskey, signOut, type PasskeyInfo } from '$lib/auth.ts';
-  import { forgetSignedOut } from '$lib/record/signed-out.ts';
+  import { forgetLeaving, renamePasskey, signOut, type PasskeyInfo } from '$lib/auth.ts';
   import { passkeysSaid } from '$lib/ui/signing-in.ts';
   import { PEOPLE } from '$lib/who.ts';
   import { createClient } from '@braindog/client';
@@ -347,8 +346,7 @@
     closing = false;
     if (answer?.ok === true) {
       /* AN ACCOUNT CLOSED ENDS ITS SESSIONS: what this browser kept of what they read goes now, as on a sign-out. */
-      forgetSignedOut();
-      await forgetOwn(leaving);
+      await forgetLeaving(leaving);
       closedNow = true;
       return;
     }

@@ -50,6 +50,20 @@ export const SIGNED_OUT_KEYS = [
   'today-late-aside',
   'braindog:slot:aside',
   'braindog.inbox.into',
+  /* the answers given and not yet shown back, with the question's words and what was answered (`answers-out.ts`), and
+     when this browser last wrote and last drew Today (`wrote-mark.ts`) */
+  'bd_answers_out',
+  'bd_wrote_at',
+  'bd_today_at',
+  /* each page's cards by id, under the record's address (`ui/shape.ts`) */
+  'bd_shapes',
+  /* the places opened most (`shell/tab-use.ts`), the records read here and what one of them said (`+layout.ts`) */
+  'bd_tab_use',
+  'bd_reads',
+  'bd_add_only',
+  'bd_add_only_said',
+  /* who on this device is the host's operator (`admin/operator.svelte.ts`): a person's id, and that they hold the keys */
+  'bd.operator',
 ] as const;
 
 /** Keys kept in `localStorage` one a page, a record or a board, by what they start with. */
@@ -65,6 +79,8 @@ export const SIGNED_OUT_PREFIXES = [
   'bd_slash_threads:',
   /* Today's Tell line and what it last added, one a person a BrainDog (`tell-line.ts`) */
   'bd.tell:',
+  /* each page's kept outline, by its address, and the index and the shell's beside them (`shell/page-trace.ts`) */
+  'bd_tr',
 ] as const;
 
 /** A drawn widget's picture in the shape kept before it was kept per person (`<code>.<size>.<mode>`, no `whose.`). */

@@ -121,7 +121,7 @@ async function readPage(address: string): Promise<void> {
   const { keepTrace, traceNow } = await import('./page-trace.ts');
   if (addressNow() !== address) return;
   const trace = traceNow();
-  if (trace !== null && trace.r.length > 0) keepTrace(address, trace);
+  if (trace !== null && trace.r.length > 0) keepTrace(keptAddress(address), trace);
 }
 
 /** With no frame to stand, the page is still read at rest. */
@@ -134,6 +134,15 @@ function settleOnly(address: string): void {
 }
 
 const addressNow = (): string => location.pathname.replace(/\/$/u, '') + location.search;
+
+/**
+ * THE QUERIES A PAGE'S OUTLINE IS NEVER KEPT UNDER, since the address is the key and a key is in the clear in this browser's
+ * storage (`bd_tr:w:/search?q=private+words`, measured): what somebody typed into search or a list's filter, and the code a
+ * device showed, which `/settings/agents?code=` and `/connect?code=` carry. The page is still read, and still drawn from its
+ * own bare address. Everything else in a query is a list's view, whose outline is its own.
+ */
+const TYPED = /[?&](?:q|code|token|next|email|text|title|url)=/u;
+export const keptAddress = (address: string): string => (TYPED.test(address) ? address.slice(0, address.indexOf('?')) : address);
 
 /**
  * A page has opened at this address: on the app's first run and on every move inside it. On a move the outline is drawn

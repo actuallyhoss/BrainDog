@@ -19,8 +19,9 @@ import { REGISTERS } from '../record/held.ts';
 import type { RegisterDecl } from '../record/schema.ts';
 import { dropCopy, readCopy } from '../record/boot-copy.ts';
 import { dropAllOut } from '../record/answers-out.ts';
+import { forgetSignedOut } from '../record/signed-out.ts';
 import { idbKey, idbStore, openEarly } from './local-db.ts';
-import { dropMark, memoryKey, readMark, writeMark, type MarkDeps } from './local-mark.ts';
+import { MARK_KEY, dropMark, memoryKey, readMark, writeMark, type MarkDeps } from './local-mark.ts';
 import { localCopy, memoryStore, railOf, scopeOf, type LocalCopy, type Log, type Near, type Rail, type Spot } from './local.ts';
 import { forget as forgetOffline } from './offline.ts';
 import { seeingAs } from '../sharing/see-as.svelte.ts';
@@ -113,6 +114,16 @@ export function lastReader(base: string): Promise<string | null> {
   return said;
 }
 
+/** Whether what this browser holds was kept for somebody other than `person`, by the marker as it stands. */
+function keptForOther(person: string): boolean {
+  try {
+    const was = (JSON.parse(strings()?.getItem(MARK_KEY) ?? 'null') as { person?: unknown } | null)?.person;
+    return typeof was === 'string' && was !== '' && person !== '' && was !== person;
+  } catch {
+    return false;
+  }
+}
+
 /** The reader a live boot named. Call only with a shell the record answered, never a drawn copy or a refusal. */
 export function claimLocal(
   base: string,
@@ -127,6 +138,14 @@ export function claimLocal(
   },
 ): void {
   if (seeingAs() !== null) return;
+  /* ANOTHER PERSON THAN THE ONE THIS BROWSER KEPT FOR, with no sign-out between (a mailed link opened where somebody was signed
+     in, on any way in, which is why it is here and not only on the sign-in screen): the claim below clears the copy, and the
+     worker's copy with Today's picture and the keys kept beside it go with it. Today's picture is keyed by the address alone,
+     so a colleague on the same BrainDog would be painted it. */
+  if (keptForOther(me.person)) {
+    void forgetOffline().catch(() => undefined);
+    forgetSignedOut();
+  }
   /* SOMEBODY ONLY SHARES LET IN (a grant, and no role on the whole record) IS A GUEST HERE, whose copy is drawn a day at
      most and never past their last share's end. */
   const guest = me.grant !== undefined && !me.owner && me.lists !== null ? { guest: { until: me.grant.until } } : {};

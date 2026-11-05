@@ -259,7 +259,41 @@ export async function forgetLapsed(said: Said<Methods>): Promise<void> {
   }
   /* The last shell is among what a sign-out drops (`signed-out.ts`); the local copy is not, so it is wiped here. */
   forgetSignedOut();
+  /* AND THE WORKER'S COPY, WITH TODAY'S PICTURE IN IT (`kept-frame.ts`). The worker deletes it on a 401, and this screen asks
+     nothing that answers one (`/auth/methods` says `me: null` with a 200), so a session ended elsewhere left the last
+     person's Today to be painted for whoever signed in next at the same address. Spelt here so this file loads no module
+     for a stranger; `signed-out.test.ts` holds it to `COPY`. */
+  await globalThis.caches?.delete('braindog-copy').catch(() => false);
   if (kept) await import('./data/local-tab.ts').then((c) => c.wipeLocal(), () => undefined);
+}
+
+/**
+ * Everything this browser keeps of the person who just left: the keys (`signed-out.ts`), their own pictures, the local
+ * copy, and the worker's copy with Today's picture in it. EVERY ENDING OF A SESSION GOES THROUGH HERE, because a press in
+ * Settings wiped less than a press in the menu: the local copy, the answers and the worker's copy stayed.
+ */
+export async function forgetLeaving(person: string | null): Promise<void> {
+  forgetSignedOut();
+  await forgetOwn(person);
+  await Promise.all([
+    import('./data/local-tab.ts').then((c) => c.wipeLocal(), () => undefined),
+    import('./data/offline.ts').then((c) => c.forget(), () => undefined),
+  ]);
+}
+
+/**
+ * ANOTHER PERSON SIGNED IN HERE WITH NO SIGN-OUT BETWEEN (a mailed link opened in a browser somebody was signed in to): what
+ * is kept is the last person's, and Today's picture is keyed by the address alone, so a colleague on the same BrainDog
+ * would be painted it. `braindog.last-reader` says who it was kept for; asked with no reader kept, nothing goes.
+ */
+export async function forgetIfOther(person: string): Promise<void> {
+  let was: unknown = null;
+  try {
+    was = (JSON.parse(globalThis.localStorage?.getItem('braindog.last-reader') ?? 'null') as { person?: unknown } | null)?.person ?? null;
+  } catch {
+    was = null;
+  }
+  if (typeof was === 'string' && was !== '' && person !== '' && was !== person) await forgetLeaving(null);
 }
 
 /** Sign in with a passkey this device or a nearby phone holds. */
@@ -505,10 +539,7 @@ export async function forgetOwn(person: string | null): Promise<void> {
 export async function signOut(io: Io = live()): Promise<Said<null>> {
   const person = await whoNow(io);
   const out = await done(call(io, '/auth/logout', {}));
-  if (out.ok) {
-    forgetSignedOut();
-    await forgetOwn(person);
-  }
+  if (out.ok) await forgetLeaving(person);
   return out;
 }
 
@@ -606,10 +637,7 @@ export async function signOutEverywhere(keep: 'this' | 'none' = 'this', io: Io =
   const out = await call(io, '/auth/logout/all', { keep });
   if (!out.ok) return out;
   const ended = isObj(out.value) && typeof out.value.ended === 'number' ? out.value.ended : null;
-  if (ended !== null && keep === 'none') {
-    forgetSignedOut();
-    await forgetOwn(person);
-  }
+  if (ended !== null && keep === 'none') await forgetLeaving(person);
   return ended === null ? { ok: false, kind: 'refused', fix: null } : { ok: true, value: ended };
 }
 
