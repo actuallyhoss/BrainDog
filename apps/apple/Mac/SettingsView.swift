@@ -7,7 +7,7 @@ enum SettingsTabs {
 }
 
 /// The app's own Settings window (⌘,), in three tabs: **General** (what belongs to this Mac: opening at login, the menu
-/// bar, text size, updates), **Shortcut** (the quick panel's keys) and **Signing in** (who is signed in here, and Sign
+/// bar, text size), **Shortcut** (the quick panel's keys) and **Signing in** (who is signed in here, and Sign
 /// out). Everything about the BrainDog itself is its Settings in the app, one press away.
 struct SettingsView: View {
     @State private var tab = SettingsTabs.chosen
@@ -36,7 +36,6 @@ struct SettingsView: View {
 
 private struct GeneralSettings: View {
     @State private var model = MacModel.shared
-    @State private var updates = Updates.shared
     @State private var atLogin = MacModel.shared.opensAtLogin
 
     var body: some View {
@@ -50,15 +49,6 @@ private struct GeneralSettings: View {
                 Toggle("Show what needs you in the menu bar", isOn: $model.inMenuBar)
                 Picker("Text size", selection: $model.zoom) {
                     ForEach(MacModel.zooms, id: \.self) { z in Text(z == 1 ? "100% (usual)" : "\(Int((z * 100).rounded()))%").tag(z) }
-                }
-            }
-            Section("Updates") {
-                Toggle("Check for updates by itself", isOn: Binding(get: { updates.automatic }, set: { updates.setAutomatic($0) }))
-                    .disabled(!updates.canCheck)
-                HStack {
-                    Text(updates.said).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    Spacer()
-                    Button("Check Now") { updates.check() }.disabled(!updates.canCheck)
                 }
             }
             Section {

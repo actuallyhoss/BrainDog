@@ -107,7 +107,7 @@ screen's own control calls; a Release build has none of it.
   receipt), ⇧Enter is a new line, ⌘Enter asks about it in the window. Search finds a place or an entry and Enter opens it
   in the window. Tab switches, Escape or a press elsewhere closes. The keys are a Carbon hot key held exclusively: when
   another app owns them Settings says so. Changed or turned off in Settings › Shortcut.
-- **Menus**: BrainDog (Check for Updates…, Settings…, Open at Login, Sign out), File (New Tell… ⌘N, Quick Panel with its
+- **Menus**: BrainDog (Settings…, Open at Login, Sign out), File (New Tell… ⌘N, Quick Panel with its
   keys), Edit, View (Reload ⌘R, Actual Size ⌘0, Zoom In ⌘=, Zoom Out ⌘−, full screen), Go (Back ⌘[, Forward ⌘], then
   Today ⌘1, Needs you ⌘2 and the web's own places and the record's pages, ⌘3 onward; Settings in BrainDog ⌥⌘,; Search or
   Go To ⌘K, Ask ⌘J), Window, Help (brain.dog/docs, /support).
@@ -120,11 +120,7 @@ screen's own control calls; a Release build has none of it.
   Today's last picture covers the page at launch until it has drawn, as on the iPhone.
 - **Links**: `braindog://open?path=`, `braindog://tell`, `braindog://quick`, and universal links on app.brain.dog (the
   same addresses as the iPhone app's, `apps/worker/src/apple.ts`) open in the window; the sign-in link signs in, only as a universal link on the app's own origin (`braindog://` is any page's to open and never signs in), never over a session already here, and after a press when this app did not ask for that link (`Web/WebGate.swift`, `SignInFlow.open`).
-- **Updates** (`Mac/Updates.swift`): Sparkle 2, pinned, reading `https://brain.dog/mac/appcast.xml`
-  (`apps/site/static/mac/appcast.xml`, empty). Off until a build is signed by the team and carries `SUPublicEDKey`; until
-  then Settings says why and Check for Updates… is dimmed. Making the key: Sparkle's `generate_keys` once on this Mac
-  (the private half stays in its keychain), the public half into `project.yml`; each release signs its dmg with
-  `sign_update` and adds an `<item>` to the feed.
+- **Updates**: the Mac App Store's. The app has no updater of its own, because the store allows none.
 - **Tell window**: the same composer as the iPhone's Tell sheet. Page notifications show while the app runs; exports go
   to Downloads.
 - Screenshots: `node apps/apple/tools/mac-shots.mjs --out mac6 --server http://localhost:5183` once signed in

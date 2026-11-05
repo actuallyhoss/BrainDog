@@ -160,7 +160,7 @@ test('A LOCKED PHONE NEITHER SAYS NOR TAKES THE RECORD: Siri needs it unlocked, 
   assert.equal(read(kit, 'Push/Push.swift').match(/options: \[\.authenticationRequired\]/g).length, 2);
 });
 
-test('A RELEASE TALKS TO THE ONE HOST: every override is Debug, no plist opens plain http, and updates are signed', () => {
+test('A RELEASE TALKS TO THE ONE HOST: every override is Debug, and no plist opens plain http', () => {
   const server = read(kit, 'API/Server.swift');
   const open = server.indexOf('#if DEBUG');
   assert.ok(open >= 0 && open < server.indexOf('braindogServer"') && server.indexOf('braindogServer"') < server.indexOf('#endif'));
@@ -168,9 +168,6 @@ test('A RELEASE TALKS TO THE ONE HOST: every override is Debug, no plist opens p
   assert.doesNotMatch(project, /NSAllowsArbitraryLoads|NSExceptionDomains|NSAllowsLocalNetworking/);
   assert.doesNotMatch(project, /BrainDogServer: (?!https:\/\/app\.brain\.dog\n)/);
   assert.match(project, /configs:\n\s+#[^\n]*\n\s+Release:\n\s+CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO/);
-  assert.match(project, /SUFeedURL: https:\/\//);
-  assert.match(project, /SUVerifyUpdateBeforeExtraction: true/);
-  assert.match(read(apple, 'Mac/Updates.swift'), /key\.isEmpty/);
   assert.doesNotMatch(walk(apple).filter((f) => f.endsWith('.entitlements')).map((f) => read(f)).join('\n'), /get-task-allow|cs\.disable-library-validation|cs\.allow-unsigned|cs\.allow-jit|cs\.debugger/);
 });
 

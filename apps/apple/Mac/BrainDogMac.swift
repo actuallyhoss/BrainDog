@@ -242,10 +242,6 @@ struct Menus: Commands {
     }
 
     var body: some Commands {
-        CommandGroup(after: .appInfo) {
-            Button("Check for Updates…") { Updates.shared.check() }
-                .disabled(!Updates.shared.canCheck)
-        }
         CommandGroup(after: .appSettings) {
             Toggle("Open at Login", isOn: Binding(get: { model.opensAtLogin }, set: { model.setOpensAtLogin($0) }))
             if session.signedIn {
