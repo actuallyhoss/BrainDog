@@ -115,6 +115,35 @@ export function route(asked: Asked, scope: string): Route {
 /** Whether an answer kept at `at` may still be drawn at `now`. A missing or unreadable time is too old. */
 export const fresh = (at: number, now: number): boolean => Number.isFinite(at) && at <= now && now - at < WEEK;
 
+/** How long a guest's answers are drawn, as the local copy holds them (`claimLocal`). */
+export const DAY = 24 * 60 * 60 * 1000;
+/** What the page writes into the copy for somebody only shares let in: their last share's end, or `null` for none set. */
+export type Guest = { until: string | null };
+
+/**
+ * `fresh`, for whoever the copy was kept for: a guest's answers a day at most, and never past their last share's end,
+ * since a guest with a lapsed share may have this browser and no way back to the record. An end that cannot be read has passed.
+ */
+export const freshFor = (at: number, now: number, guest: Guest | null): boolean =>
+  fresh(at, now) && (guest === null || (now - at < DAY && (guest.until === null || now < Date.parse(guest.until))));
+
+/** Where the copy says it is a guest's, inside the copy, so deleting the one deletes the other. Never swept, like the mark. */
+export const guestMarkOf = (scope: string): string => new URL('~guest', scope).href;
+
+/** The guest the mark names, or `null` for no mark. A mark that cannot be read is a guest with no end: the shorter limit. */
+export async function guestIn(mark: Response | undefined): Promise<Guest | null> {
+  if (!mark) return null;
+  try {
+    const until = ((await mark.json()) as { until?: unknown }).until;
+    return { until: typeof until === 'string' ? until : null };
+  } catch {
+    return { until: null };
+  }
+}
+
+/** Where in the copy the picture of Today is kept (`kept-frame.ts`); `app.html` spells the same address. */
+export const FRAME_PATH = '~today-frame';
+
 /** Where the record the copy belongs to is written down, inside the copy, so deleting the one deletes the other. */
 export const markOf = (scope: string): string => new URL('~record', scope).href;
 
@@ -185,6 +214,28 @@ export async function keep(base: string, dev: boolean): Promise<void> {
   }
   if (dev || !('serviceWorker' in navigator)) return;
   await navigator.serviceWorker.register(`${BASE}/service-worker.js`, { scope: `${BASE}/`, type: 'classic' });
+}
+
+/**
+ * Say whose copy this is, on every live boot (`claimLocal`): a guest's is drawn a day at most, and Today's picture of it
+ * is not kept at all, since the picture paints before anything has asked whether the share still holds.
+ */
+export async function markGuest(guest: Guest | null): Promise<void> {
+  const held = await cachesHere()?.open(COPY);
+  if (!held) return;
+  const mark = guestMarkOf(scopeHere());
+  if (guest === null) {
+    await held.delete(mark);
+    return;
+  }
+  await held.put(mark, new Response(JSON.stringify(guest), { headers: { 'content-type': 'application/json' } }));
+  await held.delete(new URL(FRAME_PATH, scopeHere()).href);
+}
+
+/** Whether this copy is a guest's. */
+export async function guestHere(): Promise<boolean> {
+  const held = await cachesHere()?.open(COPY);
+  return !!(await held?.match(guestMarkOf(scopeHere())));
 }
 
 /**

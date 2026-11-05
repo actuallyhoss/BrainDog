@@ -23,7 +23,7 @@ import { forgetSignedOut } from '../record/signed-out.ts';
 import { idbKey, idbStore, openEarly } from './local-db.ts';
 import { MARK_KEY, dropMark, memoryKey, readMark, writeMark, type MarkDeps } from './local-mark.ts';
 import { localCopy, memoryStore, railOf, scopeOf, type LocalCopy, type Log, type Near, type Rail, type Spot } from './local.ts';
-import { forget as forgetOffline } from './offline.ts';
+import { forget as forgetOffline, markGuest } from './offline.ts';
 import { seeingAs } from '../sharing/see-as.svelte.ts';
 
 /* THE BUILD, READ OFF KIT'S OWN `define` RATHER THAN `$app/environment`. That module lives in the entry, and naming its
@@ -142,15 +142,14 @@ export function claimLocal(
      in, on any way in, which is why it is here and not only on the sign-in screen): the claim below clears the copy, and the
      worker's copy with Today's picture and the keys kept beside it go with it. Today's picture is keyed by the address alone,
      so a colleague on the same BrainDog would be painted it. */
-  if (keptForOther(me.person)) {
-    void forgetOffline().catch(() => undefined);
-    forgetSignedOut();
-  }
+  const cleared = keptForOther(me.person) ? forgetOffline().catch(() => undefined) : Promise.resolve();
+  if (keptForOther(me.person)) forgetSignedOut();
   /* SOMEBODY ONLY SHARES LET IN (a grant, and no role on the whole record) IS A GUEST HERE, whose copy is drawn a day at
-     most and never past their last share's end. */
-  const guest = me.grant !== undefined && !me.owner && me.lists !== null ? { guest: { until: me.grant.until } } : {};
+     most and never past their last share's end, in the local copy and in the worker's (`markGuest`). */
+  const guest = me.grant !== undefined && !me.owner && me.lists !== null ? { until: me.grant.until } : null;
+  void cleared.then(() => markGuest(guest)).catch(() => undefined);
   void tab()
-    .claim({ base, person: me.person, scope: scopeOf(me), ...guest })
+    .claim({ base, person: me.person, scope: scopeOf(me), ...(guest === null ? {} : { guest }) })
     /* AFTER THE CLAIM, which clears the key with the copy when the owner changed: the marker is signed with the new one. */
     .then(() => writeMark(base, me.person, markDeps()))
     .then(() => void verified.delete(base))

@@ -27,11 +27,11 @@
  */
 
 import { apiBase, BASE } from '../at.ts';
-import { COPY, KEPT, when, words } from '../data/offline.ts';
+import { COPY, FRAME_PATH, guestHere, KEPT, when, words } from '../data/offline.ts';
 import { closedIds } from '../record/answers-out.ts';
 
 /** Where in the copy the picture is kept: one, the last Today drawn. `app.html` spells the same address. */
-export const FRAME_PATH = '~today-frame';
+export { FRAME_PATH };
 /** Bump with the shape below; `app.html` draws only this one. */
 export const FRAME_VERSION = 1;
 /** How old a picture may be before it says when it is from. Today's own line over a copy keeps the same rule. */
@@ -161,7 +161,7 @@ const frameKey = (): string => new URL(FRAME_PATH, `${location.origin}${BASE}/`)
 
 /**
  * Keep Today as drawn now, for the next open. Only on a page the worker controls (see above), and never while seeing
- * the record as somebody else, whose Today is not this phone's to keep.
+ * the record as somebody else, whose Today is not this phone's to keep, nor for a guest (`markGuest`).
  */
 export async function keepFrame(now: number = Date.now()): Promise<void> {
   if (typeof caches === 'undefined' || typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return;
@@ -170,6 +170,7 @@ export async function keepFrame(now: number = Date.now()): Promise<void> {
   } catch {
     return;
   }
+  if (await guestHere()) return;
   const frame = frameOf(document, now);
   if (frame === null) return;
   const box = await caches.open(COPY);

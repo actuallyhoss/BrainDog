@@ -45,7 +45,7 @@
  * `webworker` library into a program that is otherwise the DOM's, where the two declare `self` differently.
  */
 
-import { CEILING, COPY, KEPT, accessEnded, fresh, markOf, route, words, type Route } from './lib/data/offline.ts';
+import { CEILING, COPY, KEPT, accessEnded, freshFor, guestIn, guestMarkOf, markOf, route, words, type Route } from './lib/data/offline.ts';
 /* ─── the phone lane's imports: the kinds of push and a share from another app (`lib/phone/`) ─── */
 import { kindIn, pushLine } from './lib/phone/kinds.ts';
 import { SHARED, isShare, isSharedPhoto, sharedPhoto, takeShare } from './lib/phone/share.ts';
@@ -303,7 +303,8 @@ async function kept(key: string, now: number): Promise<{ res: Response; at: numb
   const res = await box.match(key, { ignoreVary: true });
   if (!res) return null;
   const at = Number(res.headers.get(KEPT));
-  if (fresh(at, now)) return { res: new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: res.headers }), at };
+  const guest = await guestIn(await box.match(guestMarkOf(sw.registration.scope)));
+  if (freshFor(at, now, guest)) return { res: new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: res.headers }), at };
   await box.delete(key);
   return null;
 }
@@ -392,18 +393,19 @@ let swept = 0;
  *
  * ON ACTIVATE AND AT MOST ONCE AN HOUR AFTER THAT, on opening an address of the app, so the walk over the copy is paid
  * once per visit and not once per read. It walks at most `CEILING` answers plus whatever one hour of reading added.
- * The record's mark is not an answer and is never swept.
+ * The record's mark and the guest's are not answers and are never swept.
  */
 async function sweep(now: number): Promise<void> {
   swept = now;
   const box = await sw.caches.open(COPY);
-  const mark = markOf(sw.registration.scope);
-  const keys = (await box.keys()).filter((k) => k.url !== mark);
+  const marks = [markOf(sw.registration.scope), guestMarkOf(sw.registration.scope)];
+  const guest = await guestIn(await box.match(marks[1]!));
+  const keys = (await box.keys()).filter((k) => !marks.includes(k.url));
   /* OLDEST FIRST, because a cache lists its entries in the order they were put, and a put over a key moves it last. */
   const over = keys.length - CEILING;
   for (const [i, key] of keys.entries()) {
     const res = i < over ? undefined : await box.match(key);
-    if (!res || !fresh(Number(res.headers.get(KEPT)), now)) await box.delete(key);
+    if (!res || !freshFor(Number(res.headers.get(KEPT)), now, guest)) await box.delete(key);
   }
 }
 
