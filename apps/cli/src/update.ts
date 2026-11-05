@@ -75,9 +75,32 @@ export function checkLine(mine: string, served: string): string {
   return mine.split('+')[0]! > served.split('+')[0]! ? `This command is ${a}; the site serves ${b}, an older build. Run braindog update to match it.` : `This command is ${a}; ${b} is out. Run braindog update.`;
 }
 
+/**
+ * One address asked, its moves followed here, one at a time.
+ *
+ * LEFT TO `fetch`, A MOVE FROM HTTPS TO HTTP IS FOLLOWED (`verify.ts` measured it, and this file was proved against a
+ * local https server): a bundle read in the clear, with a sum read in the clear beside it, was started by the
+ * `--version` check below. So a move anywhere but https ends the read before that address is asked anything. The one
+ * other address it may stay on is the one it began at, which is a test's own server on this machine.
+ */
+async function reached(get: typeof fetch, url: string, ms: number): Promise<Response> {
+  const signal = AbortSignal.timeout(ms);
+  const began = new URL(url).origin;
+  let at = url;
+  for (let moves = 0; ; moves++) {
+    const res = await get(at, { signal, redirect: 'manual' });
+    const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (location === null) return res;
+    const next = new URL(location, at);
+    if (next.protocol !== 'https:' && next.origin !== began) throw new Error(`it sent the request on to ${next.origin}, which is not https`);
+    if (moves === 5) throw new Error('it moved more than five times');
+    at = next.href;
+  }
+}
+
 /** One text file from the site, trimmed, with the reason it could not be read when it could not. */
 async function text(get: typeof fetch, url: string, ms: number): Promise<string> {
-  const res = await get(url, { signal: AbortSignal.timeout(ms) });
+  const res = await reached(get, url, ms);
   if (!res.ok) throw new Error(`it answered ${res.status}`);
   return (await res.text()).trim();
 }
@@ -128,7 +151,7 @@ export async function update(args: string[], io: UpdateIo): Promise<number> {
     let bytes: Buffer;
     try {
       want = (await text(get, `${base}/braindog.mjs.sha256`, 10_000)).split(/\s+/)[0] ?? '';
-      const res = await get(`${base}/braindog.mjs`, { signal: AbortSignal.timeout(120_000) });
+      const res = await reached(get, `${base}/braindog.mjs`, 120_000);
       if (!res.ok) throw new Error(`${base}/braindog.mjs answered ${res.status}`);
       bytes = Buffer.from(await res.arrayBuffer());
     } catch (e) {
