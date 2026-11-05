@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 /**
- * BrainDog.dmg: builds the Mac app, signs and notarises it when this Mac holds a Developer ID, and publishes the
- * download and the update feed where brain.dog serves them (`brain.dog/desktop/`).
+ * BrainDog.dmg: builds the old Tauri shell, signs and notarises it when this Mac holds a Developer ID.
+ *
+ * IT PUBLISHES NOTHING. BrainDog for Mac is the native app in `apps/apple`, updated by Sparkle; this shell is kept for
+ * Windows and Linux. A dmg sent up from here would land on the addresses the site names for the Mac app, so `--publish`,
+ * `--stage` and `--upload-only` stop before anything happens (`NOT_PUBLISHED`), and `upload` stops again on its own.
+ * What follows describes how a publish worked, for the day this shell has a Windows or Linux release of its own.
  *
  *   node tools/desktop/release.mjs                    build for this Mac's chip
  *   node tools/desktop/release.mjs --universal        Apple silicon and Intel in one app (needs both Rust targets)
@@ -67,8 +71,11 @@ export const PUBLIC = 'https://brain.dog/desktop';
 /** The bucket the files live in, and the public name it answers at (`brain.dog/desktop/*` redirects there). */
 export const BUCKET = 'braindog-desktop';
 export const BUCKET_PUBLIC = 'https://download.brain.dog';
-/** The Mac app's bundle identifier, which the team's application identifier is made from. */
-const BUNDLE_ID = 'dog.brain.desktop';
+/** THIS SHELL'S BUNDLE IDENTIFIER, which the team's application identifier is made from. `dog.brain.desktop` is the native Mac app's. */
+export const BUNDLE_ID = 'dog.brain.shell';
+/** WHY NOTHING GOES UP. */
+export const NOT_PUBLISHED =
+  'This shell is not published: BrainDog for Mac is the native app in apps/apple, and a dmg from here would land on its addresses. Nothing was built or uploaded.';
 const CARGO = join(process.env.HOME ?? '', '.cargo/bin');
 /**
  * WHERE CARGO BUILDS, OUTSIDE THE TREE: a release build is 1.6 GB of objects, and the gates that read every file of the
@@ -242,6 +249,8 @@ async function answers(url) {
 }
 
 async function main() {
+  /* BEFORE ANYTHING, even a dry run or a version written into the config. */
+  if (PUBLISH) stop(NOT_PUBLISHED);
   if (asked !== null) {
     const next = withVersion(readFileSync(CONF, 'utf8'), readFileSync(CARGO_TOML, 'utf8'), asked);
     if (!DRY) {
@@ -374,6 +383,7 @@ async function uploadOnly(version) {
 
 /** UP TO THE BUCKET, with wrangler from the repository, the Cloudflare account from the environment or signing.env. */
 async function upload(version, notary) {
+  stop(NOT_PUBLISHED);
   const cloud = {
     ...process.env,
     ...(notary.CLOUDFLARE_API_TOKEN ? { CLOUDFLARE_API_TOKEN: notary.CLOUDFLARE_API_TOKEN } : {}),

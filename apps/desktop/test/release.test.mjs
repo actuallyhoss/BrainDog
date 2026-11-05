@@ -6,9 +6,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-import { archiveOf, compareVersions, developerId, distMissing, entitlementsFor, envFile, feedOf, feedSignatures, liveRefusal, teamOf, uploadsOf, withVersion } from '../../../tools/desktop/release.mjs';
+import { archiveOf, BUNDLE_ID, compareVersions, developerId, distMissing, entitlementsFor, envFile, feedOf, feedSignatures, liveRefusal, teamOf, uploadsOf, withVersion } from '../../../tools/desktop/release.mjs';
 import { CONF, configPubkey, withPubkey } from '../../../tools/desktop/updater-key.mjs';
 
 test('ONLY A DEVELOPER ID SIGNS FOR OTHER MACS: an Apple Development identity is not one', () => {
@@ -69,7 +70,7 @@ test('A PROVISIONED BUILD SIGNS WITH THE ASSOCIATED DOMAINS AND THE TEAM\'S APPL
   assert.match(base, /webcredentials:brain\.dog/);
   assert.match(base, /webcredentials:app\.brain\.dog/);
   const out = entitlementsFor(base, 'ABCDE12345');
-  assert.match(out, /<string>ABCDE12345\.dog\.brain\.desktop<\/string>/);
+  assert.match(out, /<string>ABCDE12345\.dog\.brain\.shell<\/string>/);
   assert.match(out, /<\/dict>\n<\/plist>\n$/);
   assert.equal(teamOf('Developer ID Application: Quartz Apps LLC (ABCDE12345)'), 'ABCDE12345');
   assert.equal(teamOf(null), null);
@@ -108,4 +109,29 @@ test('RE13: --upload-only SENDS THE LIVE VERSION AGAIN ONLY AS THE LIVE BUILD IT
   assert.notEqual(feedSignatures(live), feedSignatures(rebuilt));
   assert.equal(feedSignatures(null), null);
   assert.equal(feedSignatures({ version: '0.2.0' }), null);
+});
+
+/*
+ * WHAT THESE TWO ARE FOR. This shell held the native Mac app's bundle id, and its release script could send a dmg and an
+ * update feed to the addresses the site names for that app. macOS would have taken one for the other, and a person with
+ * the native app could have been handed a build of the old shell.
+ */
+test('THIS SHELL CLAIMS NO BUNDLE ID THE NATIVE APPS HOLD', () => {
+  const held = [...readFileSync(new URL('../../apple/project.yml', import.meta.url), 'utf8').matchAll(/PRODUCT_BUNDLE_IDENTIFIER: (\S+)/gu)].map((m) => m[1]);
+  assert.ok(held.includes('dog.brain.desktop'), 'the Mac app has moved, so read this test again');
+  const claimed = JSON.parse(readFileSync(CONF, 'utf8')).identifier;
+  assert.equal(claimed, BUNDLE_ID, 'the release signs under another id than the config builds');
+  assert.ok(!held.includes(claimed), `${claimed} is a native app's`);
+});
+
+test('THE RELEASE SCRIPT PUBLISHES NOTHING, HOWEVER IT IS ASKED, AND STOPS BEFORE IT TOUCHES THE CONFIG', () => {
+  const before = readFileSync(CONF, 'utf8');
+  const script = new URL('../../../tools/desktop/release.mjs', import.meta.url).pathname;
+  for (const asked of [['--publish'], ['--stage'], ['--upload-only'], ['--publish', '--dry-run'], ['--publish', '--version', '9.9.9'], ['--upload-only', '--universal']]) {
+    const out = spawnSync(process.execPath, [script, ...asked], { encoding: 'utf8' });
+    assert.equal(out.status, 1, asked.join(' '));
+    assert.match(out.stdout, /not published/u, asked.join(' '));
+    assert.doesNotMatch(out.stdout, /would upload/u, asked.join(' '));
+  }
+  assert.equal(readFileSync(CONF, 'utf8'), before);
 });

@@ -1,7 +1,7 @@
 # BrainDog for Windows and Linux, later
 
-**This is not the Mac app.** BrainDog for Mac is the native SwiftUI app in `apps/apple` (target `BrainDogMac`, the same
-bundle id `dog.brain.desktop`), which replaced this shell before anything here was published (apps plan of 2 November,
+**This is not the Mac app.** BrainDog for Mac is the native SwiftUI app in `apps/apple` (target `BrainDogMac`, bundle id
+`dog.brain.desktop`; this shell is `dog.brain.shell`), which replaced this shell before anything here was published (apps plan of 2 November,
 `loop/plans/apps-2026-11-02/PLAN.md` section 1, and M6). Nobody has this build: `/download` stayed held, and the
 updater key below has signed nothing anyone installed.
 
@@ -9,8 +9,8 @@ This folder is kept as the shell for **Windows and Linux**, which are not in v1 
 Tauri 2's Windows (WebView2) and Linux (WebKitGTK) targets start from here, with the same bridge contract as the native
 apps (`window.__BRAINDOG_SHELL__`, `apps/web/src/lib/shell.ts`). Until then:
 
-- **Do not publish it, and do not run `release.mjs --publish`.** A Mac dmg from here would compete with the native app
-  for the same bundle id; the native app's updates come from Sparkle (`apps/apple/Mac/Updates.swift`), not from
+- **It cannot be published.** `release.mjs` stops at `--publish`, `--stage` and `--upload-only` before doing anything: a
+  Mac dmg from here would land on the addresses the site names for the native app. The native app's updates come from Sparkle (`apps/apple/Mac/Updates.swift`), not from
   `brain.dog/desktop/latest.json`.
 - Everything below describes the shell as it stood on 24 October, on the Mac, where it was built and checked. The
   Mac-only parts (Entitlements, notarising, the dmg) are history; the bridge, the menus, the offline page and the sign-in
@@ -88,7 +88,7 @@ password). Export the real values in the shell that runs `cargo tauri build`; th
   account; with none it builds an UNSIGNED `apps/desktop/dist/BrainDog.dmg` that runs on this Mac only, and says so.
   The update archive and `latest.json` are always signed with the updater key.
 - **The version** is raised with `--version 0.2.0` (tauri.conf.json and Cargo.toml); a version already live is refused.
-- **The download** opens with `--publish`, which only a build Gatekeeper accepts as notarised reaches: it uploads the
+- **The download (not while this shell is held: `release.mjs` refuses it)** opened with `--publish`, which only a build Gatekeeper accepts as notarised reaches: it uploads the
   dmg, the versioned update archive and `latest.json` (last) to the R2 bucket `braindog-desktop`, served at
   `download.brain.dog`, and once the dmg answers there sets `DESKTOP_NOTARIZED` (`apps/site/src/lib/desktop.ts`),
   which takes `/download` out of the site's held list. `brain.dog/desktop/*` redirects to the bucket
