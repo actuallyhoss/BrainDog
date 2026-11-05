@@ -33,8 +33,9 @@
   let { value }: { value: string | number } = $props();
 
   /* Opacity only, in the exit step; for a reader who asked for less motion the figure is simply gone, and so is one the
-     new figure counts on from. */
-  const leave = (figure: Element) => ({ duration: still() || counting(figure.textContent ?? '', said) ? 0 : ms('--d-exit', 90), css: (t: number) => `opacity:${t}` });
+     new figure counts on from, and one going while the screen settles or a filter's answer lands (`calm`): the 3 stood
+     over the 1 for 90ms. */
+  const leave = (figure: Element) => ({ duration: still() || calm() || counting(figure.textContent ?? '', said) ? 0 : ms('--d-exit', 90), css: (t: number) => `opacity:${t}` });
 
   /* THE FIGURE LAST DRAWN, to count from; not state. */
   let shown: string | null = null;
