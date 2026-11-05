@@ -43,7 +43,7 @@ public final class Client: Sendable {
         config.timeoutIntervalForRequest = 20
         config.waitsForConnectivity = false
         config.httpAdditionalHeaders = ["accept": "application/json"]
-        http = URLSession(configuration: config)
+        http = URLSession(configuration: config, delegate: StaysHome(), delegateQueue: nil)
     }
 
     /// A record call: `POST /api/<method>` with `args`, answered as `T`.
@@ -163,6 +163,13 @@ public final class Client: Sendable {
             if let refusal = try? JSONDecoder().decode(Envelope<JSONValue>.self, from: data).refusal { throw CallFailure.refused(refusal) }
             throw CallFailure.failed(status: http.statusCode)
         }
+    }
+}
+
+/// A redirect off the origin is not followed: the call carries the session by hand, in a header URLSession would carry on.
+nonisolated private final class StaysHome: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        completionHandler(WebGate.staysHome(request.url, from: task.originalRequest?.url) ? request : nil)
     }
 }
 

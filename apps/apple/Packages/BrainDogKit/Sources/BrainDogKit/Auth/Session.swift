@@ -143,8 +143,10 @@ public final class WebKitStore {
         for c in await store.allCookies() where c.domain.hasSuffix(Server.host) {
             await store.deleteCookie(c)
         }
-        /* AND THE PAGE'S OWN KEPT COPY (IndexedDB, the service worker's), so the next person on this phone reads nothing of it. */
-        let kinds: Set<String> = [WKWebsiteDataTypeIndexedDBDatabases, WKWebsiteDataTypeServiceWorkerRegistrations, WKWebsiteDataTypeFetchCache, WKWebsiteDataTypeLocalStorage]
+        /* AND EVERYTHING ELSE THE WEB VIEWS KEPT (IndexedDB, the service worker's, the disk cache's pages and files), so the
+           next person on this phone reads nothing of it. Only the cookies are left to the loop above: a sign-in that follows
+           at once has just put its own in. */
+        let kinds = WKWebsiteDataStore.allWebsiteDataTypes().subtracting([WKWebsiteDataTypeCookies])
         await WKWebsiteDataStore.default().removeData(ofTypes: kinds, modifiedSince: .distantPast)
     }
 
@@ -220,13 +222,15 @@ struct Keychain: Sendable {
         let data = Data(value.utf8)
         for group in groups {
             let q = query(account, group: group)
-            let update: [String: Any] = [kSecValueData as String: data]
+            /* AND THE CLASS: an item kept before this class was chosen moves to it the next time it is written. */
+            let update: [String: Any] = [kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
             var status = SecItemUpdate(q as CFDictionary, update as CFDictionary)
             if status == errSecItemNotFound {
                 var add = q
                 add[kSecValueData as String] = data
-                /* AFTER FIRST UNLOCK, so the notification extension can read it to rewrite a push on a locked phone. */
-                add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+                /* AFTER FIRST UNLOCK, so the notification extension can read it to rewrite a push on a locked phone. THIS DEVICE
+                   ONLY, so the session never travels in a backup to another phone. */
+                add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
                 status = SecItemAdd(add as CFDictionary, nil)
             }
             if status != errSecMissingEntitlement { return }

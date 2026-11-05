@@ -15,6 +15,11 @@ public enum Kept {
         let base = group ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         let folder = base.appendingPathComponent("Kept", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        /* A COPY OF THE RECORD'S WORDS AND MONEY, read again whenever it is wanted: it does not go in a backup. */
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var marked = folder
+        try? marked.setResourceValues(values)
         return folder
     }
 
@@ -40,7 +45,9 @@ public enum Kept {
             /* A PHOTO'S ENCODING, NOT A PNG: this runs as the app goes to the background, and a full screen's PNG took long
                enough on the main thread that the system often suspended the app first and nothing was kept. */
             if let data = newValue?.jpegData(compressionQuality: 0.85) {
-                try? data.write(to: file("launch", "png"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                /* A PICTURE OF THE WHOLE OF TODAY, read only when the app opens: shut while the phone is locked, unlike the rest,
+                   which the widgets and the notification extension read on a locked phone. */
+                try? data.write(to: file("launch", "png"), options: [.atomic, .completeFileProtection])
             } else {
                 try? FileManager.default.removeItem(at: file("launch", "png"))
             }
