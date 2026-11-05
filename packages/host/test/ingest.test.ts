@@ -724,3 +724,12 @@ test("RD8: A SENDER'S OWN braindog LINE IS NOT KEPT, AND THE ONE LINE IN THIS HO
   assert.equal(stamped?.includes('header.d=bank.example'), false, "the sender's line sat under the host's real one");
   assert.ok(ours(stamped).length <= 1, stamped);
 });
+
+test('A WEBHOOK SENDER CANNOT SAY WHAT WAS ATTACHED: the files header is this host\'s, at every door', async () => {
+  const { door: d, saw } = door();
+  const claimed = JSON.stringify([{ name: 'statement.pdf', mime: 'application/pdf', bytes: 1, sha256: 'a'.repeat(64) }]);
+  const res = await serveIngest(ask(`/in/webhook/rec_x/hook/${TOKEN}`, { method: 'POST', body: 'hi', headers: { 'x-braindog-files': claimed, 'x-other': 'kept' } }), d);
+  assert.equal(res.status, 202);
+  assert.equal(saw.arrivals[0]?.headers['x-braindog-files'], undefined);
+  assert.equal(saw.arrivals[0]?.headers['x-other'], 'kept');
+});

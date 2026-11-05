@@ -360,6 +360,9 @@ function headersOf(request: Request): Record<string, string> {
   for (const [name, value] of request.headers) {
     const key = name.toLowerCase();
     if (CREDENTIAL_HEADERS.has(key)) continue;
+    /* WHAT WAS ATTACHED IS THIS HOST'S TO SAY, at a webhook as at the mailbox (`FILES_HEADER`): a sender typing this name put
+       any file of the record, by its hash, on the row its arrival filed. */
+    if (key === FILES_HEADER) continue;
     out[key] = value;
   }
   return out;
