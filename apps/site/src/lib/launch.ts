@@ -23,7 +23,7 @@ export const LAUNCH = {
   invite: false, // sign-up is by invite (SIGNUP=invite): every start button says "Get early access"
   billing: false, // the Hosted price is charged
   extra: false, // extra usage past the allowance is sold: production sets STRIPE_PRICE_EXTRA and STRIPE_METER_EXTRA, with billing live
-  repo: false, // the GitHub repository is public (the owner)
+  repo: true, // the GitHub repository is public (the owner)
   cli: false, // the CLI is on npm under the name the docs print
   render: false, // braindog-render is on npm
   legal: true, // the owner's Terms, Privacy and processing texts are in force (approved 22 October)

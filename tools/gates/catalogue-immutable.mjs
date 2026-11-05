@@ -44,7 +44,7 @@ import { isRepository } from './public-clean.mjs';
  * The commit the deployed build was made from, WHEN NO FILE SAYS A LATER ONE, and the floor under the file: a version
  * in its catalogue is released whatever the file says. ONLY EVER MOVED FORWARD.
  */
-export const RELEASED = '63423720';
+export const RELEASED = '7250a163';
 
 /**
  * The tracked file the deploy writes: `{ "commit": "<the commit that was deployed>" }`. Anything else in it is the
