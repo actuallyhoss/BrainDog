@@ -13449,6 +13449,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (heldFile) return { ok: false, refusal: heldFile };
       /* A ROW SHE MAY NOT WRITE IS ONE THAT IS NOT THERE (`sight.ts`): every check below reads it as missing, and
          the kernel, handed `within`, answers it in a missing row's words at a missing row's step. */
+      /* A SKILL'S DESCRIPTION IS READ BY EVERY AGENT ON EVERY MACHINE THAT KEEPS IN STEP, each time it chooses a skill, so a
+         colleague or their agent proposes a change to any part of one, as `by: decide` already holds its body. MEASURED: a
+         member at write changed the owner's skill's `trigger` and it landed. */
+      if (listFor('skills', kernel.registers()) === args.register && (ctx.principal.kind === 'person' || ctx.principal.kind === 'token') && ctx.principal.level !== 'owner')
+        return no('FORBIDDEN', 'A skill reaches every agent of the owner\'s, so it changes only by an accepted proposal. Propose the change, and it is applied when the owner accepts it.', { at: 'register' });
       const found = kernel.get(`${args.register}#${args.seq}`, { includeDeleted: true });
       const self = found !== null && sight.mayWrite(ctx, args.register, found.id) ? found : null;
       const within = sight.within(ctx, args.register);
