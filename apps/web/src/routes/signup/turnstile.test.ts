@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { loadWidget, TURNSTILE_SRC, WIDGET_MS, widgetWords, type WidgetDoc } from './turnstile.ts';
+import { loadWidget, reopenForCheck, TURNSTILE_SRC, WIDGET_MS, widgetWords, type WidgetDoc } from './turnstile.ts';
 
 type StubScript = {
   src: string;
@@ -137,4 +137,19 @@ test('THE WORDS: the failed line, a Send label for each wait, and no em dash', (
     assert.ok(w.send.length > 0);
     assert.ok(!JSON.stringify(w).includes('—'));
   }
+});
+
+test('A SIGN-IN SCREEN ON A PAGE THAT MAY NOT HOLD THE CHECK IS LOADED AFRESH, ONCE', () => {
+  const at = (loaded: string, here: string) => {
+    const replaced: string[] = [];
+    const win = {
+      location: { pathname: new URL(here).pathname, href: here, replace: (to: string) => replaced.push(to) },
+      performance: { getEntriesByType: () => [{ name: loaded }] },
+    } as unknown as Pick<Window, 'location' | 'performance'>;
+    return { went: reopenForCheck(win), replaced };
+  };
+  assert.deepEqual(at('https://app.brain.dog/', 'https://app.brain.dog/signin?next=x'), { went: true, replaced: ['https://app.brain.dog/signin?next=x'] });
+  assert.deepEqual(at('https://app.brain.dog/signin', 'https://app.brain.dog/signin'), { went: false, replaced: [] });
+  assert.deepEqual(at('https://app.brain.dog/signin', 'https://app.brain.dog/signup'), { went: false, replaced: [] });
+  assert.deepEqual(at('https://app.brain.dog/maya', 'https://app.brain.dog/maya/settings'), { went: false, replaced: [] });
 });

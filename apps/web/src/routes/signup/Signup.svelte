@@ -188,7 +188,7 @@
   import Apply from './Apply.svelte';
   import { askFirst, takeEarly } from './early.ts';
   import NameField from './NameField.svelte';
-  import { loadWidget, widgetWords, type WidgetState } from './turnstile.ts';
+  import { loadWidget, reopenForCheck, widgetWords, type WidgetState } from './turnstile.ts';
   import { words } from './words.ts';
 
   type Step =
@@ -317,6 +317,7 @@
    * not arrive in ten seconds is `failed`, and `then` is not called: the box says so and offers Try again.
    */
   async function withTurnstile(then: (t: Turnstile) => void): Promise<WidgetState> {
+    if (reopenForCheck()) return;
     const state = await loadWidget({ doc: document });
     const t = turnstileOf();
     if (state === 'ready' && t) then(t);

@@ -7,7 +7,7 @@
   import { onDestroy } from 'svelte';
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
-  import { loadWidget, widgetWords, type WidgetState } from '../signup/turnstile.ts';
+  import { loadWidget, reopenForCheck, widgetWords, type WidgetState } from '../signup/turnstile.ts';
   import Notice from './Notice.svelte';
   import { words as entryWords } from './words.ts';
 
@@ -47,6 +47,7 @@
     phase = 'loading';
     answer = null;
     try {
+      if (reopenForCheck()) return;
       const loaded = await loadWidget({ doc: document });
       const t = turnstileOf();
       const el = slot;

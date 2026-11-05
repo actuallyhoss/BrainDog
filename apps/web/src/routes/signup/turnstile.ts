@@ -20,6 +20,23 @@ export const WIDGET_MS = 10_000;
 
 export type WidgetState = 'loading' | 'ready' | 'failed';
 
+/** The addresses whose page may load the check (`SIGNUP` in `apps/worker/src/route.ts`). */
+const CHECK_PAGES = /^\/(signup|signin)\/?$/u;
+
+/**
+ * THE CHECK IS ALLOWED BY THE PAGE THE BROWSER LOADED, NOT THE ONE ON SCREEN. Opening `/` signed out (the installed app's
+ * start address, or anybody's bookmark) loads a page whose policy leaves Cloudflare out, and the app moves to the sign-in
+ * screen without loading another, so the script was refused and the check "did not load", every time. So a sign-in or
+ * sign-up screen drawn on any other page is loaded afresh at its own address, once: that page is one that may hold it, and
+ * the service worker never answers those two addresses. `true` says the browser is on its way and nothing should load.
+ */
+export function reopenForCheck(win: Pick<Window, 'location' | 'performance'> = globalThis as unknown as Window): boolean {
+  const entry = win.performance.getEntriesByType('navigation')[0];
+  if (entry === undefined || CHECK_PAGES.test(new URL(entry.name).pathname) || !CHECK_PAGES.test(win.location.pathname)) return false;
+  win.location.replace(win.location.href);
+  return true;
+}
+
 /** The parts of a document this file uses; a test hands a stub cast to it. */
 export type WidgetDoc = Pick<Document, 'defaultView' | 'head' | 'querySelector' | 'createElement'>;
 
