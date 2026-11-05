@@ -2097,12 +2097,14 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
     if (!found) return { status: 422, refusal: { code: 'OUT_OF_BOUNDS', fix: 'There is nobody with that address.', at: 'email' } };
     const stop = suspended !== false;
     return sql.transactionSync((): AuthResult<Suspended> => {
+      /* `was` IS THE INSTANT THIS STOP HOLDS, so the host can lift that stop from each record and no other (`accountStop`). */
+      const was = sql.one<{ suspended_at: string | null }>('SELECT suspended_at FROM dir_person WHERE id = ?', found.id)?.suspended_at ?? null;
       if (stop) {
         sql.exec('UPDATE dir_person SET suspended_at = COALESCE(suspended_at, ?) WHERE id = ?', at(), found.id);
         sql.exec('DELETE FROM dir_session WHERE person = ?', found.id);
       } else sql.exec('UPDATE dir_person SET suspended_at = NULL WHERE id = ?', found.id);
       const row = sql.one<{ suspended_at: string | null }>('SELECT suspended_at FROM dir_person WHERE id = ?', found.id);
-      return { status: 200, body: { person: found.id, suspended_at: row?.suspended_at ?? null } };
+      return { status: 200, body: { person: found.id, suspended_at: row?.suspended_at ?? null, was } };
     });
   };
 

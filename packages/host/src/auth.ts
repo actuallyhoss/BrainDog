@@ -292,6 +292,11 @@ export type CloseDeps = {
    * rest, so the door refuses rather than closing past a record nobody would then own.
    */
   alone: (who: Who) => Promise<string[]>;
+  /**
+   * Stop this person on every record they are on and end the keys they hold there, answering how many could not be
+   * reached. Asked after `alone`, before `close`: once the Directory has forgotten them nothing says which records to walk.
+   */
+  stop: (who: Who) => Promise<number>;
   /** The Directory's `account.close`, asked only after every check below has passed. */
   close: (call: AccountCall) => Promise<AuthResult<AccountClosed>>;
   /** The `sessions.ended` letter. It must not throw, and the answer never waits for it. */
@@ -322,6 +327,10 @@ export function closeDoor(deps: CloseDeps): AccountAsk {
       return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'Type the address you sign in with, as it is, to close your account.', at: 'email' } };
     const alone = await deps.alone(who);
     if (alone.length > 0) return { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: `Delete ${alone[0]}, or make somebody else its owner, first.`, at: 'records' } };
+    /* A RECORD NOT REACHED REFUSES THE CLOSE. Closing past it would leave a key there working for somebody with no account
+       left to stop, and nothing naming the record to try again. Sent again, the stop is the same and the rest go on. */
+    if ((await deps.stop(who)) > 0)
+      return { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'Your account could not be closed just now. Try again in a minute.' } };
     const out = await deps.close({ flow: 'account.close', person: who.person });
     if (out.status !== 200)
       return { ok: false, refusal: 'refusal' in out ? out.refusal : { code: 'RECORD_UNAVAILABLE', fix: 'Your account could not be closed just now. Try again in a minute.' } };

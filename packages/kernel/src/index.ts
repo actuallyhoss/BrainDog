@@ -112,7 +112,7 @@ import { access, invite, members, remove, type AccessLens, type Held, type Level
 import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, groupKept, meOf, saysMe, sharesFor as heldSharesOf, LensCache, newListGrants, putGroup, putShare, retireGroup, revokeShare, setGroupMember, shareKept, sharesKept, sharesWaiting, type GroupKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
 import { activeAt, shareReach, type Cap as LensCapOf, type Catalog } from './lens.ts';
 import { NOBODY, narrowed, ruleOf, scopeFor, viewerOfRead, type Wheres } from './members.ts';
-import { stopped as stoppedOf, type Suspended } from './members.ts';
+import { accountStop, stopped as stoppedOf, type Suspended } from './members.ts';
 import {
   GONE as INVITE_GONE,
   acceptInvitation,
@@ -12259,6 +12259,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /** Stop somebody without deciding about them, or start them again. */
     suspendMember: (by: string, person: string, on: boolean, why?: string): Result<Suspended> =>
       transaction(() => moved(suspend(memberDeps(), by, person, on, why))),
+
+    /**
+     * An account stopped by the operator or closed by its person, carried into this record, and whether anything moved.
+     * INTERNAL: the host's RPC, never a route, and it answers the epoch bust `moved` gives any change of who holds what.
+     */
+    accountStop: (person: string, stamp: string, on: boolean, closing: boolean): Result<boolean> =>
+      transaction(() => moved(ok(accountStop(memberDeps(), person, stamp, on, closing)))),
 
     /** Whether this person is on the record and an owner has stopped them: which sentence a door turns them away with. */
     memberStopped: (person: string): boolean => stoppedOf(sql, person),

@@ -767,6 +767,47 @@ export function suspend(deps: MemberDeps, by: string, person: string, on: boolea
   return ok({ person, suspended_at: on ? at : null });
 }
 
+/**
+ * The account side of a stop, carried into this record: the operator stopping a person, or the person closing their
+ * account. The host calls it once for every record the person is on, because each record reads its own `person` row and
+ * no bearer door asks the Directory (`leaving-ends-bearers.test.ts`).
+ *
+ * NOT `suspend`, WHICH REFUSES THE LAST OWNER. That refusal keeps a record with somebody who can decide, for a stop one
+ * of its owners chose. An account stopped or closed is stopped everywhere, and leaving a key working on the one record
+ * nobody else owns would be the worst place to leave it.
+ *
+ * THE STAMP SAYS WHOSE STOP THIS IS. A stop writes the operator's instant only over a person nobody has stopped, and
+ * lifting clears only that same instant, so letting somebody back in never lifts an owner's own stop of them.
+ *
+ * `closing` ALSO ENDS WHAT THEY HOLD HERE. The person is gone from sign-in and an owner may still lift a stop, so their
+ * keys and the machines they let in go now, rather than waiting on a column somebody else can clear. The `member` row and
+ * the `person` row stay, as `remove` keeps a person: the record's history still names them.
+ */
+export function accountStop(deps: MemberDeps, person: string, stamp: string, on: boolean, closing: boolean): boolean {
+  const at = instant(deps.nowMs);
+  const was = deps.sql.one<{ suspended_at: string | null }>('SELECT suspended_at FROM person WHERE id = ?', person);
+  let moved = false;
+  if (was && (on ? was.suspended_at === null : was.suspended_at === stamp)) {
+    deps.sql.exec('UPDATE person SET suspended_at = ? WHERE id = ?', on ? stamp : null, person);
+    moved = true;
+    for (const row of deps.sql.all<{ register: string; level: Level }>('SELECT register, level FROM member WHERE person_id = ?', person))
+      event(deps, at, ACCOUNT_STOP_BY, on ? 'access.revoke' : 'access.grant', person, row.register, on ? null : row.level, on ? row.level : null, null);
+  }
+  if (closing) {
+    const keys = deps.sql.all<{ id: string }>('SELECT id FROM token WHERE person_id = ? AND revoked_at IS NULL', person);
+    for (const key of keys) {
+      deps.sql.exec('UPDATE token SET revoked_at = ? WHERE id = ?', at, key.id);
+      deps.sql.exec('UPDATE token SET revoked_at = ? WHERE revoked_at IS NULL AND id IN (SELECT token_id FROM token_lens WHERE parent_id = ?)', at, key.id);
+    }
+    deps.sql.exec("UPDATE device_grant SET status = 'revoked' WHERE approved_by = ? AND status IN ('approved', 'active')", person);
+    moved = moved || keys.length > 0;
+  }
+  return moved;
+}
+
+/** Who the ledger names for `accountStop`: no person on the record decided it. */
+const ACCOUNT_STOP_BY = 'system:account';
+
 /** What `suspend` answers: the person, and the instant they were stopped, or `null` while they are not. */
 export type Suspended = { person: string; suspended_at: string | null };
 

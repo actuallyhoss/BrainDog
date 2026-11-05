@@ -138,7 +138,7 @@ export type AccountCall = { flow: 'account.close'; person: string };
 export type AccountClosed = { passkeys: number; sessions: number; records: number };
 
 /** What `suspend` answered: who, and since when they are stopped, `null` once they may sign in again. */
-export type Suspended = { person: string; suspended_at: string | null };
+export type Suspended = { person: string; suspended_at: string | null; was?: string | null };
 
 /**
  * A stranger asking for a record of their own. The Worker's alone: a self-host is

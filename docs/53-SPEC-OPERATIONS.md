@@ -851,7 +851,9 @@ still hold the account for up to 30 days, and then it is gone from them too; Set
 
 **Suspending an abusive account**: `POST /auth/suspend` with `PROVISION_KEY` as the bearer and `{ "email": "<address>" }`
 stops the person signing in and ends every session they hold; `{ "email": "<address>", "suspended": false }` lets them
-in again. It writes `dir_person.suspended_at` and nothing in any record. A note in the ops record first:
+in again. It writes `dir_person.suspended_at`, and the same instant on the person's row in each record they are on, so
+their agent keys and machines stop with their sessions; the answer's `unreached` counts the records it could not reach,
+and sending the same call again carries it to them. A note in the ops record first:
 `suspend <person> · <reason>`.
 
 ## 6 · Refusals and errors

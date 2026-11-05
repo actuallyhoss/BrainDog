@@ -35,8 +35,8 @@ import {
 import { DESKTOP_ROUTES, serveDesktop } from './desktop-signin.ts';
 import { appleAssociation } from './apple.ts';
 /* CLOSING AN ACCOUNT: the door is the host package's, and `account()` hands it this Worker's halves. */
-import { CLOSE_RECORDS_MOST, closeDoor } from '@braindog/host/auth';
-import type { AccountClosed } from '@braindog/ports';
+import { CLOSE_RECORDS_MOST, closeDoor, type Mirrored } from '@braindog/host/auth';
+import type { AccountClosed, Suspended } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 import { withCalls } from '@braindog/mcp';
 /* The oldest command this door still works with, one day for both hosts, answered at the build address. */
@@ -2378,6 +2378,16 @@ export class Record$ extends DurableObject<Env> {
     return api.kernel.memberStopped(person);
   }
 
+  /**
+   * An account stopped by the operator or closed by its person, carried into this record's own `person` row, because no
+   * bearer door asks the Directory about a person (`accountStopped` below). A deleted record has nothing left to stop.
+   */
+  async accountStop(person: string, stamp: string, on: boolean, closing: boolean): Promise<Result<boolean>> {
+    if (this.#gone) return { ok: true, value: false };
+    const api = await this.#record();
+    return api.kernel.accountStop(person, stamp, on, closing);
+  }
+
   /** Whether this person's access here ended, and whose record it is, so a door can tell them so. */
   async accessEnded(person: string): Promise<{ owner: string | null } | null> {
     if (this.#gone) return null;
@@ -4556,6 +4566,19 @@ async function leftWithNothing(answer: Response, env: Env, record: string): Prom
 }
 
 /**
+ * Carry an account's stop into every record its person is on, with how many could not be reached.
+ *
+ * A BEARER NEVER ASKS THE DIRECTORY. A key, a keychain grant and a runner are each checked against the record's own
+ * `person` row, on the hot path, so stopping somebody only in `dir_person` ended their browser sessions and left every
+ * agent key working (`leaving-ends-bearers.test.ts`). Pushing at the moment of the stop keeps a bearer call to one object.
+ */
+async function accountStopped(env: Env, person: string, stamp: string, on: boolean, closing: boolean): Promise<Mirrored> {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const records = (await directory.reaches(person)).map((r) => r.record);
+  return mirrorEverywhere(records, (r) => env.RECORD.get(env.RECORD.idFromName(r)).accountStop(person, stamp, on, closing) as unknown as Promise<Result<unknown>>);
+}
+
+/**
  * The Directory's `renamePerson` and `mirrorEverywhere`, for a rename the record has already accepted.
  *
  * THE RECORD'S ANSWER STANDS WHATEVER THIS DOES, as `leftDirectory`'s removal does: the name is already the new one
@@ -5009,6 +5032,7 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
               }
               return alone;
             },
+            stop: async (who) => (await accountStopped(env, who.person, new Date().toISOString(), true, true)).unreached,
             close: (call) => directory.auth(call) as unknown as Promise<AuthResult<AccountClosed>>,
             mail: (to) => ctx.waitUntil(sendMail(env, 'sessions.ended', to)),
             now: () => Date.now(),
@@ -5321,7 +5345,19 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     /* WHETHER SIGN-IN MAIL IS DOWN: the last five letters all failed, the newest inside the quarter hour
        (`Directory$.lettersDown`), so `/auth/methods` answers `magic: 'down'` and the page says so. */
     mailDown: () => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).lettersDown(),
-    auth: ((call: AuthCall) => directory.auth(call)) as unknown as Auth,
+    /* THE OPERATOR'S STOP GOES ON INTO EVERY RECORD, and the answer says how many it did not reach, so a stop that is only
+       half done is one the operator can see and send again. */
+    auth: (async (call: AuthCall) => {
+      const out = (await directory.auth(call)) as unknown as AuthResult<Suspended>;
+      if (call.flow !== 'suspend' || out.status !== 200) return out;
+      const { person, suspended_at: at, was } = out.body;
+      const stamp = at ?? was ?? null;
+      if (stamp === null) return out;
+      const { unreached } = await accountStopped(env, person, stamp, at !== null, false);
+      if (unreached > 0) console.log(JSON.stringify({ op: 'account.stop', outcome: 'unreached', unreached }));
+      const { was: _was, ...said } = out.body;
+      return { status: 200, body: { ...said, unreached } };
+    }) as unknown as Auth,
     ip: request.headers.get('cf-connecting-ip') ?? '',
     /* MAIL ONLY WHEN BOTH ARE SET, so a host that cannot send says so by offering no `mail` at all. THE ANSWER NEVER
        WAITS FOR IT: the send is awaited inside `waitUntil`, which keeps it alive after the answer has gone, so a known

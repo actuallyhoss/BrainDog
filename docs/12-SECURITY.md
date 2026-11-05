@@ -115,9 +115,13 @@ a revoke button. A credential you cannot see being used is a credential you cann
   and operation grant created before the instant is refused, and the owner's list shows them "ended by the operator".
 - **Closing an account** is the person's own act (`POST /account/close`, the address typed, a sign-in within 15
   minutes), refused while they are the only owner of an open record; their passkeys, sessions, links and memberships
-  go and the Directory forgets them. **Suspending** one is the operator's (`POST /auth/suspend`, the operator key),
-  which stops sign-in and ends every session without touching a record ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)
-  §5.16).
+  go and the Directory forgets them. Every record they are on is stopped first, and the keys and machines they hold
+  there are revoked, because a bearer is checked against the record's own tables and never asks the Directory; a record
+  that cannot be reached refuses the close. **Suspending** one is the operator's (`POST /auth/suspend`, the operator
+  key), which stops sign-in, ends every session and stops them on each record they are on, so their keys stop too.
+  Letting them back in lifts that stop and no stop an owner made ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.16).
+- **A keychain grant, a runner and a shape grant stand only while the owner who approved them is an owner.** Taken off,
+  handed over or stopped, their machines stop with them (`APPROVER_STANDING`, `leaving-ends-bearers.test.ts`).
 
 ---
 
