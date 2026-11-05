@@ -216,6 +216,23 @@ test('NEVER A PERSON, NEVER A TRANSFER, AND A PAYEE ONLY A DESCRIPTION NAMES IS 
   sql.close();
 });
 
+test('A METRIC IS NOT A COMPANY: A LIST OF MEASURES AND A LINE WITH NO AMOUNT NAME NOBODY', async () => {
+  const { k, sql, deps } = await record();
+  const fields = (extra: object[]) => [{ id: 'name', type: 'text', required: true }, { id: 'amount', type: 'money' }, { id: 'organisation', type: 'ref', to: 'organisations' }, ...extra];
+  value(await k.install([
+    register({ id: 'readings', name: 'Numbers', title: 'name', fields: fields([{ id: 'value', type: 'decimal' }]) }),
+    register({ id: 'bills', name: 'Bills', title: 'name', fields: fields([]) }),
+  ]));
+  for (let i = 0; i < 3; i++) {
+    value(k.create('readings', { name: 'Daily active players, Bake', value: 800 + i }, OWNER));
+    value(k.create('readings', { name: 'Monthly revenue, Bake', amount: gbp(9_000) }, OWNER));
+    value(k.create('bills', { name: 'Servers, Bake' }, OWNER));
+  }
+  const asked = kinds(understandBackfill(deps).suggestions, 'organisation').map((s) => s.kind === 'organisation' && s.name);
+  assert.deepEqual(asked, ['Lowry St Studios'], 'only the payee a real payment names is asked about');
+  sql.close();
+});
+
 test('A RUN IS PLACED BY ITS REMOTE OR ITS FOLDER, AND A BARE NAME OR TWO PROJECTS ARE A QUESTION', async () => {
   const { k, sql, deps, ids } = await record();
   const done = understandBackfill(deps);

@@ -259,7 +259,12 @@ type Ledger = {
   transfer: string | undefined;
   /** The field its lines are filed under, a link to a list of categories or a choice, read for what a payment was for. */
   category: string | undefined;
+  /** Its money fields: a line with none of them filled moved no money, and names no payee. */
+  money: readonly string[];
 };
+
+/** A LINE IS A PAYMENT ONLY WITH AN AMOUNT ON IT. */
+const paid = (ledger: Ledger, fields: Record<string, Json>): boolean => ledger.money.some((id) => fields[id] !== undefined && fields[id] !== null);
 
 function ledgersOf(lists: Lists, orgs: string, people: string | undefined): Ledger[] {
   const out: Ledger[] = [];
@@ -268,6 +273,10 @@ function ledgersOf(lists: Lists, orgs: string, people: string | undefined): Ledg
     const fields = live(decl.fields);
     const refs = fields.filter((f) => f.type === 'ref' && f.to === orgs);
     if (refs.length === 0 || !fields.some((f) => f.type === 'money')) continue;
+    /* A LIST THAT HOLDS A PLAIN NUMBER BESIDE MONEY READS MEASURES, NOT PAYMENTS: Numbers has a value or an amount and a
+       link to an organisation, and "Daily active players, Bake.gg" on 276 lines was asked about as a company. Missing a
+       payee on such a list costs a suggestion; reading a metric as a payee costs the person's trust. */
+    if (fields.some((f) => f.type === 'decimal')) continue;
     const party = refs.find((f) => f.id === 'party') ?? refs[0]!;
     const text = (id: string | undefined): string | undefined =>
       id !== undefined && fields.some((f) => f.id === id && (f.type === 'text' || f.type === 'document')) ? id : undefined;
@@ -281,6 +290,7 @@ function ledgersOf(lists: Lists, orgs: string, people: string | undefined): Ledg
       payee: text(COUNTERPARTY),
       transfer: mark !== undefined && fields.some((f) => f.id === mark && f.type === 'bool') ? mark : undefined,
       category: fields.some((f) => f.id === 'category' && (f.type === 'enum' || (f.type === 'ref' && f.to !== orgs))) ? 'category' : undefined,
+      money: fields.filter((f) => f.type === 'money').map((f) => f.id),
     });
   }
   return out.sort((a, b) => a.register.localeCompare(b.register));
@@ -593,6 +603,7 @@ function ledgerSlice(
   const shorter = new Map<string, Set<string>>();
   for (const ledger of ledgers)
     for (const row of allRows(sql, ledger.register)) {
+      if (!paid(ledger, row.fields)) continue;
       const p = payeeOf(ledger, row.fields, readingOf(ledger));
       if (p === null || p.moved || (ledger.transfer !== undefined && row.fields[ledger.transfer] === true)) continue;
       const old = legacyBankKey(p.said);
@@ -705,6 +716,7 @@ function ledgerSlice(
       left--;
       last = `${ledger.register}/${row.id}`;
       if (ledger.transfer !== undefined && row.fields[ledger.transfer] === true) continue;
+      if (!paid(ledger, row.fields)) continue;
       const p = payeeOf(ledger, row.fields, readingOf(ledger));
       if (p === null || isPerson(p)) continue;
 
