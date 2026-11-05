@@ -1,0 +1,16 @@
+# Planted for `public-repo`: a workflow a fork can start, holding each thing it must not.
+name: fork
+on:
+  pull_request_target:
+  pull_request:
+permissions: write-all
+jobs:
+  build:
+    runs-on: [self-hosted, macos]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "${{ github.event.pull_request.title }}"
+      - run: echo "$TOKEN"
+        env:
+          TOKEN: ${{ secrets.DEPLOY_TOKEN }}

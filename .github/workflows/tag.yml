@@ -27,6 +27,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: ./.github/actions/setup
       - run: pnpm test
       - run: pnpm gates -- --except bundle,keys,prefs,layout,a11y,passkey,queue,row-drawer,perf,self-test,deploy-parity
@@ -38,6 +39,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
 
       - name: the build tuple
@@ -59,6 +62,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
         with:
           registry-url: https://registry.npmjs.org
@@ -109,7 +114,9 @@ jobs:
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
 
-      - run: pnpm --filter ${{ steps.preflight.outputs.name }} run build
+      - env:
+          NAME: ${{ steps.preflight.outputs.name }}
+        run: pnpm --filter "$NAME" run build
 
       - name: the files the manifest names
         working-directory: ${{ steps.preflight.outputs.dir }}

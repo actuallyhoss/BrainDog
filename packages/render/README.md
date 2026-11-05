@@ -271,4 +271,4 @@ hundred random byte strings parse and render without throwing.
 
 ---
 
-MIT. Part of [BrainDog](https://github.com/actuallyhoss/braindog), which is Apache-2.0.
+MIT. Part of [BrainDog](https://github.com/actuallyhoss/BrainDog), which is Apache-2.0.

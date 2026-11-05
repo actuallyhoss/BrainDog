@@ -69,6 +69,9 @@ const GATES = [
      with its Licence section and no price or badge, and on the owner's machine his own private list. Beside
      `clean-room` because both are a read of every tracked file for something that must not be in it. */
   ['public-clean', call(join(here, 'public-clean.mjs'))],
+  /* AND WHAT A STRANGER WITH A FORK REACHES ON IT, AND WHAT AN INSTALL RUNS: the workflows' triggers, permissions, secrets,
+     runners, pins and scripts, and the manifests, lockfile and build allowance. Beside `public-clean` for the same reason. */
+  ['public-repo', call(join(here, 'public-repo.mjs'))],
   /* The banned surface: one kernel, three runtimes, and a source file that imports a driver has
      chosen one of them. Cheap and early, beside the other greps. */
   ['stack', ['node', [join(here, 'stack.mjs')]]],

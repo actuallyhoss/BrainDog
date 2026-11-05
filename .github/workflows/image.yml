@@ -23,6 +23,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Name the image
         id: name
@@ -54,8 +56,10 @@ jobs:
 
       - name: Say whether it starts healthy
         if: ${{ vars.IMAGE_PUSH != 'true' }}
+        env:
+          TAGS: ${{ steps.name.outputs.tags }}
         run: |
-          image="$(echo '${{ steps.name.outputs.tags }}' | cut -d, -f1)"
+          image="$(echo "$TAGS" | cut -d, -f1)"
           docker run --rm -v "$RUNNER_TEMP/data:/data" -u 0 "$image" sh -c 'chown node:node /data'
           docker run --rm -v "$RUNNER_TEMP/data:/data" "$image" node apps/selfhost/src/main.ts init image-check --owner owner@example.com
           id="$(docker run -d -v "$RUNNER_TEMP/data:/data" "$image")"

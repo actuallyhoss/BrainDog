@@ -1,0 +1,10 @@
+lockfileVersion: '9.0'
+
+packages:
+
+  left-pad@1.3.0:
+    resolution: {tarball: https://elsewhere.example/left-pad.tgz}
+
+snapshots:
+
+  left-pad@1.3.0: {}

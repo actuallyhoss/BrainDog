@@ -1,0 +1,8 @@
+{
+  "gate": "public-repo",
+  "rule": "a workflow a fork can start that holds each thing it must not, and an install that may run what nobody chose",
+  "expect": "fork.yml: trigger pull_request_target",
+  "findings": 8,
+  "total": 15,
+  "why": "The repository goes public, so a fork's pull request is code nobody here wrote. One workflow plants the eight ways that code reaches something; a manifest, a lockfile and a workspace file plant the seven ways an install runs what nobody chose. Each is a separate finding, so a rule that stops firing changes the count."
+}
