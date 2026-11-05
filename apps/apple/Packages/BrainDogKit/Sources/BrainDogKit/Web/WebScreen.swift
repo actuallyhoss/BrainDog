@@ -282,6 +282,7 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
 
     /// An address that is not the app's goes outside: the in-app browser sheet where the app has one, else the browser.
     private func openOutside(_ url: URL) {
+        guard WebGate.mayLeave(url) else { return }
         if let onAsk, url.scheme == "https" || url.scheme == "http" {
             onAsk(.open(url))
             return
@@ -294,7 +295,7 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     }
 
     private func ours(_ url: URL) -> Bool {
-        url.scheme == Server.origin.scheme && url.host == Server.host && url.port == Server.origin.port
+        WebGate.isOurs(url, origin: Server.origin)
     }
 
     // MARK: navigation
@@ -302,22 +303,19 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     public func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
         guard let url = action.request.url else { return .cancel }
         if action.shouldPerformDownload { return .download }
-        if ["about", "blob", "data"].contains(url.scheme ?? "") { return .allow }
-        guard action.targetFrame?.isMainFrame != false else { return .allow }
-        if ours(url) {
-            /* THE WEB'S SIGN-IN PAGE NEVER SHOWS IN THE APP: arriving there means the session is gone. */
-            if url.path == "/signin" || url.path.hasPrefix("/signin/") {
-                Session.shared.lost()
-                return .cancel
-            }
+        let frame: WebGate.Frame = action.targetFrame.map { $0.isMainFrame ? .main : .sub } ?? .newWindow
+        switch WebGate.move(url, origin: Server.origin, frame: frame, link: action.navigationType == .linkActivated, popup: popups[ObjectIdentifier(webView)] != nil) {
+        case .allow:
             return .allow
-        }
-        if action.navigationType == .linkActivated || action.targetFrame == nil {
+        case .cancel:
+            return .cancel
+        case .outside:
             openOutside(url)
             return .cancel
+        case .signedOut:
+            Session.shared.lost()
+            return .cancel
         }
-        /* Turnstile's frame and the like load inside the page; a top-level move off the app does not. */
-        return action.targetFrame?.isMainFrame == true ? .cancel : .allow
     }
 
     public func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse) async -> WKNavigationResponsePolicy {
@@ -326,9 +324,15 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         /* A FILE THE PAGE CANNOT SHOW (an export, a backup) IS SAVED, never drawn as text over the screen. */
         if let http = response.response as? HTTPURLResponse,
            http.value(forHTTPHeaderField: "content-disposition")?.lowercased().hasPrefix("attachment") == true {
-            return .download
+            return keeps(response) ? .download : .cancel
         }
-        return response.canShowMIMEType ? .allow : .download
+        if response.canShowMIMEType { return .allow }
+        return keeps(response) ? .download : .cancel
+    }
+
+    /* A FRAME OF SOMEONE ELSE'S NEVER PUTS A FILE IN DOWNLOADS OR THE SHARE SHEET, however it answers. */
+    private func keeps(_ response: WKNavigationResponse) -> Bool {
+        WebGate.mayKeep(response.response.url, origin: Server.origin, mainFrame: response.isForMainFrame)
     }
 
     public func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -343,7 +347,7 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String) async -> URL? {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        var name = suggestedFilename.isEmpty ? "BrainDog" : suggestedFilename
+        var name = WebGate.fileName(suggestedFilename)
         /* A `blob:` HAS NO NAME OF ITS OWN (WebKit offers its id): a PDF is named as one, so Quick Look and Files know it. */
         if response.mimeType == "application/pdf", (name as NSString).pathExtension.lowercased() != "pdf" {
             name = (title?.isEmpty == false ? title! : "Attachment") + ".pdf"
@@ -392,7 +396,7 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
            window is never shown: what it loads is saved (`decidePolicyFor response`) and opened in Quick Look. A blob
            from anywhere else (a frame's opaque origin) is not opened at all. */
         if let url = action.request.url, url.scheme == "blob" {
-            guard url.absoluteString.hasPrefix("blob:\(Server.originText)/") else { return nil }
+            guard WebGate.isOwnBlob(url, origin: Server.origin) else { return nil }
             let popup = WKWebView(frame: .zero, configuration: configuration)
             popup.navigationDelegate = self
             popups[ObjectIdentifier(popup)] = popup

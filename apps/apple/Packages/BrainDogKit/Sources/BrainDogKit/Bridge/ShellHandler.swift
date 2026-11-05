@@ -70,7 +70,7 @@ public final class ShellBridge: NSObject, WKScriptMessageHandler {
         let text = { (key: String) in (a[key] as? String) ?? "" }
         switch m {
         case "open":
-            if let url = URL(string: text("url")), ["https", "http", "mailto", "tel"].contains(url.scheme ?? "") { hear(.open(url)) }
+            if let url = URL(string: text("url")), WebGate.mayLeave(url) { hear(.open(url)) }
         case "notify":
             hear(.notify(title: text("title"), body: text("body"), goto: a["goto"] as? String))
         case "badge":
@@ -83,7 +83,7 @@ public final class ShellBridge: NSObject, WKScriptMessageHandler {
         case "haptic":
             if let kind = Haptic(rawValue: text("kind")) { hear(.haptic(kind)) }
         case "share":
-            if let url = URL(string: text("url")) { hear(.share(url: url, title: a["title"] as? String)) }
+            if let url = URL(string: text("url")), WebGate.mayShare(url) { hear(.share(url: url, title: a["title"] as? String)) }
         case "tell":
             hear(.tell(prefill: text("prefill")))
         case "ask":
