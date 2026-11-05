@@ -70,6 +70,11 @@ details[open]::details-content {
   transition: none;
 }
 
+/* A PRESS WAITING FOR THE RECORD TO ANSWER (`held.svelte.ts`), answered at once. */
+[data-press-kept] {
+  opacity: 0.55;
+}
+
 /* ── where you are, moving ─────────────────────────────────────────────── */
 
 /* THE LIT ROW'S OWN FILL WAITS while the moving one glides to it (`$lib/motion/lit.ts`). */
