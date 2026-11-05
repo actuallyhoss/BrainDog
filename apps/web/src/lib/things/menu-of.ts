@@ -87,7 +87,8 @@ const item = (id: string, verb: VerbId, label: string, group: number, what: { hr
 
 /** The link's own three, what the browser's menu would have given. */
 export function linkItems(href: string, from: ThingFrom): ThingItem[] {
-  const here = from.pathname === href.split('?')[0];
+  /* A LINK WITH A QUERY IS ANOTHER PLACE ON THE SAME PAGE (a conversation in Slash), so it can still be opened. */
+  const here = !href.includes('?') && from.pathname === href;
   return [
     ...(here ? [] : [{ ...item('open', 'open', linkWords.open, G.link, { href }), linkVerb: true }]),
     ...(from.oneWindow ? [] : [{ ...item('newTab', 'newTab', linkWords.newTab, G.link, { href }), newTab: true, linkVerb: true }]),

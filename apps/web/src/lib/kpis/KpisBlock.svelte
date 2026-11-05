@@ -318,7 +318,8 @@
     };
   });
 
-  /* THE BLOCK MAY BE HELD UNSEEN, AND A SHEET INSIDE IT WOULD BE TOO, so its sheets are drawn at the end of the page. */
+  /* THE BLOCK MAY BE HELD UNSEEN, AND A SHEET INSIDE IT WOULD BE TOO, so its sheets, and the menus a phone draws as sheets,
+     are drawn at the end of the page. */
   const toBody = (node: HTMLElement) => {
     document.body.appendChild(node);
     return () => node.remove();
@@ -400,20 +401,6 @@
   <Button size="sm" onclick={() => void addKpi()}><Icon name="plus" size="s" />{copy.kpiAddNumber}</Button>
 {/snippet}
 
-{#if cellKpi}
-  {@const k = { input: cellKpi as KpiInput, name: cellKpi.name }}
-  <Menu label={copy.kpiMenu(k.name)} open={cellAt !== null} at={cellAt} onclose={() => (cellAt = null)}>
-    {@render numberItems(k, actionsOf(k))}
-  </Menu>
-{/if}
-
-<!-- THE TILE AROUND ITS NUMBERS: what shows on Today, a right-click away from anywhere in it. -->
-{#if writable}
-  <Menu label={copy.kpiMenuChoose} open={tileAt !== null} at={tileAt} onclose={() => (tileAt = null)}>
-    <button type="button" class="kb-item" role="menuitem" onclick={() => void openChooser()}><Icon name="grid" size="s" />{copy.kpiMenuChoose}</button>
-    {#if allNumbers}<a class="kb-item" role="menuitem" href={inApp(`/r/${encodeURIComponent(allNumbers)}`)}><Icon name="rows" size="s" />{copy.kpiAllNumbers}</a>{/if}
-  </Menu>
-{/if}
 <div class="kb" aria-busy={busy ? 'true' : undefined} {@attach tileHost}>
   {#if kpis.length === 0}
     <p class="kb-none">{unread ? copy.kpiNotRead : copy.kpiNoneYet}</p>
@@ -447,6 +434,20 @@
 </div>
 
 <div class="kb-sheets" {@attach toBody}>
+{#if cellKpi}
+  {@const k = { input: cellKpi as KpiInput, name: cellKpi.name }}
+  <Menu label={copy.kpiMenu(k.name)} open={cellAt !== null} at={cellAt} onclose={() => (cellAt = null)}>
+    {@render numberItems(k, actionsOf(k))}
+  </Menu>
+{/if}
+
+<!-- THE TILE AROUND ITS NUMBERS: what shows on Today, a right-click away from anywhere in it. -->
+{#if writable}
+  <Menu label={copy.kpiMenuChoose} open={tileAt !== null} at={tileAt} onclose={() => (tileAt = null)}>
+    <button type="button" class="kb-item" role="menuitem" onclick={() => void openChooser()}><Icon name="grid" size="s" />{copy.kpiMenuChoose}</button>
+    {#if allNumbers}<a class="kb-item" role="menuitem" href={inApp(`/r/${encodeURIComponent(allNumbers)}`)}><Icon name="rows" size="s" />{copy.kpiAllNumbers}</a>{/if}
+  </Menu>
+{/if}
 {#if chooserOn && list}
   {#await import('./KpiChooser.svelte') then { default: KpiChooser }}
     <KpiChooser bind:open={chooserOpen} rows={rows ?? []} names={projectNames} showing={form === 'today' ? kpis.map((k) => k.kpi) : []} onsave={chosen} />
