@@ -975,7 +975,11 @@ waits on the owner's yes. The sync key sits in each machine's own secret store (
 secret service) and is handed to it on standard input, never on a command line; a Keychain item of tool sign-ins too
 long for one line of `security -i` goes on `security`'s own command line for the moment it runs, as ccenv writes the
 same item. A program a pull would place is shown whole and asked about at a terminal, and pinned by the hash of its
-bytes and mode, so a changed one is asked about again. Tool sign-ins move and are never shared: they are placed only
+bytes and mode, so a changed one is asked about again. What a thing is, whether it runs and where it goes are sealed in the
+bundle's manifest: Carry can ask for more care than the sealing machine did and never less, and a place that is not the sealed
+one waits for a yes at a terminal. A skill whose text runs something (`` !`command` ``, a fenced `!` block, `hooks` or
+`allowed-tools` in its front matter) is a program too, written only after a yes at `braindog skills sync` and pinned by its
+hash. Tool sign-ins move and are never shared: they are placed only
 from a machine that has been retired. The verbs call the record as the machine's own login, never as an agent app's
 token. What leaves a machine in the clear is names, sizes, counts, times and hashes; what a file holds is only ever in
 the sealed bytes.

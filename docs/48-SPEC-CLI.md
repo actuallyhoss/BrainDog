@@ -1016,7 +1016,8 @@ The command keeps itself current, and only when it is typed: the start hook says
    says whether this command is that build, or behind it, and stops. The same build already installed is said, and
    nothing is downloaded.
 3. Downloads `<base>/braindog.mjs` to `braindog.new.mjs` beside the installed file, and refuses unless its SHA-256 is
-   the one in `<base>/braindog.mjs.sha256` and its own `--version`, asked under this Node, is the build read in 2.
+   the one in `<base>/braindog.mjs.sha256` and its own `--version`, asked under this Node, is the build read in 2. Every
+   read follows its moves by hand, five at most, and a move to anything but https ends it before that address is asked.
 4. Copies the installed file to `braindog.mjs.prev` and renames the download over it, one atomic rename, so the
    installed name always holds a whole command. Any failure deletes the download and leaves the installed file.
 5. Runs `install --apply` to place the Agent Skill and hooks again, and says the old and new builds.
@@ -1123,7 +1124,9 @@ whole in its step's plan, asked `Allow <it> to run from Claude Code on this mach
 profiles it goes into, and a yes is pinned in `~/.braindog/pins.json` by the SHA-256 of its kind, its name and the entry
 whole. The same entry is not asked about again, and a changed one is, its new pin replacing the old. A no, or no one at
 a terminal, leaves the entry out, and the last lines name each with the profiles it was left out of. Plain data (an
-HTTP server with no helper, a skill, the rules block) is written with its line and no question.
+HTTP server with no helper, a skill, the rules block) is written with its line and no question. A skill whose text runs
+something (`` !`command` ``, a fenced `!` block, `hooks` or `allowed-tools` in its front matter) is a program: it waits for
+a yes at `braindog skills sync`, shown whole and pinned by its hash, and `--yes` is not that yes.
 
 **Planned, then asked, then written, a step at a time**, so no request to the record waits on a person. At a terminal
 the data is written as the run goes. With no terminal, `--yes-data` writes the plain data and the programs already
@@ -1265,6 +1268,9 @@ never relayed.
    - **Tool sign-ins** move and are never live on two machines: placed only from a machine that is retired, never over
      sign-ins this machine holds already, and only to their own Keychain item or file, never to an agent app's login.
      Each app reads them at its next start; ccenv's own script spreads them into each profile.
+   - **A place that moved**: what a thing is, whether it runs and where it goes are sealed in the manifest, so Carry can
+     ask for more care than the sealing machine did and never less. A place on this system that is not the sealed one is
+     asked about by where it would go, `--yes-data` does not take it, and `sync patches` applies nothing there.
    With no terminal, `--yes-data` places the plain data and the programs already pinned and asks nothing; without it the
    run is its plan and exits 1. `--dry-run` places, asks and pins nothing. What waits for a yes is written on its thing
    in Carry, by this machine's name, for the page to show.
