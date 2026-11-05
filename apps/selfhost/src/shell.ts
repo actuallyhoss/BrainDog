@@ -137,8 +137,11 @@ export function shellOf(dir: string): (request: Request, origin: string) => Resp
     /* THE FRAME A DRAWN BLOCK IS DRAWN IN is answered from code under its own policy, as the Worker answers it, and is
        never a file of the build (`@braindog/host/drawn-frame`). */
     if (isDrawnFrame(new URL(request.url).pathname)) return drawnFrame(request.method, new URL(request.url).pathname);
+    /* WHAT THE WORKER'S `asPage` SETS, so a link out of a record on this host says nothing of the host it left. */
     const headers = new Headers({
       'x-content-type-options': 'nosniff',
+      'x-frame-options': 'DENY',
+      'referrer-policy': 'same-origin',
       'content-security-policy': "frame-ancestors 'none'",
       'x-frame-options': 'DENY',
       'referrer-policy': 'same-origin',

@@ -213,3 +213,23 @@ test('A PAGE SAYS WHO MAY FRAME IT, WHAT IT SENDS AS A REFERRER, AND THAT IT ASK
   assert.match(out.headers.get('permissions-policy') ?? '', /camera=\(\)/u);
   assert.equal(out.headers.get('strict-transport-security'), null);
 });
+
+test('A PAGE SENDS NO REFERRER OFF THE HOST AND NOBODY MAY FRAME IT, as on the Cloud', async () => {
+  const b = build();
+  try {
+    const serve = shellOf(b.root);
+    const out = await get(serve, '/r/tasks');
+    assert.equal(out.status, 200);
+    assert.equal(out.headers.get('referrer-policy'), 'same-origin', 'a link out of a record tells the far side which host it left');
+    assert.equal(out.headers.get('x-frame-options'), 'DENY');
+    /* THE HOSTS' FRAME DOCUMENTS ANSWER FROM CODE, UNDER THEIR OWN POLICIES, NOT THE PAGE'S. */
+    for (const path of ['/drawn-frame', '/drawn-frame/file', '/drawn-frame/hold']) {
+      const frame = await get(serve, path);
+      assert.equal(frame.status, 200, path);
+      assert.match(frame.headers.get('content-security-policy') ?? '', /frame-ancestors 'self'/u, path);
+      assert.equal(frame.headers.get('x-frame-options'), 'SAMEORIGIN', path);
+    }
+  } finally {
+    b.clean();
+  }
+});
