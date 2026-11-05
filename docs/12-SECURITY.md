@@ -455,7 +455,7 @@ FOR" is structural rather than remembered.
    rule 1's `grant.read`, signed by the run the caller names (`S12`) when one is live, and the value
    leaves in that one answer with `no-store`. On the command line, `braindog keys put` reads the value
    from stdin, never an argument, and `braindog keys exec` puts a key read back into the environment of the
-   one command it runs, and never prints it. It never puts one in a variable that changes how that command runs,
+   one command it runs, and never prints it, and a BrainDog bearer in the shell's own environment is kept from that command. It never puts one in a variable that changes how that command runs,
    such as `PATH`, `NODE_OPTIONS` or `LD_PRELOAD`, and on Windows a batch file is started through `cmd.exe` with
    its arguments escaped and the key kept off that command line ([48-SPEC-CLI](48-SPEC-CLI.md) §8). This is not
    rule 3's agent tool: no MCP tool reaches either door.
