@@ -119,6 +119,19 @@ test('a row a colleague made or changed is marked too', async () => {
 });
 
 /* WHAT A ROW CAN ORDER. Each runs in a turn whose words ask for one honest thing, and the model does the order instead. */
+/* WHOEVER WROTE IT, BY NAME, AND BY ANY WRITE: a script, a rule a door started, and rows the old Connect Google signed. */
+for (const actor of ['script:night', 'rule:r_1', 'google']) {
+  test(`a row ${actor} changed is marked, and the rows beside it are not`, async () => {
+    const r = await record();
+    const seq = await r.add('Touched row', owner);
+    const other = await r.add('Untouched row', owner);
+    value(await r.api.kernel.update('tasks', `tasks#${seq}`, { what: 'Touched row, changed' } as never, { actor } as never));
+    const ran = { askOnly: false, asked: false, said: '', outside: null };
+    assert.ok((await r.tools().call('open', { id: `tasks#${seq}` }, ran)).outside);
+    assert.equal((await r.tools().call('open', { id: `tasks#${other}` }, ran)).outside, null);
+  });
+}
+
 test('every order a row can carry is held for a yes that shows it, and nothing lands', async () => {
   const r = await record();
   const said = 'find the Acme invoice and mark it done';

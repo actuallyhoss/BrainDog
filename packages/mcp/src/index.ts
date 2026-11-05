@@ -93,7 +93,7 @@
  * attempt works.
  */
 
-import { codeOf, conflicted, refused, type Refusal, type Result } from '@braindog/ports';
+import { NAMES_ONLY, codeOf, conflicted, refused, type Refusal, type Result } from '@braindog/ports';
 import type { HANDOFF_STATES as RecordHandoffStates } from '@braindog/record';
 import { firewall } from '@braindog/record/sight';
 
@@ -2269,7 +2269,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const seqs = [...new Set(handles.filter((h) => RUN_HANDLE.test(h)).map((h) => Number(h.slice(1))))].slice(0, NAMES_PER_READ);
     const out = new Map<string, Record<string, unknown>>();
     if (seqs.length === 0) return out;
-    const got = await surface.list({ register: SESSION, where: { field: 'seq', in: seqs }, limit: seqs.length }, ctx);
+    const got = await surface.list({ register: SESSION, where: { field: 'seq', in: seqs }, limit: seqs.length, [NAMES_ONLY]: true } as never, ctx);
     if (got.ok) for (const row of got.value.rows) if (isEntry(row) && row.seq !== null) out.set(`S${String(row.seq)}`, row.fields);
     return out;
   };
@@ -2382,7 +2382,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     await Promise.all([
       ...[...by].slice(0, LISTS_NAMED).map(async ([register, seqs]) => {
         if (!decls.has(register)) await learnPrefix(register, ctx);
-        const got = await surface.list({ register, where: { field: 'seq', in: seqs.slice(0, NAMES_PER_READ) }, limit: Math.min(seqs.length, NAMES_PER_READ) }, ctx);
+        const got = await surface.list({ register, where: { field: 'seq', in: seqs.slice(0, NAMES_PER_READ) }, limit: Math.min(seqs.length, NAMES_PER_READ), [NAMES_ONLY]: true } as never, ctx);
         if (!got.ok) return;
         for (const row of got.value.rows) {
           if (!isEntry(row) || row.seq === null) continue;

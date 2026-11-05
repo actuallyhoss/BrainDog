@@ -40,7 +40,7 @@ import {
   updatesFromStore,
 } from '@braindog/declare';
 import { isDuplicate, matchLiterals, normalise as normaliseText, parseDate, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
-import { fixOf, no, ok } from '@braindog/ports';
+import { NAMES_ONLY, fixOf, no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { boardStepsOn, stepsOf, type BoardBody, type BoardStep } from './board-steps.ts';
@@ -49,7 +49,7 @@ import type { ContactArgs, ContactMet, EraseReport, EraseRequest } from '@braind
 import { NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
-import { JOINED_AT, PUSH_KINDS, SAID_MOST, mayOf, openInstructions, shareMeOf, type Instr, type Profile, type Stop } from '@braindog/kernel';
+import { JOINED_AT, PUSH_KINDS, SAID_MOST, mayOf, openInstructions, shareMeOf, tokenOfRun, type Instr, type Profile, type Stop } from '@braindog/kernel';
 import { OWN_RUN, nameMid, personNamed, stopLine, toldOf, toldTo, type Told } from './methods/instructions.ts';
 import { saysOf } from './methods/agent-profile.ts';
 import type { Grant, InvitationRow } from '@braindog/kernel';
@@ -305,7 +305,7 @@ export { SEALED_FILE_MOST, SEALED_NAME, SEALED_PART_MOST, sealedName, type Seale
 export type { AttachVisualArgs, PictureNamed, SettleVisualArgs, VisualAttached, VisualListed, VisualRead, VisualSettled, VisualStore } from './methods/visuals.ts';
 export { noteFacts } from '@braindog/seed/packs/note-facts';
 export { AGENT_ROLES, AGENT_LIST_FALLBACK, agentLists, fadeDays, fadeOf, listFor, noListSaid, type AgentRole } from './agent-lists.ts';
-import { fadeDays, fadeOf } from './agent-lists.ts';
+import { fadeDays, fadeOf, listFor } from './agent-lists.ts';
 import { placesOf as railPlaces, type AddonNav, type Place } from './places.ts';
 
 /* THE RECORD'S OWN SOURCES (`lists`, `pages`) INSTALL FIRST TRY: the kernel's install knows their names (`admitHostSources`). */
@@ -8894,14 +8894,107 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const caller = callerOf(ctx);
     if (caller === null) return out;
     /* THE IDS GO AS ONE JSON ARRAY: one placeholder a row put a read of more than a hundred over the Durable
-       Object's limit on bound values, so an agent's `list` of 101 answered INTERNAL. Two values bound at any length. */
-    const by = sql.one<{ actor: string }>(
-      `SELECT actor FROM event WHERE kind = 'create' AND target IN (SELECT value FROM json_each(?))
-       AND (actor LIKE 'ingest:%' OR actor LIKE 'report:%' OR (actor LIKE 'p\\_%' ESCAPE '\\' AND actor <> ?)) LIMIT 1`,
+       Object's limit on bound values, so an agent's `list` of 101 answered INTERNAL. Two values bound at any length.
+       WHOEVER TOUCHED IT, BY ANY WRITE. Only who made a row was read, and only a person or a door: a row a colleague's
+       agent made, signed by its run, or a colleague's edit of the owner's row, read as the owner's own, and his word
+       and every write after it still landed. */
+    const hands = sql.all<{ actor: string }>(
+      `SELECT DISTINCT actor FROM event WHERE target IN (SELECT value FROM json_each(?))`,
       JSON.stringify(rows.map((id) => `entry:${id}`)),
-      caller.person,
-    )?.actor;
-    if (by !== undefined) trust.markUntrusted(caller, by.startsWith('p_') ? 'something another person wrote' : 'something that arrived from outside BrainDog');
+    );
+    const anothers = hands.find((h) => !ownHand(h.actor, caller.person))?.actor;
+    if (anothers !== undefined) trust.markUntrusted(caller, anothers.startsWith('p_') || /^S[1-9]/u.test(anothers) || anothers.startsWith('token:') || anothers.startsWith('agent:') ? 'something another person wrote' : 'something that arrived from outside BrainDog');
+    return out;
+  };
+
+  /**
+   * WHETHER AN ACTOR IN THE LOG IS `person` OR THE RECORD ITSELF, read through every way a write is signed: the person, their
+   * own key or a run their key opened, the record's own hands, and an automation's run no key opened. A door, a feed, a
+   * project's report key, a script (whose text came from the network), a key of somebody else's, a run of theirs, and an agent no
+   * run was opened for, which names nobody, are not. `owners` counts whoever owns the record as well, for what a session is
+   * handed: a colleague's agent works to the owner's rules, and the owner's words are not its stranger's.
+   */
+  const ruleOwn = (rule: string, person: string): boolean =>
+    sql
+      .all<{ actor: string }>('SELECT DISTINCT actor FROM automation_run WHERE rule = ? LIMIT 8', rule)
+      .every((r) => r.actor === person || r.actor === 'system' || r.actor === 'seed' || (!r.actor.startsWith('rule:') && ownHand(r.actor, person, true)));
+  const ownHand = (actor: string, person: string, owners = false): boolean => {
+    if (actor === person || actor === 'system' || actor === 'seed' || actor === 'slash') return true;
+    /* A RULE IS THE RECORD'S OWN, UNLESS A DOOR OR A SCRIPT STARTS IT: it signs by its own name, and its row holds whatever
+       its template copied. Measured: a rule on an arrival wrote "Said: <the sender's words>" as a task that read as his. */
+    if (actor.startsWith('rule:')) return sql.one('SELECT 1 AS hit FROM automation_run WHERE rule = ? AND (actor LIKE \'ingest:%\' OR actor LIKE \'report:%\' OR actor LIKE \'script:%\') LIMIT 1', actor.slice('rule:'.length)) === undefined;
+    const mine = (who: string | null | undefined): boolean => who === person || (owners && typeof who === 'string' && kernel.access(who)?.level === 'owner');
+    if (actor.startsWith('p_')) return mine(actor);
+    const named = actor.startsWith('token:') ? actor.slice(6) : actor;
+    const run = /^S[1-9]\d*$/u.test(named);
+    if (!run && !named.startsWith('t_') && !named.startsWith('tok_')) return false;
+    const token = run ? tokenOfRun(sql, named) : named;
+    /* A RUN NO KEY OPENED IS AN AUTOMATION'S, which is the record's own. */
+    if (token === null) return run;
+    const key = sql.one<{ person_id: string | null; label: string | null }>('SELECT person_id, label FROM token WHERE id = ?', token);
+    /* A RUN WHOSE KEY THE RECORD NEVER HELD CAME IN A FILE THE OWNER IMPORTED OR THE SEED, as its rows did. */
+    if (key === undefined) return run;
+    return !(key.label ?? '').startsWith('report:') && mine(key.person_id);
+  };
+
+  /**
+   * WHAT A SESSION IS HANDED IS ONLY WHAT ITS OWN PERSON, THE OWNER OR THE RECORD WROTE. `context` is read first by every
+   * session, and a model takes a line under Rules, Next or Lane as true. MEASURED: a colleague's agent, on a write key, made a
+   * learning of kind rule saying to pipe a script into a shell, and a task, a question and a handoff saying the same; a fresh
+   * session of the owner's read all four, unmarked, with its word and its writes still open. Somebody else's words are
+   * left out of the briefing and it says there is something to read; `get` reads it, and marks the run as `readFrom` does.
+   */
+  const KEPT_OF_A_ROW: ReadonlySet<string> = new Set(['spoken', 'state', 'scope', 'project', 'by', 'due', 'agent', 'created_at', 'updated_at', 'hue', 'mark']);
+  const SOMEBODY_WROTE = 'Somebody else wrote this. get reads it, and reading it marks this run.';
+  const handedOwn = (ctx: CallContext, told: Context): Context => {
+    if (ctx.principal.kind !== 'token') return told;
+    const person = ctx.principal.person;
+    const hands = new Map<string, boolean>();
+    const own = (actor: string): boolean => {
+      let said = hands.get(actor);
+      if (said === undefined) hands.set(actor, (said = ownHand(actor, person, true)));
+      return said;
+    };
+    const rowOwn = (spoken: string): boolean => {
+      const row = kernel.get(spoken);
+      if (row === null) return true;
+      return sql.all<{ actor: string }>('SELECT DISTINCT actor FROM event WHERE target = ?', `entry:${row.id}`).every((e) => own(e.actor));
+    };
+    const askedOwn = (id: string): boolean => {
+      const q = sql.one<{ opened_by: string | null; drafted_by: string | null }>('SELECT opened_by, drafted_by FROM suggestion WHERE id = ?', id);
+      const signed = (who: string | null | undefined): boolean => who === null || who === undefined || who === '' || !/^(?:p_|S[1-9]|token:|t_|tok_|agent:|ingest:|report:|script:)/u.test(who) || own(who);
+      return q === undefined || (signed(q.opened_by) && signed(q.drafted_by));
+    };
+    /* THE WORDS OF A ROW, ITS MARKS LEFT: what tells a person which row it is and where it stands. */
+    const withheld = <B extends Brief>(row: B): B =>
+      Object.fromEntries(Object.entries(row).map(([k, v]) => [k, typeof v === 'string' && !KEPT_OF_A_ROW.has(k) ? SOMEBODY_WROTE : v])) as B;
+    const nameShaped = (said: string): boolean => said.length <= 60 && said.split(/\s+/u).length <= 6 && !/[:;|{}<>`$]/u.test(said);
+    const out: Context = { ...told };
+    if (told.handoff && !own(told.handoff.from)) {
+      out.handoff = { ...told.handoff, next: SOMEBODY_WROTE, tried: [] };
+      out.next_lines = [`Somebody else's agent left a step here (${told.handoff.from}). ${SOMEBODY_WROTE}`];
+    }
+    const quiet = (r: LiveBrief): LiveBrief => (own(r.spoken) ? r : { ...r, doing: null });
+    out.live = { same_repo: told.live.same_repo.map(quiet), elsewhere: told.live.elsewhere.map(quiet) };
+    if (told.also_here) {
+      const runOf = (name: string): string | null => /\((S[1-9]\d*)\)/u.exec(name)?.[1] ?? null;
+      const others = told.also_here.runs.filter((r) => r.doing !== null && !own(runOf(r.name) ?? 'agent:'));
+      out.also_here = {
+        ...told.also_here,
+        runs: told.also_here.runs.map((r) => (others.includes(r) ? { ...r, doing: null } : r)),
+        lines: [told.also_here.lines[0], others.reduce((line, r) => line.replace(`, ${r.doing!}`, ''), told.also_here.lines[1])],
+      };
+    }
+    out.waiting = told.waiting.map((q) => (askedOwn(q.id) ? q : { ...q, question: SOMEBODY_WROTE }));
+    /* WHAT IS READ AS A RULE IS LEFT OUT WHOLE: no sentence about it belongs under Rules. */
+    if (told.rules) out.rules = { ...told.rules, rows: told.rules.rows.filter((r) => rowOwn(r.spoken)) };
+    const rulesOfAgents = (role: string | undefined): boolean => role === 'learnings' || role === 'skills' || role === 'tools' || role === 'profiles';
+    out.registers = told.registers.map((reg) => {
+      const fix = (rows: Brief[]): Brief[] => (rulesOfAgents(reg.role ?? reg.id) ? rows.filter((r) => rowOwn(r.spoken)) : rows.map((r) => (rowOwn(r.spoken) ? r : withheld(r))));
+      return { ...reg, rows: fix(reg.rows), inherited: fix(reg.inherited) };
+    });
+    out.people = told.people.map((p) => (nameShaped(p.name) || rowOwn(p.spoken) ? p : { ...p, name: 'Somebody', role: null, org: null }));
+    if (told.project && !nameShaped(told.project.name) && !rowOwn(told.project.spoken)) out.project = { ...told.project, name: 'This project' };
     return out;
   };
 
@@ -12095,7 +12188,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     }
     /* THE FIELDS HIDDEN FROM HER ARE TAKEN OFF BEFORE THE CARD AND THE PLAN ARE WRITTEN, since both are text drawn from
        these rows and a mask over the answer cannot reach into a sentence. */
-    return carded(ctx, sight.mask(ctx, told), {
+    return carded(ctx, handedOwn(ctx, sight.mask(ctx, told)), {
       agent: text(run?.fields.agent) ?? hints.agent ?? null,
       host: tree.host ?? null,
       branch: hints.branch ?? text(run?.fields.branch) ?? null,
@@ -13261,7 +13354,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         args.register,
         sight.mask(
           ctx,
-          readFrom(
+          ((args as { [NAMES_ONLY]?: boolean })[NAMES_ONLY] === true ? <T>(_: CallContext, out: Result<T>): Result<T> => out : readFrom)(
             ctx,
             marked(kernel.list(
               {
@@ -19013,6 +19106,39 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     walk(v, 0);
     return [...ids];
   };
+  /* A LEARNING IS READ AS A RULE BY EVERY SESSION, so an agent's read of them holds only what `handedOwn` would hand it. */
+  {
+    const method = (api as Record<string, unknown>).learnings;
+    if (typeof method === 'function')
+      (api as Record<string, unknown>).learnings = async function (this: unknown, ...argv: unknown[]) {
+        const out = (await (method as (...a: unknown[]) => unknown).apply(this, argv)) as Result<{ rows?: unknown[] }>;
+        const ctx = argv.find(isCtx);
+        if (ctx === undefined || !out.ok || ctx.principal.kind !== 'token' || !Array.isArray(out.value.rows)) return out;
+        const person = ctx.principal.person;
+        const mine = (r: unknown): boolean => {
+          const name = r !== null && typeof r === 'object' ? (r as { spoken?: unknown; id?: unknown }).spoken ?? (r as { id?: unknown }).id : null;
+          const row = typeof name === 'string' ? kernel.get(name) : null;
+          return row === null || sql.all<{ actor: string }>('SELECT DISTINCT actor FROM event WHERE target = ?', `entry:${row.id}`).every((e) => ownHand(e.actor, person, true));
+        };
+        return { ok: true, value: { ...out.value, rows: out.value.rows.filter(mine) } };
+      };
+  }
+  /* A QUESTION'S WORDS ARE WHOEVER ASKED IT, read as a row's: `opened_by` and `drafted_by`, each through `ownHand`. */
+  for (const name of ['governance'] as const) {
+    const method = (api as Record<string, unknown>)[name];
+    if (typeof method !== 'function') continue;
+    (api as Record<string, unknown>)[name] = async function (this: unknown, ...argv: unknown[]) {
+      const out = (await (method as (...a: unknown[]) => unknown).apply(this, argv)) as Result<unknown>;
+      const ctx = argv.find(isCtx);
+      if (ctx === undefined || !out.ok || ctx.principal.kind !== 'token') return out;
+      const caller = callerOf(ctx);
+      const v = out.value as { rows?: unknown };
+      const rows = Array.isArray(v?.rows) ? (v.rows as unknown[]) : [out.value];
+      const signed = rows.flatMap((r) => (r !== null && typeof r === 'object' ? [(r as { opened_by?: unknown }).opened_by, (r as { drafted_by?: unknown }).drafted_by] : [])).filter((w): w is string => typeof w === 'string' && /^(?:p_|S[1-9]|token:|t_|tok_|agent:|ingest:|report:|script:)/u.test(w));
+      if (caller !== null && signed.some((w) => !ownHand(w, caller.person))) trust.markUntrusted(caller, 'something another person wrote');
+      return out;
+    };
+  }
   for (const name of ['page', 'previewPage', 'recentHistory', 'today'] as const) {
     const method = (api as Record<string, unknown>)[name];
     if (typeof method !== 'function') continue;

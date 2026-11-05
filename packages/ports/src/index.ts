@@ -486,3 +486,9 @@ export type { AccountCall, AccountClosed, Suspended } from './auth.ts';
  * above, which matters because a local declaration wins over a star export without a word.
  */
 export * from './inference.ts';
+
+/**
+ * On a `list`'s arguments, in process only: this read is for a row's name beside its handle, and marks nobody as having read
+ * the row's words. A SYMBOL BECAUSE NOTHING SENT OVER A WIRE CAN HOLD ONE, so no agent can read a row quietly by asking to.
+ */
+export const NAMES_ONLY: unique symbol = Symbol('names only');
