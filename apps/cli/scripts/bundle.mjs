@@ -99,6 +99,20 @@ const fail = (line) => {
   process.exit(1);
 };
 
+/**
+ * WHEN THIS RELEASE IS, in seconds: the commit's own time, which a later commit is always after, or now with no git. The signature
+ * covers it (`src/release-key.ts`), and the bundle knows its own, so `update` can refuse an older build of the same day.
+ */
+function releasedAt() {
+  try {
+    const at = Number(execFileSync('git', ['show', '-s', '--format=%ct', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
+    if (Number.isSafeInteger(at) && at > 0) return at;
+  } catch {
+    /* no git here: now, below */
+  }
+  return Math.floor(Date.now() / 1000);
+}
+
 /** The build this file will say it is: the deploy's, when the deploy named one, or today's date and this commit. */
 function stamp() {
   const given = process.env.BRAINDOG_BUILD;
@@ -118,6 +132,7 @@ function stamp() {
 }
 
 const tuple = stamp();
+const released = releasedAt();
 
 /* THE AGENT SKILL RIDES INSIDE THE BUNDLE. `install` places `skills/braindog/SKILL.md` in each profile, and a checkout
    reads it from the repository's root, but the bundle is one file on a machine with no checkout, so the text is
@@ -174,7 +189,7 @@ try {
     platform: 'node',
     format: 'esm',
     target: 'node24',
-    define: { __BUILD__: JSON.stringify(tuple), __SKILL__: JSON.stringify(skill), __INBOX_HOOK__: JSON.stringify(inboxHook), __STATUSLINE_ENTRY__: JSON.stringify(statusEntry) },
+    define: { __BUILD__: JSON.stringify(tuple), __RELEASED__: JSON.stringify(released), __SKILL__: JSON.stringify(skill), __INBOX_HOOK__: JSON.stringify(inboxHook), __STATUSLINE_ENTRY__: JSON.stringify(statusEntry) },
     // A COMMONJS DEPENDENCY STILL CALLS require() INSIDE AN ESM FILE. `yaml` asks for `process` that way, and esbuild's
     // shim throws "Dynamic require is not supported" unless a real `require` is in scope, so the bundle makes one.
     banner: { js: "import { createRequire as __braindogRequire } from 'node:module';\nconst require = __braindogRequire(import.meta.url);" },
@@ -204,6 +219,8 @@ writeFileSync(SUM, `${hex}  braindog.mjs\n`);
 writeFileSync(STAMP, `${tuple}\n`);
 /* AN OLD SIGNATURE IS NOT THIS BUILD'S (`tools/ship/cli-sign.mjs` makes the new one, at release, and nothing here can). */
 rmSync(`${OUT}.sig`, { force: true });
+/* WHEN IT WAS RELEASED, for the signature (`tools/ship/cli-sign.mjs`). The signature carries it to the site, so this is not published. */
+writeFileSync(`${OUT}.released`, `${released}\n`);
 
 /* THE PUBLISHED MANIFEST (see the top): only what a person installing it needs, read from this workspace's manifest. */
 const own = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));

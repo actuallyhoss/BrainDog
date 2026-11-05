@@ -6,8 +6,8 @@
  * `braindog update` and every curl-pipe-sh then runs their code. Here a host serves a build with a good sum and no
  * signature, and with a good sum and somebody else's signature, and neither runs.
  *
- * NO REAL KEY AND NO REAL COMMAND. Each test makes its own pair, and `braindog` here is a small script on a PATH of its own
- * that keeps a key in a file.
+ * NO REAL KEY AND NO REAL KEYCHAIN. Each test makes its own pair, and `security` here is a small script on a PATH of its own that
+ * keeps its item in a file.
  */
 
 import { test } from 'node:test';
@@ -19,7 +19,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { RELEASE_KEYS, RELEASE_LABEL, releaseMessage, signedBy } from '../src/release-key.ts';
+import { readSignature, RELEASE_KEYS, RELEASE_LABEL, releaseMessage, signedBy } from '../src/release-key.ts';
 import { update, type UpdateIo } from '../src/update.ts';
 
 const REPO = new URL('../../../', import.meta.url);
@@ -32,11 +32,13 @@ const bundle = (build: string): string =>
   `#!/usr/bin/env node\nimport { writeFileSync } from 'node:fs';\nif (process.env.${RAN}) writeFileSync(process.env.${RAN}, 'ran');\nconsole.log('app ${build}');\n`;
 const sha = (text: string): string => createHash('sha256').update(text).digest('hex');
 
-function pair(): { x: string; signs: (sum: string, build: string) => string; der: string } {
+const AT = 2_000_000_000;
+
+function pair(): { x: string; signs: (sum: string, build: string, released?: number) => string; der: string } {
   const { privateKey } = generateKeyPairSync('ed25519');
   return {
     x: createPublicKey(privateKey).export({ format: 'jwk' }).x!,
-    signs: (sum, build) => sign(null, releaseMessage(sum, build), privateKey).toString('base64url'),
+    signs: (sum, build, released = AT) => `${released}\n${sign(null, releaseMessage(sum, build, released), privateKey).toString('base64url')}`,
     der: privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64'),
   };
 }
@@ -89,6 +91,7 @@ test('A PINNED COMMAND REFUSES A GOOD SUM WITH NO SIGNATURE OR ANOTHER KEY\'S, A
     ['signed for another build', key.signs(sha(body), OLD), /not BrainDog's/u],
     ['signed for another file', key.signs(sha('other'), NEW), /not BrainDog's/u],
     ['not a signature', 'AAAA', /not BrainDog's/u],
+    ['another time written over a good signature', key.signs(sha(body), NEW, AT).replace(String(AT), String(AT + 1)), /not BrainDog's/u],
   ];
   for (const [why, sig, says] of cases) {
     const run = machine(scratch(t), await serve(t, served(body, sig)), [key.x]);
@@ -107,15 +110,62 @@ test('A COMMAND WITH NO KEY PINNED KEEPS WORKING OVER THE SUM, AS EVERY BUILD BE
   assert.equal(readFileSync(run.file, 'utf8'), body);
 });
 
+test('AN OLDER SIGNED BUILD SERVED AGAIN IS REFUSED BEFORE IT RUNS, BY ITS DAY AND WITHIN A DAY, AND --older TAKES IT', async (t) => {
+  const key = pair();
+  const body = bundle(NEW);
+  /* WITHIN A DAY: a good signature on a build of the same date as the one running, released before it. */
+  const today = `${NEW.split('+')[0]}+ccccccc`;
+  const same = machine(scratch(t), await serve(t, served(body, key.signs(sha(body), NEW, AT - 60))), [key.x]);
+  same.build = today;
+  same.released = AT;
+  assert.equal(await update([], same), 1);
+  assert.match(same.refused.join('\n'), /older build/u);
+  assert.match(same.refused.join('\n'), /--older/u);
+  assert.equal(readFileSync(same.file, 'utf8'), bundle(OLD));
+  assert.equal(existsSync(same.ran), false, 'the older build ran');
+  assert.equal(await update(['--older'], same), 0, same.refused.join('\n'));
+  assert.equal(readFileSync(same.file, 'utf8'), body);
+
+  /* BY ITS DAY, and nothing is downloaded. */
+  const asked: string[] = [];
+  const later = machine(scratch(t), await serve(t, served(body, key.signs(sha(body), NEW, AT - 86_400 * 30))), [key.x]);
+  later.build = '2027.01.01+ddddddd';
+  later.released = AT;
+  later.fetch = ((url: string, init?: RequestInit) => (asked.push(url), fetch(url, init))) as typeof fetch;
+  assert.equal(await update([], later), 1);
+  assert.deepEqual(asked.map((u) => u.split('/').pop()), ['braindog.mjs.build']);
+  assert.equal(await update(['--older'], later), 0, later.refused.join('\n'));
+
+  /* AND A NEWER RELEASE OF THE SAME DAY GOES THROUGH. */
+  const newer = machine(scratch(t), await serve(t, served(body, key.signs(sha(body), NEW, AT + 60))), [key.x]);
+  newer.build = today;
+  newer.released = AT;
+  assert.equal(await update([], newer), 0, newer.refused.join('\n'));
+
+  /* AN UNPINNED COMMAND HOLDS TO THE DAY. */
+  const unpinned = machine(scratch(t), await serve(t, served(body)), []);
+  unpinned.build = '2027.01.01+ddddddd';
+  assert.equal(await update([], unpinned), 1);
+  assert.match(unpinned.refused.join('\n'), /older build/u);
+});
+
+test('THE SIGNATURE FILE IS A TIME AND A SIGNATURE, AND NOTHING ELSE', () => {
+  assert.deepEqual(readSignature('123\nabc\n'), { released: 123, signature: 'abc' });
+  for (const bad of ['', 'abc', '123', 'x y', '1 2 3', '-1 abc', '1.5 abc']) assert.equal(readSignature(bad), null, bad);
+});
+
 test('THE TWO SCRIPTS PIN WHAT THE COMMAND PINS, AND SPELL THE SAME MESSAGE', () => {
   const sh = readFileSync(repo('apps/site/static/cli/install.sh'), 'utf8');
   const ps = readFileSync(repo('apps/site/static/cli/install.ps1'), 'utf8');
   assert.equal(/^PIN='([^']*)'$/mu.exec(sh)?.[1], RELEASE_KEYS.join(' '));
   assert.equal(/^ {2}\$pin = '([^']*)'$/mu.exec(ps)?.[1], RELEASE_KEYS.join(' '));
-  const said = 'braindog-cli release\\n"+sum+"\\n"+build+"\\n"';
+  const said = 'braindog-cli release\\n"+sum+"\\n"+build+"\\n"+r+"\\n"';
   assert.ok(sh.includes(said), 'install.sh signs another message');
   assert.ok(ps.includes(said), 'install.ps1 signs another message');
-  assert.equal(releaseMessage('s', 'b').toString(), 'braindog-cli release\ns\nb\n');
+  assert.equal(releaseMessage('s', 'b', 7).toString(), 'braindog-cli release\ns\nb\n7\n');
+  /* AND THE LIST PUBLISHED IN THE REPOSITORY, which is the check on the scripts. */
+  const published = /<!-- release-keys -->([\s\S]*?)<!-- \/release-keys -->/u.exec(readFileSync(repo('apps/cli/README.md'), 'utf8'))?.[1] ?? '';
+  assert.deepEqual([...published.matchAll(/`([^`]+)`/gu)].map((m) => m[1]), [...RELEASE_KEYS]);
 });
 
 test('THE DEPLOY SIGNS BEFORE IT PUBLISHES, AND PUBLISHES THE SUM BESIDE THE SIGNATURE FOR A COMMAND FROM BEFORE THE PIN', () => {
@@ -123,6 +173,18 @@ test('THE DEPLOY SIGNS BEFORE IT PUBLISHES, AND PUBLISHES THE SUM BESIDE THE SIG
   const at = yml.indexOf('node tools/ship/cli-sign.mjs');
   const copy = yml.indexOf('cp apps/cli/dist/braindog.mjs');
   assert.ok(at > 0 && at < copy, 'the CLI is copied to the site before it is signed');
+  /* NO HALF A DEPLOY: nothing is written anywhere before this step, so a stop here leaves what is live as it was. */
+  for (const write of ['Take a restore point', 'wrangler deploy', 'wrangler rollback', 'migrat']) {
+    const first = yml.indexOf(write);
+    assert.ok(first === -1 || first > at, `${write} comes before the CLI is signed`);
+  }
+  /* AND A RED HERE ROLLS NOTHING BACK, which would undo a deploy that never happened. */
+  assert.match(yml, /if: failure\(\) && \(steps\.parity\.outcome == 'failure' \|\| steps\.smoke\.outcome == 'failure'\)/u);
+  /* WITH NO KEY THE DEPLOY STOPS BEFORE ITS FIRST STEP, among its refusals, and asks for no value to do it. */
+  const deploy = readFileSync(repo('tools/ship/deploy.mjs'), 'utf8');
+  const asked = deploy.indexOf("'tools/ship/cli-sign.mjs'), '--check'");
+  assert.ok(asked > 0 && asked < deploy.indexOf('for (const line of refusals) say'), 'deploy.mjs does not ask for the key among its refusals');
+  assert.ok(deploy.indexOf('Nothing was deployed.') < deploy.indexOf('writeFileSync(LOCK'));
   const line = yml.slice(copy, yml.indexOf('\n', copy));
   assert.ok(line.includes('braindog.mjs.sig') && line.includes('braindog.mjs.sha256') && line.includes('braindog.mjs.build'), line);
 });
@@ -217,122 +279,166 @@ test('install.ps1 DOES THE SAME, WHERE THIS MACHINE HAS PowerShell', { skip: spa
   }
 });
 
-/* ─── the two tools, over a copy of the files they write and a `braindog` that keeps its key in a file ─── */
+/* ─── the two tools, over a copy of the files they write and a `security` that keeps its item in a file ─── */
 
-function tree(t: { after: (f: () => void) => void }, opts: { keys?: 'none' | 'fails' } = {}) {
+const PINS = /RELEASE_KEYS: readonly string\[\] = \[(.*)\]/u;
+
+function tree(t: { after: (f: () => void) => void }, opts: { keeps?: boolean; locked?: boolean } = {}) {
   const root = scratch(t);
-  for (const path of ['apps/cli/src/release-key.ts', 'apps/site/static/cli/install.sh', 'apps/site/static/cli/install.ps1']) {
+  for (const path of ['apps/cli/src/release-key.ts', 'apps/cli/README.md', 'apps/site/static/cli/install.sh', 'apps/site/static/cli/install.ps1']) {
     mkdirSync(join(root, path, '..'), { recursive: true });
     cpSync(repo(path), join(root, path));
   }
   mkdirSync(join(root, 'apps/cli/dist'), { recursive: true });
   writeFileSync(join(root, 'apps/cli/dist/braindog.mjs'), bundle(NEW));
   writeFileSync(join(root, 'apps/cli/dist/braindog.mjs.build'), `${NEW}\n`);
+  writeFileSync(join(root, 'apps/cli/dist/braindog.mjs.released'), `${AT}\n`);
   const bin = join(root, 'bin');
   mkdirSync(bin);
   const kept = join(root, 'kept-key');
   const argvLog = join(root, 'argv');
+  /* `add-generic-password` WITH NO -U REFUSES A DUPLICATE, as the real one was seen to on a throwaway keychain. */
   writeFileSync(
-    join(bin, 'braindog'),
+    join(bin, 'security'),
     `#!/bin/sh
 printf '%s\\n' "$*" >> '${argvLog}'
-${opts.keys === 'fails' ? `echo 'No keychain access is kept for this host.'; exit 2` : ''}
-case "$2" in
-  put) cat > '${kept}'; echo 'Kept.' ;;
-  exec)
-    [ -f '${kept}' ] || { echo 'There is no key by that label.'; exit 2; }
-    shift 3
-    while [ "$1" != "--" ]; do shift; done
-    shift
-    BRAINDOG_CLI_SIGNING_KEY="$(cat '${kept}')" exec "$@"
+case "$1" in
+  -i)
+    while IFS= read -r line; do
+      case "$line" in
+        add-generic-password*-U*) printf 'overwrite\\n' >> '${argvLog}' ;;
+        add-generic-password*)
+          ${opts.keeps === false ? ':' : `[ -f '${kept}' ] || { v="\${line##*-w \\"}"; printf '%s' "\${v%\\"}" > '${kept}'; }`}
+          ;;
+      esac
+    done
+    exit 0
+    ;;
+  find-generic-password)
+    [ -f '${kept}' ] || exit 44
+    case "$*" in
+      *-w*) ${opts.locked ? 'exit 36' : `cat '${kept}'; echo`} ;;
+      *) echo 'attributes of the item' ;;
+    esac
     ;;
 esac
 `,
   );
-  chmodSync(join(bin, 'braindog'), 0o755);
+  chmodSync(join(bin, 'security'), 0o755);
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}`, BRAINDOG_SIGN_ROOT: root };
   const tool = (name: string, ...args: string[]) => {
     const out = spawnSync(process.execPath, [repo(`tools/ship/${name}`), ...args], { encoding: 'utf8', env });
     return { status: out.status, said: `${out.stdout}${out.stderr}` };
   };
-  return { root, kept, argvLog, tool };
+  const pins = () => PINS.exec(readFileSync(join(root, 'apps/cli/src/release-key.ts'), 'utf8'))?.[1] ?? '';
+  return { root, kept, argvLog, tool, pins, sig: join(root, 'apps/cli/dist/braindog.mjs.sig') };
 }
 
-test('NO KEY MADE: SIGNING STOPS AND SAYS THE ONE LINE TO RUN, AND A DRY RUN SAYS THE SAME AND OPENS NOTHING', (t) => {
+test('NO KEY MADE: SIGNING STOPS AND SAYS THE ONE COMMAND, AND THE DEPLOY\'S CHECK SAYS THE SAME AND OPENS NOTHING', (t) => {
   const w = tree(t);
   for (const args of [[], ['--check']]) {
     const out = w.tool('cli-sign.mjs', ...args);
     assert.equal(out.status, 1, args.join());
-    assert.match(out.said, /node tools\/ship\/cli-key\.mjs/u);
+    assert.match(out.said, /^ {2}node tools\/ship\/cli-key\.mjs$/mu);
     assert.match(out.said, /nothing was published/u);
   }
-  assert.equal(existsSync(w.argvLog), false, 'the Keychain was asked with no key pinned');
-  assert.equal(existsSync(join(w.root, 'apps/cli/dist/braindog.mjs.sig')), false);
+  assert.doesNotMatch(readFileSync(w.argvLog, 'utf8'), /-w/u, 'the value was asked for with no key made');
+  assert.equal(existsSync(w.sig), false);
 });
 
-test('MAKING THE KEY KEEPS THE PRIVATE HALF IN THE KEYCHAIN, OFF EVERY ARGUMENT AND OFF THE SCREEN, AND PINS THE PUBLIC HALF IN THREE PLACES; THEN A BUILD SIGNS AND VERIFIES', async (t) => {
+test('MAKING THE KEY KEEPS THE PRIVATE HALF IN THE KEYCHAIN, OFF EVERY ARGUMENT AND OFF THE SCREEN, AND PINS THE PUBLIC HALF; THEN A BUILD SIGNS AND VERIFIES', async (t) => {
   const w = tree(t);
   const made = w.tool('cli-key.mjs');
   assert.equal(made.status, 0, made.said);
   const held = readFileSync(w.kept, 'utf8').trim();
+  assert.ok(held.length > 40, 'nothing was kept');
   assert.ok(!made.said.includes(held), 'the private key was printed');
-  assert.ok(!readFileSync(w.argvLog, 'utf8').includes(held), 'the private key was on an argument');
-  const x = /RELEASE_KEYS: readonly string\[\] = \['([^']+)'\]/u.exec(readFileSync(join(w.root, 'apps/cli/src/release-key.ts'), 'utf8'))?.[1];
+  assert.ok(!readFileSync(w.argvLog, 'utf8').includes(held), 'the private key was on an argument, where ps shows it');
+  assert.ok(!readFileSync(w.argvLog, 'utf8').includes('overwrite'), 'it asked security to replace an item');
+  const x = /'([^']+)'/u.exec(w.pins())?.[1];
   assert.ok(x);
   assert.ok(made.said.includes(x), 'the public key was not said');
   assert.ok(readFileSync(join(w.root, 'apps/site/static/cli/install.sh'), 'utf8').includes(`PIN='${x}'`));
   assert.ok(readFileSync(join(w.root, 'apps/site/static/cli/install.ps1'), 'utf8').includes(`$pin = '${x}'`));
-  assert.ok(readFileSync(w.argvLog, 'utf8').includes(`keys put ${RELEASE_LABEL}`));
+  assert.ok(readFileSync(join(w.root, 'apps/cli/README.md'), 'utf8').includes(`<!-- release-keys -->\n- \`${x}\`\n<!-- /release-keys -->`), 'the published list does not name it');
 
   assert.equal(w.tool('cli-sign.mjs', '--check').status, 0);
   const signing = w.tool('cli-sign.mjs');
   assert.equal(signing.status, 0, signing.said);
   assert.ok(!signing.said.includes(held), 'the private key was printed');
-  assert.ok(readFileSync(w.argvLog, 'utf8').includes(`keys exec ${RELEASE_LABEL} --as BRAINDOG_CLI_SIGNING_KEY --keychain *`));
-  const sig = readFileSync(join(w.root, 'apps/cli/dist/braindog.mjs.sig'), 'utf8');
-  assert.equal(signedBy([x], sha(bundle(NEW)), NEW, sig), true);
+  const line = readFileSync(w.sig, 'utf8');
+  const sig = readSignature(line);
+  assert.equal(sig?.released, AT);
+  assert.equal(signedBy([x], sha(bundle(NEW)), NEW, AT, sig!.signature), true);
 
   /* AND A PINNED COMMAND TAKES WHAT THE TOOL SIGNED. */
-  const run = machine(scratch(t), await serve(t, served(bundle(NEW), sig.trim())), [x]);
+  const run = machine(scratch(t), await serve(t, served(bundle(NEW), line.trim())), [x]);
   assert.equal(await update([], run), 0, run.refused.join('\n'));
-
-  /* A SECOND KEY IS ASKED FOR BY NAME, AND STANDS BESIDE THE FIRST. */
-  assert.equal(w.tool('cli-key.mjs').status, 1);
-  assert.equal(w.tool('cli-key.mjs', '--again').status, 0);
-  const pins = /RELEASE_KEYS: readonly string\[\] = \[(.*)\]/u.exec(readFileSync(join(w.root, 'apps/cli/src/release-key.ts'), 'utf8'))?.[1] ?? '';
-  assert.equal(pins.split(',').length, 2);
-  assert.ok(pins.includes(x));
 });
 
-test('A PIN WITH NO KEY BEHIND IT, OR ANOTHER KEY BEHIND IT, STOPS THE SIGNING AND SAYS WHAT TO RUN', (t) => {
+test('IT NEVER REPLACES AN ITEM, AND A SECOND KEY IS MADE WHERE NONE IS HELD AND STANDS BESIDE THE FIRST', (t) => {
   const w = tree(t);
   assert.equal(w.tool('cli-key.mjs').status, 0);
-  /* THE LABEL IS GONE. */
-  const held = readFileSync(w.kept, 'utf8');
+  const first = readFileSync(w.kept, 'utf8');
+  const pinned = w.pins();
+  for (const args of [[], ['--again']]) {
+    const out = w.tool('cli-key.mjs', ...args);
+    assert.equal(out.status, 1, args.join());
+    assert.equal(readFileSync(w.kept, 'utf8'), first, 'the item was replaced');
+    assert.equal(w.pins(), pinned);
+  }
+  /* A SECOND MAC, which holds no item, and the same tree. */
   rmSync(w.kept);
-  const gone = w.tool('cli-sign.mjs');
-  assert.equal(gone.status, 1);
-  assert.match(gone.said, /There is no key by that label/u);
-  assert.match(gone.said, /braindog login .* --keychain '\*'/u);
-  assert.match(gone.said, /node tools\/ship\/cli-key\.mjs --again/u);
-  assert.match(gone.said, /nothing was published/u);
-  /* THE LABEL HOLDS ANOTHER KEY. */
+  const second = w.tool('cli-key.mjs', '--again');
+  assert.equal(second.status, 0, second.said);
+  assert.equal(w.pins().split(',').length, 2);
+  assert.ok(w.pins().startsWith(pinned), 'the first key went');
+  /* AND EITHER MAC SIGNS. */
+  assert.equal(w.tool('cli-sign.mjs').status, 0);
+  rmSync(w.sig);
+  writeFileSync(w.kept, first);
+  assert.equal(w.tool('cli-sign.mjs').status, 0);
+});
+
+test('A PIN WITH NO ITEM, OR ANOTHER KEY IN THE ITEM, OR A LOCKED KEYCHAIN, STOPS THE SIGNING AND PUBLISHES NOTHING', (t) => {
+  const w = tree(t);
+  assert.equal(w.tool('cli-key.mjs').status, 0);
+  rmSync(w.kept);
+  for (const args of [[], ['--check']]) {
+    const gone = w.tool('cli-sign.mjs', ...args);
+    assert.equal(gone.status, 1);
+    assert.match(gone.said, /^ {2}node tools\/ship\/cli-key\.mjs --again$/mu);
+    assert.match(gone.said, /nothing was published/u);
+  }
   writeFileSync(w.kept, pair().der);
   const other = w.tool('cli-sign.mjs');
   assert.equal(other.status, 1);
-  assert.match(other.said, /not the one pinned/u);
-  assert.equal(existsSync(join(w.root, 'apps/cli/dist/braindog.mjs.sig')), false);
-  /* THE LABEL HOLDS RUBBISH. */
+  assert.match(other.said, /not a key pinned/u);
   writeFileSync(w.kept, 'not a key');
   assert.equal(w.tool('cli-sign.mjs').status, 1);
-  assert.ok(held !== '');
+  assert.equal(existsSync(w.sig), false);
+
+  const locked = tree(t, { locked: true });
+  writeFileSync(join(locked.root, 'apps/cli/src/release-key.ts'), readFileSync(join(locked.root, 'apps/cli/src/release-key.ts'), 'utf8').replace(PINS, `RELEASE_KEYS: readonly string[] = ['${pair().x}']`));
+  writeFileSync(locked.kept, pair().der);
+  const shut = locked.tool('cli-sign.mjs');
+  assert.equal(shut.status, 1);
+  assert.match(shut.said, /did not open/u);
 });
 
-test('THE KEYCHAIN REFUSING TO TAKE THE KEY PINS NOTHING, AND SAYS WHAT TO RUN', (t) => {
-  const w = tree(t, { keys: 'fails' });
+test('AN ITEM WITH NO PIN IN THIS TREE SAYS TO COMMIT, AND MAKES NOTHING', (t) => {
+  const w = tree(t);
+  writeFileSync(w.kept, pair().der);
+  const out = w.tool('cli-sign.mjs');
+  assert.equal(out.status, 1);
+  assert.match(out.said, /^ {2}git add /mu);
+});
+
+test('A KEYCHAIN THAT DID NOT KEEP THE KEY PINS NOTHING, WHATEVER `security -i` ANSWERED', (t) => {
+  const w = tree(t, { keeps: false });
   const out = w.tool('cli-key.mjs');
   assert.equal(out.status, 1);
-  assert.match(out.said, /braindog login .* --keychain '\*'/u);
-  assert.match(out.said, /No keychain access is kept/u);
-  assert.match(readFileSync(join(w.root, 'apps/cli/src/release-key.ts'), 'utf8'), /RELEASE_KEYS: readonly string\[\] = \[\]/u);
+  assert.match(out.said, /did not keep the key/u);
+  assert.equal(w.pins(), '');
+  assert.match(readFileSync(join(w.root, 'apps/cli/README.md'), 'utf8'), /None yet/u);
 });

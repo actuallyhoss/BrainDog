@@ -1,5 +1,5 @@
 /**
- * `braindog update [--check]`: the command keeps itself current.
+ * `braindog update [--check] [--older]`: the command keeps itself current.
  *
  * WHERE IT READS. The address the install scripts download from, `https://brain.dog/cli`, where the deploy publishes
  * three files side by side: `braindog.mjs`, its `.sha256`, and its `.build`, the one line `bundle.mjs` writes. The
@@ -18,6 +18,10 @@
  * not there. Checked before the download is ever started, because the `--version` below runs it. With no key pinned, the sum
  * alone, as every build before the pin, which is how one of those reaches the first pinned build.
  *
+ * NOT BACKWARDS UNLESS ASKED. Somebody who can change what the site serves can serve an older build with its own good signature, one
+ * with a hole a later one closed. So a build older than this one is refused unless `--older` asks for it, by its day before anything
+ * is downloaded, and once pinned by the release time the signature covers, since a day holds several releases.
+ *
  * THE FILE'S OWN BUILD MUST BE THE ONE THE SITE NAMED. A deploy copies the three files one after another, so a read in
  * between can pair a new `.build` with an old bundle. The downloaded file's `--version` is compared with the build that
  * was read, and a mismatch is refused, rather than an update that reports one build and installs another.
@@ -35,7 +39,7 @@ import { basename } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { placeAgain, type Placed } from './placed.ts';
-import { RELEASE_KEYS, signedBy } from './release-key.ts';
+import { readSignature, RELEASE_KEYS, signedBy } from './release-key.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -54,6 +58,8 @@ export interface UpdateIo {
   file: string;
   /** This command's build. */
   build: string;
+  /** When this command was released (`__RELEASED__`), in seconds; nothing is older than a command that does not know. */
+  released?: number;
   env: Env;
   /** The result line, on stdout. */
   out: (line: string) => void;
@@ -80,7 +86,7 @@ export function pair(a: string, b: string): [string, string] {
 export function checkLine(mine: string, served: string): string {
   if (mine === served) return `This command is ${mine}, the build that is out.`;
   const [a, b] = pair(mine, served);
-  return mine.split('+')[0]! > served.split('+')[0]! ? `This command is ${a}; the site serves ${b}, an older build. Run braindog update to match it.` : `This command is ${a}; ${b} is out. Run braindog update.`;
+  return mine.split('+')[0]! > served.split('+')[0]! ? `This command is ${a}; the site serves ${b}, an older build. Run braindog update --older to match it.` : `This command is ${a}; ${b} is out. Run braindog update.`;
 }
 
 /**
@@ -113,15 +119,21 @@ async function text(get: typeof fetch, url: string, ms: number): Promise<string>
   return (await res.text()).trim();
 }
 
+const olderLine = (mine: string, served: string): string =>
+  `This command is ${mine}, and the site serves ${served}, an older build, so nothing changed and it did not run. After a rollback that is expected, and braindog update --older takes it. If nobody rolled back, somebody may be serving an old build on purpose, so leave it.`;
+
 const reason = (e: unknown): string => (e instanceof Error ? (e.name === 'TimeoutError' ? 'it did not answer in time' : e.message) : String(e));
 
 /** Runs `braindog update [--check]`, and answers the exit code. */
 export async function update(args: string[], io: UpdateIo): Promise<number> {
   let check = false;
+  let older = false;
   try {
-    check = parseArgs({ args, options: { check: { type: 'boolean' } }, strict: true }).values.check === true;
+    const { values } = parseArgs({ args, options: { check: { type: 'boolean' }, older: { type: 'boolean' } }, strict: true });
+    check = values.check === true;
+    older = values.older === true;
   } catch {
-    io.err('braindog update takes --check, and nothing else.');
+    io.err('braindog update takes --check and --older, and nothing else.');
     return 1;
   }
   if (io.build === CHECKOUT_BUILD) {
@@ -149,6 +161,11 @@ export async function update(args: string[], io: UpdateIo): Promise<number> {
   if (served === io.build) {
     io.out(`This command is ${served}, the build that is out, so there is nothing to update.`);
     return 0;
+  }
+  if (!older && served.split('+')[0]! < io.build.split('+')[0]!) {
+    const [a, b] = pair(io.build, served);
+    io.err(olderLine(a, b));
+    return 1;
   }
 
   const fresh = io.file.replace(/(\.mjs)?$/, '.new.mjs');
@@ -182,13 +199,21 @@ export async function update(args: string[], io: UpdateIo): Promise<number> {
     }
     /* BEFORE IT RUNS. A deploy copying its files can pair a new bundle with an old signature, so this one is worth a second try
        and is said as such; a build nobody signed stays refused however often it is asked. */
-    if (keys.length > 0 && !signedBy(keys, want, served, signature)) {
-      io.err(
-        signature === ''
-          ? `${base} serves this build with no signature, so nothing changed and it did not run. This command takes only a build signed at release. Run braindog update again in a few minutes; if it says the same, do not install it by hand, and tell whoever runs that host.`
-          : `The signature on this build is not BrainDog's, so nothing changed and it did not run. It can happen for a moment while a deploy is copying its files, so run braindog update again in a few minutes; if it says the same, do not install it by hand, and tell whoever runs that host.`,
-      );
-      return 1;
+    if (keys.length > 0) {
+      const said = readSignature(signature);
+      if (said === null || !signedBy(keys, want, served, said.released, said.signature)) {
+        io.err(
+          signature === ''
+            ? `${base} serves this build with no signature, so nothing changed and it did not run. This command takes only a build signed at release. Run braindog update again in a few minutes; if it says the same, do not install it by hand, and tell whoever runs that host.`
+            : `The signature on this build is not BrainDog's, so nothing changed and it did not run. It can happen for a moment while a deploy is copying its files, so run braindog update again in a few minutes; if it says the same, do not install it by hand, and tell whoever runs that host.`,
+        );
+        return 1;
+      }
+      /* THE SIGNED TIME, for the release of the same day the check above could not tell apart. */
+      if (!older && said.released < (io.released ?? 0)) {
+        io.err(olderLine(io.build, served));
+        return 1;
+      }
     }
     /* ASKED BEFORE IT IS PUT IN PLACE, so a file this Node cannot run never replaces one that works. */
     const asked = spawnSync(process.execPath, [fresh, '--version'], { encoding: 'utf8', timeout: 30_000, env: io.env });

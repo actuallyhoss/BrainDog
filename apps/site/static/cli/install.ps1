@@ -89,7 +89,7 @@
         return
       }
       $check = Join-Path $tmp 'check.cjs'
-      [IO.File]::WriteAllText($check, 'const c=require("node:crypto"),f=require("node:fs");const [pin,sum,build,sig]=process.argv.slice(2);const s=Buffer.from(f.readFileSync(sig,"utf8").trim(),"base64url");const m=Buffer.from("braindog-cli release\n"+sum+"\n"+build+"\n");process.exit(s.length===64&&pin.split(" ").some((x)=>{try{return c.verify(null,m,{key:{kty:"OKP",crv:"Ed25519",x},format:"jwk"},s)}catch(e){return false}})?0:1)')
+      [IO.File]::WriteAllText($check, 'const c=require("node:crypto"),f=require("node:fs");const [pin,sum,build,sig]=process.argv.slice(2);const [r,b]=f.readFileSync(sig,"utf8").trim().split(/\s+/);const s=Buffer.from(b||"","base64url");const m=Buffer.from("braindog-cli release\n"+sum+"\n"+build+"\n"+r+"\n");process.exit(/^\d+$/.test(r)&&s.length===64&&pin.split(" ").some((x)=>{try{return c.verify(null,m,{key:{kty:"OKP",crv:"Ed25519",x},format:"jwk"},s)}catch(e){return false}})?0:1)')
       $null = & $node.Source $check $pin $got ((Get-Content -Raw -LiteralPath $buildFile).Trim()) $sigFile
       if ($LASTEXITCODE -ne 0) {
         & $fail "The signature on this build is not BrainDog's, so nothing was installed and it did not run. Run this again in a few minutes; if it says the same, do not install it another way."

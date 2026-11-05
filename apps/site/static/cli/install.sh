@@ -19,7 +19,7 @@
 # AND TO ITS SIGNATURE BEFORE IT RUNS, once PIN holds a key (apps/cli/src/release-key.ts, tools/ship/cli-key.mjs): one made at
 # release with a key that is not on the site. Empty, the sum alone. THIS SCRIPT COMES FROM THE SITE TOO, so the pin holds
 # against the bundle being swapped on its own, and against somebody who can rewrite the site only if you read this
-# script before running it, or compare PIN with the key published in the repository's README.
+# script before running it and compare PIN with the keys published in apps/cli/README.md in the repository: that is the check.
 #
 # NODE IS NOT INSTALLED FOR YOU. The command runs on Node 24.13 or later (apps/cli/package.json, engines), and which
 # Node a machine has is its owner's choice, so a missing or older one stops this with the address to get one.
@@ -71,7 +71,7 @@ got=$(node -e 'process.stdout.write(require("node:crypto").createHash("sha256").
 if [ -n "$PIN" ]; then
   fetch "$BASE/braindog.mjs.sig" "$TMP/braindog.mjs.sig" || die "This build has no signature at $BASE/braindog.mjs.sig, so nothing was installed. Run this again in a few minutes; if it says the same, do not install it another way."
   fetch "$BASE/braindog.mjs.build" "$TMP/braindog.mjs.build" || die "The build could not be read from $BASE/braindog.mjs.build, so nothing was installed."
-  node -e 'const c=require("node:crypto"),f=require("node:fs");const [pin,sum,build,sig]=process.argv.slice(1);const s=Buffer.from(f.readFileSync(sig,"utf8").trim(),"base64url");const m=Buffer.from("braindog-cli release\n"+sum+"\n"+build+"\n");process.exit(s.length===64&&pin.split(" ").some((x)=>{try{return c.verify(null,m,{key:{kty:"OKP",crv:"Ed25519",x},format:"jwk"},s)}catch(e){return false}})?0:1)' "$PIN" "$got" "$(tr -d '[:space:]' <"$TMP/braindog.mjs.build")" "$TMP/braindog.mjs.sig" ||
+  node -e 'const c=require("node:crypto"),f=require("node:fs");const [pin,sum,build,sig]=process.argv.slice(1);const [r,b]=f.readFileSync(sig,"utf8").trim().split(/\s+/);const s=Buffer.from(b||"","base64url");const m=Buffer.from("braindog-cli release\n"+sum+"\n"+build+"\n"+r+"\n");process.exit(/^\d+$/.test(r)&&s.length===64&&pin.split(" ").some((x)=>{try{return c.verify(null,m,{key:{kty:"OKP",crv:"Ed25519",x},format:"jwk"},s)}catch(e){return false}})?0:1)' "$PIN" "$got" "$(tr -d '[:space:]' <"$TMP/braindog.mjs.build")" "$TMP/braindog.mjs.sig" ||
     die 'The signature on this build is not BrainDog'"'"'s, so nothing was installed and it did not run. Run this again in a few minutes; if it says the same, do not install it another way.'
 fi
 

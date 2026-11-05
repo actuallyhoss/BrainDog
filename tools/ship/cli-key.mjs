@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 /**
- * Make the key the CLI's releases are signed with, once, on the owner's own machine. `apps/cli/src/release-key.ts` says why.
+ * Make the key the CLI's releases are signed with, on the Mac that releases. `apps/cli/src/release-key.ts` says why.
  *
- *   node tools/ship/cli-key.mjs            make it, keep it, pin it
- *   node tools/ship/cli-key.mjs --again    a new key beside the old pin, when the old one was lost or is being retired
+ *   node tools/ship/cli-key.mjs            make the first key, keep it, pin it
+ *   node tools/ship/cli-key.mjs --again    a further key beside the ones pinned: on a second Mac, or when this Mac's is lost
  *
- * IT MAKES AN ED25519 PAIR, PIPES THE PRIVATE HALF INTO `braindog keys put` AND FORGETS IT. It is on no argument and in no file,
- * and it is never printed. Only once the Keychain has taken it is the public half written, into the three places it is pinned:
- * `apps/cli/src/release-key.ts`, `apps/site/static/cli/install.sh` and `install.ps1`. Commit them; a build signs from then on.
+ * IT MAKES AN ED25519 PAIR AND KEEPS THE PRIVATE HALF ONLY IN THIS MAC'S LOGIN KEYCHAIN, as the generic password item
+ * `braindog-cli-release`. The value goes to `security -i` on a pipe, as a line of its own input, so it is on no argument and `ps` never
+ * shows it; it is in no file and it is never printed. What `security` answers is not taken on trust: the item is read back and compared
+ * before anything is pinned. IT NEVER REPLACES AN ITEM: `security` is not given `-U`, and one already here stops this first.
  *
- * A LOST KEY COSTS A REINSTALL AND NOTHING ELSE: `--again` pins a new one beside it, and a machine still on the old pin takes the
- * new build by running the install line once.
+ * Only then is the public half written where it is pinned: `apps/cli/src/release-key.ts`, `apps/site/static/cli/install.sh` and
+ * `install.ps1`, and the list published in `apps/cli/README.md`. Commit them, and the next release signs. WHAT A LOST KEY COSTS,
+ * and how a second Mac saves it, is in that README.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -23,62 +25,52 @@ const ROOT = env.BRAINDOG_SIGN_ROOT ?? fileURLToPath(new URL('../../', import.me
 const TS = `${ROOT}/apps/cli/src/release-key.ts`;
 const SH = `${ROOT}/apps/site/static/cli/install.sh`;
 const PS = `${ROOT}/apps/site/static/cli/install.ps1`;
+const README = `${ROOT}/apps/cli/README.md`;
 const { RELEASE_KEYS, RELEASE_LABEL } = await import(pathToFileURL(TS).href);
 
+const stop = (line) => {
+  stderr.write(`${line}\n`);
+  exit(1);
+};
+
 const again = argv.includes('--again');
-if (argv.slice(2).some((a) => a !== '--again')) {
-  stderr.write('cli-key.mjs takes --again, and nothing else.\n');
-  exit(1);
-}
-if (RELEASE_KEYS.length > 0 && !again) {
-  stderr.write(`A signing key is already pinned in apps/cli/src/release-key.ts, so nothing was made. To pin a new one beside it: node tools/ship/cli-key.mjs --again\n`);
-  exit(1);
-}
+if (argv.slice(2).some((a) => a !== '--again')) stop('cli-key.mjs takes --again, and nothing else.');
+if (RELEASE_KEYS.length > 0 && !again) stop('A key is already pinned in apps/cli/src/release-key.ts, so nothing was made. A further key, on a second Mac or for a lost one: node tools/ship/cli-key.mjs --again');
+
+/** The item's value as this Mac's keychain holds it, on a pipe, or `null`. */
+const read = () => {
+  const out = spawnSync('security', ['find-generic-password', '-s', RELEASE_LABEL, '-w'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 60_000 });
+  return out.status === 0 ? out.stdout.trim() : null;
+};
+
+const asked = spawnSync('security', ['find-generic-password', '-s', RELEASE_LABEL], { stdio: 'ignore', timeout: 60_000 });
+if (asked.error) stop('There is no macOS keychain here, and the key lives in one, so nothing was made.');
+if (asked.status === 0) stop(`This Mac already holds ${RELEASE_LABEL}, and this never replaces one, so nothing was made or pinned. A further key is made on a second Mac.`);
 
 const { privateKey } = generateKeyPairSync('ed25519');
 const x = createPublicKey(privateKey).export({ format: 'jwk' }).x;
-const held = spawnSync('braindog', ['keys', 'put', RELEASE_LABEL, '--opens', 'CLI releases at brain.dog/cli', '--keychain', '*'], {
-  input: `${privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64')}\n`,
-  encoding: 'utf8',
-  env,
-  timeout: 150_000,
-  stdio: ['pipe', 'pipe', 'pipe'],
-});
-if (held.status !== 0) {
-  const said = `${held.stdout ?? ''}\n${held.stderr ?? ''}`.split('\n').map((l) => l.trim()).filter((l) => l !== '').slice(-3);
-  stderr.write(
-    [
-      'The Keychain did not take the key, so nothing was pinned and the key is gone.',
-      held.error ? '  There is no braindog command on this PATH.' : '',
-      ...said.map((l) => `  braindog said: ${l}`),
-      `Sign in for keys, approve it in BrainDog, and run this again:`,
-      `  braindog login <your BrainDog's address> --keychain '*'`,
-      `  node tools/ship/cli-key.mjs${again ? ' --again' : ''}`,
-      again ? `If the Keychain already holds ${RELEASE_LABEL}, delete it on the Keys screen first: an agent's access never replaces a key by its label from here.` : '',
-    ]
-      .filter((l) => l !== '')
-      .join('\n') + '\n',
-  );
-  exit(1);
-}
+const value = privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64');
+/* WHAT `security -i` SAYS IS NEVER SHOWN, whatever it says: it was given the value. */
+spawnSync('security', ['-i'], { input: `add-generic-password -a braindog -s ${RELEASE_LABEL} -l "BrainDog CLI release signing key" -w "${value}"\n`, stdio: ['pipe', 'ignore', 'ignore'], timeout: 60_000 });
+if (read() !== value) stop(`The login keychain did not keep the key, so nothing was pinned and the key is gone. Unlock it and run this again. Nothing else changed.`);
 
-const keys = [...RELEASE_KEYS, x].slice(-2);
+const keys = [...RELEASE_KEYS, x];
 const swap = (file, from, to) => {
   const was = readFileSync(file, 'utf8');
   const now = was.replace(from, to);
-  if (now === was) throw new Error(`${file} has no pin line to write.`);
+  if (now === was) throw new Error(`${file} has no pin to write.`);
   writeFileSync(file, now);
 };
 swap(TS, /^export const RELEASE_KEYS: readonly string\[\] = \[.*\];$/mu, `export const RELEASE_KEYS: readonly string[] = [${keys.map((k) => `'${k}'`).join(', ')}];`);
 swap(SH, /^PIN='[^']*'$/mu, `PIN='${keys.join(' ')}'`);
 swap(PS, /^ {2}\$pin = '[^']*'$/mu, `  $pin = '${keys.join(' ')}'`);
+swap(README, /<!-- release-keys -->[\s\S]*?<!-- \/release-keys -->/u, () => `<!-- release-keys -->\n${keys.map((k) => `- \`${k}\``).join('\n')}\n<!-- /release-keys -->`);
 stdout.write(
   [
-    `The key is in your Keychain as ${RELEASE_LABEL}, and its public half is pinned:`,
+    `The key is in this Mac's login keychain as ${RELEASE_LABEL}, and its public half is pinned:`,
     `  ${x}`,
-    'Commit these three, and publish the line above in the README, so somebody can check a script against it from somewhere that is not the site:',
-    '  apps/cli/src/release-key.ts apps/site/static/cli/install.sh apps/site/static/cli/install.ps1',
-    'Every deploy from then on signs the CLI, and asks for keychain access when it has run out.',
+    'Commit these, and the next release signs:',
+    '  git add apps/cli/src/release-key.ts apps/cli/README.md apps/site/static/cli/install.sh apps/site/static/cli/install.ps1',
     '',
   ].join('\n'),
 );

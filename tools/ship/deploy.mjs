@@ -182,6 +182,11 @@ if (secret('SMOKE_TOKEN')) okay.push(`SMOKE_TOKEN from ${secretFrom.get('SMOKE_T
 else if (canary) refusals.push(`SMOKE_TOKEN is missing and a canary is named (${variable('SMOKE_SLUG') ? 'SMOKE_SLUG' : 'OPS_RECORD'}): export it, or put it in the keychain as braindog-smoke-token`);
 else okay.push('SMOKE_TOKEN: none, and no canary is named, so the smoke skips its signed-in half as the workflow does');
 
+/* THE CLI'S RELEASE KEY, ASKED NOW AND NOT ONLY AT ITS STEP, so a Mac without it hears the one command to run with nothing begun.
+   The value is not read here: `--check` asks only whether the item exists. */
+const signing = spawnSync(process.execPath, [join(ROOT, 'tools/ship/cli-sign.mjs'), '--check'], { cwd: ROOT, encoding: 'utf8' });
+check(signing.status === 0, signing.stdout.trim(), signing.stderr.trim().replace(/\s*\n\s*/gu, ' '));
+
 /* ONE AT A TIME, as `concurrency: deploy` with `cancel-in-progress: false`. */
 let lockHeld = false;
 if (existsSync(LOCK)) {

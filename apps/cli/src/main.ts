@@ -280,6 +280,8 @@ const stop = (line: string): never => {
  */
 declare const __BUILD__: string;
 const build = (): string => (typeof __BUILD__ === 'string' ? __BUILD__ : 'dev+0000000');
+declare const __RELEASED__: number;
+const released = (): number => (typeof __RELEASED__ === 'number' ? __RELEASED__ : 0);
 const version = (): string => `app ${build()} · format ${FORMAT_VERSION} · kernel ${KERNEL_MIGRATION} · primitives ${PRIMITIVES_VERSION}`;
 
 /**
@@ -475,7 +477,7 @@ const fullUsage = () =>
     'braindog init <slug> --owner <email> [--from <file.brainl>]',
     'braindog serve [<record file>]',
     '  Create or serve a BrainDog on this machine, through the self-host. With --from, the new BrainDog is the one in a file braindog export wrote; start it in an empty data folder.',
-    'braindog update [--check]',
+    'braindog update [--check] [--older]',
     '  Replace this command with the build that is out, held to its checksum, keeping the old one as braindog.mjs.prev, and place the Agent Skill and hooks again. --check only says whether it is behind.',
     'braindog --version',
     '  The build, the file format it writes, the kernel it expects, and the primitives it renders.',
@@ -569,7 +571,7 @@ const GROUPS: [string, [string, string][]][] = [
   ['Other', [
     ['doctor', 'List what still names a replaced tool or holds a key'],
     ['init <slug> / serve', 'Create or serve a BrainDog on this machine'],
-    ['update [--check]', 'Replace this command with the build that is out'],
+    ['update [--check] [--older]', 'Replace this command with the build that is out'],
     ['--version', 'The build and the formats it speaks'],
   ]],
 ];
@@ -1404,7 +1406,7 @@ try {
   else if (command === 'env' || command === 'sync') await readsCommand(command, args);
   /* THE FILE IT REPLACES IS THIS ONE: in the bundle every module is the one file, and from a checkout `build()` says
      `dev+0000000` and `update` refuses before it touches anything. */
-  else if (command === 'update') process.exitCode = await update(rest, { file: fileURLToPath(import.meta.url), build: build(), env: process.env, out: (line) => process.stdout.write(`${line}\n`), err: say });
+  else if (command === 'update') process.exitCode = await update(rest, { file: fileURLToPath(import.meta.url), build: build(), released: released(), env: process.env, out: (line) => process.stdout.write(`${line}\n`), err: say });
   else if (command === 'init' || command === 'serve') selfhost(command, rest);
   else if (command === 'help' || command === '--help' || command === '-h') {
     /* `help` IS NOT ONE OF THE SIX §4.5 EXCLUDES, so it answers the flag rather than ignoring it.
