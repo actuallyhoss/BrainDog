@@ -59,7 +59,7 @@
     <h2>{p.holds.title}</h2>
     <p class="say">{p.holds.say}</p>
     <div class="tablebox">
-      <table class="ptable">
+      <table class="ptable even">
         <thead>
           <tr>
             <th scope="col"><span class="vh">{p.holds.what}</span></th>
@@ -231,5 +231,16 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* THE THREE PLANS' COLUMNS THE SAME WIDTH, so the numbers read straight down from a wide enough window. */
+  @media (width >= 640px) {
+    .even {
+      table-layout: fixed;
+    }
+
+    .even :global(th:first-child) {
+      inline-size: 31%;
+    }
   }
 </style>

@@ -636,9 +636,9 @@
            one pair per environment; the private half lives only in the Worker secret and in his secrets
            folder, never in this repository. */
         "VAPID_PUBLIC": "BDFva-xw8GzY6aZWJ56lUpaec3IFwe545q2VcuYgEW6QgWkXeGiBUn2WPouNTuJx-_6lPyAcd9KezHlV8DbOE1k",
-        /* BILLING IS OFF, AND THIS IS ITS SWITCH, as alpha's comment says. `live` here takes real cards, and is the owner's choice
-           alone; the site's `LAUNCH` flags mirror this value, and a site test holds them equal. */
-        "BILLING": "",
+        /* BILLING IS LIVE (5 Nov, the owner's word), AND THIS IS ITS SWITCH, as alpha's comment says. `live` takes real cards, and
+           is the owner's choice alone; the site's `LAUNCH` flags mirror this value, and a site test holds them equal. */
+        "BILLING": "live",
         /* THE STRIPE PRICES OF CLOUD AND CLOUD PLUS, as alpha's comment says, from the live mode of the owner's Stripe account. */
         "STRIPE_PRICE_HOSTED": "price_1UKmaqPop5yzbTmmSOx5842B",
         "STRIPE_PRICE_PLUS": "price_1UKiNQPop5yzbTmm6IjGxQFd",

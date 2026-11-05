@@ -90,7 +90,8 @@ test('PRODUCTION SAYS open, as the owner chose on 5 November, and alpha open so 
   for (const name of ['alpha', 'production']) {
     const vars = config.env?.[name]?.vars ?? {};
     assert.equal(vars['SIGNUP'], 'open', `${name}'s SIGNUP in apps/worker/wrangler.jsonc`);
-    assert.notEqual(billingMode(vars), 'live', `${name} takes real cards, which is a separate word of his`);
+    /* REAL CARDS ON PRODUCTION ALONE, on his word of 5 November; alpha never. */
+    assert.equal(billingMode(vars) === 'live', name === 'production', `${name}'s BILLING in apps/worker/wrangler.jsonc`);
   }
 });
 

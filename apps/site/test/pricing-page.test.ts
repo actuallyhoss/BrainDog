@@ -174,7 +174,7 @@ test('with billing off one h1 and one plan, no paid plan; with it on the plans, 
   assert.equal((on.body.match(/<tr\b/g) ?? []).length, 1 + 7 + 1 + 4, 'the two tables are not a header and seven meters, and a header and four prices');
   /* The cap is a promise about a checkout that is not sold yet, so it is said only with billing on (`extra-use-capped`). */
   assert.doesNotMatch(words(off.body), /monthly cap/, 'the page promises a cap on extra use while nothing is sold');
-  assert.match(words(on.body), /Off by default\. Turn it on with a monthly cap, and BrainDog never goes past it\. Coming soon\./);
+  assert.match(words(on.body), /Off by default\. Turn it on with a monthly cap, and BrainDog never goes past it\./);
   assert.doesNotMatch(words(off.body), /Can I cancel any time\?/, 'the page asks about cancelling while nothing is sold');
   assert.match(words(on.body), /Can I cancel any time\?/, 'with billing on the page does not ask about cancelling');
   assert.match(off.head, /<title>/, 'the page writes no title');
@@ -203,6 +203,7 @@ test('the built pricing page: one h1 with no $, and as billing stands, the early
     return;
   }
   for (const plan of PLANS) assert.ok(text.includes(plan.name), `pricing.html does not name ${plan.name}`);
-  for (const meter of ['AI tools connected', 'Slash questions', 'People', 'Automation runs', 'Requests to other services', 'Data fetched', 'Script time'])
+  for (const meter of ['Agents connected', 'Slash questions', 'People', 'Automation runs', 'Calls to other services', 'Data fetched', 'Script time'])
     assert.ok(text.includes(meter), `pricing.html has no "${meter}" row`);
+  assert.ok(!/coming soon/i.test(text), 'pricing.html says coming soon while billing is live');
 });

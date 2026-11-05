@@ -1,10 +1,10 @@
 # Terms of Service
 
-Last updated: 2026-11-01
+Last updated: 2026-11-05
 
 ## The short version
 
-- BrainDog is a hosted service at brain.dog. Free gives one person one record at no charge. Cloud and Cloud Plus, paid by the month for each record, are coming soon and will be priced at launch.
+- BrainDog is a hosted service at brain.dog. Free gives one person one record at no charge. Cloud is $12 a month and Cloud Plus is $29 a month, for each record.
 - What you put in your record is yours. We host it and run it for you, and we don't sell it or use it for ads.
 - You can export the whole record as one file at any time, even if a payment has failed.
 - Slash, the assistant, can be wrong. Nothing it writes goes into your record until a person accepts it.

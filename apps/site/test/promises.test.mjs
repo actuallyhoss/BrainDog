@@ -229,7 +229,8 @@ const notYet = (said, launch = LAUNCH) =>
   );
 
 test('no sentence says the product is not open yet', () => {
-  const found = notYet(SAID);
+  /* The two `SOON` words stay in the copy for billing's off switch and are not drawn while it is on: `pricing-page.test.ts` reads the built page for them. */
+  const found = notYet(SAID.filter(([at]) => !Object.hasOwn(SOON, at)));
   assert.deepEqual(found, [], `${found.length} sentence(s) describe the product before launch:\n${found.join('\n')}`);
 });
 

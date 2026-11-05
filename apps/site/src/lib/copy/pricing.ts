@@ -127,14 +127,14 @@ export const pricing = {
     extra: {
       title: 'Extra use, if you want it',
       say: 'Off by default. Turn it on with a monthly cap, and BrainDog never goes past it.',
-      // Said until `LAUNCH.extra` is on, the day production sells extra usage (`promises.test.mjs` allows it here).
+      // Said while `LAUNCH.extra` is off: with billing live it is not drawn, and the built page is held to that.
       soon: 'Coming soon.',
       on: 'On Cloud and Cloud Plus',
       price: 'Price',
       /** `extra` in `PLAN_TABLE`'s Cloud row: a name, and how the amount a price buys reads after the price. */
       rows: [
         { key: 'runs', name: 'Automation runs', per: (n: number) => `per ${grouped(n)}` },
-        { key: 'requests', name: 'Requests to other services', per: (n: number) => `per ${grouped(n)}` },
+        { key: 'requests', name: 'Calls to other services', per: (n: number) => `per ${grouped(n)}` },
         { key: 'bytes', name: 'Data fetched', per: (n: number) => (n === 1_000_000_000 ? 'per GB' : `per ${size(n)}`) },
         { key: 'ms', name: 'Script time', per: (n: number) => `per ${hours(n)}` },
       ],

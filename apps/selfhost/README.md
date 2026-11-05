@@ -5,9 +5,11 @@ with us. You need Docker with Compose, or Node 24.13 and pnpm.
 
 ## Zero to working in 5 minutes
 
-Start at the top of your copy of this repository:
+Get the code:
 
 ```sh
+git clone https://github.com/actuallyhoss/BrainDog braindog
+cd braindog
 cp selfhost.env.example .env
 ```
 

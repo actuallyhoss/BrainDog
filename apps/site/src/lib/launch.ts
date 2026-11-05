@@ -3,7 +3,7 @@ import { DESKTOP_NOTARIZED } from './desktop.ts';
 
 /**
  * The pages written for one kind of person that a visitor reaches; the rest are in `HELD`. /for/teams IS BACK (1 Nov):
- * it was held from 23 October while brain.dog held invitations, and teams are open now, on any plan while billing is off.
+ * it was held from 23 October while brain.dog held invitations, and a team is on Cloud Plus.
  */
 export const FOR_SHOWN: readonly string[] = ['/for/founders', '/for/teams'];
 
@@ -15,17 +15,16 @@ export const FOR_SHOWN: readonly string[] = ['/for/founders', '/for/teams'];
  * production's Worker vars (`apps/worker/wrangler.jsonc`), and `claims.test.ts` holds each pair equal:
  * `signup` is `SIGNUP` being `open` or `invite` (a stranger reaches sign-up either way), and `billing` is `BILLING` being `live`.
  *
- * SIGN-UP OPENED TO STRANGERS ON 8 OCTOBER. Billing did not: charging
- * money is a separate word, so it stays off or in test mode and `billing` stays `false`.
+ * SIGN-UP OPENED TO STRANGERS ON 8 OCTOBER. Billing went live on 5 November, on the owner's word.
  */
 export const LAUNCH = {
   signup: true, // a stranger can make a hosted record at SIGNUP
   invite: false, // sign-up is by invite (SIGNUP=invite): every start button says "Get early access"
-  billing: false, // the Hosted price is charged
-  extra: false, // extra usage past the allowance is sold: production sets STRIPE_PRICE_EXTRA and STRIPE_METER_EXTRA, with billing live
+  billing: true, // the Hosted price is charged
+  extra: true, // extra usage past the allowance is sold: production sets STRIPE_PRICE_EXTRA and STRIPE_METER_EXTRA, with billing live
   repo: true, // the GitHub repository is public (the owner)
-  cli: false, // the CLI is on npm under the name the docs print
-  render: false, // braindog-render is on npm
+  cli: true, // the CLI is on npm under the name the docs print
+  render: true, // braindog-render is on npm
   legal: true, // the owner's Terms, Privacy and processing texts are in force (approved 22 October)
   public: false, // the site is public: the changelog and its feed are shown
 } as const;

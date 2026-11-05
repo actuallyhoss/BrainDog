@@ -89,11 +89,10 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'nothing-lost', said: 'Nothing you set up now is lost.', where: 'pricing.early.later.say', state: 'true' },
   { id: 'export-any-time-early', said: 'Yes, all of it, as one file, whenever you like.', where: 'pricing.early.faq.questions.2.a', state: 'true' },
   { id: 'export-every-plan', said: 'Yes, all of it, as one file, on every plan.', where: 'pricing.faq.questions.2.a', state: 'true' },
-  { id: 'cancel-any-time', said: 'Yes, from Settings.', where: 'pricing.faq.questions.3.a', state: 'flag', flag: 'billing' },
-  { id: 'extra-use-soon', said: 'Coming soon.', where: 'pricing.extra.soon', state: 'not-yet', flag: 'extra', soon: true },
+  { id: 'cancel-any-time', said: 'Yes, from Settings.', where: 'pricing.faq.questions.3.a', state: 'true', flag: 'billing' },
   { id: 'waits-next-month', said: 'Nothing stops at the limit: it waits for next month.', where: 'pricing.holds.say', state: 'true' },
   { id: 'brief-spends-no-ask', said: 'The briefing, filing and your rules never spend one.', where: 'pricing.faq.questions.1.a', state: 'true' },
-  { id: 'extra-use-capped', said: 'Turn it on with a monthly cap, and BrainDog never goes past it.', where: 'pricing.extra.say', state: 'flag', flag: 'extra' },
+  { id: 'extra-use-capped', said: 'Turn it on with a monthly cap, and BrainDog never goes past it.', where: 'pricing.extra.say', state: 'true', flag: 'extra' },
 
   /* The pages for each kind of person (`copy/for.ts`). */
   { id: 'bills-file-themselves', said: 'Once it knows their shape, each lands in the right list with its amount and due day.', where: 'person.who.personal.rows.0.said', state: 'true' },
@@ -102,12 +101,12 @@ export const CLAIMS: readonly Claim[] = [
 
   /* The trust pages (`copy/trust.ts`) and the shared words (`copy/shell.ts`). */
   { id: 'licence', said: 'The software is licensed under the Apache License 2.0', where: 'legal.licence.body.0', state: 'true' },
-  { id: 'open-source', said: 'BrainDog is open source.', where: 'legal.licence.body.0', state: 'not-yet', flag: 'repo' },
+  { id: 'open-source', said: 'The software is licensed under the Apache License 2.0', where: 'legal.licence.body.0', state: 'true', flag: 'repo' },
   { id: 'terms-before-signup', said: 'are published on this page before sign-up opens', where: 'legal.terms.body', state: 'not-yet' },
   { id: 'text-before-signup', said: 'This text is published here before sign-up opens.', where: 'legal.pending', state: 'not-yet' },
   { id: 'terms-meta', said: 'and its Terms of Service and Privacy Policy', where: 'meta.legal.description', state: 'true', flag: 'legal' },
   { id: 'support-before-signup', said: 'The support address is published here before sign-up opens.', where: 'support.mail.pending', state: 'not-yet' },
-  { id: 'issues-on-github', said: 'Report a fault as an issue, or ask in Discussions', where: 'support.github.body', state: 'flag', flag: 'repo' },
+  { id: 'issues-on-github', said: 'Report a fault as an issue, or ask in Discussions', where: 'support.github.body', state: 'true', flag: 'repo' },
   { id: 'no-shared-table', said: "apart from everyone else's", where: 'security.kept.facts.0.text', state: 'true' },
   { id: 'sealed-copies', said: 'Every night a copy is sealed to a key kept elsewhere', where: 'security.kept.facts.2.text', state: 'true' },
   { id: 'no-password', said: 'There is no password to steal.', where: 'security.kept.facts.3.text', state: 'true' },
