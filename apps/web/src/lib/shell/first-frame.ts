@@ -173,6 +173,12 @@ function openMove(f: FrameDoor, address: string): void {
   }, OUTLINE_MS);
   const look = (): void => {
     queued = false;
+    /* THE OUTLINE GOES WHEN THE PAGE IS OVER IT, whatever the screen says: Usage drew its tiles 700ms before its last read let
+       it say so, and stood in front of grey bars until then. */
+    if (document.querySelector('#ff .ff-page > *') !== null) {
+      cover();
+      if (landed()) f.clear();
+    }
     if (document.querySelector(MAIN_DRAWN) === null || document.querySelector(WAITS) !== null) return;
     settle(address);
   };
