@@ -42,3 +42,11 @@ test('only the one path is the frame', () => {
   assert.equal(isDrawnFrame(DRAWN_FRAME_PATH), true);
   for (const path of ['/drawn-frame/', '/acme/drawn-frame', '/app/drawn-frame', '/drawn-frame.html']) assert.equal(isDrawnFrame(path), false, path);
 });
+
+test('THE FRAME ITSELF TAKES THE PEER CONNECTION AWAY BEFORE IT WRITES ANYTHING, for an attached page that carries no guard of ours (sec-web, 5 Nov)', () => {
+  const guard = DRAWN_FRAME_HTML.indexOf('RTCPeerConnection');
+  const write = DRAWN_FRAME_HTML.indexOf('document.write');
+  assert.ok(guard > 0 && guard < write, 'the frame writes a document before it takes away what its policy cannot hold');
+  assert.match(DRAWN_FRAME_HTML, /configurable: false/u);
+  assert.ok(DRAWN_FRAME_HTML.indexOf('MutationObserver') < write, 'a frame an attached page makes has constructors of its own');
+});

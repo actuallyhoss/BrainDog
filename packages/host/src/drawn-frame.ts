@@ -39,10 +39,30 @@ export const DRAWN_FRAME_POLICY = [
   "frame-ancestors 'self'",
 ].join('; ');
 
-/** The document: ready, then one `draw` from its parent, written whole. */
+/**
+ * The document: ready, then one `draw` from its parent, written whole.
+ *
+ * THE WAY OUT NO POLICY CLOSES IS TAKEN AWAY HERE, BEFORE THE WRITE, for whatever is written: no engine holds a peer connection
+ * to `connect-src`, so an attached page reached a TURN server it named (8 UDP packets from `/drawn-frame/file`, with its
+ * words in the user name, measured 5 Nov), though this file's policy says it cannot send what it shows anywhere. `render`'s
+ * `DRAWN_GUARD` does this for a drawn block and a visual, and an attached page is written as it came, with no guard of ours
+ * in it. `document.open` keeps this window and this document, so what is done here holds for what is written.
+ */
 export const DRAWN_FRAME_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Drawn</title></head><body><script>
 (function () {
   if (parent === window) return;
+  ['RTCPeerConnection', 'webkitRTCPeerConnection', 'mozRTCPeerConnection'].forEach(function (n) {
+    try { Object.defineProperty(window, n, { value: undefined, writable: false, configurable: false }); } catch (e) {}
+  });
+  new MutationObserver(function (records) {
+    records.forEach(function (r) {
+      r.addedNodes.forEach(function (n) {
+        if (n.nodeType !== 1) return;
+        if (n.matches('iframe,frame,object,embed')) n.remove();
+        else n.querySelectorAll('iframe,frame,object,embed').forEach(function (f) { f.remove(); });
+      });
+    });
+  }).observe(document, { childList: true, subtree: true });
   function first(e) {
     if (e.source !== parent) return;
     var m = e.data;
@@ -82,7 +102,7 @@ export function drawnFrameHeaders(): Headers {
  *
  * - `sandbox allow-scripts` and no `allow-same-origin`: an origin that holds nothing, so no cookie, no storage, and the
  *   app's API answers it as a stranger. No `allow-top-navigation`, no popups, no forms.
- * - `connect-src 'none'`: no fetch, XHR, WebSocket or beacon, so it cannot send what it shows anywhere.
+ * - `connect-src 'none'`: no fetch, XHR, WebSocket or beacon, and no peer connection (`DRAWN_FRAME_HTML`), so it cannot send what it shows anywhere.
  * - pictures only inline or from those hosts: no pixel from anywhere else learns who opened it, or when.
  * - `form-action 'none'` and `base-uri 'none'`: no sign-in form that posts, no base that moves its links.
  * - `'unsafe-eval'` inside this frame only, for an artifact that compiles its JSX in the browser; the origin it runs in
