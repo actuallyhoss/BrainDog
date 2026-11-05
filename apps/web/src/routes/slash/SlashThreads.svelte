@@ -368,9 +368,25 @@
       inset-block-start: var(--sp-4);
       align-self: start;
       max-block-size: calc(100dvh - 140px);
+      overflow: hidden;
+      margin-inline-start: calc(-1 * var(--title-inset, 12px));
+    }
+
+    /* THE LIST SCROLLS, AND ONLY THE LIST: the button above it and Past suggestions under it stay put, and a long list can no longer run over the link. */
+    .slash[data-listed] .side :global(.side-list) {
+      flex: 1 1 auto;
+      min-block-size: 0;
+    }
+
+    .slash[data-listed] .side :global(.t-list) {
+      flex: 1 1 auto;
+      min-block-size: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
-      margin-inline-start: calc(-1 * var(--title-inset, 12px));
+    }
+
+    .slash[data-listed] .side .past {
+      flex: none;
     }
 
     .slash[data-listed] .main {
