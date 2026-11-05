@@ -37,11 +37,14 @@ const WAITS = 'main#main :is(.waiting, .skel-board, .pw, .sk, .sk-group, [data-s
 const REST_MS = 1500;
 /** What arrives fades up (`data-arrive`, `--d-swap`): the outline stands under it until that has played. */
 const FADE_MS = 240;
-/** A screen that said it has drawn and whose page differs from its outline: this long, then the outline goes anyway. */
-const SAID_MS = 1200;
+/** A first open whose screen said it has drawn and whose page differs from its outline: this long, then the outline goes anyway. */
+const SAID_MS = 400;
+/** A move: what the screen has to draw in before its outline comes up. Under this the reader never sees one. */
+const OUTLINE_MS = 200;
 
 let watcher: MutationObserver | null = null;
 let readTimer: ReturnType<typeof setTimeout> | undefined;
+let outlineTimer: ReturnType<typeof setTimeout> | undefined;
 let queued = false;
 
 const px = (v: string): number => Number.parseFloat(v) || 0;
@@ -83,6 +86,7 @@ function stop(): void {
   watcher?.disconnect();
   watcher = null;
   queued = false;
+  clearTimeout(outlineTimer);
 }
 
 /** Whether the page's tiles are over most of their outlines: the page has landed, not only said it has. */
@@ -144,9 +148,46 @@ const addressNow = (): string => location.pathname.replace(/\/$/u, '') + locatio
 const TYPED = /[?&](?:q|code|token|next|email|text|title|url)=/u;
 export const keptAddress = (address: string): string => (TYPED.test(address) ? address.slice(0, address.indexOf('?')) : address);
 
+/** Nothing kept: the shape a typical page of this kind has, once its chunk is here and only if the page has not landed. */
+function typicalShape(f: FrameDoor, address: string): void {
+  void firstTrace(address).then((t) => {
+    if (t !== null && addressNow() === address && document.querySelector(MAIN_DRAWN) === null) f.put(t);
+    else if (t === null) f.clear();
+  });
+}
+
 /**
- * A page has opened at this address: on the app's first run and on every move inside it. On a move the outline is drawn
- * here, and only if the new page has not already drawn; on the first run `app.html` already drew it.
+ * A MOVE INSIDE THE APP. NO OUTLINE FOR A SCREEN IN MEMORY OR A READ UNDER `OUTLINE_MS`: it stood behind the old page's
+ * picture and between the new page's cards for over a second on a screen that had nothing to wait for. A slower read
+ * gets the outline, shaped like the page, and it goes the moment the screen says it drew and no wait of its own stands,
+ * in the same frame, so nothing is left under the page and the swap moves nothing.
+ */
+function openMove(f: FrameDoor, address: string): void {
+  /* THE OUTLINE OF THE MOVE THIS ONE TURNED ASIDE is not this page's shape. */
+  f.clear();
+  outlineTimer = setTimeout(() => {
+    if (addressNow() !== address || document.querySelector(MAIN_DRAWN) !== null) return;
+    if (!f.draw(address)) typicalShape(f, address);
+    /* COMING UP RATHER THAN SWITCHING ON, so a read that lands just after this shows no flash of it. */
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.querySelector('#ff .ff-page')?.animate({ opacity: [0, 1] }, { duration: 120, easing: 'ease-out' });
+  }, OUTLINE_MS);
+  const look = (): void => {
+    queued = false;
+    if (document.querySelector(MAIN_DRAWN) === null || document.querySelector(WAITS) !== null) return;
+    settle(address);
+  };
+  watcher = new MutationObserver(() => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(look);
+  });
+  watcher.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-screen'] });
+  requestAnimationFrame(look);
+}
+
+/**
+ * A page has opened at this address: on the app's first run and on every move inside it. On the first run `app.html`
+ * already drew the outline; a move draws one only for a read that takes a while (`openMove`).
  */
 export function pageOpened(first: boolean): void {
   const address = addressNow();
@@ -156,14 +197,8 @@ export function pageOpened(first: boolean): void {
   /* A FRAME THAT HAS GONE (a page with no shell came first) draws nothing, and a page's waits are its own again. */
   if (f === undefined || document.getElementById('ff') === null) return settleOnly(address);
   if (first === false && document.querySelector(MAIN_DRAWN) !== null) return settle(address);
-  const has = first ? document.querySelector('#ff .ff-page > * > *') !== null : f.draw(address);
-  if (!has) {
-    /* NOTHING KEPT: THE SHAPE A TYPICAL PAGE OF THIS KIND HAS, once its chunk is here and only if the page has not landed. */
-    void firstTrace(address).then((t) => {
-      if (t !== null && addressNow() === address && document.querySelector(MAIN_DRAWN) === null) f.put(t);
-      else if (t === null) f.clear();
-    });
-  }
+  if (!first) return openMove(f, address);
+  if (document.querySelector('#ff .ff-page > * > *') === null) typicalShape(f, address);
   let said: ReturnType<typeof setTimeout> | undefined;
   let leaving = false;
   const look = (): void => {
