@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { APP_ROOT, bakedSaid, bakedSecrets, secretFile } from '../src/baked.ts';
-import { listenOf, originOf, serverKeyOf } from '../src/how.ts';
+import { listenOf, openWide, originOf, serverKeyOf } from '../src/how.ts';
 import { start } from '../src/server.ts';
 
 const scratch = (): string => mkdtempSync(join(tmpdir(), 'braindog-door-'));
@@ -136,4 +136,11 @@ test('A HOST WITH A SERVER KEY ANSWERS ON IPv6 TOO, and an open one on both loop
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('NO KEY PAST LOOPBACK IS REFUSED AT START: anybody on the network would send Host: localhost and be the owner', () => {
+  for (const wide of ['0.0.0.0', '::', '[::]', '192.168.1.20', 'box.local']) assert.equal(openWide(undefined, wide), true, wide);
+  assert.equal(openWide('   ', '0.0.0.0'), true, 'a blank key is no key');
+  for (const near of [undefined, '127.0.0.1', '::1', '[::1]', 'localhost', 'LOCALHOST']) assert.equal(openWide(undefined, near), false, String(near));
+  assert.equal(openWide('a-real-key', '0.0.0.0'), false, 'a key is what makes a wide bind fine');
 });

@@ -49,7 +49,7 @@ import { NIGHTLY_AT, nightlyBackups } from './backup.ts';
 import { APP_ROOT, bakedSaid, bakedSecrets } from './baked.ts';
 import { backupData, restoreData } from './cold.ts';
 import { degradeLines, setupLine } from './first-run.ts';
-import { commandFor, inImage, listenOf, originOf, plainLine, serverKeyOf } from './how.ts';
+import { commandFor, inImage, listenOf, openWide, originOf, plainLine, serverKeyOf } from './how.ts';
 import { lockDown, openKeyStore, recordKeys } from './keys.ts';
 import { nameChange, reachLine, reachOf } from './reach.ts';
 import { ONE_PLACE, proxyTrustOf } from './key-lockout.ts';
@@ -708,6 +708,8 @@ async function serve(): Promise<void> {
   const orLoopback = inImage() ? '' : ', or remove the line to run on loopback only with nobody signing in';
   if (inImage() && (serverKey.value === undefined || serverKey.value.trim() === '') && listenOf(env) === undefined)
     return refuse(`Set BRAINDOG_SERVER_KEY in .env (make one with ${MAKE_KEY}): in a container nothing outside can reach a server without one.`);
+  if (openWide(serverKey.value, listenOf(env)))
+    return refuse(`BRAINDOG_LISTEN reaches past this machine and there is no server key, so anybody on the network would be the owner. Set BRAINDOG_SERVER_KEY (make one with ${MAKE_KEY})${orLoopback}.`);
   if (serverKey.value !== undefined && serverKey.value.trim() === '')
     return refuse(`${serverKey.name} is set but empty. Put a long random value in it (${MAKE_KEY})${orLoopback}.`);
   /* AND A SHORT ONE IS A KEY SOMEBODY CAN GUESS (SEC5): it is the owner to whoever presents it, on every interface. The

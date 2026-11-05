@@ -24,6 +24,8 @@ import { sameOrigin } from './auth.ts';
 
 /** What a host hands the door. `read` and `botCheck` are null where that host has no model or no bot check keyed. */
 export type FirstReadDoor = {
+  /** The address to count by, where the host has worked it out itself. On a self-host `x-forwarded-for` is the caller's to write until a proxy is trusted. */
+  ip?: string | undefined;
   /** This BrainDog's own origin, `https://` and the host: the only page whose sentence is read. */
   origin: string;
   /** The owner's yes to a model reading a stranger's words. Off by default on every host. */
@@ -71,7 +73,7 @@ function reply(status: number, payload: object, extra: readonly [string, string]
 const refused = (status: number, code: RefusalCode, fix: string, at?: string, extra: readonly [string, string][] = []): Response =>
   reply(status, { ok: false, refusal: { code, fix, ...(at === undefined ? {} : { at }) } }, extra);
 
-/** The address the sign-up doors count by: what Cloudflare wrote, or a proxy's first hop on a self-host. */
+/** The address the sign-up doors count by, where the host hands none (`FirstReadDoor.ip`): what Cloudflare wrote, or a proxy's first hop. */
 export function firstReadIp(request: Request): string {
   const cf = request.headers.get('cf-connecting-ip');
   if (cf !== null && cf.trim() !== '') return cf.trim();
@@ -118,7 +120,7 @@ export async function serveFirstRead(request: Request, door: FirstReadDoor, now 
      the rules reading, where a 501 put a red line in every stranger's console on every sign-up. */
   if (!door.on || read === null || door.botCheck === null) return refused(200, 'NOT_IN_THIS_BUILD', FIRST_READ_OFF);
 
-  const ip = firstReadIp(request);
+  const ip = door.ip ?? firstReadIp(request);
   const token = typeof body['turnstile'] === 'string' ? body['turnstile'] : '';
   const person = token !== '' && (await door.botCheck(token, ip).catch(() => false));
   if (!person) return refused(403, 'FORBIDDEN', FIRST_READ_NOT_PERSON, 'turnstile');

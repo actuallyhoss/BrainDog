@@ -84,6 +84,8 @@ test("AN OLD SELF-HOST'S spark.sqlite, WAL AND ALL, IS slash.sqlite AFTER THE FI
     try {
       for (const p of OLD) assert.equal(existsSync(join(dir, p)), false, `${p} is still beside the record after the boot`);
       assert.ok(existsSync(join(dir, 'slash.sqlite')), 'no slash.sqlite beside the record');
+      /* IT HOLDS THE CONVERSATIONS, so it is the owner's alone, as the record's own file is. */
+      if (process.platform !== 'win32') assert.equal(statSync(join(dir, 'slash.sqlite')).mode & 0o777, 0o600);
 
       const origin = `http://127.0.0.1:${(running.server.address() as { port: number }).port}`;
       const now = await askAt(origin, '/api/slash/read');

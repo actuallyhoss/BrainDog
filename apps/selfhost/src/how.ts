@@ -77,6 +77,19 @@ export function listenOf(e: Record<string, string | undefined>): string | undefi
 }
 
 /**
+ * Whether this host would answer as the owner on an interface other than this machine's: no key, and a bind past loopback.
+ *
+ * WITH NO KEY, A REQUEST CARRYING NOTHING IS THE OWNER, and the `Host` check is what keeps a web page out, not somebody on
+ * the network, who sends `Host: localhost` and gets the record (`BRAINDOG_LISTEN=<a LAN address>`, proved). So it is
+ * refused at start, as a blank key is, and the only keyless start left is loopback.
+ */
+export function openWide(key: string | undefined, listen: string | undefined): boolean {
+  if (key !== undefined && key.trim() !== '') return false;
+  if (listen === undefined) return false;
+  return !['127.0.0.1', '::1', 'localhost'].includes(listen.replace(/^\[|\]$/gu, '').toLowerCase());
+}
+
+/**
  * The start's warning when a server key goes over plain http on every interface, or `null` when it does not.
  *
  * A KEY TURNS THE BIND WIDE, AND NOTHING TURNS TLS ON. With `BRAINDOG_SERVER_KEY` set and no certificate, the default

@@ -245,3 +245,9 @@ test('THE FALLBACK: no catalogue, or one that does not read, is the build’s li
   assert.match(read.said ?? '', /no title.*nameless/u);
   assert.equal((await firstReadCasesRead(async () => [LANDLORD], BUILT)).said, null);
 });
+
+test('AN ADDRESS THE HOST WORKED OUT BEATS A HEADER THE CALLER WROTE: a self-host does not count by x-forwarded-for it never trusted', async () => {
+  const { door, seen } = fakeDoor();
+  await serveFirstRead(ask(good, { ip: { 'x-forwarded-for': '198.51.100.4' } }), { ...door, ip: '203.0.113.9' }, NOW);
+  assert.equal(seen.checks.at(-1)?.[1], '203.0.113.9');
+});

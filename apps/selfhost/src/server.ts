@@ -115,7 +115,7 @@ import { methods as shapeMethods } from '@braindog/record/shape';
 import { oauthHere, servesOAuth, type OAuthHere } from './oauth.ts';
 import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
 import { withKeychainPassphrase } from '@braindog/host';
-import { rootKeysOf } from './keys.ts';
+import { lockDown, rootKeysOf } from './keys.ts';
 import { slashErasing } from './slash.ts';
 import { ACCESS_ENDED_AT, accessEndedSaid, MEMBER_STOPPED } from '@braindog/kernel';
 import { deriveShareKey, serveShared, sharedNone, shareOf, withShareLinks, type SharedDoor } from '@braindog/host';
@@ -1446,6 +1446,8 @@ export async function start(options: {
      time. `destroy` removes it with the record. */
   const slashFile = options.file === ':memory:' ? null : slashLedger(dirOf(options.file));
   const slashSql = openSqlite(slashFile ?? ':memory:');
+  /* IT HOLDS THE CONVERSATIONS, so it is the owner's alone, as the record's own file is. */
+  if (slashFile !== null) lockDown(slashFile);
   /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SLASH, from the same config and the same key path as `slashModel`, so the
      record's `answersSlash` below and `/api/version`'s `slash` are one fact. Before this, a self-host with a model
      refused `ask_slash` at install as if it had none (`test/slash-answers.test.ts`). */
@@ -2643,7 +2645,7 @@ async function answer(
     const over = await overLimit(site, null, ip, SAFE_METHODS.has(method) ? 'read' : 'write');
     /* A STRANGER'S FIRST SENTENCE, READ BY THIS HOST'S MODEL (`./first-read.ts`): off until `FIRST_READ_DAILY` is set,
        and read by `readSetup`, with no record, owner or ledger. */
-    if (over === null && /^\/+auth\/signup\/read\/*$/.test(path)) return write(res, await serveFirstRead(request, site.firstRead));
+    if (over === null && /^\/+auth\/signup\/read\/*$/.test(path)) return write(res, await serveFirstRead(request, { ...site.firstRead, ip }));
     return write(res, over ?? (await serveAuth(request, { ...site.door, ip, reached: req.headers.host ?? '' })));
   }
   /* `/account/*` IS THE DIRECTORY'S TOO, and reads only the session cookie. */
