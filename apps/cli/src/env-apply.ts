@@ -20,7 +20,7 @@
  * and a tool's stdio command or `headersHelper` each run a program: each is printed whole, asked y/N at a terminal, and
  * a yes is pinned by its SHA-256 (`pins.ts`), so the same entry is not asked again and a changed one is. With no
  * terminal an entry that is not pinned is left out and named. Plain data (a skill's text, a URL server, the rules
- * block) is written with its line and no question.
+ * block) is written with its line and no question; a skill that runs something waits for `braindog skills sync` (`skillRuns`).
  *
  * PLANNED, THEN ASKED, THEN WRITTEN, a step at a time: each question comes after its step's plan is printed and before
  * the record is read again to write it, so no connection to the record waits on a person.

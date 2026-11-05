@@ -21,6 +21,13 @@
  * A NAME WITHIN ITS SCOPE IS THE SKILL. A file whose name a skill of that scope holds is that skill's file, never a new
  * row, and a project's file named as a global skill is the project's own.
  *
+ * A SKILL THAT RUNS SOMETHING IS A PROGRAM, NOT DATA. Claude Code runs `` !`command` `` lines and a fenced ```` ```! ````
+ * block when a skill loads, a `hooks` block in its front matter while it is active, and `allowed-tools` lifts the question
+ * a person would otherwise be asked. A row of the record could put any of them on every machine at its next session
+ * start, so such a text is written only once a person at this machine has read it and said yes at `braindog skills sync`,
+ * pinned by its hash as `env apply` pins a tool (`pins.ts`), so a changed one is asked about again. No terminal and no
+ * yes leaves it out and says so; `--yes` is the yes to keeping skills in step, and never this one.
+ *
  * WHAT THE SESSION MAY CREATE IS WHERE ITS RUN IS. An agent's create lands in its run's project, so a file found in
  * the global folder is registered only from a run in no project, and a project's file only from a run in that
  * project.
@@ -368,6 +375,12 @@ function writeText(path: string, text: string, top: string | null): boolean {
   return true;
 }
 
+/** Whether a skill's text runs something by itself once it is on this machine (see the top). */
+export function skillRuns(text: string): boolean {
+  const front = FRONT.exec(text)?.[1] ?? '';
+  return /^(?:hooks|allowed-tools|allowedTools)\s*:/mu.test(front) || /!`[^`\n]+`/u.test(text) || /^\s*```+!/mu.test(text);
+}
+
 /** How many skills one page of the list read asks for: under the hundred a long read has been cut at. */
 const PAGE = 50;
 
@@ -444,6 +457,8 @@ export type SkillSync = {
   upload?: boolean | undefined;
   /** Filled with the names of what was (or, in a dry run, would be) copied each way, for the question before a yes. */
   tally?: Tally | undefined;
+  /** Filled with each skill left out because it runs something and nobody here has said yes to it (`skillRuns`). */
+  held?: { name: string; text: string }[] | undefined;
 };
 
 /** What a sync copied, or would copy, by skill name: up into the record, edits proposed, down into a folder, deleted. */
@@ -568,8 +583,15 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     lines.push(`${nameAt(path)}: ${path} goes through a link in this repository, so the sync left it alone.`);
     return false;
   };
+  const pins = await import('./pins.ts');
   const write = (path: string, text: string, spoken: string, rev: number): boolean => {
     if (s.dryRun) return true;
+    const called = nameAt(path);
+    if (skillRuns(text) && (pins.readPins(pins.pinsFile(s.home)) ?? {})[pins.pinOf('skill', called, sha256(text))] === undefined) {
+      s.held?.push({ name: called, text });
+      lines.push(`Skill ${called} runs commands on this machine when it is used, so it was not written. Run braindog skills sync at a terminal to read it and say yes.`);
+      return false;
+    }
     const repo = s.top !== null && projectBase !== null && inside(path, projectBase);
     if (!writeText(path, text, repo ? s.top : null)) {
       lines.push(`${nameAt(path)}: ${path} goes through a link in this repository, so the sync left it alone.`);
@@ -999,7 +1021,21 @@ export async function skills(args: string[], io: SkillsIo): Promise<number> {
     }
     allowSkills(io.home, at.to.key);
   }
-  const lines = await syncSkills({ ...base, dryRun });
+  const held: { name: string; text: string }[] = [];
+  let lines = await syncSkills({ ...base, dryRun, held });
+  /* ASKED ONE BY ONE, EACH SHOWN WHOLE, and a yes is written by a second pass through the same sync. */
+  let said = false;
+  if (held.length > 0) {
+    const { keepPin, pinOf, pinsFile } = await import('./pins.ts');
+    for (const one of held) {
+      io.out(`Skill ${one.name} runs commands on this machine when it is used:`);
+      for (const line of one.text.split(/\r?\n/u)) io.out(`    ${clip(line, 2_000)}`);
+      if ((await (io.ask ?? askAtTerminal)(`Write skill ${one.name} on this machine? It can run commands. [y/N] `)) !== true) continue;
+      keepPin(pinsFile(io.home), pinOf('skill', one.name, sha256(one.text)), { name: one.name, kind: 'skill', profile: configDir, now: Date.now() });
+      said = true;
+    }
+    if (said) lines = await syncSkills({ ...base, dryRun });
+  }
   for (const line of lines) io.out(line);
   if (lines.length === 0) io.out('Skills are in sync.');
   if (dryRun) io.out('That was a dry run, so nothing was written, sent or proposed.');

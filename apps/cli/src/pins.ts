@@ -8,7 +8,8 @@
  * MCP server's stdio command or an HTTP server's `headersHelper`, the `claude` that `env check` runs, and a file of a
  * thing setup sync carries that runs a program, such as a script for `~/.local/bin` (`sync pull`). Each is
  * printed whole and asked y/N at a terminal before it is first placed, as a runner job kind is pinned before its first
- * run (`runner.ts`, `48 §5.13` step 4). Plain data (a skill's text, a URL server, a rules block) is never pinned.
+ * run (`runner.ts`, `48 §5.13` step 4). A skill whose text runs something by itself is one too (`skillRuns` in `skills.ts`).
+ * Plain data (a skill's other text, a URL server, a rules block) is never pinned.
  *
  * BY KIND, NAME AND ENTRY. The hash covers the three, so one entry approved is the same entry wherever it goes:
  * BrainDog's server is asked about once for every profile it goes into, not once a profile. A pin keeps the profiles it
@@ -33,8 +34,8 @@ import { canonical } from './tools.ts';
  * What a pin is for: BrainDog's hooks, its MCP server, one of the record's tools, the `claude` `env check` runs, the status line, or a
  * program setup sync carried here (`sync-pull.ts`), pinned by where it goes and the SHA-256 of its bytes and mode.
  */
-export type PinKind = 'hooks' | 'server' | 'tool' | 'check' | 'carry' | 'statusline';
-const KINDS: readonly PinKind[] = ['hooks', 'server', 'tool', 'check', 'carry', 'statusline'];
+export type PinKind = 'hooks' | 'server' | 'tool' | 'check' | 'carry' | 'statusline' | 'skill';
+const KINDS: readonly PinKind[] = ['hooks', 'server', 'tool', 'check', 'carry', 'statusline', 'skill'];
 
 /** One approved entry: its name, its kind, the profiles it was placed in, and when it was approved. */
 export type Pin = { name: string; kind: PinKind; profiles: string[]; at: string };
@@ -90,7 +91,7 @@ export function forgetPins(file: string, name: string): number {
 }
 
 /** What each kind is, after its name in a line. */
-const KIND_SAID: Record<PinKind, string> = { hooks: "BrainDog's hooks", server: 'the MCP server', tool: 'an MCP tool', check: 'what env check runs', carry: 'a program setup sync placed', statusline: 'the status line' };
+const KIND_SAID: Record<PinKind, string> = { skill: 'a skill that runs commands', hooks: "BrainDog's hooks", server: 'the MCP server', tool: 'an MCP tool', check: 'what env check runs', carry: 'a program setup sync placed', statusline: 'the status line' };
 
 /** Names joined as a sentence says them: `a`, `a and b`, `a, b and c`. */
 const and = (names: string[]): string => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}`);
