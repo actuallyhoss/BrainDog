@@ -278,7 +278,7 @@ function pageBody(slug: string): Promise<PageBody | null> {
 
 /* THE LEDGER AS THE TAB FOUND IT, OR ASKED ONCE: a link to Money is right-clicked from pages that have not looked for it. */
 let ledgerAsked: { base: string; found: Promise<Ledger | null> } | null = null;
-function ledgerHere(lists: readonly string[]): Promise<Ledger | null> {
+function ledgerHere(lists: Parameters<typeof import('../money/read.ts').findLedger>[1]): Promise<Ledger | null> {
   const base = apiBase();
   if (quick.base === base && quick.ledger) return Promise.resolve(quick.ledger);
   if (ledgerAsked?.base !== base) ledgerAsked = { base, found: import('../money/read.ts').then((m) => m.findLedger(base, lists)).catch(() => null) };
@@ -290,7 +290,7 @@ async function moneyItems(t: Extract<Thing, { kind: 'page' }>, shell: Shell, bod
   if (!body) return [];
   const out: ThingItem[] = [];
   /* THE SAME QUESTION THE PAGE'S OWN "…" ASKS OF IT. */
-  const ledger = await ledgerHere((shell.index?.registers ?? []).map((r) => r.id));
+  const ledger = await ledgerHere(shell.index?.registers ?? []);
   if (ledger && pageOfLedger(body.requires, ledger) && may(shell, 'append', ledger.list)) out.push(item('statement', 'add', thingWords.statement, G.page, { href: '/add/statement', icon: 'upload' }));
   const money = body.nav?.section?.toLowerCase() === 'money' || /^money(-|$)/u.test(body.page ?? '');
   const currency = shell.index?.currency ?? null;
