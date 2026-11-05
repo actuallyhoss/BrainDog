@@ -22,7 +22,7 @@
     "@braindog/ports": "workspace:*",
     "@braindog/seed": "workspace:*",
     "braindog-render": "workspace:*",
-    "esbuild": "0.28.1"
+    "esbuild": "0.28.2"
   },
   "scripts": {
     "build": "node scripts/bundle.mjs",
