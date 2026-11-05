@@ -202,6 +202,61 @@ export function linkMisleads(label: string, href: string): boolean {
   return !(bare(to) === bare(host) || to.endsWith(`.${bare(host)}`) || host.endsWith(`.${bare(to)}`));
 }
 
+/** What sets a writing direction, which words can leave running and turn what is drawn after them round. */
+const SETS_DIRECTION = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/gu;
+
+/**
+ * Where a link goes, in words: the host of an https address without its `www.`, the address of a mailto, and nothing for
+ * a path of this BrainDog, whose own words are its title. AS THE BROWSER WILL READ IT, so a name before an `@` is no host
+ * and a host in another alphabet is its punycode.
+ */
+export function linkHost(href: string): string {
+  if (/^mailto:/iu.test(href)) {
+    const address = href.slice('mailto:'.length).split('?')[0] ?? '';
+    try {
+      return decodeURIComponent(address).replace(SETS_DIRECTION, '');
+    } catch {
+      return address;
+    }
+  }
+  if (!/^https:\/\//iu.test(href)) return '';
+  try {
+    return new URL(href).hostname.replace(/^www\./iu, '');
+  } catch {
+    return '';
+  }
+}
+
+/** Whether words say this host or address whole: `example.com` is not said by `notexample.com` or `example.com.evil.example`. */
+function wordsSay(words: string, host: string): boolean {
+  const said = words.toLowerCase().replace(/\bwww\./gu, '');
+  const name = host.toLowerCase();
+  for (let at = said.indexOf(name); at !== -1; at = said.indexOf(name, at + 1)) {
+    const before = said.slice(0, at);
+    const after = said.slice(at + name.length);
+    if (!/[\p{L}\p{N}.@-]$/u.test(before) && !/^(?:[\p{L}\p{N}-]|\.[\p{L}\p{N}])/u.test(after)) return true;
+  }
+  return false;
+}
+
+/**
+ * THE NODES OF A LINK, AND WHERE IT REALLY GOES BESIDE THEM WHEN ITS WORDS DO NOT SAY.
+ *
+ * ORDINARY WORDS PROMISE NOTHING, AND THAT IS THE TROUBLE: `[Renew now](https://evil.example)`, or `[Open in BrainDog](...)`,
+ * in text an agent, a mail or a feed wrote, reads as one of ours until it is pressed. The renderer cannot know who wrote a
+ * sentence, so every link that leaves says so, the person's own too, and that costs a host in brackets. It is a text node
+ * and not part of the link, so every drawer (`html.ts`, `Text.svelte`, `text`) says it, and a block's own `linkHost` line
+ * is the same words. Beside the words and not in them: what the text wrote stays what it wrote.
+ */
+function linkNodes(label: string, href: string, drawn: (words: string) => Inline[]): Inline[] {
+  const host = linkHost(href);
+  if (host === '') return [{ type: 'link', href, body: drawn(label) }];
+  const said = label.replace(SETS_DIRECTION, '');
+  const misleads = linkMisleads(said, href);
+  const body: Inline[] = misleads ? [{ type: 'text', text: href.replace(SETS_DIRECTION, '') }] : drawn(said);
+  return misleads || !wordsSay(said, host) ? [{ type: 'link', href, body }, { type: 'text', text: ` (${host})` }] : [{ type: 'link', href, body }];
+}
+
 /** A safe address as `opts` draw it: `null` for one that stays in the record where only links away are drawn (`links`). */
 export const drawnLink = (href: string | null, opts: Pick<InlineOptions, 'links'>): string | null =>
   href !== null && opts.links === 'away' && !/^(?:https:\/\/|mailto:)/iu.test(href) ? null : href;
@@ -496,8 +551,8 @@ function tokens(text: string, opts: InlineOptions, held = false): Inline[] {
           const href = drawnLink(safe, opts);
           push();
           // A link the host cannot resolve is plain text, not a dead anchor (36 §13 D16).
-          // Words that read as another address are drawn as the address it goes to (`linkMisleads`).
-          if (href) out.push({ type: 'link', href, body: linkMisleads(label, href) ? [{ type: 'text', text: href }] : tokens(label, opts, held) });
+          // Words that read as another address are drawn as the address it goes to, and a link that leaves says where (`linkNodes`).
+          if (href) out.push(...linkNodes(label, href, (words) => tokens(words, opts, held)));
           // A path into the record where only links away are drawn is its words, as the author wrote them (`links`).
           else if (safe) out.push(...tokens(label, opts, held));
           else out.push({ type: 'text', text: label });

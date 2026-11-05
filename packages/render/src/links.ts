@@ -18,7 +18,9 @@
  * What is drawn under the title is the address's own host, read off the text.
  */
 
-import { drawnLink, glyphName, safeHref, type InlineOptions } from './inline.ts';
+import { drawnLink, glyphName, linkHost, safeHref, type InlineOptions } from './inline.ts';
+
+export { linkHost };
 
 /** The sentence the parser degrades a block with when a row's address is none of the three. */
 export const LINK_ADDRESS = 'A link is an https address, a mailto or a path of this BrainDog.';
@@ -44,27 +46,6 @@ export function linkFault(rows: readonly (readonly string[])[]): string | null {
     if (url !== '' && linkHref(url) === null) return `"${url}" is not a link here. ${LINK_ADDRESS}`;
   }
   return null;
-}
-
-/**
- * The words drawn under a link's title: the host of an https address without its `www.`, the address of a mailto, and
- * nothing for a path of this BrainDog, whose own words are its title.
- */
-export function linkHost(href: string): string {
-  if (/^mailto:/iu.test(href)) {
-    const address = href.slice('mailto:'.length).split('?')[0] ?? '';
-    try {
-      return decodeURIComponent(address);
-    } catch {
-      return address;
-    }
-  }
-  if (!/^https:\/\//iu.test(href)) return '';
-  try {
-    return new URL(href).hostname.replace(/^www\./iu, '');
-  } catch {
-    return '';
-  }
 }
 
 /**
