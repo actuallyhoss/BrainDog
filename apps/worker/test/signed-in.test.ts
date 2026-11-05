@@ -1,6 +1,6 @@
 /**
- * The readable `bd_in` cookie beside the session (`src/signed-in.ts`): set when the session is set,
- * taught the record's address by `GET /`, cleared when the session is, and nothing else touched.
+ * The readable `bd_in` cookie beside the session (`src/signed-in.ts`): `1` when the session is set, cleared when the
+ * session is, and nothing else touched. It is readable by every script and every name under the site's, and it names no record.
  *
  * THE ANSWERS ARE THE HOST'S OWN COOKIES, from `sessionCookie` and `clearCookie`, so a change to how the session is
  * written is a change these tests see.
@@ -31,63 +31,21 @@ test('the name is bd_in', () => {
   assert.equal(SIGNED_IN, 'bd_in');
 });
 
-test('a session set with a redirect into a record writes that address, with every attribute exact', () => {
-  const out = withSignedIn(answer(302, [['location', '/maya-okafor/'], ['set-cookie', sessionCookie(SID, 'secure')]]), ask('/auth/verify'));
-  assert.deepEqual(inOf(out), ['bd_in=maya-okafor; Path=/; Max-Age=2592000; Secure; SameSite=Lax']);
-  assert.equal(out.headers.getSetCookie().length, 2, 'the session cookie stays beside it');
-  assert.equal(out.headers.get('location'), '/maya-okafor/');
-  assert.equal(out.status, 302);
+test('a session set writes 1, whatever it redirects into and whatever the request held, with every attribute exact', () => {
+  const line = 'bd_in=1; Path=/; Max-Age=2592000; Secure; SameSite=Lax';
+  const into = withSignedIn(answer(302, [['location', '/maya-okafor/'], ['set-cookie', sessionCookie(SID, 'secure')]]), ask('/auth/verify'));
+  assert.deepEqual(inOf(into), [line]);
+  assert.equal(into.headers.getSetCookie().length, 2, 'the session cookie stays beside it');
+  assert.equal(into.headers.get('location'), '/maya-okafor/');
+  assert.equal(into.status, 302);
+  /* A COOKIE THAT STILL NAMES A RECORD, from before 5 Nov, is replaced at the next rotation. */
+  const rotated = withSignedIn(answer(200, [['set-cookie', sessionCookie(SID, 'secure')]]), ask('/tidepool/api/boot', `__Host-bd_s=${SID}; bd_in=tidepool`));
+  assert.deepEqual(inOf(rotated), [line]);
 });
 
-test('an absolute redirect into a record is read the same way', () => {
-  const out = withSignedIn(answer(303, [['location', 'https://brain.dog/tidepool/'], ['set-cookie', sessionCookie(SID, 'secure')]]), ask('/auth/google/callback'));
-  assert.deepEqual(inOf(out), ['bd_in=tidepool; Path=/; Max-Age=2592000; Secure; SameSite=Lax']);
-});
-
-test('a session set with no redirect keeps the address the request already holds, else 1', () => {
-  const rotated = () => answer(200, [['set-cookie', sessionCookie(SID, 'secure')]]);
-  assert.deepEqual(inOf(withSignedIn(rotated(), ask('/tidepool/api/boot', `__Host-bd_s=${SID}; bd_in=tidepool`))), ['bd_in=tidepool; Path=/; Max-Age=2592000; Secure; SameSite=Lax']);
-  assert.deepEqual(inOf(withSignedIn(rotated(), ask('/auth/passkey/finish'))), ['bd_in=1; Path=/; Max-Age=2592000; Secure; SameSite=Lax']);
-  /* A redirect to the start page is no record, so the held address or 1 is what is written. */
-  const start = answer(302, [['location', '/start'], ['set-cookie', sessionCookie(SID, 'secure')]]);
-  assert.deepEqual(inOf(withSignedIn(start, ask('/auth/verify'))), ['bd_in=1; Path=/; Max-Age=2592000; Secure; SameSite=Lax']);
-});
-
-test('an address is only lower-case letters, digits and dashes, up to 64; anything else is 1', () => {
-  const bad = ['Maya', 'a%20b', 'a.b', 'x'.repeat(65), 'a_b'];
-  for (const held of bad) {
-    const out = withSignedIn(answer(200, [['set-cookie', sessionCookie(SID, 'secure')]]), ask('/auth/verify', `bd_in=${held}`));
-    assert.deepEqual(inOf(out), ['bd_in=1; Path=/; Max-Age=2592000; Secure; SameSite=Lax'], held);
-  }
-  const shouting = withSignedIn(answer(302, [['location', '/MAYA/'], ['set-cookie', sessionCookie(SID, 'secure')]]), ask('/auth/verify'));
-  assert.deepEqual(inOf(shouting), ['bd_in=1; Path=/; Max-Age=2592000; Secure; SameSite=Lax']);
-  const longest = 'a'.repeat(64);
-  const fits = withSignedIn(answer(302, [['location', `/${longest}/`], ['set-cookie', sessionCookie(SID, 'secure')]]), ask('/auth/verify'));
-  assert.deepEqual(inOf(fits), [`bd_in=${longest}; Path=/; Max-Age=2592000; Secure; SameSite=Lax`]);
-});
-
-test('GET / with a session and no rotation teaches the cookie the address, even through frozen headers', () => {
-  /* `Response.redirect` answers with immutable headers, as a fetched or asset answer does. */
+test('GET / with a session and no rotation teaches the cookie nothing: no record is named to every name under the site', () => {
   const frozen = Response.redirect(`${ORIGIN}/ferment-co/`, 302);
-  assert.throws(() => frozen.headers.append('x-test', '1'));
-  const out = withSignedIn(frozen, ask('/', `__Host-bd_s=${SID}`));
-  assert.deepEqual(inOf(out), ['bd_in=ferment-co; Path=/; Max-Age=2592000; Secure; SameSite=Lax']);
-  assert.equal(out.headers.get('location'), `${ORIGIN}/ferment-co/`);
-  assert.deepEqual(inOf(withSignedIn(answer(302, [['location', '/northbound/']]), ask('/', `__Host-bd_s=${SID}`))), [
-    'bd_in=northbound; Path=/; Max-Age=2592000; Secure; SameSite=Lax',
-  ]);
-});
-
-test('GET / without a session, another method or another path adds nothing', () => {
-  const into = () => answer(302, [['location', '/pocketlab/']]);
-  for (const [request, why] of [
-    [ask('/'), 'no session'],
-    [ask('/', `__Host-bd_s=${SID}`, 'POST'), 'a POST'],
-    [ask('/settings', `__Host-bd_s=${SID}`), 'another path'],
-  ] as const) {
-    const given = into();
-    assert.equal(withSignedIn(given, request), given, why);
-  }
+  assert.equal(withSignedIn(frozen, ask('/', `__Host-bd_s=${SID}`)), frozen);
 });
 
 test('a cleared session clears bd_in, as sign-out and account close answer', () => {
@@ -100,11 +58,9 @@ test('a cleared session clears bd_in, as sign-out and account close answer', () 
 
 test('local mode writes and clears without Secure', () => {
   const set = withSignedIn(answer(302, [['location', '/maya/'], ['set-cookie', sessionCookie(SID, 'local')]]), ask('/auth/verify'));
-  assert.deepEqual(inOf(set), ['bd_in=maya; Path=/; Max-Age=2592000; SameSite=Lax']);
+  assert.deepEqual(inOf(set), ['bd_in=1; Path=/; Max-Age=2592000; SameSite=Lax']);
   const gone = withSignedIn(answer(200, [['set-cookie', clearCookie('local')]]), ask('/auth/logout'));
   assert.deepEqual(inOf(gone), ['bd_in=; Path=/; Max-Age=0; SameSite=Lax']);
-  const learnt = withSignedIn(answer(302, [['location', '/maya/']]), new Request('http://localhost:8787/', { headers: { cookie: `bd_s=${SID}` } }));
-  assert.deepEqual(inOf(learnt), ['bd_in=maya; Path=/; Max-Age=2592000; SameSite=Lax']);
 });
 
 test('it is never HttpOnly and never holds the session id or an email', () => {
@@ -121,6 +77,7 @@ test('it is never HttpOnly and never holds the session id or an email', () => {
     assert.notEqual(value, SID);
     assert.ok(!cookie.includes(SID), cookie);
     assert.ok(!cookie.includes('@'), cookie);
+    assert.equal(value, '1', 'it names no record');
   }
 });
 
@@ -154,7 +111,7 @@ test('on a subdomain of the parent the cookie carries the parent Domain, set and
   assert.equal(cookieDomain('localhost', 'localhost'), null);
 
   const set = withSignedIn(answer(302, [['location', '/maya-okafor/'], ['set-cookie', sessionCookie(SID, 'secure')]]), ask('/auth/verify'), 'brain.dog');
-  assert.deepEqual(inOf(set), ['bd_in=maya-okafor; Path=/; Domain=brain.dog; Max-Age=2592000; Secure; SameSite=Lax']);
+  assert.deepEqual(inOf(set), ['bd_in=1; Path=/; Domain=brain.dog; Max-Age=2592000; Secure; SameSite=Lax']);
   const gone = withSignedIn(answer(200, [['set-cookie', clearCookie('secure')]]), ask('/auth/logout', 'bd_in=1', 'POST'), 'brain.dog');
   assert.deepEqual(inOf(gone), ['bd_in=; Path=/; Domain=brain.dog; Max-Age=0; Secure; SameSite=Lax']);
 });

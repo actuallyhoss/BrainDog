@@ -1,8 +1,8 @@
 /**
  * Whether the visitor is signed in to BrainDog, read from the one cookie the site reads.
  *
- * THE WORKER SETS `bd_in` BESIDE THE SESSION (`apps/worker/src/signed-in.ts`) and clears it at sign-out. It holds the
- * record's address or `1`, never a credential, and it is readable by a page (not HttpOnly) so this site, which is
+ * THE WORKER SETS `bd_in` BESIDE THE SESSION (`apps/worker/src/signed-in.ts`) and clears it at sign-out. It holds `1`,
+ * never a credential or a record's name, and it is readable by a page (not HttpOnly) so this site, which is
  * prerendered and has no server, can draw "Open BrainDog" in place of "Start free" and "Sign in". The site never
  * sets it.
  *
