@@ -3,6 +3,8 @@
  * (`pastSplitView`, for `sql-reads.ts`). PURE, and Node loads it.
  */
 
+import type { Sql } from '@braindog/ports';
+
 const COLUMNS = 'id, register, seq, fields, state, version, created_at, updated_at, deleted_at';
 
 /**
@@ -22,6 +24,42 @@ export function splitView(register: string, field: string): string {
     `UNION ALL SELECT e.rowid AS rowid, e.id, e.register, e.seq, json_patch(e.fields, p.value) AS fields, e.state, e.version, e.created_at, e.updated_at, e.deleted_at ` +
     `FROM main.entry AS e, json_each(e.fields, '${path}') AS p WHERE e.register = '${reg}' AND json_type(e.fields, '${path}') = 'array')`
   );
+}
+
+/** A list's or a field's id as the grammar has it: the one kind of name written into these statements unbound. */
+const NAME = /^[a-z][a-z0-9_]{0,63}$/u;
+
+/** The index that holds the rows of a list that are split, and no others (`splitIndex`). */
+export const splitIndexName = (register: string, field: string): string => `entry_i_${register}__${field}__split`;
+
+/**
+ * THE INDEX THAT SAYS WHETHER ANY ROW OF A LIST IS SPLIT. It holds exactly the rows the view reads as parts, deleted ones
+ * too, as the view does. SQLite keeps it in the transaction of every write there is, the kernel's, a repair's, an import's
+ * or a rollback's, so what it says is the rows and no kept flag that could go stale.
+ *
+ * NOT A MIGRATION, AND SAFE TO LEAVE BEHIND: `CREATE ... IF NOT EXISTS` at the record's open and at each install of the
+ * list (`declare.ts`, `indexesFor`), and a build before this one reads past an index it does not know. It is named as a
+ * list's own indexes are, so declaring the list again drops it and makes it again. `null` for a name this will not write.
+ */
+export function splitIndex(register: string, field: string): string | null {
+  if (!NAME.test(register) || !NAME.test(field)) return null;
+  return `CREATE INDEX IF NOT EXISTS ${splitIndexName(register, field)} ON entry (register) WHERE register = '${register}' AND json_type(fields, '$.${field}') = 'array'`;
+}
+
+/**
+ * WHETHER A READ OF THIS LIST HAS ANY SPLIT ROW TO SEE, asked of the rows each time and kept nowhere, so it cannot go stale.
+ *
+ * ANYTHING THAT IS NOT A PLAIN NO IS A YES. With no index to ask (a record that has not been opened by this build, a list
+ * declared again by an older one), or a name this will not write, or any error, the read goes through the view as it always
+ * did: slower and never wrong.
+ */
+export function holdsSplit(sql: Pick<Sql, 'one'>, register: string, field: string): boolean {
+  if (!NAME.test(register) || !NAME.test(field)) return true;
+  try {
+    return sql.one(`SELECT 1 AS y FROM main.entry INDEXED BY ${splitIndexName(register, field)} WHERE register = '${register}' AND json_type(fields, '$.${field}') = 'array' LIMIT 1`) !== undefined;
+  } catch {
+    return true;
+  }
 }
 
 /** The head of a statement read over the view: its list and its path, each as SQL quotes them. */

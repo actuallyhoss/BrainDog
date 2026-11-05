@@ -22,7 +22,8 @@ import { clash, codeOf, fixOf, no, ok, refused } from '@braindog/ports';
 
 import { nameSpokenIn } from './spoken-names.ts';
 import { coerce, currencyFixed, isAbsent, instant, measure, parseSpoken, range, rowOverCap, type FieldDecl, type Json } from './coerce.ts';
-import { overSplit, splitFault, splitOf, splitOfFields } from './row-parts.ts';
+import { overSplitNow, splitFault, splitOf, splitOfFields } from './row-parts.ts';
+import { splitIndex, splitIndexName } from './split-view.ts';
 import { attempt } from './tx.ts';
 import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
@@ -1811,7 +1812,30 @@ export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {
   /* MIGRATION 16'S OTHER HALF, the declaration bodies SQL cannot re-checksum. Before `makeKernel`, so the first reload
      already reads them renamed; never over a refused schema, whose tables this build cannot vouch for. */
   if (!state.refusal) await renameDeclarations(sql);
+  if (!state.refusal) keepSplitIndexes(sql);
   return makeKernel(sql, clock, state, opts);
+}
+
+/**
+ * THE INDEX THAT SAYS WHETHER A LIST HOLDS A SPLIT ROW, on each list that can (`split-view.ts`), for a record last opened
+ * before there was one. One read when it is there, one index built once when it is not. It only speeds a read: one that
+ * cannot be made is a read through the view, as it always was, so nothing here can stop a record opening.
+ */
+function keepSplitIndexes(sql: Sql): void {
+  try {
+    const lists = sql.all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND body LIKE '%parts\_of%' ESCAPE '\\'");
+    if (lists.length === 0) return;
+    const held = new Set(sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'entry'").map((r) => r.name));
+    for (const { body } of lists) {
+      const decl = JSON.parse(body) as { id?: unknown; fields?: { id: string; type: string; parts_of?: string; retired?: boolean }[] };
+      if (typeof decl.id !== 'string' || !Array.isArray(decl.fields)) continue;
+      const split = splitOfFields(decl.fields.filter((f) => f.retired !== true));
+      const make = split === null ? null : splitIndex(decl.id, split.field);
+      if (split !== null && make !== null && !held.has(splitIndexName(decl.id, split.field))) sql.exec(make);
+    }
+  } catch {
+    /* Read through the view, as it always was. */
+  }
 }
 
 /** Whether a statement only reads: a `SELECT`. Anything else is taken as a write. */
@@ -8740,7 +8764,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const split = splitOf(schema);
       const grouped = `SELECT ${cols.join(', ')} FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})${kept === null ? '' : ` AND (${kept.sql})`} GROUP BY ${group}`;
       const rows = sql.all<Record<string, unknown>>(
-        split && q.value === split.of ? overSplit(grouped, q.register, split.field) : grouped,
+        split && q.value === split.of ? overSplitNow(sql, grouped, q.register, split.field) : grouped,
         q.register,
         ...c.params,
         ...(kept === null ? [] : kept.params),

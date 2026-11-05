@@ -53,6 +53,7 @@ import { AGENT_ROLES, HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, typ
    is what two lists that disagree cost. */
 import { BYDAY, FREQ, shiftFrom } from './schedule.ts';
 import { pairsFault } from './pairs.ts';
+import { splitIndex } from './split-view.ts';
 /* THE VALUES `delete:` TAKES, from the file that keeps the rule, so the check and the reader hold one list. */
 import { DELETE_RULES, ON_DELETE } from './referenced.ts';
 import { spanMs } from './keychain.ts';
@@ -154,6 +155,7 @@ type FieldLike = {
   index?: boolean;
   unique?: boolean;
   retired?: boolean;
+  parts_of?: unknown;
 };
 
 /** `02 §5`'s caps table, and the sentence each one is there to make true. */
@@ -246,6 +248,11 @@ function nearest(said: string): string | null {
 export function indexesFor(register: string, fields: readonly FieldLike[]): string[] {
   const out: string[] = [];
   for (const f of fields) {
+    /* A FIELD OF PARTS HAS THE INDEX THAT SAYS WHETHER ANY ROW IS SPLIT (`split-view.ts`), asked before every sum of the list. */
+    if (!f.retired && f.type === 'json' && typeof f.parts_of === 'string' && f.parts_of !== '') {
+      const split = splitIndex(register, f.id);
+      if (split !== null) out.push(split);
+    }
     if (f.retired || (!f.index && !f.unique)) continue;
     const parts = PARTS[f.type] ?? [''];
     for (const part of parts) {
