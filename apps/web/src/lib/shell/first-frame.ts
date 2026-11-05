@@ -32,6 +32,7 @@ export function frameGone(): void {
 }
 
 const MAIN_DRAWN = 'main#main[data-screen]';
+const WAITS = 'main#main :is(.waiting, .skel-board, .pw, .sk, .sk-group, [data-standing], [data-board-reading])';
 /** Quiet before reading: what a screen fills in just after it says it has drawn (a side tile, the name's banner). */
 const REST_MS = 1500;
 /** What arrives fades up (`data-arrive`, `--d-swap`): the outline stands under it until that has played. */
@@ -46,7 +47,7 @@ let queued = false;
 const px = (v: string): number => Number.parseFloat(v) || 0;
 
 /** A wait still standing, the frame itself, or the page's bare box: none of them is the page having landed. */
-const notPage = (el: Element): boolean => el.matches('main#main, html, body, #ff, #ff *') || el.closest('main#main') === null || el.closest('.waiting, .sk, .sk-group, .pw, [role="status"], [data-standing]') !== null;
+const notPage = (el: Element): boolean => el.matches('main#main, html, body, #ff, #ff *') || el.closest('main#main') === null || el.closest('.waiting, .sk, .sk-group, .pw, [role="status"], [data-standing], [data-board-reading]') !== null;
 
 /** Whether words or a picture of the page are at this point. A wrapper with nothing of its own there is not the page yet. */
 function wordsAt(x: number, y: number): boolean {
@@ -61,7 +62,8 @@ function tileAt(x: number, y: number): boolean {
   if (el === null || notPage(el)) return false;
   for (; el !== null && !el.matches('main#main'); el = el.parentElement) {
     const c = getComputedStyle(el).backgroundColor;
-    if (!/(?:, 0(?:\.\d+)?\)|\/ 0?\.\d+\)|transparent)$/u.test(c)) return true;
+    /* WITH SOMETHING IN IT: a slot standing empty for its board to come is the page's box and not the page. */
+    if (!/(?:, 0(?:\.\d+)?\)|\/ 0?\.\d+\)|transparent)$/u.test(c)) return (el.textContent ?? '').trim() !== '';
   }
   return false;
 }
@@ -159,7 +161,9 @@ export function pageOpened(first: boolean): void {
     queued = false;
     if (leaving) return;
     cover();
-    if (document.querySelector(MAIN_DRAWN) === null) return;
+    /* A SCREEN SAYS IT HAS DRAWN WHILE A PART OF IT STILL WAITS (Projects' board): the outline stands until no wait does, or for
+       its 8 s in `app.html`. Its own bars came up for half a second in the outline's place. */
+    if (document.querySelector(MAIN_DRAWN) === null || document.querySelector(WAITS) !== null) return;
     if (landed()) {
       leaving = true;
       clearTimeout(said);

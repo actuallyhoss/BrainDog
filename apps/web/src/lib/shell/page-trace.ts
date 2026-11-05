@@ -50,7 +50,7 @@ export type Trace = {
 };
 
 /** Never read as part of a page: what floats over it, what is hidden, and any skeleton still standing. */
-const SKIP = 'script,style,template,dialog,[popover],[data-kept-skip],.sr-only,.said,.skip,.waiting,.sk,.sk-group,.pw,.toasts-at';
+const SKIP = 'script,style,template,dialog,[popover],[data-kept-skip],.sr-only,.said,.skip,.waiting,.sk,.sk-group,.pw,.toasts-at,[data-board-reading]';
 
 type Box = { l: number; r: number };
 

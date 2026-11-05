@@ -261,15 +261,16 @@
 
   /* THE FIRST FRAME (`app.html`, `first-frame.ts`): on every page opened, its kept outline stands behind it until it has
      drawn, and a surface with no shell, an error or an ended access draws none of it. */
-  let framed = false;
+  let framed: string | null = null;
   $effect(() => {
     const none = bare || endedSaid !== undefined || page.error !== null;
     const address = page.url.pathname + page.url.search;
     untrack(() => {
       if (none) return frameGone();
-      const first = !framed;
-      framed = true;
-      void address;
+      /* ONLY A NEW ADDRESS: `boot` answering hands `page` a new url object at the same address, and that took the outline away. */
+      if (address === framed) return;
+      const first = framed === null;
+      framed = address;
       pageOpened(first);
     });
   });
