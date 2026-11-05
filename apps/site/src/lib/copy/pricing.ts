@@ -52,8 +52,8 @@ export const pricing = {
      * the day billing does. The figures are `TABLE.free`'s, filled in by the page.
      */
     early: {
-      title: 'Free while in early access.',
-      lede: 'BrainDog is invite only for now, and everything in it is free while we open it up.',
+      title: 'Free to start.',
+      lede: 'Everything in BrainDog is free for now, with no card.',
       plan: {
         name: 'Free',
         price: '$0',

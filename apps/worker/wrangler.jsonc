@@ -654,7 +654,7 @@
            and a site test holds them equal and fails when this line is missing.
            INVITE ONLY FROM 17 OCTOBER: a new address needs a code, minted at
            the app's Admin page or by an application the owner invites, and the site still says "Start free". */
-        "SIGNUP": "invite",
+        "SIGNUP": "open",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET, as alpha's comment says. */
         "TURNSTILE_SITE_KEY": "0x4AAAAAAFvL6vpxsuMhToz5",
         /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and the operator's yes to them. Unset is off, and the page reads by rules. 300, his yes to C7 (1 Nov, "i need it highly intelligent"). Still off in effect until `TURNSTILE_SECRET` is set: the door reads nothing behind no bot check. */

@@ -94,7 +94,7 @@ export const docsWords = {
       'The Agents page shows every agent working now; the person can tell one something, pause, redirect or stop it.',
       'Projects, Work, People, Agents and Money are built in. Money: cash ahead, accounts, ledger, budgets, forecast, coming up, payees, reports. Stripe and Mercury connect read only; bank statements import as CSV.',
       'Slash: the built-in assistant. Press ⌘J to ask in plain words or ask for a change, with an undo.',
-      'Free is $0, with every feature, 3 connected agents and 20 Slash questions a month; sign-up is by invite for now. ' +
+      'Free is $0, with every feature, 3 connected agents and 20 Slash questions a month; no card to start. ' +
         (LAUNCH.billing ? 'Cloud and Cloud Plus are paid monthly; see https://brain.dog/pricing.' : 'Cloud and Cloud Plus, paid monthly, are coming soon, priced at launch.'),
       'The app is at https://app.brain.dog. BrainDog is made by Quartz Apps LLC. Support: support@brain.dog.',
     ],

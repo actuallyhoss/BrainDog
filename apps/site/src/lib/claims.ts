@@ -17,7 +17,7 @@
  *
  * SIGN-UP OPENED ON 8 OCTOBER, SO WHAT RESTS ON `signup` IS `true`, and it stays true by invitation: production runs
  * `SIGNUP=invite` from 17 October, where a stranger who presses Get early access signs up with an invite or applies
- * for one, and from 20 October the site says so ("Early access, invite only"). Billing is still off or in test mode, so a claim
+ * for one, and from 20 October the site said so. SIGNUP=open from 5 November, and the site says that. Billing is still off or in test mode, so a claim
  * that a stranger can pay, upgrade, cancel or have colleagues is `flag`. The repository is private, so a claim that
  * anybody can read the code is `not-yet`, and `claims.test.ts` asks for it to be marked again once `LAUNCH.repo` is on.
  */
@@ -66,7 +66,7 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'together-link-money', said: 'Money stays off it unless you add it.', where: 'together.link.say', state: 'true' },
   { id: 'together-contacts', said: 'Bring contacts in from a CSV or vCard. Anyone already here is skipped.', where: 'together.imports', state: 'true' },
   { id: 'slash-change-undo', said: 'Ask for a change and it makes it, with an undo.', where: 'slash.say', state: 'true' },
-  { id: 'invite-only', said: 'BrainDog is invite only for now.', where: 'free.say', state: 'true', flag: 'signup' },
+  { id: 'open-signup', said: 'Sign up with your email and start.', where: 'free.say', state: 'true', flag: 'signup' },
   { id: 'faq-switch-never', said: 'but reading a key, giving BrainDog away, deleting it and paying stay yours even then.', where: 'faq.questions.3.a', state: 'true' },
   { id: 'faq-trust-settings', said: 'You can see where each agent stands, and put any kind back to asking, in Settings.', where: 'faq.questions.4.a', state: 'true' },
 
@@ -85,7 +85,7 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'agent-signs-writes', said: 'Every change carries its name, and you can undo it.', where: 'agents.cannot.lines.3', state: 'true' },
 
   /* The pricing page (`copy/pricing.ts`, `pricing`): the early access page while billing is off, then the plans. */
-  { id: 'early-free', said: 'everything in it is free while we open it up.', where: 'pricing.early.lede', state: 'true', flag: 'signup' },
+  { id: 'early-free', said: 'Everything in BrainDog is free for now', where: 'pricing.early.lede', state: 'true', flag: 'signup' },
   { id: 'nothing-lost', said: 'Nothing you set up now is lost.', where: 'pricing.early.later.say', state: 'true' },
   { id: 'export-any-time-early', said: 'Yes, all of it, as one file, whenever you like.', where: 'pricing.early.faq.questions.2.a', state: 'true' },
   { id: 'export-every-plan', said: 'Yes, all of it, as one file, on every plan.', where: 'pricing.faq.questions.2.a', state: 'true' },

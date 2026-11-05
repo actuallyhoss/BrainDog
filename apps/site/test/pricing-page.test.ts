@@ -161,7 +161,7 @@ test('with billing off one h1 and one plan, no paid plan; with it on the plans, 
   const off = await render('routes/pricing/+page.svelte', { billing: false });
   const on = await render('routes/pricing/+page.svelte', { billing: true });
   const h1 = (r: { body: string }) => [...r.body.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => words(m[1]!));
-  assert.deepEqual(h1(off), ['Free while in early access.'], 'the early access page does not have its one h1');
+  assert.deepEqual(h1(off), ['Free to start.'], 'the early access page does not have its one h1');
   assert.deepEqual(h1(on), ['Free to start.'], 'the plans page does not have one h1, Free’s');
   assert.equal((off.body.match(/<tr\b/g) ?? []).length, 0, 'the early access page draws a table of plans');
   /* FEWER WORDS (fbf2abe2d, 3 November): one line says paid plans come later, with no name and no figure of theirs. */

@@ -19,10 +19,10 @@ export const shell = {
         'Press ⌘J and ask in plain words. Slash answers from your own numbers and makes the changes you ask for, with an undo.',
     },
     pricing: {
-      title: 'Pricing: free in early access · BrainDog',
+      title: 'Pricing: free to start · BrainDog',
       description: LAUNCH.billing
         ? 'Free to start with 3 connected agents. Cloud and Cloud Plus add more agents, more questions and, on Cloud Plus, your team.'
-        : 'BrainDog is free while invite only: every feature, 3 connected agents and 20 questions to the built-in assistant a ' +
+        : 'BrainDog is free to start: every feature, 3 connected agents and 20 questions to the built-in assistant a ' +
           'month. Paid plans come later.',
     },
     agents: {
@@ -82,8 +82,8 @@ export const shell = {
 
   /** The early access line: the hero's under its buttons, and the strip that closes an inner page. */
   early: {
-    strong: 'Early access, invite only.',
-    rest: 'Free while we open it up.',
+    strong: 'Open to everyone.',
+    rest: 'Free to start, no card.',
   },
 
   /** The dark footer: the brand with no blurb, three groups of plain links (`lib/site/footer.ts`) and the owner. */

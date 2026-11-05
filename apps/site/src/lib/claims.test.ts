@@ -117,8 +117,8 @@ test("the launch flags and the support address match production's Worker vars", 
  */
 const OPEN_TO_ALL = /anyone can sign up|open to everyone|no invite|no waitlist/i;
 
-test('no sentence on the site says sign-up is open to everyone', () => {
-  const said = strings(COPY).filter((s) => OPEN_TO_ALL.test(s));
+test('while sign-up is by invite, no sentence on the site says it is open to everyone', () => {
+  const said = LAUNCH.invite ? strings(COPY).filter((s) => OPEN_TO_ALL.test(s)) : [];
   assert.deepEqual(said, [], `the site says sign-up is open to everyone, and production may be invite only: ${said.join(' | ')}`);
   /* THE PLANTED FAULT, so the pattern is seen to catch each shape, whatever its case. */
   for (const planted of ['Anyone can sign up today.', 'BrainDog is OPEN TO EVERYONE.', 'No invite needed.', 'No waitlist, just start.'])

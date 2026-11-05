@@ -69,7 +69,7 @@ test('home.ts holds the words of the site story at the key paths the ledger read
     'See which agents are working, and pause or stop one from any browser.',
     'Agents use your keys without ever seeing them.',
   ]);
-  assert.equal(home.free.title, 'Free while in early access.');
+  assert.equal(home.free.title, 'Start today, for free.');
   assert.equal(home.faq.questions.length, 9);
   assert.ok(!('closing' in home), 'home has no recap close (site F1)');
 });

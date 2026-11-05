@@ -161,8 +161,8 @@ export const home = {
   },
 
   free: {
-    title: 'Free while in early access.',
-    say: "BrainDog is invite only for now. Ask, and we'll email you when your place is ready.",
+    title: 'Start today, for free.',
+    say: 'Sign up with your email and start. No card.',
     /* The figures are `TABLE.free`'s, said in ONE SENTENCE, NOT A ROW OF STATS (the site's own rule, §47). */
     /* "built\u2011in" with a hyphen that never breaks, so a phone does not leave "in assistant." alone on a line. */
     figures: (tools: number, questions: number): string =>
@@ -220,7 +220,7 @@ export const home = {
         /* THE PAID PLANS BY THE BILLING FLAG: priced at launch while it is off, and the pricing page's own figures once it is on. */
         a: LAUNCH.billing
           ? 'Free is $0. Cloud and Cloud Plus are monthly plans for more agents, more questions and, on Cloud Plus, your team.'
-          : 'Nothing in early access: every feature is free. Paid plans for more agents, more questions and teams come later.',
+          : 'Nothing for now: every feature is free. Paid plans for more agents, more questions and teams come later.',
         link: { label: 'Pricing', href: '/pricing' },
       },
     ],

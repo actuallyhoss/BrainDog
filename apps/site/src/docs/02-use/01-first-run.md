@@ -2,10 +2,6 @@
 
 Your BrainDog holds your lists, your pages and the history of every change. Making one takes a short conversation, an email address, and a minute.
 
-## Early access
-
-BrainDog is in early access, so sign-up is by invitation. Without one, the sign-up page asks your name, your email and what you would use it for, and your invitation comes to that address when there is room. Open the link in it to start.
-
 ## A short conversation
 
 BrainDog says hello and asks **What do you do?** Tap one of the answers, such as I freelance or I run a small business, or type a sentence or two in your own words.
