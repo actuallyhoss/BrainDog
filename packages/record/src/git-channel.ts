@@ -27,9 +27,19 @@ const SHA = /^[0-9a-f]{40}$/u;
 export const GITHUB_API = 'https://api.github.com';
 export const GITHUB_RAW = 'https://raw.githubusercontent.com';
 
+/**
+ * A step up the address, however it is written: a URL takes `..`, `%2e%2e` and `.%2E` alike as a step up, and `\\` as a `/`.
+ *
+ * THE REPOSITORY THE SHEET NAMES IS THE ONE THE FILE COMES FROM, OR NOTHING IS READ. `git:someone/kit@v1.0.0:../../../other/evil/main/kit.pack.json`
+ * read as `someone/kit`, and its raw address normalised to `other/evil/main`: the person was told it came from a
+ * repository they trust, pinned to a commit, and the file was a stranger's, on a branch that moves.
+ */
+const STEPS_UP = /\\|(?:^|\/)(?:\.|%2e){1,2}(?:\/|$)/iu;
+
 export function parseGit(address: string): GitAddress | null {
   const m = GIT.exec(address.trim());
   if (!m) return null;
+  if (/^\.{1,2}$/u.test(m[1]!) || /^\.{1,2}$/u.test(m[2]!) || STEPS_UP.test(m[3]!) || STEPS_UP.test(m[4]!)) return null;
   return { owner: m[1]!, repo: m[2]!, ref: m[3]!, path: String(m[4]).replace(/^\/+/u, '') };
 }
 
