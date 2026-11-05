@@ -127,7 +127,7 @@ export const HOOKS_HELD = 'already runs every BrainDog hook';
  * with this event's word last. By the script's name and not the whole command, so an entry from before a checkout moved
  * is replaced in place rather than joined by a second hook that does the same thing.
  */
-const isOurs = (command: string, which: Which): boolean => new RegExp(`braindog-hook\\.(?:sh|ps1)"?\\s+${which}\\s*$`, 'u').test(command);
+const isOurs = (command: string, which: Which): boolean => new RegExp(`braindog-hook\\.(?:sh|ps1)["']?\\s+${which}\\s*$`, 'u').test(command);
 
 /**
  * WHAT `--replace <replace.json>` TAKES OUT, READ FROM THAT FILE AND FROM NOTHING COMPILED HERE.
@@ -325,11 +325,23 @@ export function gitShell(env: NodeJS.ProcessEnv = process.env, exists: (path: st
   return found.find((p) => exists(p)) ?? null;
 }
 
+/**
+ * A path as one word of the line a shell reads, for a hook or a status line.
+ *
+ * DOUBLE QUOTES FOR A PLAIN PATH, so the line every machine already pinned stays those bytes. A shell still runs what is
+ * inside double quotes, so a folder holding `$`, a backtick, a `"` or a `\\` is written in single quotes, where nothing
+ * is read: `sh "/x$(touch y)/braindog-hook.sh" start` ran `touch y` every time the hook fired.
+ */
+export const shellWord = (path: string, reads: RegExp = /[$`"\\\n]/u): string => (reads.test(path) ? `'${path.replaceAll("'", "'\\''")}'` : `"${path}"`);
+
+/** The same for a path on Windows read by Git's `sh`, whose backslashes are its folders and its line has always held them. */
+const winWord = (path: string): string => shellWord(path, /[$`"\n]/u);
+
 /** The command Claude Code runs: Git's `sh` on Windows when there is one, else the PowerShell shim; `sh` elsewhere. */
 export function hookCommand(which: Which, scripts: string, platform: string = process.platform, shell: string | null = platform === 'win32' ? gitShell() : null): string {
-  if (platform !== 'win32') return `sh "${join(scripts, 'braindog-hook.sh')}" ${which}`;
+  if (platform !== 'win32') return `sh ${shellWord(join(scripts, 'braindog-hook.sh'))} ${which}`;
   return shell !== null
-    ? `"${shell}" "${join(scripts, 'braindog-hook.sh').replaceAll('\\', '/')}" ${which}`
+    ? `${winWord(shell)} ${shellWord(join(scripts, 'braindog-hook.sh').replaceAll('\\', '/'))} ${which}`
     : `powershell -NoProfile -ExecutionPolicy Bypass -File "${join(scripts, 'braindog-hook.ps1')}" ${which}`;
 }
 

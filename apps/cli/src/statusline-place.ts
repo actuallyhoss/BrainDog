@@ -12,7 +12,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { keepCopy } from './install.ts';
+import { keepCopy, shellWord } from './install.ts';
 
 /** The status line's own entry, written beside the hook scripts: `statusline-entry.ts` built on its own (`scripts/bundle.mjs`). */
 export const STATUSLINE_FILE = 'braindog-statusline.mjs';
@@ -21,7 +21,7 @@ export const STATUSLINE_FILE = 'braindog-statusline.mjs';
 export const statuslineEntryIn = (scripts: string): string => (existsSync(join(scripts, STATUSLINE_FILE)) ? join(scripts, STATUSLINE_FILE) : resolve(scripts, '..', 'src', 'statusline-entry.ts')).replaceAll('\\', '/');
 
 /** The entry placed: Node on that small file, so a redraw does not load the whole command. */
-export const statusLineEntry = (scripts: string): { type: 'command'; command: string } => ({ type: 'command', command: `node "${statuslineEntryIn(scripts)}"` });
+export const statusLineEntry = (scripts: string): { type: 'command'; command: string } => ({ type: 'command', command: `node ${shellWord(statuslineEntryIn(scripts))}` });
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 

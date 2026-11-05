@@ -204,7 +204,7 @@ function hooksOf(file: string): { event: string; command: string }[] {
 }
 
 /** BrainDog's own hook for an event, by its script's name and its last word, as `install` tells one (`isOurs`). */
-const isOurHook = (command: string, which: string): boolean => new RegExp(`braindog-hook\\.(?:sh|ps1)"?\\s+${which}\\s*$`, 'u').test(command);
+const isOurHook = (command: string, which: string): boolean => new RegExp(`braindog-hook\\.(?:sh|ps1)["']?\\s+${which}\\s*$`, 'u').test(command);
 
 /**
  * THE FOUR HOOKS BESIDE THE START AND THE END, by their event and word as `install` writes them. Without the prompt and
