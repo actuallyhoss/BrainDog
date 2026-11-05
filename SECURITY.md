@@ -267,8 +267,10 @@ own sandboxed frame.
 
 ### 8 · Dependencies
 
-Runtime dependencies are enumerated and near-zero ([ADR-046](docs/16-DECISIONS.md)): `valibot` in
-`declare`, and one YAML parser on the CLI and self-host paths only ([ADR-063](docs/16-DECISIONS.md)).
+Runtime dependencies are enumerated and near-zero ([ADR-046](docs/16-DECISIONS.md)): `svelte` in the two
+built apps, one YAML parser on the CLI and self-host paths ([ADR-063](docs/16-DECISIONS.md)), and QuickJS for
+scripts (`@jitl/quickjs-ng-wasmfile-release-sync`, `quickjs-emscripten-core`). `tools/gates/public-repo.mjs` holds
+the list.
 An exploitable advisory in one of those, on a path that reaches production, is in scope. A transitive
 **dev**-dependency advisory with no path to a shipped artefact is a dependency-update issue; open a
 normal issue for it.

@@ -56,7 +56,6 @@ says so.
 9.5 months · 1.8–2.3 · 2.6–3.4 · 3.7–4.9 years, which no single divisor reproduces; the header
 said one rate and the cells used three.*
 
-Against a month-24 base case of ~$960/month and a modal single outcome of **$0**.
 
 ### The 2026-09-01 additions and the 2026-09-02 parity trace, costed rather than absorbed
 

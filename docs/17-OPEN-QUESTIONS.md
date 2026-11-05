@@ -14,7 +14,7 @@ Ordered by how expensive it is to get wrong.
 **The question.** [00-README](00-README.md) §1 withdrew all reuse of `brain`. An earlier version of
 this question priced that at ~115 days. **The audited number is ≈488–645 working days — ≈3.0–4.0
 years at 4 productive days in 9, which is 162 productive days a year** ([15-ROADMAP](15-ROADMAP.md)
-§1; the two days over the previous 486–643 are `@braindog/host`, added in iteration 2). Against a base case of ~$960/mo at month 24 and a modal single outcome of $0. *(An earlier
+§1; the two days over the previous 486–643 are `@braindog/host`, added in iteration 2).  *(An earlier
 draft of this question paired 488–643 days with 2.6–3.4 years — the years the roadmap had computed
 for a smaller number.)*
 

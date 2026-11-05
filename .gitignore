@@ -63,6 +63,8 @@ apps/site/static/desktop/
 # Working notes, briefs and reports kept on the machine that builds BrainDog, never in the repository.
 /loop/
 /loop
+# And the notes folder, which only this checkout's .git/info/exclude kept out until now, so a fresh clone would have added it.
+/.notes/
 /braindog-finish-plan-scratchpad/
 CLAUDE.local.md
 /REPORT.md
