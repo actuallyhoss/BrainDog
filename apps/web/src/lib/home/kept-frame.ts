@@ -21,7 +21,9 @@
  * row moved since it was taken leaves it unpainted that once (`record/answers-out.ts`, `record/wrote-mark.ts`, `app.html`).
  *
  * NOTHING IN IT RUNS OR LOADS: scripts, frames and media are left out, every `id` is renamed so nothing finds the
- * picture for the screen, and `data-screen` is dropped so nothing reads it as drawn.
+ * picture for the screen, and `data-screen` is dropped so nothing reads it as drawn. AND `app.html` DOES NOT TAKE THIS ON
+ * TRUST: it parses the markup apart and drops script, frame, meta, base and link before the picture lands, since a meta
+ * refresh written into the cache by anything on this origin goes wherever it says on every open, and no policy holds one.
  */
 
 import { apiBase, BASE } from '../at.ts';
