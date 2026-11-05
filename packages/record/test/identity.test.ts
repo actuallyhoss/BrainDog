@@ -292,17 +292,17 @@ test('A BLANK SERVER KEY OPENS NOTHING: an empty configured key refuses every ex
   }
 });
 
-test('THE LOCKOUT: ten wrong keys are compared, the eleventh is not, and the right key waits it out', async () => {
+test('THE LOCKOUT: ten wrong keys are counted, the eleventh is refused, and the right key always gets in', async () => {
   const { sql, clock, d, lines } = setup();
   const ip = '198.51.100.7';
   for (let i = 0; i < 10; i++) notYou(await keyIn(d, { ip, key: `wrong-${i}` }));
   assert.deepEqual(reasons(lines), Array(10).fill('key'));
 
   assert.deepEqual({ ...(await keyIn(d, { ip, key: 'wrong-again' })) }, { status: 429, retryAfter: 900 });
-  /* STICKY: the right key during the window is refused without being looked at. */
+  /* A WRONG KEY WAITS IT OUT. */
   clock.advance(5 * MINUTE);
-  assert.deepEqual({ ...(await keyIn(d, { ip })) }, { status: 429, retryAfter: 600 });
-  assert.equal(reasons(lines).filter((r) => r === 'key').length, 10, 'a key was compared during the lock');
+  assert.deepEqual({ ...(await keyIn(d, { ip, key: 'wrong-later' })) }, { status: 429, retryAfter: 600 });
+  assert.equal(reasons(lines).filter((r) => r === 'key').length, 10, 'a wrong key was counted as a failure during the lock');
 
   /* Hammering does not extend it, and the counter stays capped. */
   for (let i = 0; i < 20; i++) await keyIn(d, { ip, key: 'wrong' });
@@ -312,9 +312,10 @@ test('THE LOCKOUT: ten wrong keys are compared, the eleventh is not, and the rig
   ok(await keyIn(d, { ip: '198.51.100.8' }));
 
   clock.set(NOW + 15 * MINUTE - 1);
-  assert.equal((await keyIn(d, { ip })).status, 429);
-  clock.set(NOW + 15 * MINUTE);
+  assert.equal((await keyIn(d, { ip, key: 'wrong' })).status, 429);
+  /* THE RIGHT KEY IS THE OWNER WHEREVER IT CAME FROM (RG14): somebody naming their address cannot lock them out. */
   ok(await keyIn(d, { ip }));
+  assert.equal(sql.all('SELECT 1 FROM dir_fail WHERE key = ?', `ip:${ip}`).length, 0, 'and it clears the address');
 });
 
 test('AND IT FORGETS: strikes whose first is fifteen minutes old start again at one', async () => {
@@ -369,9 +370,9 @@ test('TEN FAILURES LOCK, AND A CORRECT SECRET DURING THE LOCK IS REFUSED AND UNL
   const locked = strikes();
   assert.deepEqual(locked, { n: 10, until: NOW + 15 * MINUTE });
 
-  /* All three ways in, each with the right secret, and none of them is compared or clears the lock. */
+  /* A LINK AND A PASSKEY, each with the right secret, and neither is compared or clears the lock. The server key is the one
+     way past it (RG14), and is asked below. */
   clock.advance(MINUTE);
-  assert.equal((await keyIn(d, { ip })).status, 429, 'the right server key');
   assert.equal((await d.auth({ flow: 'magic.redeem', linkToken, ip })).status, 429, 'a live link');
   assert.equal((await passkeyIn(d, KEYS.es256, { person: ada, signCount: 1, ip })).status, 429, 'a good passkey');
   assert.deepEqual(strikes(), locked, 'a correct secret during the lock moved it');
@@ -407,7 +408,7 @@ test('THE LOCKOUT FAILS CLOSED: a reservation with no row back is a 503, never a
     });
     value(d.person$('ada@example.com'));
 
-    assert.deepEqual({ ...(await keyIn(d)) }, { status: 503 }, broken);
+    assert.deepEqual({ ...(await keyIn(d, { key: 'wrong' })) }, { status: 503 }, broken);
     assert.deepEqual({ ...(await d.auth({ flow: 'magic.start', email: 'ada@example.com', ip: nextIp() })) }, { status: 503 }, broken);
     assert.equal(real.all('SELECT 1 FROM dir_session').length, 0, 'somebody was signed in past a broken lockout');
     assert.deepEqual(reasons(lines), ['reserve', 'reserve']);

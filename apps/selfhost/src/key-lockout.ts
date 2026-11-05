@@ -14,7 +14,8 @@
  * `SIGN_IN` is: a locked place was refused before anything was compared, the right key too. Under
  * `BRAINDOG_TRUST_PROXY=1` or a trusted range the place is a header, and a header is words, so anybody on the LAN could
  * name the owner's own address with ten wrong keys and lock the owner out for fifteen minutes, again and again. Now the
- * key is compared first, in constant time, and a match is the owner wherever it came from. A wrong key from a locked
+ * key is compared first, in constant time, and a match is the owner wherever it came from. `/auth/token` does the same
+ * (`key.exchange` in `packages/record/src/identity.ts`). A wrong key from a locked
  * place is a 429, held to one answer per `wait` (`turn`): one more may wait for the next turn and the rest are refused
  * at once, so a guesser who waits for answers gets one every two seconds and a flood holds no sockets. That the right
  * key answers differently during a lock costs no secret: a server key is at least 128 bits (`weakKey` in `main.ts`).

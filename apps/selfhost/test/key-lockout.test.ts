@@ -195,3 +195,33 @@ test('RG14: OVER HTTP, TEN WRONG KEYS NAMING THE OWNER\'S ADDRESS DO NOT LOCK TH
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('/auth/token HOLDS ONLY WRONG KEYS, BY THE SOCKET: naming the owner locks nobody out, and a fresh header buys no guesses', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-token-door-'));
+  const KEY = 'k'.repeat(40);
+  const running = await start({
+    file: join(dir, 'record.brain'),
+    directory: join(dir, 'directory.sqlite'),
+    sessionKey: new Uint8Array(32).fill(7),
+    port: 0,
+    pollMs: 0,
+    token: KEY,
+    host: '127.0.0.1',
+    trustProxy: true,
+    limits: null,
+  });
+  const port = (running.server.address() as { port: number }).port;
+  assert.ok(running.directory?.person$('owner@example.test', 'Owner').ok);
+  const origin = `http://localhost:${port}`;
+  const exchange = (serverKey: string, forwarded: string) =>
+    fetch(`http://127.0.0.1:${port}/auth/token`, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'x-forwarded-for': forwarded }, body: JSON.stringify({ serverKey }) });
+  try {
+    let last = 0;
+    for (let i = 0; i < 11; i++) last = (await exchange(`guess-${i}`, `198.51.100.${i + 1}`)).status;
+    assert.equal(last, 429, 'a fresh x-forwarded-for bought every guess a new count');
+    assert.equal((await exchange(KEY, '198.51.100.200')).status, 200, 'the right key was held by the lock');
+  } finally {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

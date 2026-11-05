@@ -893,14 +893,20 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!config.key || !wanted) return off();
         const [presented, next, given, expected] = await Promise.all([hashOf(call.sid), minted(), digest(call.serverKey), wanted]);
         const strike = `ip:${ipBucket(text(call.ip))}`;
-        const stop = reserve(flow, strike, now);
-        if (stop) return stop;
+        /* THE LOCK HOLDS WRONG KEYS ONLY, AND THE RIGHT KEY ALWAYS GETS IN (RG14), as at `/api` on the self-host, whose only
+           door this is. Compared first, in constant time. A strike was reserved before anything else here, so ten wrong keys
+           named as coming from the owner's address locked the owner out of signing in while their key still worked at `/api`. */
+        const right = same(given, new Uint8Array(expected));
+        if (!right) {
+          const stop = reserve(flow, strike, now);
+          if (stop) return stop;
+        }
         if (persons() > 1)
           return {
             status: 403,
             refusal: { code: 'FORBIDDEN', fix: 'The server key only signs in where BrainDog has one person, and this one has more. Sign in with a passkey.' },
           };
-        if (!same(given, new Uint8Array(expected))) return rejected(flow, 'key');
+        if (!right) return rejected(flow, 'key');
         const outcome = sql.transactionSync((): Who | Reason => {
           const only = sql.one<{ id: string; email: string; suspended_at: string | null }>('SELECT id, email, suspended_at FROM dir_person LIMIT 1');
           if (!only) return 'unknown';

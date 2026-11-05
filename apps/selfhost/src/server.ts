@@ -2646,7 +2646,10 @@ async function answer(
     /* A STRANGER'S FIRST SENTENCE, READ BY THIS HOST'S MODEL (`./first-read.ts`): off until `FIRST_READ_DAILY` is set,
        and read by `readSetup`, with no record, owner or ledger. */
     if (over === null && /^\/+auth\/signup\/read\/*$/.test(path)) return write(res, await serveFirstRead(request, { ...site.firstRead, ip }));
-    return write(res, over ?? (await serveAuth(request, { ...site.door, ip, reached: req.headers.host ?? '' })));
+    /* A WRONG SERVER KEY IS COUNTED BY THE SOCKET AND NOT BY A HEADER (RG14): behind a proxy `x-forwarded-for` is words, so a
+       fresh one with every guess was never counted. A shared count costs nobody anything, since the right key always gets in. */
+    const counted = /^\/+auth\/+token\/*$/.test(path) ? (req.socket.remoteAddress ?? ip) : ip;
+    return write(res, over ?? (await serveAuth(request, { ...site.door, ip: counted, reached: req.headers.host ?? '' })));
   }
   /* `/account/*` IS THE DIRECTORY'S TOO, and reads only the session cookie. */
   if (/^\/+account(?:\/|$)/.test(path)) return write(res, await serveAccount(request, { origin: site.origin, auth: site.auth, usage: site.usage, records: site.records, email: site.email }));
