@@ -312,7 +312,7 @@
      second press a moment later landed on whichever row had moved under the pointer, and flicking down the rail ended
      somewhere nobody pressed. So after a press the rail opens and closes what it should once the hand has stopped for
      `RAIL_REST_MS`; the row pressed is lit from the press (`motion/press.ts`), and anything else that moves it goes at once. */
-  const RAIL_REST_MS = 220;
+  const RAIL_REST_MS = 180;
   const PRESS_NEAR_MS = 1000;
   let openOn = $state.raw(untrack(() => ({ lit, project: projectLit })));
   $effect(() => {
