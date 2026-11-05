@@ -14,6 +14,9 @@ struct TellBrainDogIntent: AppIntent {
 
     static var parameterSummary: some ParameterSummary { Summary("Tell BrainDog \(\.$words)") }
 
+    /// Only with the phone unlocked: whoever holds a locked phone does not write in the record by talking to it.
+    static var authenticationPolicy: IntentAuthenticationPolicy { .requiresAuthentication }
+
     #if os(iOS)
     /// Done without opening the app, unless the words need Tell to finish (`finish`).
     static var supportedModes: IntentModes { [.background, .foreground(.dynamic)] }
@@ -56,6 +59,9 @@ struct TellBrainDogIntent: AppIntent {
 struct WhatNeedsMeIntent: AppIntent {
     static let title: LocalizedStringResource = "What needs me"
     static let description = IntentDescription("How many questions wait on you in BrainDog, and the first of them.")
+
+    /// Only with the phone unlocked: whoever holds a locked phone does not hear the record's words read out.
+    static var authenticationPolicy: IntentAuthenticationPolicy { .requiresAuthentication }
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<Int> & ProvidesDialog {

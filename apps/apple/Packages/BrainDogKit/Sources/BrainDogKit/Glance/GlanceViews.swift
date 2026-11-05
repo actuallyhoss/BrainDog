@@ -55,7 +55,8 @@ struct GlanceEmpty: View {
 }
 
 /// Needs you at a glance (plan 3.10): the count, red when above nought as the design system allows for that count, and
-/// the first questions in the record's own words.
+/// the first questions in the record's own words. WHAT THE RECORD SAYS IS `privacySensitive` in every glance: the system
+/// blanks it on a locked phone (the Lock Screen, StandBy), where the count and the labels stay.
 public struct NeedsGlance: View {
     let glance: Glance?
     let size: GlanceSize
@@ -93,7 +94,7 @@ public struct NeedsGlance: View {
                 if let first = glance.questions.first {
                     Spacer(minLength: 0)
                     countText
-                    Text(first.question).font(Typeface.meta).foregroundStyle(Palette.ink2).lineLimit(2)
+                    Text(first.question).font(Typeface.meta).foregroundStyle(Palette.ink2).lineLimit(2).privacySensitive()
                 } else {
                     GlanceEmpty(glyph: .check, line: Words.nothingWaits)
                 }
@@ -122,6 +123,7 @@ public struct NeedsGlance: View {
                                     .lineLimit(lines.count == 1 ? 3 : 2)
                                     .leading(lines.count == 1 ? .row : .meta)
                                     .multilineTextAlignment(.leading)
+                                    .privacySensitive()
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                             }
                             if i < lines.count - 1 { Hairline() }
@@ -153,7 +155,7 @@ public struct NeedsGlance: View {
                     .font(Typeface.caption)
             }
             Text(glance?.questions.first?.question ?? (glance == nil ? Words.signInToSee : Words.nothingWaits))
-                .font(Typeface.meta).lineLimit(2)
+                .font(Typeface.meta).lineLimit(2).privacySensitive()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -210,6 +212,7 @@ public struct NumbersGlance: View {
                 .tracking(Typeface.tight(22))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
+                .privacySensitive()
         }
         .accessibilityElement(children: .combine)
     }
@@ -263,7 +266,7 @@ public struct DueGlance: View {
                     Glyph.clock.image.resizable().scaledToFit().frame(width: 13, height: 13)
                     Text(Words.dueNext).font(Typeface.caption)
                 }
-                Text(dueLine).font(Typeface.meta).lineLimit(2)
+                Text(dueLine).font(Typeface.meta).lineLimit(2).privacySensitive()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
@@ -285,10 +288,10 @@ public struct DueGlance: View {
                     } else if let line = due.first {
                         Spacer(minLength: 0)
                         if let figure = line.figure {
-                            Text(figure).font(Typeface.figure).tracking(Typeface.tight(22)).foregroundStyle(Palette.ink).lineLimit(1).minimumScaleFactor(0.6)
+                            Text(figure).font(Typeface.figure).tracking(Typeface.tight(22)).foregroundStyle(Palette.ink).lineLimit(1).minimumScaleFactor(0.6).privacySensitive()
                         }
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(line.text).font(Typeface.meta).foregroundStyle(Palette.ink).lineLimit(2).leading(.meta)
+                            Text(line.text).font(Typeface.meta).foregroundStyle(Palette.ink).lineLimit(2).leading(.meta).privacySensitive()
                             if let day = line.day { Text(day).font(Typeface.caption).foregroundStyle(Palette.ink3).lineLimit(1) }
                         }
                     }
@@ -310,10 +313,10 @@ private struct DueLine: View {
             if let day = line.day {
                 Text(day).font(Typeface.caption).foregroundStyle(Palette.ink3).lineLimit(1).frame(width: 68, alignment: .leading)
             }
-            Text(line.text).font(Typeface.meta).foregroundStyle(Palette.ink).lineLimit(1)
+            Text(line.text).font(Typeface.meta).foregroundStyle(Palette.ink).lineLimit(1).privacySensitive()
             Spacer(minLength: Space.s2)
             if let figure = line.figure {
-                Text(figure).font(Typeface.meta).monospacedDigit().foregroundStyle(figure.hasPrefix("+") ? Palette.good : Palette.ink).lineLimit(1)
+                Text(figure).font(Typeface.meta).monospacedDigit().foregroundStyle(figure.hasPrefix("+") ? Palette.good : Palette.ink).lineLimit(1).privacySensitive()
             }
         }
         .accessibilityElement(children: .combine)
@@ -347,6 +350,7 @@ public struct FigureGlance: View {
                     .foregroundStyle(figure.met == false ? Palette.red : Palette.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
+                    .privacySensitive()
                 Text(figure.label).font(Typeface.meta).foregroundStyle(Palette.ink2).lineLimit(2).leading(.meta)
             } else {
                 GlanceEmpty(glyph: glance == nil ? .lock : .observe, line: glance == nil ? Words.signInToSee : Words.pickNumber)
