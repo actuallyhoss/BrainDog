@@ -39,7 +39,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
-  import { areaOf, areasWithFlow, boxesOf, flowAfterRail, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, railDrawn, slotOf, snapped, splitAreas, sticks, widened, type Measured, type Run } from './layout.ts';
+  import { areaOf, areasWithFlow, boxesOf, flowAfterRail, keptFlow, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, railDrawn, slotOf, snapped, splitAreas, sticks, widened, type Measured, type Run } from './layout.ts';
   import { FOLD_LINES, foldOf, foldWords, linesOf, mayFold } from './fold.ts';
   import { arranged, emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
@@ -582,9 +582,8 @@
    */
   let flowAt = $state<{ on: string; at: number } | null>(null);
   const mayFlow = $derived(mode === 'page' && !arranging && layout !== null && railShown && wide.current && !narrow && workWidth !== null);
-  const flowSplit = $derived(
-    mayFlow && flowAt !== null && flowAt.on === page.page ? areasWithFlow(mainRest, flowAt.at) : { beside: mainRest, after: [] as Laid[] },
-  );
+  const flowCut = $derived(flowAt !== null && flowAt.on === page.page ? flowAt.at : (keptFlow.get(`${page.page} ${workWidth}`) ?? 0));
+  const flowSplit = $derived(mayFlow && flowCut > 0 && flowCut < mainRest.length ? areasWithFlow(mainRest, flowCut) : { beside: mainRest, after: [] as Laid[] });
 
   /**
    * THE WIDTHS A ROW IS DRAWN AT ONCE ITS HIDDEN BLOCKS ARE GONE, by declared index, for the blocks whose width changes
@@ -748,14 +747,26 @@
       /* A HIDDEN BLOCK JUST BEFORE THE CUT GOES UNDER WITH WHAT FOLLOWS IT, so a boxed run keeps its section. */
       while (at > 0 && !list[at - 1]!.block.drawn) at--;
       const was = untrack(() => flowAt);
-      const next = at > 0 ? { on, at } : null;
-      if (next?.at !== was?.at || next?.on !== was?.on) flowAt = next;
+      const next = { on, at: Math.max(at, 0) };
+      untrack(() => keptFlow.set(`${on} ${workWidth}`, next.at));
+      if (next.at !== was?.at || next.on !== was?.on) flowAt = next;
     };
     const watch = frameResizeObserver(measure);
-    watch.observe(main);
-    watch.observe(rail);
-    if (under) watch.observe(under);
-    return () => watch.disconnect();
+    /* THE FIRST MEASURE IS TAKEN BEFORE THE FRAME IS PAINTED, as the width's is above: a frame later the page had been seen
+       with the column running to its foot, and then fell 700px shorter. One round and let go, so no second round is asked
+       of the observer in that frame. */
+    const first = new ResizeObserver(() => {
+      first.disconnect();
+      measure();
+      watch.observe(main);
+      watch.observe(rail);
+      if (under) watch.observe(under);
+    });
+    first.observe(main);
+    return () => {
+      first.disconnect();
+      watch.disconnect();
+    };
   });
 
   /* ── a long note, folded ───────────────────────────────────────────────────

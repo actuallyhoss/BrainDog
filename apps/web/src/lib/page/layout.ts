@@ -451,3 +451,9 @@ export function areasWithFlow<T>(main: readonly T[], at: number): { beside: T[];
   if (at <= 0 || at >= main.length) return { beside: [...main], after: [] };
   return { beside: main.slice(0, at), after: main.slice(at) };
 }
+
+/**
+ * WHERE EACH PAGE'S SIDE COLUMN LAST CLOSED, by page and width, for the tab: a page opened again is laid out with its column
+ * closed from its first layout, and is not laid out tall and then again short (Money, 2098 then 1394 tall).
+ */
+export const keptFlow = new Map<string, number>();
