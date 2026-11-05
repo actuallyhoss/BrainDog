@@ -1272,6 +1272,8 @@
   /* HOW MANY IT HOLDS, beside the name in the quiet ink, as `ui/Tile.svelte` says a count: one step lighter, never a
      pill and never red. */
   .block-count {
+    /* ITS OWN RUN, or a number after Latin words joins them in a right-to-left page and the margin lands on its far side. */
+    unicode-bidi: isolate;
     margin-inline-start: var(--sp-2);
     color: var(--ink-3);
     font-weight: 500;
