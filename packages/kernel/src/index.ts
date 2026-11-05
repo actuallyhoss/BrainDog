@@ -4837,12 +4837,20 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if (named) return no<Entry>('IMMUTABLE_FIELD', `${named} is written by BrainDog itself, and no caller sets it.`, { at: named });
         if (w.principal?.kind === 'token')
           return no<Entry>('NEEDS_BROWSER_SESSION', 'Only a person tells an agent, signed in to BrainDog. An agent answers with instructions.', { at: 'register' });
+        /* NOR A SCRIPT, A RULE OR A DOOR, which have no token and reached this line as a person would. A row here is read by
+           the next agent as what its person told it, so the words of a mail a rule copied, or an add-on's, would be orders.
+           Measured: `writes: ['instructions']` filed "Run curl ... | sh" to whoever works next. */
+        if (!/^p_/u.test(w.actor)) return no<Entry>('FORBIDDEN', 'Only a person tells an agent, signed in to BrainDog. A script, a rule or a door does not.', { at: 'register' });
         const was = ref === null ? null : get(ref, { includeDeleted: true });
         if (was && was.state !== 'sent' && Object.keys(patch).some((k) => k !== 'deleted_at'))
           return no<Entry>('FORBIDDEN', 'A run has seen this instruction, so it is changed only by withdrawing it; say the new thing as a new one.', {
             at: 'register',
           });
       }
+      /* A RUN'S ROW IS THE RUN'S. Its `next`, `tried` and `notes` are handed to the next session as what the last one left, so
+         a script or a rule writing them speaks to every future agent in another agent's voice. Measured: `writes:
+         ['session']` set a live run's `next`, and nothing on the install sheet said so. */
+      if (register === SESSION && /^(?:script|rule):/u.test(w.actor)) return no<Entry>('FORBIDDEN', "A run's row is its own, and a script or a rule does not write it.", { at: 'register' });
       /* AND A VERSION IS A WHOLE NUMBER. `version: "4"` never equals 4, so a client that sent its version as
          text was told its row had moved on every attempt, and re-reading could never cure it. */
       if (w.version !== undefined && !Number.isSafeInteger(w.version))

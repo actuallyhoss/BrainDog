@@ -132,7 +132,12 @@ function readUses(doc: unknown): { uses: Use[]; filled: string[] } {
     if (kind === undefined) continue;
     /* A SCRIPT SAYS WHAT IT READS AND WRITES IN ITS HEADER, BARE, and the kernel holds every run to it. */
     if (kind === 'script') {
-      for (const r of Array.isArray(d.reads) ? d.reads : []) list(r, false, 'reads');
+      /* AND A SCRIPT READING THE RUNS IS SAID, though a page drawing them is not: a page shows the reader what the reader may
+         see, and a script carries what agents wrote wherever else it writes or sends. */
+      for (const r of Array.isArray(d.reads) ? d.reads : []) {
+        if (r === 'session') found.set('register.session', found.get('register.session') ?? { id: 'register.session', kind: 'list', writes: false });
+        else list(r, false, 'reads');
+      }
       for (const r of Array.isArray(d.writes) ? d.writes : []) list(r, true, 'writes');
     }
     /* A RULE CHANGES THE ROWS OF THE LIST IT IS ABOUT. */

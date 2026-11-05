@@ -199,6 +199,11 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
     const wrong = list.findIndex((r) => !TARGET.test(r));
     if (wrong >= 0) return bad('DECLARATION_INVALID', `${id}'s ${side} names ${JSON.stringify(list[wrong])}, which is not a register id.`, `${side}[${wrong}]`);
   }
+  /* WHAT THE WRITE PATH WOULD REFUSE AT EVERY RUN IS REFUSED BEFORE ANYBODY IS ASKED TO APPROVE IT: what a person tells an
+     agent, and what a run left for the next one. */
+  const kernels = (body.writes as string[]).findIndex((r) => r === 'instructions' || r === 'session');
+  if (kernels >= 0)
+    return bad('FORBIDDEN', `${id} writes ${(body.writes as string[])[kernels]!}, and a script may not: only a person tells an agent, and a run's row is its own.`, `writes[${kernels}]`);
 
   if (body.limits !== undefined) {
     const limits = body.limits as Record<string, unknown>;
