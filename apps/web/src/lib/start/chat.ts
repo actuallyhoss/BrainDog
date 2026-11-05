@@ -76,6 +76,8 @@ export const chatWords = {
   placeholderFirst: 'A sentence or two is plenty',
   send: 'Send',
   skip: 'Skip',
+  earlierShow: 'See your answers',
+  earlierHide: 'Hide your answers',
   enough: "That's enough, build it",
   typing: 'BrainDog is reading what you said',
   you: 'You',

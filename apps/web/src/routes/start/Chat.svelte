@@ -2,6 +2,9 @@
   THE FIRST RUN'S CONVERSATION, one part for /start and /signup (1 Nov, the owner: "i need the who are you to be a
   conversation with questions. not just a field").
 
+  ONE QUESTION ON THE SCREEN (5 Nov, the owner: the first run "feels very overwhelming"). Only what is being asked now is
+  drawn; what was said before opens from one quiet control, for whoever wants to read it back.
+
   BRAINDOG ASKS, ONE QUESTION AT A TIME. Its lines are plain text beside its mark, on the tile; the person's answers are
   quiet bubbles at the right. The question being asked comes last, with two to four answers to tap under it (plain
   bordered buttons, never pills) and the field under those, so on a phone the taps sit just over the keyboard. Enter
@@ -66,6 +69,7 @@
   let text = $state('');
   let field = $state<HTMLTextAreaElement | undefined>(undefined);
   let nudge = $state(false);
+  let earlier = $state(false);
 
   /* A TAP ON A QUESTION THAT TAKES SEVERAL (`many`) ADDS ITS WORDS TO THE FIELD, or takes them out; on any other it is
      the answer. */
@@ -141,13 +145,17 @@
   <span class="dog-line" data-quiet={quiet ? '' : undefined}>{words}</span>
 {/snippet}
 
+{#snippet earlierToggle()}
+  <Button weight="bare" size="sm" aria-expanded={earlier} onclick={() => (earlier = !earlier)}>{earlier ? chatWords.earlierHide : chatWords.earlierShow}</Button>
+{/snippet}
+
 <div class="chat">
   <p class="sr" aria-live="polite" aria-atomic="true">{spoken}</p>
 
   <ol class="log" aria-label={chatWords.dog}>
     <!-- THE HELLO AND THE FIRST QUESTION ARE ONE MESSAGE UNDER ONE MARK (UI pass, 3 Nov): drawn as two, the screen opened
          on the same face twice, one over the other. Until the first answer the hello rides in the asking message. -->
-    {#if !opening}
+    {#if earlier && !opening}
       <li class="msg dog">
         <span class="mark" aria-hidden="true"><Mark height={14} /></span>
         <div class="dog-body">
@@ -157,6 +165,7 @@
       </li>
     {/if}
 
+    {#if earlier}
     {#each turns as t, i (i)}
       <li class="msg you" in:arrive={{ rise: 6 }}>
         <span class="sr">{chatWords.you}: </span>
@@ -177,6 +186,7 @@
         </li>
       {/if}
     {/each}
+    {/if}
 
     {#if thinking}
       <li class="msg dog" in:arrive={{ rise: 4 }}>
@@ -224,6 +234,7 @@
   </ol>
 
   {#if done}
+    {#if turns.length > 0}{@render earlierToggle()}{/if}
     {@render after?.()}
   {:else}
     <form
@@ -254,6 +265,7 @@
       {#if nudge}<p class="nudge" role="status">{chatWords.empty}</p>{/if}
       <div class="foot">
         {@render tools?.()}
+        {#if turns.length > 0}{@render earlierToggle()}{/if}
         <span class="foot-end">
           <Button weight="bare" size="sm" disabled={busy || thinking || !current} aria-label={chatWords.more} onclick={skip}>{chatWords.skip}</Button>
           {#if turns.length > 0}
@@ -340,10 +352,11 @@
     line-height: var(--lead-ui);
   }
 
+  /* THE ONE THING ON THE SCREEN, so it reads as the screen's subject. */
   .question {
     font-weight: 600;
-    font-size: var(--fs-head);
-    line-height: calc(24px * var(--type, 1));
+    font-size: var(--fs-figure);
+    line-height: calc(28px * var(--type, 1));
     letter-spacing: var(--track-head, -0.01em);
   }
 

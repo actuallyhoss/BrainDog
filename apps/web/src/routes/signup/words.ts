@@ -41,7 +41,7 @@ export const words = {
 
   /** The one tap that says the guessed time zone and currency are right, or changes them (1 Nov). */
   setTitle: 'Time and money',
-  setLine: (zone: string, money: string | null) => (money === null ? `Times in ${zone} time.` : `Times in ${zone} time, money in ${money}.`),
+  setLine: (zone: string, money: string | null) => (money === null ? `${zone} time.` : `${zone} time, money in ${money}.`),
   setChange: 'Change',
   setZone: 'Time zone',
   setDone: 'Done',

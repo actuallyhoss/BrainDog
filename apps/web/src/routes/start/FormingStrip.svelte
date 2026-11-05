@@ -1,4 +1,7 @@
 <!--
+  AT EVERY WIDTH SINCE 5 NOV: the build beside the talk was a second screen to read while answering. This line is the
+  build everywhere, and the whole of it is one press away.
+
   YOUR BRAINDOG, FORMING, ON A PHONE (skills pass 3, 2 Nov). Under 900px the build tile stands under the whole
   conversation, so while she answers the BrainDog formed out of sight and only BrainDog's line ("That adds People and
   Money") said so. This is the build held at the top of the conversation: one compact line that stays in view as the
@@ -13,8 +16,7 @@
   A PRESS OPENS THE WHOLE BUILD AS A SHEET (the page's `onopen`), where a part can be taken out or put back. The line is
   one button: its name says what the BrainDog is called, what it holds so far, and that it opens.
 
-  NOT A LIVE REGION: the conversation says what each answer added, once. Never drawn from 900px up, where the tile
-  stands beside the talk.
+  NOT A LIVE REGION: the conversation says what each answer added, once.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
@@ -156,13 +158,7 @@
     box-shadow: inset 0 -1px 0 var(--rule);
   }
 
-  @media (width >= 900px) {
-    .strip-wrap {
-      display: none;
-    }
-  }
-
-  /* ONE BUTTON, 44 TALL, the home mark, the parts, and the chevron that says it opens. */
+    /* ONE BUTTON, 44 TALL, the home mark, the parts, and the chevron that says it opens. */
   .strip {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;

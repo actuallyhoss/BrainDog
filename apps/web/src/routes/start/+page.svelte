@@ -1240,7 +1240,7 @@
       {/if}
 
       <!-- THE TITLE ROW: one plain line; the conversation under it does the asking. -->
-      <header class="title">
+      <header class="title" data-quiet={chatTurns.length > 0 ? '' : undefined}>
         <h1 class="entry-title" id="who-h">{talkDone ? words.summaryTitle : words.talkTitle}</h1>
       </header>
 
@@ -1249,7 +1249,7 @@
         <section class="talk" aria-labelledby="who-h" data-dragging={dragging ? '' : undefined}>
           {#if dragging}<p class="drop" aria-hidden="true">{firstRun.exportDrop}</p>{/if}
           <!-- ON A PHONE, THE BUILD HELD AT THE TOP OF THE TALK while it lasts, opening whole as a sheet. -->
-          {#if !talkDone}
+          {#if !talkDone && !buildGhost}
             <FormingStrip parts={buildParts} ghost={buildGhost} title={proposal?.title ?? null} open={formingOpen} onopen={() => (formingOpen = true)} />
           {/if}
           <Chat
@@ -1359,43 +1359,43 @@
   .title {
     display: grid;
     gap: var(--sp-2);
+    inline-size: 100%;
+    max-inline-size: 36rem;
+    margin-inline: auto;
     min-inline-size: 0;
+  }
+
+  /* THE TITLE SAYS WHAT THIS IS ONCE: after the first answer the question is the heading to read, and it stays for a reader. */
+  .title[data-quiet] {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   /* ── the board ─────────────────────────────────────────────────────────── */
 
-  /* ONE COLUMN ON A PHONE; FROM 900PX THE CONVERSATION AND THE BUILD SIDE BY SIDE, 12 apart. */
+  /* ONE COLUMN AT EVERY WIDTH (5 Nov): one thing to read at a time. While the talk lasts the strip is the build. */
   .board {
     display: grid;
     align-items: start;
     gap: var(--inset);
+    inline-size: 100%;
+    max-inline-size: 36rem;
+    margin-inline: auto;
     min-inline-size: 0;
   }
 
-  @media (width >= 900px) {
-    .board {
-      grid-template-columns: minmax(0, 1.45fr) minmax(20rem, 1fr);
-    }
-
-    /* THE BUILD STAYS IN VIEW BESIDE A LONG CONVERSATION, under the frame's own top edge. */
-    .build {
-      position: sticky;
-      inset-block-start: var(--sp-5);
-    }
-  }.build {
+  .build {
     display: grid;
     gap: var(--inset);
     min-inline-size: 0;
   }
 
-  /* WHILE TYPING ON A PHONE the build tile alone says what lit up; the part tiles arrive once the sentence is read. */
-
-  /* AND ON A PHONE, WHILE THE TALK LASTS, THE STRIP AT THE TOP OF IT IS THE BUILD (UI pass, 3 Nov): the same rows drawn
-     again as a tile under the talk said every part twice. The strip opens them whole as a sheet. */
-  @media (width < 900px) {
-    .build[data-talking] > :global([data-build]) {
-      display: none;
-    }
+  /* WHILE THE TALK LASTS THE STRIP AT THE TOP OF IT IS THE BUILD, and it opens whole as a sheet. */
+  .build[data-talking] > :global([data-build]) {
+    display: none;
   }
 
   /* A TILE THAT JUST CAME ON takes the arrival tint and fades back to the tile over a second and a half. */

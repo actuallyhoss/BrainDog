@@ -2,6 +2,9 @@
   The end of the first run, and the first of the five minutes: the BrainDog is made, and the person is shown what to do
   first, in the app, and then, for whoever uses one, how to connect an AI app.
 
+  ONE COLUMN, AND CONNECTING OPENS ONLY WHEN ASKED (5 Nov, the owner: "feels very overwhelming"). The first screen after
+  sign-up has one job, Go to Today. Connecting an AI app is one quiet row under it, and asks the record nothing until opened.
+
   TODAY LEADS, THE AGENT IS SECOND (first hour audit, E3). The screen opened on "Connect your agent" with Claude Code's
   `curl` install chosen and a small "Skip for now" at its foot, for a bakery, while the site says connecting an AI tool
   is optional and nobody needs to be technical. Now the first tile says what was made and the one thing to do on Today,
@@ -44,6 +47,7 @@
   import { step } from '$lib/funnel.ts';
   import Button from '$lib/ui/Button.svelte';
   import CodeLine from '$lib/ui/CodeLine.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Swap from '$lib/motion/Swap.svelte';
   import { arrive, settleOn } from '$lib/motion';
@@ -194,6 +198,7 @@
     return () => el.removeEventListener('click', on);
   }
 
+  let connectOpen = $state(false);
   let heard = $state<Heard[]>([]);
   const sign = $derived(signOf(heard));
   /* THE YES OR NO ALONE, which the poll hangs on: `signOf` makes a new object each time, and an effect over it ran
@@ -219,7 +224,7 @@
     if (signOf(next).connected) step('agent_connected');
   }
   $effect(() => {
-    if (connected) return;
+    if (connected || !connectOpen) return;
     /* `untrack`, as the connect sheet asks: what an ask reads never starts the poll again. */
     return poll(() => untrack(() => void ask()));
   });
@@ -270,10 +275,15 @@
   </div>
 
   <section class="made-tile agent" aria-labelledby="agent-h" data-forming="made-agent">
-    <header class="head">
-      <h2 class="agent-h" id="agent-h">{firstWords.agentTitle}</h2>
-      <p class="agent-sub">{firstWords.agentSub}</p>
-    </header>
+    <button type="button" class="agent-open" aria-expanded={connectOpen} onclick={() => (connectOpen = !connectOpen)}>
+      <span class="head">
+        <span class="agent-h" id="agent-h">{firstWords.agentTitle}</span>
+        <span class="agent-sub">{firstWords.agentOptional}</span>
+      </span>
+      <span class="agent-chev" data-open={connectOpen ? '' : undefined} aria-hidden="true"><Icon name="chevron" size="s" /></span>
+    </button>
+
+    {#if connectOpen}
 
     <Segmented full role="group" aria-label={words.apps}>
       {#each apps as a (a.id)}
@@ -311,17 +321,19 @@
     <!-- CONNECTED SETTLES WHERE IT IS: the line gives a little and comes back on the spring the moment the agent is
          heard, once, never on the first draw. -->
     <p class="sign" role="status" data-on={sign.connected ? '' : undefined} {@attach settleOn(sign.connected)}><span class="dot" aria-hidden="true"></span>{sign.said}</p>
+    {/if}
   </section>
 </section>
 
 <style>
-  /* ONE COLUMN UP TO 1100, the tiles at most 720 on the frame's start edge; WIDER, TWO COLUMNS ACROSS THE FRAME (1 Nov, a
-     live run: at 1568 both tiles sat in the left 40% and the rest of the window was empty). Today's step and the add-ons
-     at the left, the connect step at the right, their tops level, across the same width the conversation and its build
-     took on the screen before. */
+  /* ONE COLUMN AT EVERY WIDTH, centred: one thing to do on this screen. */
   .made {
     display: grid;
-    grid-template-columns: minmax(0, min(720px, 100%));
+    grid-template-columns: minmax(0, 1fr);
+    inline-size: 100%;
+    max-inline-size: 36rem;
+    margin-inline: auto;
+    padding-block-start: var(--sp-4);
     align-items: start;
     gap: var(--sp-4);
     min-inline-size: 0;
@@ -334,10 +346,35 @@
     min-inline-size: 0;
   }
 
-  @media (width >= 1100px) {
-    .made {
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    }
+  /* THE WHOLE ROW OPENS IT: its title and what it costs you, which is nothing. */
+  .agent-open {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    inline-size: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .agent-open .head {
+    display: grid;
+  }
+
+  .agent-chev {
+    display: inline-grid;
+    color: var(--ink-3);
+    transform: rotate(90deg);
+    transition: transform var(--d-press, 70ms) var(--ease-out);
+  }
+
+  .agent-chev[data-open] {
+    transform: rotate(-90deg);
   }
 
   /* ONE TILE, THE WIDTH OF ITS COLUMN: 24 in, 20 on a phone. */
@@ -559,24 +596,20 @@
     }
   }
 
-  /* FIVE APPS ON A PHONE ARE ONE ROW THAT SCROLLS (UI pass 1 Nov), as a page's own tabs do: wrapped, they stood as three
+  /* FIVE APPS IN THE ONE COLUMN ARE ONE ROW THAT SCROLLS (UI pass 1 Nov), as a page's own tabs do: wrapped, they stood as three
      rows of two, two and one, Cursor alone and centred under them, which read as a grid of buttons and not one choice. */
-  @media (width < 640px) {
-    .agent :global(.segmented[data-full][data-wrap]) {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      scrollbar-width: none;
-      padding-inline-end: var(--sp-4);
-      mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
-    }
+  .agent :global(.segmented[data-full]) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
 
-    .agent :global(.segmented[data-full][data-wrap]::-webkit-scrollbar) {
-      display: none;
-    }
+  .agent :global(.segmented[data-full]::-webkit-scrollbar) {
+    display: none;
+  }
 
-    .agent :global(.segmented[data-full][data-wrap] > .segment) {
-      flex: none;
-    }
+  .agent :global(.segmented[data-full] > .segment) {
+    flex: none;
   }
 </style>

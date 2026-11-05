@@ -28,7 +28,8 @@ export const firstWords = {
   /* WHAT WAS JUST MADE, first, by its places: the screen opened on a terminal command and never said. */
   /* THE PLACES THE RAIL SHOWS, AND MORE AS THEY FILL (AM10): Projects and Work come with their first entry. */
   made: (places: readonly string[]) => (places.length === 0 ? 'Your BrainDog is made.' : `Your BrainDog is made, with ${firstRun.and(places)}, and more as you fill them.`),
-  agentTitle: 'Connect an AI app, if you use one',
+  agentTitle: 'Connect an AI app',
+  agentOptional: 'Optional. You can also do this later in Settings.',
   agentSub: 'Claude, ChatGPT and coding apps can read and update your BrainDog once connected. You can also do this later in Settings, under Agents.',
   waiting: 'Waiting for your agent…',
   connected: (who: string) => `Connected: ${who}`,

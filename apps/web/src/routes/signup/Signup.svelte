@@ -152,6 +152,8 @@
   import { caseOf, keepsCurrency } from '../start/preview.ts';
   import Chat from '../start/Chat.svelte';
   import Forming from '../start/Forming.svelte';
+  import FormingStrip from '../start/FormingStrip.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
   import {
     ackOf,
     toolsHeldBack,
@@ -248,6 +250,10 @@
   let tzPick = $state<string | null>(null);
   let currencyPick = $state<string | null>(null);
   let setOpen = $state(false);
+  /** The whole build, opened from its strip. */
+  let formingOpen = $state(false);
+  /** The name, address, time, money and words behind one Change on the keep step. */
+  let moreOpen = $state(false);
   /** The zone the record is made in: the one picked, else this device's. */
   const zoneSent = (): string | null => tzPick ?? here;
 
@@ -1426,6 +1432,8 @@
   const watching = $derived(step === 'making' && watched !== null);
   /** Whether the build stands beside the words: while describing, asking and keeping. */
   const showBuild = $derived(step === 'describe' || step === 'keep');
+  /* THE KEEP STEP OPENS BY ITSELF ONLY WHEN IT HAS SOMETHING TO ASK: a name that is taken, or a place the words named on another clock. */
+  const detailsShown = $derived(moreOpen || nameByHand || setOpen || (slug !== '' && !free && !naming) || (zoneOffer !== null && zoneOffer.zone !== zoneNow));
   /**
    * Whether the step is one column, drawn in the entry sheet as sign in is (first F5): every step but the three that
    * stand beside the build, and the build being written, which takes the whole board.
@@ -1439,6 +1447,12 @@
 </script>
 
 <svelte:head><title>{titleOf(words.title)}</title></svelte:head>
+
+{#snippet stripNow()}
+  {#if read !== null}
+    <FormingStrip parts={stepsOf(parts)} title={read?.title ?? null} open={formingOpen} onopen={() => (formingOpen = true)} />
+  {/if}
+{/snippet}
 
 {#snippet signInLink()}
   {#if step === 'describe' || step === 'keep'}
@@ -1488,23 +1502,37 @@
   {:else if step === 'invite-only'}
     <Apply {siteKey} />
   {:else if step === 'describe'}
-    <h1 class="entry-title" id="who-h">{chatWords.title}</h1>
+    {@render stripNow()}
+    <h1 class="entry-title" class:unseen={chatTurns.length > 0} id="who-h">{chatWords.title}</h1>
     <!-- THE CONVERSATION (1 Nov): BrainDog asks, one question at a time, and the build beside it forms with each answer.
          Each answer is read by the model at this host's reading door while reads are left (`readPressed`), else here. -->
     <Chat turns={chatTurns} current={asking} thinking={talking} {busy} onanswer={(a) => void answerChat(a)} onskip={() => void answerChat(null)} onenough={() => void keep()} />
-    <ul class="promises">
-      {#each words.promises as line, i (line)}
-        {#if i > 0 || plan === 'free'}<li><Icon name="check" size="s" />{line}</li>{/if}
-      {/each}
-    </ul>
+    {#if chatTurns.length === 0}
+      <p class="quiet promise">{words.promises.filter((_, i) => i < 2 && (i > 0 || plan === 'free')).join('. ')}.</p>
+    {/if}
   {:else if step === 'keep'}
+    {@render stripNow()}
     <h1 class="entry-title" id="keep-h" tabindex="-1">{words.keepTitle}</h1>
-    {@render saidLine()}
+    {#if linkCut}<p class="quiet">{words.linkCut}</p>{/if}
     {#if signedIn || plan !== 'free'}
       <p class="entry-lede">{signedIn ? (plan === 'free' ? words.keepSignedIn : words.keepSignedInPaid) : words.keepLedePaid}</p>
     {/if}
     <form class="form" onsubmit={send}>
       <!-- THE NAME IT WILL HAVE, with Change: the places are on the build beside, and are not said twice (first F10). -->
+      {#if !detailsShown}
+        <section class="brief">
+          <div class="brief-said">
+            <h2 class="kept-name" aria-live="polite">{naming ? words.calledFinding : (read?.title ?? ownName(nameSent(read, email)) ?? words.calledNone)}</h2>
+            {#if !naming}
+              <p class="quiet brief-line">
+                {#if slug !== ''}{addressHost}/{slug}{/if}{#if slug !== '' && zoneNow !== null}<br />{/if}{#if zoneNow !== null}{words.setLine(zonePlace(zoneNow), moneyNow === null ? null : currencyWord(moneyNow))}{/if}
+              </p>
+            {/if}
+          </div>
+          <button type="button" class="link plain" aria-expanded="false" onclick={() => (moreOpen = true)}>{words.change}</button>
+        </section>
+      {:else}
+      {@render saidLine()}
       <section class="kept">
         {#if nameByHand}
           <NameField bind:value={slug} bind:free id="up-name" />
@@ -1572,6 +1600,7 @@
             <div class="chips"><Button weight="quiet" onclick={() => (setOpen = false)}>{words.setDone}</Button></div>
           {/if}
         </section>
+      {/if}
       {/if}
 
       {#if signedIn === null}
@@ -1721,8 +1750,13 @@
         <div class="talk" data-tile>{@render stepNow()}</div>
 
         {#if showBuild}
-          <aside class="build" aria-label={firstRun.mineTitle} data-forming="build">
+          <!-- A TURN'S MODEL READING STILL OUT, or just landed: said once, so a build that changes in a moment is expected. -->
+          <p class="late" role="status" data-late={lateFor !== null && lateFor === sentence ? 'reading' : landed === sentence ? 'landed' : undefined}>
+              {lateFor !== null && lateFor === sentence ? words.stillReading : landed === sentence ? words.readAgain : ''}
+            </p>
+          <Sheet bind:open={formingOpen} title={read?.title ?? firstRun.mineTitle} caret={false}>
             <Forming
+              bare
               parts={stepsOf(parts)}
               left={read ? parts.filter((p) => !p.on && !p.id.startsWith('usecase-')).map((p) => ({ id: p.id, name: p.name })) : []}
               said={sentence}
@@ -1731,16 +1765,10 @@
               settled={step !== 'describe'}
               {busy}
               {locale}
-              onremove={step === 'describe' || step === 'keep' ? partOut : undefined}
-              onrestore={step === 'describe' || step === 'keep' ? partBack : undefined}
+              onremove={partOut}
+              onrestore={partBack}
             />
-            <!-- A TURN'S MODEL READING STILL OUT AFTER THE CONVERSATION WENT ON WITH THE RULES' (1 Nov; onboarding10: the only
-                 reading this page asks is a turn's, the whole one is the record's once made): said, so a build that changes
-                 in a moment is expected, and once it lands, that it did. One slot, so the line moves nothing above it. -->
-            <p class="late" role="status" data-late={lateFor !== null && lateFor === sentence ? 'reading' : landed === sentence ? 'landed' : undefined}>
-              {lateFor !== null && lateFor === sentence ? words.stillReading : landed === sentence ? words.readAgain : ''}
-            </p>
-          </aside>
+          </Sheet>
         {/if}
       {/if}
     </div>
@@ -1757,16 +1785,16 @@
     min-inline-size: 0;
   }
 
+  /* ONE COLUMN AT EVERY WIDTH (5 Nov, the owner: "feels very overwhelming"). The build is the strip, and opens as a sheet. */
+  .board[data-paired] {
+    inline-size: 100%;
+    max-inline-size: 36rem;
+    margin-inline: auto;
+  }
+
   @media (width >= 900px) {
     .board[data-paired] {
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      column-gap: clamp(var(--sp-5), 3vw, var(--sp-7));
-    }
-
-    /* THE WORDS STAY IN VIEW while the build grows under a long answer. */
-    .board[data-paired] .talk {
-      position: sticky;
-      inset-block-start: var(--sp-5);
+      padding-block-start: var(--sp-4);
     }
   }
 
@@ -1781,6 +1809,7 @@
   .talk[data-tile] {
     box-sizing: border-box;
     max-inline-size: 40rem;
+    --tile-pad-lead: var(--sp-5);
     padding: var(--sp-5);
     background: var(--tile);
     border-radius: var(--r-tile);
@@ -1788,6 +1817,7 @@
 
   @media (width < 640px) {
     .talk[data-tile] {
+      --tile-pad-lead: 20px;
       padding: 20px;
     }
   }
@@ -1796,24 +1826,7 @@
     margin-block-start: var(--sp-3);
   }
 
-  .build {
-    min-inline-size: 0;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .build {
-      animation: build-in var(--d-page) var(--ease-out) both;
-    }
-  }
-
-  @keyframes build-in {
-    from {
-      opacity: 0;
-      transform: translateY(4px);
-    }
-  }
-
-  /* `Empty` stands in a tile or the sheet with no tile of its own. */
+      /* `Empty` stands in a tile or the sheet with no tile of its own. */
   .talk :global(.empty) {
     padding: 0;
     background: none;
@@ -1975,8 +1988,7 @@
     line-height: var(--lead-head);
   }
 
-  .lines,
-  .promises {
+  .lines {
     display: grid;
     gap: var(--sp-1);
     margin: 0;
@@ -2041,13 +2053,42 @@
     padding: var(--sp-2) 0 var(--sp-3);
   }
 
-  .promises li {
+  .promise {
+    font-size: var(--fs-meta);
+  }
+
+  /* THE TITLE UNDER THE STRIP'S HAIRLINE HAS ROOM OF ITS OWN. */
+  #keep-h {
+    margin-block-start: var(--sp-2);
+  }
+
+  .unseen {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  /* WHAT IS BEING KEPT, IN TWO LINES, and one Change for all of it. */
+  .brief {
     display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: calc(22px * var(--type, 1));
+    align-items: start;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+  }
+
+  .brief-said {
+    display: grid;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+  }
+
+  .brief-line {
+    overflow-wrap: anywhere;
   }
 
   /* ── Keep it ───────────────────────────────────────────────────────────── */
