@@ -34,7 +34,7 @@ import { refused, type Result } from '@braindog/ports';
 import { moduleName } from '@braindog/seed/usecases/names';
 
 import { installFromCatalogue, loadSource, reachLines, sdkVerb } from './catalogue.ts';
-import { oneLine, printable } from './clip.ts';
+import { oneLine, plainFileName, printable } from './clip.ts';
 import { refuse } from './json.ts';
 import { untilAccepted } from './links.ts';
 import { causeOf, connect, fixOf, joinedSaid, type AgentIo, type Connected } from './skills.ts';
@@ -135,6 +135,12 @@ async function exportFile(args: string[], io: AgentIo): Promise<number> {
   const got = answer.value as { file?: unknown; doc?: unknown };
   if (typeof got.file !== 'string' || typeof got.doc !== 'object' || got.doc === null) {
     io.say('BrainDog answered in a shape this build does not recognise as a starter.');
+    return 1;
+  }
+  /* THE NAME IS THE HOST'S, so it is a file name in this folder and nothing else: `resolve` took `../../x` or a whole path
+     from a host and wrote over whatever was there. */
+  if (!plainFileName(got.file) || !got.file.endsWith(SHARED_SUFFIX)) {
+    io.say('BrainDog answered with a file name this command will not write to, so nothing was written.');
     return 1;
   }
   const file = resolve(io.cwd, values.out ?? got.file);

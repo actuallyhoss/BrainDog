@@ -347,7 +347,9 @@ async function approve(host: { key: string; url: URL }, asked: Asked, label: str
     }
 
     const life = seconds(code.expires_in, 600, 1_800) || 600;
-    io.say(`Open ${uri} and enter ${userCode.slice(0, 3)} ${userCode.slice(3)} (${Math.max(1, Math.round(life / 60))} minutes).`);
+    /* THE PARSED ADDRESS AND NOT THE HOST'S STRING: the parser drops the control characters at its ends and the line
+       breaks inside it, so the origin passed above while the string printed could still move the cursor. */
+    io.say(`Open ${new URL(uri).href} and enter ${userCode.slice(0, 3)} ${userCode.slice(3)} (${Math.max(1, Math.round(life / 60))} minutes).`);
     /* AND THE ONE REQUEST IT APPROVES, by the print the app shows beside it, when the request was named. */
     if ('binds' in asked && typeof asked.binds === 'string') io.say(`It approves this one request, which the app shows as ${bodyPrint(asked.binds)}.`);
 

@@ -34,6 +34,18 @@
  */
 const FORMAT = /[\u00ad\u061c\u200b\u200e\u200f\u202a-\u202e\u2060\u2066-\u2069\ufff9-\ufffb\u{e0000}-\u{e007f}]/gu;
 
+/**
+ * Whether a name another machine chose is a file name in one folder and nothing more: no folder in it, by either slash,
+ * no drive or stream by a colon, no control character, and not a dot file, so it cannot climb out or land on a `.bashrc`.
+ */
+export const plainFileName = (name: string): boolean => name !== '' && name.length <= 255 && !/^\.|[\\/:\x00-\x1f\x7f]/u.test(name);
+
+/**
+ * A sentence for the terminal, its line breaks and indent kept: what `oneLine` takes out of a line, without joining
+ * lines. For what reaches standard error whatever wrote it, such as a host's refusal said whole.
+ */
+export const forTerminal = (said: string): string => said.replace(FORMAT, '').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/gu, '');
+
 /** One line of somebody else's words: format characters gone, every control character and run of space one space, trimmed. */
 export const oneLine = (said: string): string =>
   said

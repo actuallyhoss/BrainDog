@@ -29,6 +29,7 @@ import { parseArgs } from 'node:util';
 import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
 import { PRIMITIVES_VERSION } from 'braindog-render';
 
+import { forTerminal } from './clip.ts';
 import { automations, scripts } from './automations.ts';
 import { bypassCommand, systemOpen } from './bypass.ts';
 import { behindLine, doctorLine, installedBuild } from './behind.ts';
@@ -81,7 +82,7 @@ import { verify } from './verify.ts';
 
 /* Synchronous, so the line is out before `exit`: a write to a pipe on Windows is asynchronous, and
    `process.exit` does not wait for it. */
-const say = (line: string) => writeFileSync(2, `${line}\n`);
+const say = (line: string) => writeFileSync(2, `${forTerminal(line)}\n`);
 
 /* NODE'S "SQLite is an experimental feature" IS NOT SAID TO A PERSON. `usecase`, `pack`, `kennel` and
    `import` load `node:sqlite` for a scratch record and printed two lines of it, with a process id, above their answer.

@@ -42,6 +42,7 @@ import { validateDeclaration } from '@braindog/kernel';
 import { fixOf, refused, type Result } from '@braindog/ports';
 
 import { refuse } from './json.ts';
+import { plainFileName } from './clip.ts';
 import { connect, type AgentIo, type Connected } from './skills.ts';
 
 /**
@@ -105,6 +106,11 @@ async function pull(args: string[], io: AgentIo): Promise<number> {
   }
 
   const name = nameOf(stored.body);
+  /* THE NAME IS THE HOST'S, as `usecase export`'s is: a file name in this folder and nothing else. */
+  if (values.out === undefined && !plainFileName(name)) {
+    io.say('BrainDog answered with a page name that is not a file name, so nothing was written. Name a file with --out.');
+    return 1;
+  }
   const file = resolve(io.cwd, values.out ?? dogName(name));
   /* `dogText` ENDS WITH ITS OWN LINE BREAK, so the file is the bytes the app shows, with nothing added here. */
   writeFileSync(file, dogText(stored.body));
