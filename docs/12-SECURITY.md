@@ -168,6 +168,17 @@ communication.** BrainDog has the first two structurally. The full design is in
 | Every proposal records what it read | audit |
 | A model key kept in the Keychain opens only for the owner on a proof under fifteen minutes old, and each opening names who asked | procedural, the Keychain's own gate, in the host ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9, §6.2 below) |
 
+**In a conversation, a read is marked by the row and a write is weighed against the person's sentence** (*5 November 2026,
+`packages/mcp/src/slash-heard.ts`*). `search`, `open`, `list`, `today`, `waiting` and `changes` mark any row a run, a door, a
+feed, a rule, a script or a colleague made or changed, between « » and for the model. A mark lasts as long as the words can be
+read back: an answer that read one marks the conversation's next turns, whose model reads that answer again. On a marked
+conversation a write lands at once only when the person's own sentence accounts for all of it: its row is one they named or
+pointed at, and every value it sets is one they said. Anything else waits for a yes that shows what it would set. A write to
+what steers agents and machines (skills, tools, learnings, profiles, what carries, keys) always waits, a message to an agent
+waits on any mark, and `instructions` and a run's row are written only by `tell`. The evidence for this over holding every
+write after a marked read is `packages/mcp/test/slash-marks.test.ts`: twelve "find it and change it" turns on rows an agent
+made all land and all would have been held, and nine orders a row can carry are all held.
+
 **No injection classifier is a control here.** ~95% accuracy at ~65 ms is a fine signal and a
 useless gate on a record holding credentials. It goes in the audit log as a flag.
 

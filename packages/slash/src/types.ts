@@ -559,7 +559,7 @@ export type ChatRan = {
 };
 
 /** How the run stands when a tool is called: whether it may write at once, and the person's words it acts on. */
-export type ChatRun = { askOnly: boolean; asked: boolean; said: string; outside: string | null };
+export type ChatRun = { askOnly: boolean; asked: boolean; said: string; outside: string | null; sent?: readonly string[] };
 
 /**
  * The tools a host hands a conversation, over the record and as the asker: reads, writes through the record's own write
