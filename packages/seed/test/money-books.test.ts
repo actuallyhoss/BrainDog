@@ -249,7 +249,6 @@ test('a bank text for an account in a book lands in that book', async () => {
       headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' },
       body: 'Your Credit Card ending with *** 2291 has been used for EGP 1,284.50 on 14/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50',
       sha256: 'book-1',
-      verified: true,
     }),
   );
   assert.equal(arrived.state, 'matched');

@@ -347,7 +347,7 @@ test('A CARD CHARGE MEETS ITS SHOP AS ONE ORGANISATION, and a second charge ther
   value(k.create('accounts', { name: 'Cairo credit card', kind: 'card', balance: { amount: 0, currency: 'EGP' }, as_of: '2026-08-01', liquid: false, last4: '2291' }, { actor: 'p_seed' }));
   const alert = (amount: string, day: string, n: number) =>
     value<{ state: string; reason?: string }>(
-      k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: `Your Credit Card ending with *** 2291 has been used for EGP ${amount} on ${day}/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50`, sha256: `payee-${n}`, verified: true }),
+      k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'HSBC' }, body: `Your Credit Card ending with *** 2291 has been used for EGP ${amount} on ${day}/08/2026 at CEDAR LANE BAKERY. Your available limit is EGP 23,715.50`, sha256: `payee-${n}` }),
     );
   assert.equal(alert('1,284.50', '14', 1).state, 'matched');
   assert.equal(alert('96.00', '15', 2).state, 'matched');
