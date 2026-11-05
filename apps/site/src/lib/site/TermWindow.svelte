@@ -84,7 +84,7 @@
     --tw-out: #b9bec7;
     --tw-dim: #8a909a;
     /* THE ONE RED IS BRAINDOG'S (`--red`, SPEC 1.1), here and on the close dot. */
-    --tw-accent: #f0776c;
+    --tw-accent: color-mix(in oklab, var(--red) 62%, white);
     --tw-ok: #5fd08f;
     --tw-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 
