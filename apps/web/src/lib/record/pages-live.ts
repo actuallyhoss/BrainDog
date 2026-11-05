@@ -85,13 +85,13 @@ export type Expanded = { slug: string; title: string; why: string };
 export type Opened =
   | { from: 'live'; pages: DeclaredPage[]; expanded: Expanded[] }
   | { from: 'absent' }
-  | { from: 'refused'; fix: string };
+  | { from: 'refused'; fix: string; code?: string };
 
 export type OneOpened =
   | { from: 'live'; page: DeclaredPage }
   | { from: 'expanded'; expanded: Expanded }
   | { from: 'absent' }
-  | { from: 'refused'; fix: string };
+  | { from: 'refused'; fix: string; code?: string };
 
 /**
  * The keys the kernel writes onto a block when it runs one, which are the answer and never the
@@ -174,9 +174,10 @@ const isExpanded = (answered: Record<string, unknown>): boolean =>
   answered.for !== undefined || answered.param !== undefined;
 
 /** What a failed call means here. A refusal is the record's own sentence and is never rewritten. */
-function missed(out: object): { from: 'refused'; fix: string } {
+function missed(out: object): { from: 'refused'; fix: string; code?: string } {
   if (!('refusal' in out)) return { from: 'refused', fix: declWords.changed };
-  return { from: 'refused', fix: (out.refusal as { fix: string }).fix };
+  const { fix, code } = out.refusal as { fix: string; code?: string };
+  return { from: 'refused', fix, ...(code === undefined ? {} : { code }) };
 }
 
 export type PagesReader = {
@@ -199,7 +200,7 @@ export function pagesReader(base: string, io?: Fetch): PagesReader {
 
   type Got =
     | { ok: true; value: Record<string, unknown> }
-    | { ok: false; miss: { from: 'refused'; fix: string } };
+    | { ok: false; miss: { from: 'refused'; fix: string; code?: string } };
 
   async function answerOf(slug: string): Promise<Got> {
     const held = kept.get(slug);

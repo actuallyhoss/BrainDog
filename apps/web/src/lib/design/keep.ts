@@ -45,7 +45,9 @@ export async function keepOffer(base: string, item: PenItem): Promise<Kept> {
 
   const slug = typeof to.body.page === 'string' ? to.body.page : to.id.replace(/^page\./u, '');
   const before = await pagesReader(base).readOne(slug);
-  if (before.from === 'refused') return { from: 'refused', fix: before.fix };
+  /* A PAGE THAT IS NOT THERE YET IS WHAT AN OFFER OF A NEW PAGE IS FOR, and never a reason to refuse it. */
+  const absent = before.from === 'refused' && before.code === 'PAGE_UNKNOWN';
+  if (before.from === 'refused' && !absent) return { from: 'refused', fix: before.fix };
   if (before.from === 'expanded') return { from: 'refused', fix: before.expanded.why };
   const was = before.from === 'live' ? before.page : null;
 
