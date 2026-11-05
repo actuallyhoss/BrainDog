@@ -785,6 +785,16 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged |
        that sends this key. A refusal is the run not happening, never the run happening unsigned. */
     let seal: LeasedSeal | null = null;
     if (key) {
+      /* AND THE KEY GOES ONLY TO THE HOST ITS ENTRY OPENS, as `sendAction` holds every other send and `keyRefused` a script's.
+         This path goes to `runPull` through the `Http` port and met neither, so a declaration naming somebody's key beside a
+         `base` of its own had the key unsealed for it and sent there. Before the seal, so nothing is opened. */
+      const own = heldHost(key.opens);
+      if (own !== null && own !== new URL(address).hostname.toLowerCase().replace(/\.$/u, '')) {
+        const said = `${ingest} is paused: its key opens ${own} only, and it calls ${host}.`;
+        deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, result: { failed: said } });
+        pause(deps, channel, ingest, said);
+        return meter(deps, { ingest, channel, host, project: decl.project, status: null, outcome: 'paused', requests: 0, bytes: 0, ms: 0, failures: 1 }, said);
+      }
       const got = deps.seal({ outbox: job.id, leasedUntil: job.leasedUntil, grant: key.id, actor: `ingest:${ingest}` });
       if (!got.ok) {
         /* A CONFLICT CANNOT COME BACK FROM HERE — the keychain only refuses — but `Result` allows one,
