@@ -18,6 +18,33 @@ import type { Http, HttpInit } from '@braindog/ports';
 
 import type { Send } from './actions.ts';
 
+/** What `textWithin` answers for a body past its cap. */
+export const OVER = Symbol('over the cap');
+
+/**
+ * A request's body as text, counted as it streams and left unread past `most`.
+ *
+ * THE BYTES ARE READ HERE, BEFORE THE RUN'S COUNT OR ITS EGRESS IS ASKED, in the record's Worker and not the sandbox. A script
+ * can hold a body as large as its own isolate allows and send it again and again, and `request.text()` took each whole.
+ */
+export async function textWithin(request: Request, most: number): Promise<string | typeof OVER> {
+  if (request.body === null) return '';
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let out = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return out + decoder.decode();
+    size += value.byteLength;
+    if (size > most) {
+      await reader.cancel().catch(() => undefined);
+      return OVER;
+    }
+    out += decoder.decode(value, { stream: true });
+  }
+}
+
 /** `47 §4.1`: the row and BLOB ceiling, and the cap the caller may not raise. */
 const RESPONSE_BYTES = 2_000_000;
 

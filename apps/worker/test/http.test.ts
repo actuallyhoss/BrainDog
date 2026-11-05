@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { httpFor } from '../src/http.ts';
+import { httpFor, OVER, textWithin } from '../src/http.ts';
 import type { Send } from '../src/actions.ts';
 
 const AT = new URL('https://api.example.com/v1/things');
@@ -69,4 +69,14 @@ test('A HOST WRITTEN AS A PRIVATE ADDRESS IS REFUSED BEFORE THE PLATFORM IS ASKE
     await assert.rejects(http.fetch(new URL(at), { method: 'GET', headers: {}, timeoutMs: 1000 }), (e: Error) => e.name === 'PrivateRange', at);
     assert.equal(sent, 0, `${at} was sent`);
   }
+});
+
+test('WHAT A SCRIPT POSTS IS READ UP TO THE CAP AND NO FURTHER', async () => {
+  const post = (body: BodyInit): Request => new Request('https://a.example/', { method: 'POST', body });
+  assert.equal(await textWithin(post('héllo'), 100), 'héllo');
+  assert.equal(await textWithin(post('x'.repeat(101)), 100), OVER);
+  let pulled = 0;
+  const endless = new ReadableStream<Uint8Array>({ pull(c) { pulled++; c.enqueue(new Uint8Array(1_000)); } });
+  assert.equal(await textWithin(new Request('https://a.example/', { method: 'POST', body: endless, duplex: 'half' } as RequestInit), 2_000), OVER);
+  assert.ok(pulled < 10, `it kept reading: ${pulled} pulls`);
 });

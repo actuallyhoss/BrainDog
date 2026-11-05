@@ -102,3 +102,13 @@ test('A REQUEST WITH NO KEY IS HELD TO NOTHING NEW', async () => {
   assert.deepEqual(net.opened, []);
   assert.deepEqual(net.fetched, ['collector.example']);
 });
+
+test('WHAT GOES OUT IS HELD TO THE CAP: a body over it is refused unsent, with the key unopened', async () => {
+  const net = counted();
+  const answer = await net.run({ ...request(OXBOW, 'oxbow.example'), method: 'POST', body: 'x'.repeat(2_000_001) });
+  assert.equal(codeOf(answer), 'PULL_REQUEST_REFUSED');
+  assert.deepEqual(net.opened, []);
+  assert.deepEqual(net.fetched, []);
+  const under = counted();
+  assert.equal(codeOf(await under.run({ ...request(OXBOW, 'oxbow.example'), method: 'POST', body: 'x'.repeat(2_000_000) })), 200);
+});

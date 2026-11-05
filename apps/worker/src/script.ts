@@ -38,6 +38,7 @@
 
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
+import { OVER, textWithin } from './http.ts';
 import type { ActionRequest, Execute, OpenKey } from '@braindog/host/actions';
 import { addressed, addressSecrets, CYCLE_CHARS, keyRefused, scriptCycle, scriptFold, slashDeclared, type ScriptAsk, type ScriptCycle, type ScriptFold, type ScriptGrant, type ScriptProposals, type ScriptReads, type ScriptState } from '@braindog/host/script';
 import type { ScriptAnswer, Scripted } from '@braindog/kernel';
@@ -171,7 +172,11 @@ export class ScriptOutbound extends WorkerEntrypoint<Wired, Linked> {
     if (run === null) throw new Error(BARE);
     const headers: Record<string, string> = {};
     for (const [name, value] of request.headers) if (name !== RUN_HEADER && name !== KEY_HEADER && name !== URL_HEADER && name !== ADDRESS_HEADER) headers[name] = value;
-    const body = request.method === 'GET' || request.method === 'HEAD' ? null : await request.text();
+    const body = request.method === 'GET' || request.method === 'HEAD' ? null : await textWithin(request, MAX_BYTES);
+    if (body === OVER) {
+      console.info('script fetch: a request over the cap was not read');
+      return new Response(`A request is at most ${MAX_BYTES} bytes, so nothing was sent.`, { headers: { [REFUSED_HEADER]: '1', 'cache-control': 'no-store' } });
+    }
     const stamped = request.headers.get(URL_HEADER);
     let asked: string | null = null;
     try {

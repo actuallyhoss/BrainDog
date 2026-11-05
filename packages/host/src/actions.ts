@@ -746,8 +746,10 @@ function bytes16(text: string): number[] | null {
   return out;
 }
 
-function refusedV4([a = 0, b = 0, c = 0]: number[]): string | null {
+function refusedV4([a = 0, b = 0, c = 0, d = 0]: number[]): string | null {
   if (a === 0) return 'unspecified';
+  /* AZURE'S WIRESERVER, an address that reads as public and answers only from inside a VM, with what the VM's agent is told. */
+  if (a === 168 && b === 63 && c === 129 && d === 16) return 'reserved';
   if (a === 127) return 'loopback';
   if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return 'private';
   if (a === 169 && b === 254) return 'link-local';
@@ -917,6 +919,11 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
     /* ONE WORD IS A NAME, NOT A HOST ("Stripe" parses as `stripe`), so it holds the key to nothing (kernel `heldHost`). */
     const own = parsed !== null && /[.:]/.test(parsed) ? parsed : null;
     if (own !== null && own !== url.hostname.toLowerCase().replace(/\.$/, '')) return refuse('WRONG_KEY', `This key opens ${own} only.`);
+
+    /* WHAT GOES OUT IS HELD TO THE SAME CAP AS WHAT COMES BACK. A script writes its own body, so nothing else bounded it but
+       its heap (32 MB on the self-host, the platform's on the Cloud), per fetch, on the host's thread and its socket. */
+    if (request.body !== undefined && utf8(request.body).length > request.maxBytes)
+      return refuse('PULL_REQUEST_REFUSED', `The request to ${url.host} was over ${request.maxBytes} bytes, so nothing was sent.`);
 
     const signal = AbortSignal.timeout(request.timeoutMs);
     let method: string = request.method;

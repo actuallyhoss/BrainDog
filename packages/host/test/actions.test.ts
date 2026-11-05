@@ -441,6 +441,7 @@ test('EVERY PRIVATE, LOCAL AND SPECIAL RANGE IS REFUSED, in both families and in
     ['198.18.0.1', 'reserved'],
     ['198.19.255.255', 'reserved'],
     ['192.0.0.1', 'reserved'],
+    ['168.63.129.16', 'reserved'],
     ['not an address', 'unreadable'],
     ['01.2.3.4', 'unreadable'],
     ['1:2:3:4:5:6:7:8:9', 'unreadable'],
