@@ -823,7 +823,7 @@ const bindingOf = (email: unknown): Binding | null =>
   typeof email === 'object' && email !== null && typeof (email as { send?: unknown }).send === 'function' ? (email as Binding) : null;
 
 /** The name every mail is sent under. */
-const SENDER_NAME = 'BrainDog';
+export const SENDER_NAME = 'BrainDog';
 
 /**
  * The code a failed send carries, when it is one of Email Service's own (`E_` and capitals), else `unknown`.

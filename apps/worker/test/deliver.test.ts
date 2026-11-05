@@ -44,7 +44,7 @@ test('AN EMAIL IS SENT WITH WHAT THE ROW SAYS, from the sender this deployment n
   assert.equal(sent.length, 1);
   const mail = sent[0] as Record<string, string>;
   assert.deepEqual(Object.keys(mail).sort(), ['from', 'html', 'subject', 'text', 'to']);
-  assert.equal(mail.from, 'notify@brain.example');
+  assert.deepEqual(mail.from, { email: 'notify@brain.example', name: 'BrainDog' });
   assert.equal(mail.to, 'ada@example.com');
   assert.equal(mail.subject, 'Monday');
   // The record's words first, then the footer that says what the mail is and who sent it.

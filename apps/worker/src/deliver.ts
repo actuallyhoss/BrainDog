@@ -27,7 +27,7 @@ import type { LeasedSeal, OutboxKind, OutboxRow } from '@braindog/kernel';
 import { fixOf, type Result } from '@braindog/ports';
 
 import { unwrap, type KeyStore } from './keys.ts';
-import { recordLetter } from './mail.ts';
+import { SENDER_NAME, recordLetter } from './mail.ts';
 import { PUSH_BODY_HEADERS, encryptPush, pushHeaders, type PushSend, type Vapid } from './vapid.ts';
 import { apnsKeyed, apnsPayload, isApns, sendApns, type Apns, type ApnsSend } from './apns.ts';
 
@@ -35,7 +35,7 @@ import { apnsKeyed, apnsPayload, isApns, sendApns, type Apns, type ApnsSend } fr
  * One message as Email Service takes it: `to` is one address or up to fifty, and `from` is required. The text and the
  * HTML say the same thing, drawn by `recordLetter` in the page every BrainDog mail wears.
  */
-export type Mail = { from: string; to: string | string[]; subject: string; text: string; html: string };
+export type Mail = { from: { email: string; name: string }; to: string | string[]; subject: string; text: string; html: string };
 
 /** The key a post names, opened, or the sentence that says why it was not. Never both, and the secret never logged. */
 export type Opened = { ok: true; secret: Uint8Array } | { ok: false; why: string };
@@ -362,7 +362,7 @@ export function makeDeliver(transports: Transports): Deliver {
         ...(text(payload.link) ? { link: text(payload.link), linkLabel: text(payload.link_label) } : {}),
         ...(base ? { settings: `${base}/settings/notifications` } : {}),
       });
-      await transports.email({ from, to, subject: letter.subject, text: letter.text, html: letter.html });
+      await transports.email({ from: { email: from, name: SENDER_NAME }, to, subject: letter.subject, text: letter.text, html: letter.html });
       await count(transports, job);
       return;
     }
