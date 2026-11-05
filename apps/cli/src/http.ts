@@ -7,7 +7,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -84,10 +84,27 @@ export function readHosts(file: string): HostsFile {
  * The mode is set again after the write because `writeFileSync` applies `mode` only to a file it
  * creates, and a `.tmp` left by a killed run keeps whatever mode it had. On Windows the mode is
  * advisory and the file takes the profile's permissions.
+ *
+ * NEVER THROUGH A LINK. A `.tmp` planted as a symbolic link took every token wherever it pointed, and `chmod` followed it
+ * too, so whatever is at that name goes first and the file is opened so a link there fails. A folder that was already
+ * there keeps the mode it had unless it is closed here, and it names every session this machine runs.
  */
 export function saveHosts(file: string, hosts: HostsFile): void {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
-  writeFileSync(partOf(file), `${JSON.stringify(hosts, null, 2)}\n`, { mode: 0o600 });
+  if (process.platform !== 'win32') {
+    try {
+      chmodSync(dirname(file), 0o700);
+    } catch {
+      /* A folder somebody else owns stays as it is; the file below is still 0600. */
+    }
+  }
+  discardPart(file);
+  const fd = openSync(partOf(file), constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | (constants.O_NOFOLLOW ?? 0), 0o600);
+  try {
+    writeFileSync(fd, `${JSON.stringify(hosts, null, 2)}\n`);
+  } finally {
+    closeSync(fd);
+  }
   chmodSync(partOf(file), 0o600);
   renameSync(partOf(file), file);
 }
