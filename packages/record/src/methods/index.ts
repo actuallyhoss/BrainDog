@@ -114,6 +114,8 @@ export type RecordDeps = {
   scoped: (ctx: CallContext, need: Need) => Refusal | null;
   /** Whether the caller may read one list's rows: what `list` asks, asked of every list an answer reads. */
   readable: (ctx: CallContext, register: string) => Refusal | null;
+  /** Whether a file is kept from this caller (`fileHeld` in `index.ts`), named only on rows they cannot read. */
+  fileHeld: (sha256: string, ctx: CallContext) => boolean;
   /** A page as one caller is shown it, each block held as `page` holds it (`index.ts`, `drawnWithheld` reads the same). */
   pageFor?: (ctx: CallContext, slug: string) => Result<PageResult>;
   /**

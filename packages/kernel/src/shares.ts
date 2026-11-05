@@ -582,7 +582,7 @@ export function groupKept(sql: Pick<Sql, 'one' | 'all'>, id: string): GroupKept 
 }
 
 /** The live shares a group holds, oldest first. */
-const groupShares = (sql: Pick<Sql, 'all'>, group: string): ShareKept[] =>
+export const groupShares = (sql: Pick<Sql, 'all'>, group: string): ShareKept[] =>
   sql
     .all<KeptRow>(`SELECT ${KEPT} FROM share s WHERE s.who_kind = 'group' AND s.who = ? AND s.revoked_at IS NULL ORDER BY s.made_at, s.id`, group)
     .map(keptOf)

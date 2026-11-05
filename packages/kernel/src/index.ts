@@ -109,7 +109,7 @@ import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { leasedPushTarget, ownersPushSubs, personPushSubs, pushKindOf, pushOpenOf, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type AccessLens, type Held, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
-import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, groupKept, meOf, saysMe, sharesFor as heldSharesOf, LensCache, newListGrants, putGroup, putShare, retireGroup, revokeShare, setGroupMember, shareKept, sharesKept, sharesWaiting, type GroupKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
+import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, groupKept, groupShares as groupSharesOf, meOf, saysMe, sharesFor as heldSharesOf, LensCache, newListGrants, putGroup, putShare, retireGroup, revokeShare, setGroupMember, shareKept, sharesKept, sharesWaiting, type GroupKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
 import { activeAt, shareReach, type Cap as LensCapOf, type Catalog } from './lens.ts';
 import { NOBODY, narrowed, ruleOf, scopeFor, viewerOfRead, type Wheres } from './members.ts';
 import { accountStop, stopped as stoppedOf, type Suspended } from './members.ts';
@@ -12164,6 +12164,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** One group by id, retired or not, with its people and how many live shares it holds. */
     groupKept: (id: string): GroupKept | null => groupKept(sql, id),
+    /** The live shares a group holds, oldest first. */
+    groupShares: (id: string): ShareKept[] => groupSharesOf(sql, id),
 
     /** Make a group, or rename one (`id`). A group holds nothing until a share names it. */
     groupSave: (by: string, args: { id?: string; name: string }): Result<{ id: string }> =>

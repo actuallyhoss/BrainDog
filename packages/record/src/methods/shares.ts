@@ -216,6 +216,9 @@ export const shareDraws = (source: unknown): boolean =>
  */
 const NEVER_READ: ReadonlySet<string> = new Set(['*', 'session']);
 
+/** A list no link reads: the record's own (`NEVER_READ`), or one its owner keeps to himself (`owner_only`), which a page of his may draw and a link may not. */
+const neverOnLink = (list: string, showing: { lists: ReadonlyMap<string, RegisterDecl> }): boolean => NEVER_READ.has(list) || showing.lists.get(list)?.owner_only === true;
+
 /** Who a link reads as, for the sight module: nobody, so a row its maker kept private is not shown (`viewerOfRead`). */
 const LINK = { principal: { kind: 'system', id: 'share' }, outbound: true } as const;
 
@@ -738,7 +741,7 @@ export const leadShown = (template: string, fill: (key: string) => string | unde
  * which takes their clause or sentence with them, while the rest of the note stays only if nothing else of it reads one.
  */
 const heldHoles = (b: BlockResult, showing: Showing): ReadonlySet<string> | null => {
-  const never = (x: unknown): boolean => showing.reads(x as BlockResult).some((list) => NEVER_READ.has(list));
+  const never = (x: unknown): boolean => showing.reads(x as BlockResult).some((list) => neverOnLink(list, showing));
   if (!never(b)) return new Set();
   const body = (b as { body?: unknown }).body;
   if (b.kind !== 'note' || typeof body !== 'string' || (b.source !== undefined && b.source !== null && b.source !== '')) return null;
@@ -1121,7 +1124,7 @@ const neverReadCut = (given: BlockResult, showing: Showing): BlockResult => {
   const columns = b.columns.filter((c) => {
     if (typeof c.metric !== 'string') return true;
     const reads = showing.reads({ kind: b.kind, columns: [c], rows: [], refusals: [] } as unknown as BlockResult);
-    if (!reads.some((list) => NEVER_READ.has(list))) return true;
+    if (!reads.some((list) => neverOnLink(list, showing))) return true;
     if (typeof c.as === 'string' && FIGURE_COLUMN_OUT[c.as] !== undefined) cut.add(FIGURE_COLUMN_OUT[c.as]!);
     return false;
   });
@@ -1710,6 +1713,8 @@ export function methods(deps: RecordDeps) {
       if (!ULID.test(id)) return undefined;
       const row = kernel.get(id);
       if (row === null || row.deleted_at !== null || personal.has(row.register) || NEVER_READ.has(row.register)) return undefined;
+      /* NOR A LIST THE OWNER KEEPS TO HIMSELF, or the agents' own, as `projectOf` leaves them out of the work it lists. */
+      if (lists.get(row.register)?.owner_only === true || Object.values(agentLists(lists)).includes(row.register)) return undefined;
       if (!money && moneyList(lists.get(row.register))) return undefined;
       if (!deps.sight.admits(LINK, row)) return undefined;
       return kernel.titleOfRow(row.id) ?? undefined;

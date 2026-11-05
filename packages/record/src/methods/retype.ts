@@ -120,6 +120,12 @@ export function methods(deps: RecordDeps) {
       if (ask === null)
         return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'Say the list, the field and what it becomes: {"register":"<list>","field":"<field>","as":{"type":"<type>"}}.', at: 'as' } };
 
+      /* THE SAME ONE WHO MAY SEE THE PREVIEW (`previewRetype`). The answer here counts the rows that do not convert, so a
+         member who could only add, or was held to some rows, told a value's existence by guessing it in `as.values`. */
+      const whole = ctx.principal.kind === 'person' && ctx.principal.level === 'owner';
+      if (!whole && (deps.readable(ctx, ask.register) !== null || kernel.scope(ctx, ask.register) !== undefined || (ctx.hides?.[ask.register]?.length ?? 0) > 0))
+        return { ok: false, refusal: { code: 'FORBIDDEN', fix: 'You can see only part of this list, so only an owner can change this field.', at: 'register' } };
+
       /* EVERY ROW ANSWERED AND THE LIST LINTED BEFORE ANYTHING IS FILED. The kernel files a retype without `review`,
          which would count the rows the way the install does, so the lint the install runs is asked here instead. */
       const landing = kernel.retypeLanding(ask);

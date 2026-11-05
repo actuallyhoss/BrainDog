@@ -2515,7 +2515,14 @@ export function groupNames(sql: Sql, schema: Schema, by: string, keys: readonly 
     return { label: (key) => (key === 'true' || key === '1' ? 'Yes' : key === 'false' || key === '0' ? 'No' : undefined), currency: () => null };
   const to = spec?.type === 'ref' && typeof spec.to === 'string' && spec.to !== '' ? spec.to : null;
   if (to === null || (ctx.reads !== undefined && !ctx.reads(to))) return { label: () => undefined, currency: () => null };
-  const pointed = pointedRows(sql, to, keys);
+  /* A ROW KEPT PRIVATE NAMES NOTHING HERE, FOR ANYBODY, as it reads as nothing in `list`. A figure that groups by a link to
+     it gave its title to everybody the figure reached, a link included. Its maker loses the name too, because a reading
+     is held across readers (`readingHeld`), and one held for her would hand it on. */
+  const asked = [...new Set(keys)];
+  const kept = asked.length === 0
+    ? new Set<string>()
+    : new Set(sql.all<{ entry_id: string }>('SELECT entry_id FROM entry_private WHERE entry_id IN (SELECT value FROM json_each(?))', JSON.stringify(asked)).map((r) => r.entry_id));
+  const pointed = pointedRows(sql, to, asked.filter((k) => !kept.has(k)));
   return { label: (key) => pointed.get(key)?.title ?? undefined, currency: (key) => pointed.get(key)?.currency ?? null };
 }
 

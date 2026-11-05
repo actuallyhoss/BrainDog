@@ -208,9 +208,11 @@ export function methods(deps: RecordDeps & { createDoor?: CreateDoor | undefined
       if (stop) return { ok: false, refusal: stop };
       const extra = plain(args) ? Object.keys(args).find((k) => k !== 'rows' && k !== 'op_id') : undefined;
       if (extra !== undefined) return no('FIELD_UNKNOWN', `capture takes rows and op_id, and nothing called ${extra}.`, { at: extra });
-      const op = plain(args) ? args.op_id : undefined;
-      if (op !== undefined && (!said(op) || op.length > 200))
+      const sent = plain(args) ? args.op_id : undefined;
+      if (sent !== undefined && (!said(sent) || sent.length > 200))
         return no('VALUE_MALFORMED', 'op_id is your own name for this capture, a word of at most 200 characters, sent again on a retry.', { at: 'op_id' });
+      /* UNDER WHO SENT IT (`opIdOf` in `index.ts`): a replay answers the first call's rows, and only to the one who made them. */
+      const op = sent === undefined ? undefined : `${ctx.principal.kind === 'token' ? ctx.principal.person : (ctx.principal as { id: string }).id}|${sent}`;
       const rows = rowsOf(args, no);
       if (!rows.ok) return rows;
 

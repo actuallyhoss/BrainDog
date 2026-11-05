@@ -80,7 +80,9 @@ export function methods(deps: RecordDeps & { nudgeAction?: NudgeAction | undefin
 
   return {
     async actionRun(args: { ingest?: unknown } | undefined, ctx: CallContext): Promise<Result<ActionRan>> {
-      const stop = scoped(ctx, 'write') ?? (ctx.principal.kind === 'token' ? null : admin(ctx, 'run an action now'));
+      /* A KEY HOLDS NO MORE THAN ITS PERSON: a member refused in a browser was let through by their own token. */
+      const held = ctx.principal.kind === 'token' && kernel.access(ctx.principal.person)?.level !== 'owner';
+      const stop = scoped(ctx, 'write') ?? (held ? { code: 'FORBIDDEN', fix: 'Only an owner, or a key of theirs, runs an action now.', at: 'principal' } : ctx.principal.kind === 'token' ? null : admin(ctx, 'run an action now'));
       if (stop) return { ok: false as const, refusal: stop };
       const extra = Object.keys(args ?? {}).find((k) => !(TAKES as readonly string[]).includes(k));
       if (extra !== undefined)

@@ -8330,6 +8330,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
 
   /**
+   * A retry's id as the record keeps it: the caller's own, under who sent it.
+   *
+   * A REPLAY ANSWERS THE ROW IT FIRST MADE, so an id somebody else had used answered their row, amount and notes to a
+   * member who can only add. Agents choose these ids, so they are not secrets, and one person's never meets another's.
+   */
+  const opIdOf = (ctx: CallContext, op: string): string => `${actorOf(ctx)}|${op}`;
+
+  /**
+   * A file field naming a file this caller is kept from, as a refusal, or `null`.
+   *
+   * NAMING IT ON A ROW OF THEIR OWN WAS HOW TO READ IT. `fileHeld` lets a file through for whoever reads a row that names
+   * it, so a member narrowed to Tasks who held a Payroll file's hash put it on a task and took the bytes. Refused in the
+   * sentence a file nobody kept gets, so the answer does not say whether it exists.
+   */
+  const fileLaundered = (register: string, fields: unknown, ctx: CallContext): Refusal | null => {
+    if (fields === null || typeof fields !== 'object') return null;
+    for (const field of kernel.register(register)?.fields ?? []) {
+      if (field.type !== 'file' || !Object.hasOwn(fields, field.id)) continue;
+      for (const hash of JSON.stringify((fields as Record<string, unknown>)[field.id]).match(/\b[0-9a-f]{64}\b/gu) ?? [])
+        if (api.fileHeld(hash, ctx)) return { code: 'REF_UNKNOWN', fix: 'There is no file kept here under that hash. Put it with PUT /api/files first.', at: field.id };
+    }
+    return null;
+  };
+
+  /**
    * A board's steps written on top of the page as it stands, one new version (`boardSteps`, and an agent's draft through
    * `widgetDraft`). Who may is the caller's to have checked.
    */
@@ -12044,7 +12069,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const got = kernel.metric(filled, {});
     return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
   };
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, pageFor: (ctx, slug) => kernel.page(slug, undefined, { reader: pageReader(ctx), ...pageCut(ctx), ...pageHost(ctx) }), sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.catalogueShelf === undefined ? {} : { catalogueShelf: deps.catalogueShelf }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), agentFor, landNow: (ctx, id) => bypassAccept(ctx, id, 'rowset'), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, previewAs: (args, ctx) => api.previewPage(args as never, ctx) as Promise<Result<unknown>>, ...(deps.tryScript === undefined ? {} : { tryScript: deps.tryScript }), scriptReadsAs, writeAs: (op, args, ctx) => (op === 'create' ? api.create(args as never, ctx) : op === 'update' ? api.update(args as never, ctx) : api.get(args as never, ctx)) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, fileHeld: (sha256: string, ctx: CallContext): boolean => api.fileHeld(sha256, ctx), pageFor: (ctx, slug) => kernel.page(slug, undefined, { reader: pageReader(ctx), ...pageCut(ctx), ...pageHost(ctx) }), sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.catalogueShelf === undefined ? {} : { catalogueShelf: deps.catalogueShelf }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), agentFor, landNow: (ctx, id) => bypassAccept(ctx, id, 'rowset'), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, previewAs: (args, ctx) => api.previewPage(args as never, ctx) as Promise<Result<unknown>>, ...(deps.tryScript === undefined ? {} : { tryScript: deps.tryScript }), scriptReadsAs, writeAs: (op, args, ctx) => (op === 'create' ? api.create(args as never, ctx) : op === 'update' ? api.update(args as never, ctx) : api.get(args as never, ctx)) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -13229,6 +13254,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       args = { ...args, fields: plainFields(args.register, args.fields, ctx) };
       const stop = guard(ctx, 'append', args.register);
       if (stop) return { ok: false, refusal: stop };
+      const heldFile = fileLaundered(args.register, args.fields, ctx);
+      if (heldFile) return { ok: false, refusal: heldFile };
       /* `deleted_at` IS THE RECORD'S, and a row does not arrive deleted. No register declares it, and
          dropping it quietly would be a write that did less than it was asked. `delete` is how a row goes. */
       if (args.fields && typeof args.fields === 'object' && Object.hasOwn(args.fields, 'deleted_at'))
@@ -13282,7 +13309,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
               /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
                  without its own id the record has no way to know the second is the first. */
-              ...(args.op_id === undefined ? {} : { opId: args.op_id }),
+              ...(args.op_id === undefined ? {} : { opId: opIdOf(ctx, args.op_id) }),
             }),
           ),
         ),
@@ -13376,6 +13403,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       args = { ...args, patch: plainFields(args.register, args.patch, ctx) };
       const stop = guard(ctx, 'write', args.register);
       if (stop) return { ok: false, refusal: stop };
+      const heldFile = fileLaundered(args.register, args.patch, ctx);
+      if (heldFile) return { ok: false, refusal: heldFile };
       /* A ROW SHE MAY NOT WRITE IS ONE THAT IS NOT THERE (`sight.ts`): every check below reads it as missing, and
          the kernel, handed `within`, answers it in a missing row's words at a missing row's step. */
       const found = kernel.get(`${args.register}#${args.seq}`, { includeDeleted: true });
@@ -13435,7 +13464,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               ...(args.version === undefined ? {} : { version: args.version }),
               ...(note === undefined ? {} : { note }),
               ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
-              ...(args.op_id === undefined ? {} : { opId: args.op_id }),
+              ...(args.op_id === undefined ? {} : { opId: opIdOf(ctx, args.op_id) }),
             }),
           ),
         ),
@@ -15028,6 +15057,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const block = body !== null && Array.isArray(body.blocks) ? (body.blocks[args.block] as Record<string, unknown> | undefined) : undefined;
       if (block === undefined || block === null || typeof block !== 'object' || block.kind !== 'drawn')
         return no('REF_UNKNOWN', `There is no drawn block ${args.block + 1} on ${args.page}.`, { at: 'block' });
+      /* A DRAFT HAS BEEN APPROVED BY NOBODY. Its frame runs in the browser of whoever opens Today, so an act from one is a
+         write as the owner by whoever filed the draft. `widgetDraft` keeps acts off it; this holds for one kept before that. */
+      if (block.draft !== undefined && block.draft !== null)
+        return no('FORBIDDEN', 'This view is still a draft, so it may not write. Keep it first.', { at: 'block' });
       const { creates, updates } = drawnWrites(block.acts);
       const list = args.create !== undefined ? args.create.list : (/^([a-z][a-z0-9_-]{0,31})#(\d+)$/u.exec(String(args.update?.ref ?? ''))?.[1] ?? '');
       const verb = args.create !== undefined ? 'create' : 'update';
@@ -16951,7 +16984,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         size ??= made.value.size;
       }
       if (block === null || typeof block.kind !== 'string') return no('REQUIRED_MISSING', 'body.block is the widget, a block with its kind, or body.said says what it shows.', { at: 'body.block' });
-      const { key: _k, draft: _d, span: _s, area: _a, ...own } = block;
+      /* NO `acts`: WHAT A VIEW MAY WRITE IS THE OWNER'S TO DECLARE, on a page he wrote, and a draft is somebody else's. */
+      const { key: _k, draft: _d, span: _s, area: _a, acts: _acts, ...own } = block;
       const key = `w-${Math.random().toString(36).slice(2, 6)}`;
       const out = await boardWrite('home', [{ add: { ...own, key, ...(size ? { size } : {}), draft: { by, why } } as never }], undefined, ctx);
       if (!out.ok) return out;
@@ -18828,12 +18862,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/`: the owner's, in a browser, and a runner's,
        for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin` as every ADMIN method
        here is, and a runner's admit the one principal every guard above refuses. */
-    ...jobMethods({ kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, keychain, named, no, tail, directory: deps.directory ?? null, clock }),
+    ...jobMethods({ kernel, sql, guard, scoped, readable, fileHeld: (sha256: string, ctx: CallContext): boolean => api.fileHeld(sha256, ctx), sightOf, spokenAs, sight, admin, keychain, named, no, tail, directory: deps.directory ?? null, clock }),
     /* AND `previewChange`, WHICH IS UNDER `methods/` BUT SPREAD HERE, as `jobs.ts` is, because it is handed the functions
        above that hold a page to its reader as well as the guards: a change is drawn through `page`'s own reader and held
        as `page` and `previewPage` hold a block, never by a second copy of who may see what (`methods/preview-change.ts`). */
     ...previewChangeMethods(
-      { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, keychain, named, no, tail, directory: deps.directory ?? null, clock },
+      { kernel, sql, guard, scoped, readable, fileHeld: (sha256: string, ctx: CallContext): boolean => api.fileHeld(sha256, ctx), sightOf, spokenAs, sight, admin, keychain, named, no, tail, directory: deps.directory ?? null, clock },
       { heldBlock, shellOf, heldBy, unplaced, whereHeld, seesPage, readsEveryList, seesFor },
     ),
   };

@@ -917,6 +917,13 @@ export function methods(deps: RecordDeps) {
       /* AN ADMIN NEITHER PUTS THEMSELVES IN A GROUP NOR TAKES THEMSELVES OUT: either changes what they hold. */
       if (ctx.principal.kind === 'person' && ctx.principal.level !== 'owner' && person === ctx.principal.id)
         return refuse('FORBIDDEN', 'Only an owner can change what you can do here.', 'person');
+      /* PUTTING SOMEBODY IN A GROUP GIVES THEM ITS SHARES, so an Admin may do it only where they could have given each share:
+         an owner's group holding Keys or Money was how an Admin kept from both handed them to a colleague. */
+      if (args.in)
+        for (const held of kernel.groupShares(g.id)) {
+          const kept = adminKeeps(ctx, { ...held, who: { kind: 'person', id: person } }, null);
+          if (kept) return { ok: false, refusal: kept };
+        }
       const said = kernel.groupMember(actor(ctx), g.id, person, args.in) ?? [];
       return deps.tail(ok({ ...groupOf(kernel.groupKept(g.id)!), said, left: args.in ? [] : leftOf([person]) }));
     },
@@ -932,6 +939,10 @@ export function methods(deps: RecordDeps) {
       if ('code' in s) return { ok: false, refusal: s };
       const bad = checkShare(s, catalog, { owners: owners() });
       if (bad) return { ok: false, refusal: bad };
+      /* A PREVIEW COUNTS ROWS UNDER ANY RULE IT IS GIVEN, so it is held to what the caller could share at all: an Admin kept
+         from a list could guess at its words and read the answer in the count. */
+      const kept = adminKeeps(ctx, s, null);
+      if (kept) return { ok: false, refusal: kept };
       const lists = reachOf(s, catalog);
       return ok({ sentence: sentence(s, catalog), lists, money: moneyShown(s, catalog, lists, ctx) });
     },

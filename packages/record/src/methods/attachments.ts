@@ -230,7 +230,9 @@ export function methods(deps: RecordDeps) {
         if (typeof a.sha256 !== 'string' || !SHA.test(a.sha256))
           return no('REQUIRED_MISSING', 'Name the file by the sha256 the file door answered (PUT /api/files?name=...), or hand its words in as text.', { at: 'sha256' });
         sha256 = a.sha256;
-        const got = await files.getFile(sha256);
+        /* ATTACHING A FILE IS NOT HOW TO READ ONE. What is attached is there for whoever sees the thing, so a hash somebody was
+           kept from became bytes on a thing of their own. Told as a file nobody kept, so the answer does not say it exists. */
+        const got = deps.fileHeld(sha256, ctx) ? null : await files.getFile(sha256);
         if (got === null) return no('REF_UNKNOWN', `There is no file kept here under that hash. Put it with PUT /api/files?name=${encodeURIComponent(name)} first.`, { at: 'sha256' });
         bytes = got;
       }

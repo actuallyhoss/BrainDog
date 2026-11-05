@@ -68,6 +68,9 @@ async function record(): Promise<Made> {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const api = await createRecordApi({ sql, clock });
+  /* THE TOKEN BELOW IS THE OWNER'S, and a key presses only while its person is an owner. */
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_1', 'owner@example.test', 'Owner')");
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_1', '*', 'owner')");
   assert.ok((await api.kernel.install([SITES, NOTES])).ok);
   const site = await api.create({ register: 'sites', fields: { name: SITE } }, owner);
   assert.ok(site.ok, JSON.stringify(site));
@@ -153,4 +156,13 @@ test('AN ARGUMENT THE CALL DOES NOT TAKE, A MISSING ACTION AND AN UNKNOWN ONE AR
   assert.deepEqual([stray.code, stray.at], ['FIELD_UNKNOWN', 'force']);
   assert.equal(refusal(await run({}, owner)).code, 'REQUIRED_MISSING');
   assert.equal(refusal(await run({ ingest: 'lighthouse' }, owner)).code, 'DECLARATION_UNKNOWN');
+});
+
+test("A MEMBER'S OWN KEY PRESSES NO MORE THAN THEY DO: refused in a browser, refused by their token", async () => {
+  const { sql, run, due } = await record();
+  const before = due();
+  const theirs: CallContext = { principal: { kind: 'token', id: 't_9', scope: 'write', person: 'p_3', level: 'write' } };
+  refusal(await run({ ingest: 'tide' }, theirs));
+  assert.equal(due(), before);
+  assert.deepEqual(presses(sql), []);
 });

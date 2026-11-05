@@ -478,7 +478,9 @@ export function previewer(deps: PreviewDeps) {
         const base = slugify(name);
         entry = listed.find((q) => q.about === null && q.slug === base) ?? listed.find((q) => q.about === null && q.slug.startsWith(`${base}-`));
       } else {
-        const mine = listed.filter((q) => q.about?.register === plan.forList);
+        /* ONLY A ROW SHE CAN SEE. `fill` writes the row's own fields into the page, so a row past her row rule, or somebody's
+           private row, came back through `about` or as the first of the list, title, notes and amount. */
+        const mine = listed.filter((q) => q.about?.register === plan.forList && held.seesPage(ctx, q));
         if (aboutRow !== null && aboutRow.register === plan.forList) {
           entry = mine.find((q) => q.about?.seq === aboutRow.seq);
           if (entry === undefined)

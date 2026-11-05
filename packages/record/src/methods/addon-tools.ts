@@ -9,8 +9,9 @@
  * `runs: { tool | command | row: true }` before anything may start it this way (`pack-actions.ts` in declare).
  *
  * THE KEYS IT DECLARED OPEN, AS ON ITS CLOCK. The owner approved, at install, this script sending this key to this host,
- * and a door lets anybody on the internet start a script that does exactly that, so an agent of the person's starting
- * it is no wider. What is narrower here is sight: the script reads through the caller's own `list` and `get`, held to
+ * and a door lets anybody on the internet start a script that does exactly that, so an agent of the OWNER'S starting it
+ * is no wider. Anybody else's start runs as a trial runs, with no key and no send, because the answer and the log come
+ * back to the caller, which no public door hands anybody. What is narrower here is sight: the script reads through the caller's own `list` and `get`, held to
  * its `reads:` (`scriptReadsAs`), so a tool shows an agent nothing that agent could not read itself.
  *
  * ITS WRITES ARE THE CALLER'S. Nothing the sandbox asks for is applied as the script: each create and update goes
@@ -218,7 +219,10 @@ export function methods(deps: RecordDeps) {
         config,
         input,
         reads: deps.scriptReadsAs(script, strings(body.reads), ctx),
-        owner: true,
+        /* ONLY THE OWNER'S OWN OPENS THE KEYS. The answer and the log come back to the caller, so a member's agent got what the
+           owner's key could fetch, and an outside write in the owner's name. Anybody else runs it as a trial is run: no key
+           and no send, their own reads. */
+        owner: kernel.access(String((p.kind === 'token' ? p.person : p.id) ?? ''))?.level === 'owner',
         stale: false,
         asker: String((p.kind === 'token' ? p.person : p.id) ?? ''),
       })) as Body;
