@@ -387,14 +387,15 @@ test('OPENING ANOTHER RECORD MOVES THE SESSION, from a page here only, and keeps
   assert.equal((await call('/auth/switch', { body: { slug: 'the-shop' } })).status, 401, 'no cookie opened a record');
 });
 
-test('TEN WRONG KEYS ARE COMPARED, THE ELEVENTH IS A 429 WITH Retry-After, and the right key during it is too', async () => {
+test('TEN WRONG KEYS ARE COMPARED, THE ELEVENTH IS A 429 WITH Retry-After, and the right key always gets in', async () => {
   const { call } = setup();
   for (let i = 0; i < 10; i++) assert.equal((await call('/auth/token', { body: { serverKey: `wrong-${i}` } })).status, 401);
-  const locked = await call('/auth/token', { body: { serverKey: KEY } });
+  const locked = await call('/auth/token', { body: { serverKey: 'wrong-again' } });
   assert.equal(locked.status, 429);
   assert.equal(locked.headers.get('retry-after'), '900');
   assert.deepEqual(locked.body, { ok: false, retryAfter: 900 });
   assert.deepEqual(locked.headers.getSetCookie(), []);
+  assert.equal((await call('/auth/token', { body: { serverKey: KEY } })).status, 200, 'the right key was held by the lock (RG14)');
 });
 
 test('a path that is no route, the wrong verb, and a route this host does not serve', async () => {
