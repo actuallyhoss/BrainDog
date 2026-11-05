@@ -68,7 +68,7 @@ export function itemsIn(source) {
     const head = s.slice(m.index, end + 1);
     if (!/role="menuitem/u.test(head) || /menu-cancel/u.test(head)) continue;
     const close = s.indexOf(`</${m[1]}>`, end);
-    out.push({ body: s.slice(end + 1, close < 0 ? end + 300 : close), line: s.slice(0, m.index).split('\n').length });
+    out.push({ body: s.slice(end + 1, close < 0 ? s.length : close), line: s.slice(0, m.index).split('\n').length });
   }
   return out;
 }
@@ -102,7 +102,7 @@ export default function menuItems(root) {
         else if (!had) said.set(words, { icon: icon[1], at: `${rel}:${item.line}` });
       }
     }
-    if (/<Menu\b[\s\S]{0,240}?\{#snippet trigger\(\)\}/u.test(source) && !PICKERS.has(rel)) {
+    if (/<Menu\b[\s\S]*?\{#snippet trigger\(\)\}/u.test(source) && !PICKERS.has(rel)) {
       const hosted = /data-menu-host|ownMenu\(|class="head-more|class="change-more|class="tool-more|class="more-trigger/u.test(source);
       if (!hosted) findings.push(`${rel}  a "…" in no data-menu-host: its item has only the browser's menu on a right-click.`);
     }
@@ -116,4 +116,7 @@ export default function menuItems(root) {
   return 1;
 }
 
+export default menuItems;
+
+/* AND IT IS STILL A SCRIPT, for `self-test` and the command line above. */
 if (import.meta.main) process.exitCode = menuItems(process.argv[2]);
