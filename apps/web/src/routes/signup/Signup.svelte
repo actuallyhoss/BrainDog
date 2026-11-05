@@ -317,7 +317,7 @@
    * not arrive in ten seconds is `failed`, and `then` is not called: the box says so and offers Try again.
    */
   async function withTurnstile(then: (t: Turnstile) => void): Promise<WidgetState> {
-    if (reopenForCheck()) return;
+    if (reopenForCheck()) return 'loading';
     const state = await loadWidget({ doc: document });
     const t = turnstileOf();
     if (state === 'ready' && t) then(t);
