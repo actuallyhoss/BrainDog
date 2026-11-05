@@ -62,7 +62,7 @@ export type Frame = {
   other: string;
 };
 
-const LEFT_OUT = 'script, iframe, video, audio, object, embed, canvas, dialog, [popover], [data-kept-skip]';
+const LEFT_OUT = 'script, iframe, video, audio, object, embed, canvas, dialog, [popover], [data-kept-skip], noscript, xmp, noembed, noframes, plaintext';
 
 /** A selector that names the page's root or body and nothing under them: drawn outside the picture's scope. */
 const ROOTISH = /^\s*(?::root|html|body)(?:[.:[#][^\s>+~]*)?\s*$/u;

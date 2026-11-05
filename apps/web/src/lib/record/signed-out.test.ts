@@ -151,6 +151,11 @@ test('THE WORKER\'S COPY NAMED BY THE SIGN-IN SCREEN IS THE COPY, since it spell
   const copy = /export const COPY = '([^']+)'/u.exec(offline)?.[1];
   assert.ok(copy);
   assert.ok(auth.includes(`caches?.delete('${copy}')`), 'forgetLapsed no longer deletes the copy Today is painted from');
+  const share = readFileSync(new URL('../phone/share.ts', import.meta.url), 'utf8');
+  const shared = /export const SHARED = '([^']+)'/u.exec(share)?.[1];
+  assert.ok(shared && auth.includes(`caches?.delete('${shared}')`), 'a shared photo outlives the session');
+  const worker = readFileSync(new URL('../../service-worker.ts', import.meta.url), 'utf8');
+  assert.match(worker, /accessEnded\(res\.headers\)\) await Promise\.all\(\[sw\.caches\.delete\(COPY\), sw\.caches\.delete\(SHARED\)\]\)/u);
 });
 
 test('NO ADDRESS OF WHAT SOMEBODY TYPED OR A DEVICE SHOWED IS A KEY OF A PAGE\'S OUTLINE', async () => {
@@ -163,4 +168,12 @@ test('NO ADDRESS OF WHAT SOMEBODY TYPED OR A DEVICE SHOWED IS A KEY OF A PAGE\'S
   assert.equal(kept('/r/tasks?q=words'), '/r/tasks');
   assert.equal(kept('/r/tasks?view=open'), '/r/tasks?view=open');
   assert.equal(kept('/r/tasks'), '/r/tasks');
+});
+
+test('THE KEPT PICTURE IS PARSED APART AND PAINTED WITHOUT WHAT ACTS ON ITS OWN, whoever wrote it: a meta refresh in it went to any address on every open, and no policy holds one', () => {
+  const shell = readFileSync(new URL('../../app.html', import.meta.url), 'utf8');
+  const painted = /[a-zA-Z]\.innerHTML=f\.html;(.{0,160})/u.exec(shell);
+  assert.ok(painted, 'the picture is no longer painted from f.html');
+  assert.match(painted[0], /^[a-zA-Z]\.innerHTML=f\.html;[^;]*querySelectorAll\('script,iframe,frame,object,embed,meta,base,link'\)/u);
+  assert.doesNotMatch(shell, /\be\.innerHTML=f\.html/u, 'written straight into the page, a meta refresh acts as it lands');
 });

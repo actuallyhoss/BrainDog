@@ -263,7 +263,7 @@ export async function forgetLapsed(said: Said<Methods>): Promise<void> {
      nothing that answers one (`/auth/methods` says `me: null` with a 200), so a session ended elsewhere left the last
      person's Today to be painted for whoever signed in next at the same address. Spelt here so this file loads no module
      for a stranger; `signed-out.test.ts` holds it to `COPY`. */
-  await globalThis.caches?.delete('braindog-copy').catch(() => false);
+  await Promise.all([globalThis.caches?.delete('braindog-copy'), globalThis.caches?.delete('braindog-share')]).catch(() => undefined);
   if (kept) await import('./data/local-tab.ts').then((c) => c.wipeLocal(), () => undefined);
 }
 
@@ -278,6 +278,7 @@ export async function forgetLeaving(person: string | null): Promise<void> {
   await Promise.all([
     import('./data/local-tab.ts').then((c) => c.wipeLocal(), () => undefined),
     import('./data/offline.ts').then((c) => c.forget(), () => undefined),
+    globalThis.caches?.delete('braindog-share').catch(() => false),
   ]);
 }
 

@@ -221,7 +221,7 @@ async function network(req: Request): Promise<Response | null> {
   } catch {
     return null;
   }
-  if (res.status === 401 || accessEnded(res.headers)) await sw.caches.delete(COPY);
+  if (res.status === 401 || accessEnded(res.headers)) await Promise.all([sw.caches.delete(COPY), sw.caches.delete(SHARED)]);
   return res;
 }
 
