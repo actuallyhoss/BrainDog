@@ -34,7 +34,7 @@ import type { AddressInfo } from 'node:net';
 
 import { createRecordApi, type CallContext } from '@braindog/record';
 
-import { handlersFor, serveApi, serveSlash, servesSlash, slashAskDoor, type SlashAskDoor, type SlashAskEngine } from '../src/index.ts';
+import { handlersFor, PREVIEW_READ_ONLY, serveApi, serveSlash, servesSlash, slashAskDoor, type SlashAskDoor, type SlashAskEngine } from '../src/index.ts';
 import { endpointInference, slashRecord } from '../src/slash.ts';
 import { slashRecordMeter } from '../src/slash-ask.ts';
 import { createSlash } from '../../slash/src/index.ts';
@@ -701,4 +701,24 @@ test("A BACKGROUND ASK LEAVES HIS COUNT WHERE IT WAS, and his own press moves it
     ['headline background', 'look background', 'skill background', 'understand background', 'ask person', 'plan person'],
   );
   sql.close();
+});
+
+test("SEEING AS SOMEBODY NEVER REACHES THEIR CONVERSATIONS: every Slash door with words behind it is refused, before the door's own checks", async () => {
+  const seeing = { principal: { kind: 'person', id: 'p_colleague', level: null }, preview: 'p_colleague', previewBy: 'p_owner' };
+  const door = { origins: new Set(['https://app.example.test']) } as never;
+  const at = 'https://app.example.test/api/slash/';
+  for (const [route, method] of [
+    ['threads', 'GET'],
+    ['thread/01JZ8QK3F7R2M9V4XN6TCB5HAD', 'GET'],
+    ['asks', 'GET'],
+    ['now', 'GET'],
+    ['chat', 'POST'],
+    ['conversation', 'POST'],
+    ['read', 'POST'],
+    ['act', 'POST'],
+  ] as const) {
+    const out = await serveSlash(new Request(`${at}${route}`, { method, headers: { origin: 'https://app.example.test' }, ...(method === 'POST' ? { body: '{}' } : {}) }), door, seeing);
+    assert.equal(out.status, 403, route);
+    assert.deepEqual(((await out.json()) as { refusal: unknown }).refusal, PREVIEW_READ_ONLY, route);
+  }
 });

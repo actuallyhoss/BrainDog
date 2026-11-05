@@ -79,7 +79,7 @@ import { codeOf, fixOf, type Refusal, type Result, type Sql } from '@braindog/po
 import type { SlashBackground, SlashMeter } from '@braindog/record';
 
 import { ABUSE, tooManyLine } from './abuse.ts';
-import { httpStatus } from './index.ts';
+import { httpStatus, previewOf, PREVIEW_READ_ONLY } from './index.ts';
 import { mayThink, sendable, type Reads } from './infer.ts';
 import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK, UNDERSTAND_ASK, type AskPurpose, type AskSpends } from './model-jobs.ts';
 import { slashBaseUrlOf, slashKeySave } from './slash.ts';
@@ -372,6 +372,11 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   const path = `/api/slash/${route}`;
   const verb = GETS.has(route) ? 'GET' : 'POST';
   if (request.method !== verb) return refusal(405, { code: 'ROUTE_UNKNOWN', fix: `${path} takes a ${verb}.` }, [['allow', verb]]);
+
+  /* SEEING AS SOMEBODY READS THE RECORD AS THEY WOULD, AND A CONVERSATION IS NOT THE RECORD'S. Slash's doors key on who is
+     asking, so an owner seeing as a colleague was that colleague here: their private conversations read, posted into and
+     deleted, and asks spent in their name. Only the two doors that read no row and no words stay, for the palette. */
+  if (previewOf(ctx) !== null && route !== 'status' && route !== 'health') return refusal(403, PREVIEW_READ_ONLY);
 
   /* A BEARER OF ANY KIND, BEFORE ANYTHING ELSE, as in `keys.ts`: on a self-host the server key makes
      the owner and would pass every check below this one, so it is the header that is refused rather
