@@ -23,9 +23,10 @@ A full run with nothing red, on a clean tree whose HEAD did not move, writes `.s
 
 ## `pnpm ship:deploy` (`node tools/ship/deploy.mjs`)
 
-**It signs the CLI before it publishes (`tools/ship/cli-sign.mjs`), and stops at that step, saying what to run, until a release
-key exists** (`node tools/ship/cli-key.mjs`, `apps/cli/README.md`). The key comes from `braindog keys exec`, so this machine's
-`braindog` must hold Keychain access (`braindog login <address> --keychain '*'`, seven days). A dry run checks a key is pinned and opens nothing.
+**It signs the CLI before it publishes (`tools/ship/cli-sign.mjs`), with the login keychain item `braindog-cli-release` on this Mac.** With no
+such item it refuses before its first step and says the one command to run (`node tools/ship/cli-key.mjs`, `apps/cli/README.md`), so nothing
+is deployed. That stops the whole deploy and not just the CLI: going on without it would publish the site with no `/cli/` files. A key that
+cannot be opened stops at the signing step, which comes before any write. A dry run asks only whether the item exists, and opens nothing.
 
 Runs `deploy.yml`'s `deploy` job, step by step in its order. It refuses, with nothing deployed, when:
 

@@ -336,7 +336,7 @@ hooks; `keys.ts` for the key doors; `skills.ts` and `tools.ts` for the sync, the
 `hooks/braindog-hook.ps1` and `hooks/braindog-hook.sh`, the shims Claude Code runs. Setup sync adds `sealer.ts`,
 `secret-store.ts`, `carry.ts`, `sync-record.ts`, `sync-join.ts`, `sync-push.ts`, `sync-pull.ts` and `sync-patches.ts`
 (§5.20). Published artefact: `dist/braindog.mjs`, one file, with `dist/braindog.mjs.sha256`, `dist/braindog.mjs.sig` (made at deploy by
-`tools/ship/cli-sign.mjs`) and `dist/braindog.mjs.build` (the one line `braindog update` reads, §5.17) beside it, built by
+`tools/ship/cli-sign.mjs`, the release's time and a signature over the sum, the build and that time) and `dist/braindog.mjs.build` (the one line `braindog update` reads, §5.17) beside it, built by
 `scripts/bundle.mjs` (`pnpm --filter braindog-cli build`): esbuild with `src/main.ts --bundle --platform=node
 --format=esm --target=node24 --define:__BUILD__="<yyyy.mm.dd>+<sha7>" --outfile=dist/braindog.mjs`, keeping the
 entry's own hashbang in place of a banner, the build taken from `BRAINDOG_BUILD` or else the UTC date and
@@ -1007,7 +1007,7 @@ and no `--as`, runs steps 1, 3 and 4 above, and `headersOne` prints the key alon
 printable ASCII is refused there too, since Claude Code refuses one. Nothing here writes an `apiKeyHelper` into a
 profile yet; when `env apply` does, it is a program entry (§5.19).
 
-### 5.17 · `braindog update [--check]` (`update.ts`)
+### 5.17 · `braindog update [--check] [--older]` (`update.ts`)
 
 The command keeps itself current, and only when it is typed: the start hook says it is behind and never runs this.
 
@@ -1018,6 +1018,10 @@ The command keeps itself current, and only when it is typed: the start hook says
 3. Downloads `<base>/braindog.mjs` to `braindog.new.mjs` beside the installed file, and refuses unless its SHA-256 is
    the one in `<base>/braindog.mjs.sha256` and its own `--version`, asked under this Node, is the build read in 2. Every
    read follows its moves by hand, five at most, and a move to anything but https ends it before that address is asked.
+   A build of an earlier day is refused before anything is downloaded, unless `--older` asks for it. Once this command
+   is pinned (`release-key.ts`), the download must also carry `<base>/braindog.mjs.sig`, a pinned key's signature over the
+   sum, the build and the release's time, and may not be older than this command by that time unless `--older` asks,
+   all before it runs.
 4. Copies the installed file to `braindog.mjs.prev` and renames the download over it, one atomic rename, so the
    installed name always holds a whole command. Any failure deletes the download and leaves the installed file.
 5. Runs `install --apply` to place the Agent Skill and hooks again, and says the old and new builds.
