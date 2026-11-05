@@ -31,6 +31,10 @@ settings:
     ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: NO
     LOCALIZATION_PREFERS_STRING_CATALOGS: YES
     DEAD_CODE_STRIPPING: YES
+  configs:
+    # A Release build never carries get-task-allow, whatever signs it: no debugger attaches, and notarising would refuse it.
+    Release:
+      CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
 packages:
   BrainDogKit:
@@ -165,6 +169,8 @@ targets:
         # updater off) until the key pair is made for the first signed release. The installer runs as Sparkle's own
         # service, as a sandboxed app needs (the Release entitlements let the app reach it).
         SUFeedURL: https://brain.dog/mac/appcast.xml
+        # The download is checked against the key before it is unpacked, not after: no unsigned archive reaches the unpacker.
+        SUVerifyUpdateBeforeExtraction: true
         SUPublicEDKey: ""
         SUEnableInstallerLauncherService: true
         SUEnableAutomaticChecks: true
