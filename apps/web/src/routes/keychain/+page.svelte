@@ -1001,7 +1001,7 @@
                       <button type="button" class="mi" role="menuitem" disabled={revealing === k.id} onclick={() => void revealKey(k)}><Icon name="eye" size="s" />{words.reveal}</button>
                     {/if}
                     <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}><Icon name="refresh" size="s" />{k.sealed ? words.replace : tileWords.sealValue}</button>
-                    <button type="button" class="mi" role="menuitem" onclick={() => (accessFor = k)}><Icon name="people" size="s" />{accessWords.access}</button>
+                    <button type="button" class="mi" role="menuitem" onclick={() => (accessFor = k)}><Icon name="user-check" size="s" />{accessWords.access}</button>
                     {#if k.grant && k.sealed}
                       <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}><Icon name="ban" size="s" />{copy.revokeKey}</button>
                     {/if}

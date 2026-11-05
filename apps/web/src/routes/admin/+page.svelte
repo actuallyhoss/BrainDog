@@ -59,7 +59,7 @@
   } from '$lib/admin/ops.ts';
 
   const words = {
-    rowMenu: 'This row',
+    rowMenu: { app: 'This application', plugin: 'This plugin', report: 'This report', code: 'This code' },
     showDetails: 'Show details',
     hideDetails: 'Hide details',
     reviewOne: 'Review',
@@ -433,7 +433,7 @@
 {/snippet}
 
 <!-- A ROW'S VERBS AT THE POINTER: what its buttons do, one menu for the page's kinds of row. -->
-<Menu label={words.rowMenu} open={pointed !== null} at={pointedAt} onclose={() => (pointed = null)}>
+<Menu label={pointed ? words.rowMenu[pointed.kind] : words.way} open={pointed !== null} at={pointedAt} onclose={() => (pointed = null)}>
   {#if pointed?.kind === 'app'}
     {@const a = pointed.app}
     <button type="button" role="menuitem" onclick={() => toggle(a.id)}><Icon name="eye" size="s" />{opened === a.id ? words.hideDetails : words.showDetails}</button>

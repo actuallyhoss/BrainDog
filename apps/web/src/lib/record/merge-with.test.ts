@@ -41,6 +41,9 @@ test('a press asks the record whether the two are one, and opens the question it
 test('the row page draws the menu with Merge in it, and not only once the record has answered', () => {
   const page = readFileSync(new URL('../../routes/r/[register]/[seq]/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /\{#if row\}\n\s+<Menu label=\{copy\.moreOn\(/u, 'the menu waits behind the live read again');
-  assert.match(page, /\{#if mergeable\}<button type="button" class="mi" role="menuitem" data-merge /u, 'the menu has no Merge');
+  assert.match(page, /\{:else if v === 'merge'\}<button type="button" class="mi" role="menuitem" data-merge /u, 'the menu has no Merge');
+  /* THE MENU DRAWS WHAT `rowVerbs` SAYS, the one list a link to the row reads too, and it offers Merge on the same terms. */
+  const verbs = readFileSync(new URL('../things/menu-of.ts', import.meta.url), 'utf8');
+  assert.match(verbs, /f\.changes && !f\.archived && f\.decl\.meets !== undefined \? \(\['merge'\] as const\)/u, 'rowVerbs no longer offers Merge');
   assert.match(page, /const mergeable = \$derived\(changes && !archived && decl\?\.meets !== undefined\)/u);
 });

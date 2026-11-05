@@ -143,9 +143,9 @@ export const HELD = {
     ids: ['people'],
     why: 'the `people` glyph a list declares, which is how a list of people is known without its id.',
   },
-  'apps/web/src/lib/ui/RowMenu.svelte': {
+  'apps/web/src/lib/things/menu-of.ts': {
     ids: ['people'],
-    why: 'the `people` icon on Hand to.',
+    why: 'Import contacts on a page that draws people, the same question `PageView.svelte` asks for its own "…".',
   },
   'apps/web/src/lib/nav.ts': {
     ids: ['people', 'services', 'work'],

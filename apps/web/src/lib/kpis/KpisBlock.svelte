@@ -380,18 +380,18 @@
 
 {#snippet numberItems(k: Pick<KpiView, 'input' | 'name'>, acts: readonly KpiAction[])}
   <!-- OPEN: the number's sheet for who may change it, its project's page for who may only read. -->
-        {#if writable}
-          <button type="button" class="kb-item" role="menuitem" onclick={() => void openKpi(k.input)}><Icon name="arrow" size="s" />{copy.kpiMenuOpen}</button>
-        {:else if href?.(k.input as KpiAnswered)}
-          <a class="kb-item" role="menuitem" data-link-verb href={href(k.input as KpiAnswered)}><Icon name="arrow" size="s" />{copy.kpiMenuOpen}</a>
-        {/if}
-        {#each acts as a (a.id)}
-          <button type="button" class="kb-item" role="menuitem" onclick={() => void press(a, k)}><Icon name={rowIcon(a.id)} size="s" />{a.label}</button>
-        {/each}
-        {#if writable}
-          <hr />
-          <button type="button" class="kb-item" role="menuitem" onclick={() => void openChooser()}><Icon name="grid" size="s" />{copy.kpiMenuChoose}</button>
-        {/if}
+  {#if writable}
+    <button type="button" class="kb-item" role="menuitem" onclick={() => void openKpi(k.input)}><Icon name="arrow" size="s" />{copy.kpiMenuOpen}</button>
+  {:else if href?.(k.input as KpiAnswered)}
+    <a class="kb-item" role="menuitem" data-link-verb href={href(k.input as KpiAnswered)}><Icon name="arrow" size="s" />{copy.kpiMenuOpen}</a>
+  {/if}
+  {#each acts as a (a.id)}
+    <button type="button" class="kb-item" role="menuitem" onclick={() => void press(a, k)}><Icon name={rowIcon(a.id)} size="s" />{a.label}</button>
+  {/each}
+  {#if writable}
+    <hr />
+    <button type="button" class="kb-item" role="menuitem" onclick={() => void openChooser()}><Icon name="grid" size="s" />{copy.kpiMenuChoose}</button>
+  {/if}
 {/snippet}
 
 {#snippet menu(k: KpiView)}

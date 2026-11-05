@@ -47,6 +47,8 @@ import { askPage } from './page-verbs.ts';
 import { askSheet } from './asks.svelte.ts';
 import { dotOf } from './state-dot.ts';
 import { thingOf, type Thing } from './thing.ts';
+import { quick } from '../money/quick.svelte.ts';
+import { pageOfLedger } from '../money/ledger.ts';
 import { actorOf, mutedOf, tellsQuietly } from '../../routes/settings/[area]/muted.ts';
 import { VERB_ICONS, linkWords, thingWords, type VerbId } from './verbs.ts';
 
@@ -75,6 +77,8 @@ export type ThingItem = {
 
 /** Where the press was, for what only makes sense there. */
 export type ThingFrom = { sidebar: boolean; wide: boolean; oneWindow: boolean; pathname: string };
+
+const PEOPLE = 'people';
 
 const G = { link: 0, keep: 1, change: 2, who: 3, page: 4, more: 5, sidebar: 6, going: 9 } as const;
 
@@ -276,9 +280,10 @@ function pageBody(slug: string): Promise<PageBody | null> {
 function moneyItems(t: Extract<Thing, { kind: 'page' }>, shell: Shell, body: PageBody | null): ThingItem[] {
   if (!body) return [];
   const out: ThingItem[] = [];
-  const drawsLedger = (body.requires ?? []).includes('register.transactions');
-  if (drawsLedger && may(shell, 'append', 'transactions')) out.push(item('statement', 'add', thingWords.statement, G.page, { href: '/add/statement', icon: 'upload' }));
-  const money = body.nav?.section?.toLowerCase() === 'money' || /^money(-|$)/u.test(body.page ?? '') || body.pack === 'money-core';
+  /* THE LEDGER AS THE TAB FOUND IT (`money/quick.svelte.ts`), and the same question the page's own "…" asks of it. */
+  const ledger = quick.base === apiBase() ? quick.ledger : null;
+  if (ledger && pageOfLedger(body.requires, ledger) && may(shell, 'append', ledger.list)) out.push(item('statement', 'add', thingWords.statement, G.page, { href: '/add/statement', icon: 'upload' }));
+  const money = body.nav?.section?.toLowerCase() === 'money' || /^money(-|$)/u.test(body.page ?? '');
   const currency = shell.index?.currency ?? null;
   if (money && shell.me?.owner === true) out.push(item('currency', 'money', currency ? `Counted in ${currency}` : 'Money’s currency', G.page, { run: () => askPage(t.href, 'currency') }));
   return out;
@@ -314,7 +319,8 @@ async function pageThing(t: Extract<Thing, { kind: 'page' }>, shell: Shell, from
     const on = pageBoards.of(t.slug) !== null;
     out.push(item('board', on ? 'fields' : 'board', on ? thingWords.boardOff : thingWords.boardOn, G.page, { run: () => askPage(t.href, 'board') }));
   }
-  if (body?.requires?.includes('register.people') && may(shell, 'append', 'people'))
+  /* PEOPLE'S OWN, AS `PageView.svelte` ASKS IT: held there and here for the one list a contacts file lands in. */
+  if (body?.requires?.includes(`register.${PEOPLE}`) && may(shell, 'append', PEOPLE))
     out.push(item('contacts', 'add', thingWords.contacts, G.page, { href: '/add/contacts', icon: 'upload' }));
   return out;
 }

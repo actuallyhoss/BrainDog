@@ -38,7 +38,6 @@ export const VERB_ICONS = {
   /* Who has it. */
   hand: 'user-check',
   share: 'user-plus',
-  people: 'people',
   private: 'lock',
   merge: 'git-merge',
   /* How it is drawn and made. */
