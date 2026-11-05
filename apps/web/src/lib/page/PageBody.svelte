@@ -1409,10 +1409,9 @@
     {#if opens && opensAt === at}<div class="page-strip" data-opens>{@render opens()}</div>{/if}
     {#if lifted?.at === at}
       <!-- THEN the line the page opens on, on a phone, under its sentence and never between the name and the sentence;
-           then what narrows the page, as part of its header, then what was just done on it, before what it holds. -->
+           then what narrows the page, as part of its header. -->
       {#if under && !leadTile}<div class="page-strip">{@render under()}</div>{/if}
       {#if strip && !leadTile}<div class="page-strip">{@render strip()}</div>{/if}
-      {#if host && mode === 'page'}<JustChanged {host} />{/if}
     {/if}
   {/if}
 {/snippet}
@@ -1521,7 +1520,6 @@
   {/if}
   {#if under && !lifted}<div class="page-strip">{@render under()}</div>{/if}
   {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
-  {#if host && mode === 'page' && !arranging && !lifted && !bare}<JustChanged {host} />{/if}
   <!-- THE RESERVED SLOT (`slot.ts`): BrainDog's one suggestion, at the head of a page or a home being read by someone who
        may answer it. It arrives after the page has drawn and draws nothing when there is nothing to suggest, and never
        on a page that is no place to decide (`slotPlace`). ON A HOME EVERY QUESTION ITS QUEUE HOLDS COUNTS AS DRAWN, the
@@ -1548,6 +1546,9 @@
   {:else}
     {@render column(rest)}
   {/if}
+  <!-- WHAT WAS JUST DONE ON IT, UNDER WHAT IT HOLDS: over the blocks, its tile landed a quarter second after a tick and pushed
+       the whole list 132px down under the pointer, and the next press landed on another row. -->
+  {#if host && mode === 'page' && !arranging && !bare}<JustChanged {host} />{/if}
   <!-- WHAT WAS CHANGED FOR THE READER THIS WEEK, one line at the foot of the board; the list opens in the panel. -->
   {#if host && mode === 'page' && !arranging && !bare}<Changed {host} />{/if}
 </div>
