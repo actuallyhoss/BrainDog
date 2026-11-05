@@ -152,7 +152,7 @@ import { opsPlan, type OpsPlanDeps } from './ops-plan.ts';
 import { stripeOf } from './stripe.ts';
 /* TELEMETRY: one Analytics Engine point per request, when `TELEMETRY` is bound. */
 import { telemetry } from './telemetry.ts';
-import { flooredError, installLogFloor, reasonOf } from '@braindog/host/log-floor';
+import { floored, flooredError, installLogFloor, reasonOf } from '@braindog/host/log-floor';
 import { readSetup } from '@braindog/slash/propose';
 
 /* FIRST THING THE ISOLATE DOES, so no line any code here writes misses it, a library's and a thrown sentence's included (`log-floor.ts`). */
@@ -892,7 +892,8 @@ export class Record$ extends DurableObject<Env> {
     /* NOTHING THROWN HERE CROSSES AS IT WAS SAID. What this answers reaches a person's script, which may read it and send it
        on, and a throw past it goes in the logs, and the host's own code held a key a moment ago (`log-floor.ts`). */
     try {
-      return await this.#scripts.answer(run, call);
+      const reply = await this.#scripts.answer(run, call);
+      return 'error' in reply ? { error: floored(reply.error) } : reply;
     } catch (e) {
       return { error: reasonOf(e) };
     }

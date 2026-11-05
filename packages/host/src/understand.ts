@@ -30,6 +30,7 @@
  * STRUCTURAL, AS `slash-answers.ts` IS: the model is handed in, and this file imports neither `@braindog/slash` nor an app.
  */
 
+import { messageOf } from './log-floor.ts';
 import {
   codeName,
   dayIn,
@@ -789,7 +790,7 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
   try {
     out = await deps.mentions({ notes });
   } catch (e) {
-    out = { ok: false, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } };
+    out = { ok: false, refusal: { code: 'UNREACHABLE', fix: messageOf(e) } };
   }
   if (!out.ok) {
     log(`notes: ${fixOf(out)}`);
@@ -1347,7 +1348,7 @@ export function understandingOver(
       hold.value.settle({ usage: { in: tokens(input), out: tokens(answer) } });
       return { ok: true, value: answer };
     } catch (e) {
-      const fix = e instanceof Error ? e.message : String(e);
+      const fix = messageOf(e);
       /* A MODEL THAT ANSWERED SOMETHING UNREADABLE WAS PAID FOR, and is counted, and the job is not asked again. */
       if (typeof e === 'object' && e !== null && (e as { answered?: unknown }).answered === true) {
         const usage = (e as { usage?: { in: number; out: number } }).usage;

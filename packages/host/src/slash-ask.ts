@@ -73,6 +73,7 @@
  * imports `@braindog/slash` nowhere, and cannot, because `packages/host` does not depend on it.
  */
 
+import { messageOf } from './log-floor.ts';
 import { ulids } from '@braindog/kernel';
 import { codeOf, fixOf, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { SlashBackground, SlashMeter } from '@braindog/record';
@@ -491,7 +492,7 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
       try {
         stop = await door.keychain(ctx);
       } catch (e) {
-        return refusal(500, { code: 'INTERNAL', fix: `The keychain could not be asked about your key: ${e instanceof Error ? e.message : String(e)}.` });
+        return refusal(500, { code: 'INTERNAL', fix: `The keychain could not be asked about your key: ${messageOf(e)}.` });
       }
       if (stop !== null) return slashReply({ ok: false, refusal: stop });
     }
@@ -588,7 +589,7 @@ async function pattern<C>(body: Record<string, unknown>, door: SlashAskDoor<C>, 
   try {
     read = await door.samples([...new Set(ids as string[])], ctx);
   } catch (e) {
-    return refusal(500, { code: 'INTERNAL', fix: `The inbox could not be read for Slash: ${e instanceof Error ? e.message : String(e)}.` });
+    return refusal(500, { code: 'INTERNAL', fix: `The inbox could not be read for Slash: ${messageOf(e)}.` });
   }
   if (!read.ok) return slashReply(read);
   const samples = read.value;
@@ -635,7 +636,7 @@ async function opened<C>(door: SlashAskDoor<C>, ctx: C): Promise<unknown> {
   try {
     own = door.byok ? await door.byok(ctx) : undefined;
   } catch (e) {
-    return refusal(500, { code: 'INTERNAL', fix: `Your key could not be opened for Slash: ${e instanceof Error ? e.message : String(e)}.` });
+    return refusal(500, { code: 'INTERNAL', fix: `Your key could not be opened for Slash: ${messageOf(e)}.` });
   }
   return refusedKey(own) ? slashReply({ ok: false, refusal: own.refusal }) : own;
 }
@@ -671,7 +672,7 @@ async function flat(run: () => Result<unknown> | Promise<Result<unknown>>): Prom
     const value = out.value !== null && typeof out.value === 'object' && !Array.isArray(out.value) ? (out.value as Record<string, unknown>) : {};
     return reply(200, { ...value, ok: true, value: out.value });
   } catch (e) {
-    return refusal(500, { code: 'INTERNAL', fix: `Slash could not answer that: ${e instanceof Error ? e.message : String(e)}.` });
+    return refusal(500, { code: 'INTERNAL', fix: `Slash could not answer that: ${messageOf(e)}.` });
   }
 }
 
@@ -779,7 +780,7 @@ async function conversation<C>(route: 'chat' | 'act', body: Record<string, unkno
     try {
       deep = await door.deep(ctx);
     } catch (e) {
-      deep = { refused: `Your Anthropic key could not be opened for Deep: ${e instanceof Error ? e.message : String(e)}.` };
+      deep = { refused: `Your Anthropic key could not be opened for Deep: ${messageOf(e)}.` };
     }
   }
 
@@ -799,7 +800,7 @@ async function conversation<C>(route: 'chat' | 'act', body: Record<string, unkno
       };
       /* NOT AWAITED, so the response goes out with its first line and the turn writes into it as it runs. */
       void chat(input, ctx, tools, send, own, deep)
-        .catch((e: unknown) => send({ type: 'error', text: `Slash stopped: ${e instanceof Error ? e.message : String(e)}.` }))
+        .catch((e: unknown) => send({ type: 'error', text: `Slash stopped: ${messageOf(e)}.` }))
         .finally(() => {
           if (!ended) send({ type: 'done', spent: { asks: 0, left: null } });
           if (closed) return;
@@ -829,7 +830,7 @@ async function built<C>(engine: () => Promise<SlashAskEngine<C> | undefined>): P
   try {
     out = await engine();
   } catch (e) {
-    return refusal(500, { code: 'INTERNAL', fix: `Slash could not be started here: ${e instanceof Error ? e.message : String(e)}.` });
+    return refusal(500, { code: 'INTERNAL', fix: `Slash could not be started here: ${messageOf(e)}.` });
   }
   return out ?? refusal(501, NO_MODEL);
 }
@@ -839,7 +840,7 @@ async function answer(run: () => Result<unknown> | Promise<Result<unknown>>): Pr
   try {
     return slashReply(await run());
   } catch (e) {
-    return refusal(500, { code: 'INTERNAL', fix: `Slash could not answer that: ${e instanceof Error ? e.message : String(e)}.` });
+    return refusal(500, { code: 'INTERNAL', fix: `Slash could not answer that: ${messageOf(e)}.` });
   }
 }
 

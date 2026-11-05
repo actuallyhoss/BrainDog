@@ -93,6 +93,15 @@ export function reasonOf(e: unknown): string {
   }
 }
 
+/** The thrown thing's own sentence, floored, for a caller who is told it: no error's name, as `e.message` reads. */
+export function messageOf(e: unknown): string {
+  try {
+    return floored(e instanceof Error ? e.message : String(e));
+  } catch {
+    return `a thrown ${typeof e} that could not be turned into text`;
+  }
+}
+
 /**
  * The thrown thing with its sentence floored, to throw on.
  *

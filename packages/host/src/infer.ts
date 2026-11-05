@@ -17,6 +17,7 @@
  * it: a question he sent to his provider is not sent on to the operator's model because his provider was slow.
  */
 
+import { messageOf } from './log-floor.ts';
 import { looksLikeCredential } from '@braindog/kernel';
 import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
 
@@ -376,7 +377,7 @@ export type Inferred<T> = {
 /** The host's own error for a key that would not open (`SlashKeyClosedError`, `slash.ts`), read by its name: no import, no cycle. */
 const keyClosed = (thrown: unknown): boolean => thrown instanceof Error && thrown.name === 'SlashKeyClosedError';
 
-const said = (thrown: unknown): string => (thrown instanceof Error ? thrown.message : String(thrown)).slice(0, RAW_MAX);
+const said = (thrown: unknown): string => messageOf(thrown).slice(0, RAW_MAX);
 
 const USED_UP = {
   operator:

@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { floored, flooredError, installLogFloor, LINE_MOST, reasonOf, type LogTarget } from '../src/log-floor.ts';
+import { floored, flooredError, installLogFloor, LINE_MOST, messageOf, reasonOf, type LogTarget } from '../src/log-floor.ts';
 import { crashed } from '../src/crash.ts';
 
 const random = 'Q7d9Xk2Lm4Zp8Rt6Vb3Nc1Hs5Jf0Gw2Y';
@@ -128,4 +128,11 @@ test('AN ERROR THROWN ON IS THE SAME ERROR, with its flags, and its message and 
   assert.ok(!on.message.includes(key));
   assert.ok(!(on.stack ?? '').includes(key));
   assert.ok(!flooredError(`refused ${key}`).message.includes(key));
+});
+
+test('a sentence told to a caller is the thrown message with no key in it, and no error name added', () => {
+  const key = `sk_${'live'}_${random}`;
+  assert.equal(messageOf(new Error('the model is busy')), 'the model is busy');
+  assert.ok(!messageOf(new Error(`refused ${key}`)).includes(key));
+  assert.ok(!messageOf(`refused ${key}`).includes(key));
 });
