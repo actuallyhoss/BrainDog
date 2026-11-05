@@ -107,6 +107,7 @@ const shadows = (source: string) => declared(source, /^\s*box-shadow\s*:\s*([\s\
  *   control  `--g-bf`: a glass control sitting on the page's ground, which takes the film off itself on a tile
  */
 const GLASS: Record<string, readonly string[]> = {
+  'apps/web/src/app.html': ['.ff-side, .ff-tabs', '.ff-ask'], // the first frame draws the same floating chrome the shell does
   'apps/web/src/lib/board/Board.svelte': ['.edit-bar'], // chrome
   'apps/web/src/lib/money/QuickAdd.svelte': ['.qa-drop'], // chrome
   'apps/web/src/lib/page/BatchBar.svelte': ['.batch'], // chrome
