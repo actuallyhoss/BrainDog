@@ -5,7 +5,7 @@
  *
  * THE NAMES ARE NEVER SPELLED HERE, or anywhere git tracks (`tools/gates/public-clean.mjs`, `shell-words.mjs`). One
  * comes from `public-clean`'s `WORDS`, put together at run time; the rest are `{ hash, length }` in
- * `real-names.hashes.json`, salted the way `shell-words`' `hashOf` salts them. A hit says the file, the line and the
+ * `~/.braindog/real-names.hashes.json`, never tracked, salted the way `shell-words`' `hashOf` salts them. A hit says the file, the line and the
  * name's length, and never the name.
  *
  * WHOLE WORDS AND TWO-WORD PHRASES. Text is read lower case as words of letters and digits, a dotted word read both
@@ -20,7 +20,7 @@
 
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -37,7 +37,8 @@ const { WORDS, ALLOWED_SPELLING } = (await import(gate('public-clean.mjs'))) as 
 const { hashOf } = (await import(gate('shell-words.mjs'))) as { hashOf: (word: string) => string };
 
 type Entry = { hash: string; length: number };
-const FILE: { hashes: Entry[] } = JSON.parse(readFileSync(new URL('./real-names.hashes.json', import.meta.url), 'utf8'));
+const HASH_FILE = join(homedir(), '.braindog', 'real-names.hashes.json');
+const FILE: { hashes: Entry[] } = existsSync(HASH_FILE) ? JSON.parse(readFileSync(HASH_FILE, 'utf8')) : { hashes: [] };
 
 /** Hash to length, for every name: the file's, and `WORDS` hashed here. */
 const NAMES = new Map<string, number>([...FILE.hashes.map((e) => [e.hash, e.length] as const), ...WORDS.map((w) => [hashOf(w), w.length] as const)]);

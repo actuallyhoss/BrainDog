@@ -56,11 +56,10 @@
  * them exactly as it guards `WORDS`. A machine without it reads the tracked list alone, and every
  * seeded count in `self-test` is made of tracked words, so the file changes no count there.
  *
- * AND A TRACKED LIST OF THEIR HASHES, BECAUSE A LIST ONLY ONE MACHINE HOLDS BANS NOTHING ANYWHERE ELSE.
- * Measured on 9 October: 7 of the owner's 11 words were only in the private file, which was absent on
- * the Mac and can never be in CI, so they were banned nowhere. `private-words.hashes.json` holds a
+ * AND A LOCAL LIST OF THEIR HASHES, NEVER TRACKED. A salted hash still confirms a guess, so a public
+ * repository holding one would say which names were on it. `~/.braindog/private-words.hashes.json` holds a
  * hash and a length for each, and the gate hashes every window of that length that starts at a part
- * boundary, so CI and a fork ban the word without the repository publishing it. A hit prints the
+ * boundary. A machine without the file bans only the words this gate holds itself. A hit prints the
  * file and the line and never the word or the token; the private file, where a machine has it, is
  * still how its owner sees which word it was. `node tools/gates/shell-words.mjs --hash <word>` adds one.
  *
@@ -70,6 +69,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -138,26 +138,21 @@ const WHOLE = new Set(PRIVATE_WORDS.filter((e) => e.whole).map((e) => e.word));
 const ALL = [...new Set([...WORDS, ...PRIVATE_WORDS.map((e) => e.word)])];
 
 /**
- * THE HASHED WORDS, read from `private-words.hashes.json` beside this file, or from the file
+ * THE HASHED WORDS, read from `private-words.hashes.json` in `~/.braindog`, or from the file
  * `BRAINDOG_PRIVATE_HASHES` names, which is how a test or a planted tree aims the gate at hashes of its own.
  *
- * THE TRACKED FILE MISSING IS A THROW, for the reason a broken private list is: a gate that read no
- * hashes would pass every word they were there to catch. A file named by the variable may be absent,
- * which is a test asking for none.
+ * NO FILE IS NO HASHES. The list is the owner's and is never tracked: a salted hash stops nobody who
+ * already guesses a word, so publishing one confirms the guess.
  *
  * SALTED WITH THE GATE'S NAME, so a table of plain sha256 digests of common words does not read the
- * file at a glance. It stops nobody who already guesses a word: that is the price of banning a word
- * without publishing it, and a CI secret, the other way, would ban nothing on a fork or another machine.
+ * file at a glance.
  */
-const HASHES = process.env.BRAINDOG_PRIVATE_HASHES ?? fileURLToPath(new URL('./private-words.hashes.json', import.meta.url));
+const HASHES = process.env.BRAINDOG_PRIVATE_HASHES ?? join(homedir(), '.braindog', 'private-words.hashes.json');
 
 export const hashOf = (word) => createHash('sha256').update(`braindog shell-words ${word}`).digest('hex');
 
 function privateHashes(file) {
-  if (!existsSync(file)) {
-    if (process.env.BRAINDOG_PRIVATE_HASHES) return [];
-    throw new Error(`${file} is missing, so no private word would be banned. It is tracked; restore it.`);
-  }
+  if (!existsSync(file)) return [];
   const doc = JSON.parse(readFileSync(file, 'utf8'));
   if (!Array.isArray(doc?.hashes)) throw new Error(`${file} must hold { "hashes": [...] }.`);
   return doc.hashes.map((e) => {

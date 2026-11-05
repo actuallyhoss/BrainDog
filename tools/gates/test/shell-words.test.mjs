@@ -18,7 +18,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -258,10 +258,7 @@ test('a hashes file that is not hashes and lengths is refused', () => {
   }
 });
 
-/* THE TRACKED FILE IS THERE AND READS, which is what CI bans by. Its words are not this test's to know. */
-test('the tracked hashes file holds only hashes and lengths', () => {
-  const doc = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'private-words.hashes.json'), 'utf8'));
-  assert.ok(doc.hashes.length > 0);
-  for (const e of doc.hashes) assert.ok(/^[0-9a-f]{64}$/.test(e.hash) && Number.isInteger(e.length) && e.length >= 2, JSON.stringify(e));
-  assert.deepEqual(Object.keys(doc).sort(), ['hashes', 'why']);
+/* A SALTED HASH CONFIRMS A GUESS, so the owner's list stays on the owner's machine. */
+test('no hash list of private words is tracked', () => {
+  assert.equal(existsSync(join(import.meta.dirname, '..', 'private-words.hashes.json')), false);
 });
