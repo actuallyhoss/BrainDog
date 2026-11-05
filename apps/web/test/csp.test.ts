@@ -40,7 +40,7 @@ function directives(policy: string): Map<string, string[]> {
   return out;
 }
 
-test('THE POLICY FRAMES ONLY THE HOSTS' OWN FRAMES AND TURNSTILE, AND ITS ONE INLINE EXCEPTION IS A STYLE ATTRIBUTE', async () => {
+test('THE POLICY FRAMES ONLY THE HOSTS OWN FRAMES AND TURNSTILE, AND ITS ONE INLINE EXCEPTION IS A STYLE ATTRIBUTE', async () => {
   const { default: config } = (await import(CONFIG)) as { default: { kit?: { csp?: Csp } } };
   const d = config.kit?.csp?.directives ?? {};
   /* `'self'` FOR THE HOSTS' FRAME DOCUMENTS ALONE (`@braindog/host/drawn-frame`). A frame may be navigated to anything the
