@@ -262,3 +262,12 @@ test('A HASH IS NOT THE WAY TO A FILE: neither attaching it nor naming it on a r
   /* AN OWNER, WHO READS THE ROW THAT NAMES IT, STILL DOES. */
   value(await api.update({ register: 'tasks', seq: task.seq, patch: { doc } }, owner));
 });
+
+test('A STALE WRITE ANSWERS THE ROW AS SHE MAY SEE IT, from the method and not only through the door', async () => {
+  const { api } = await record();
+  const hidden: CallContext = { principal: { kind: 'person', id: 'p_h', level: 'write' }, hides: { tasks: ['cost'] } };
+  const out = (await api.update({ register: 'tasks', seq: 2, patch: { notes: 'mine' }, version: 99 }, hidden)) as { ok: boolean; conflict?: { current?: unknown } };
+  assert.equal(out.ok, false);
+  assert.ok(out.conflict?.current, 'a stale write still says what the row is now');
+  assert.doesNotMatch(JSON.stringify(out), /secret-cost/u);
+});

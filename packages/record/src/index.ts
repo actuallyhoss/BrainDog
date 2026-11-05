@@ -13509,6 +13509,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ),
       );
       if (word !== null && self !== null && written.ok && 'fields' in written.value) askedLanded(ctx, args.register, { at: `${args.register}#${args.seq}`, patch: args.patch });
+      /* A STALE WRITE ANSWERS THE ROW AS IT NOW STANDS, AND THAT IS HER VIEW OF IT TOO. The door's firewall took a hidden field off
+         this one, but a method's answer should not need a second lock, and every caller that is not a door has none. */
+      if (!written.ok && 'conflict' in written && written.conflict.current !== null)
+        return tail({ ...written, conflict: { ...written.conflict, current: sight.maskRow(ctx, written.conflict.current as Entry) } });
       return tail(written.ok && 'fields' in written.value ? ok(sight.maskRow(ctx, written.value as Entry) as Entry | Asked) : written);
     },
 
@@ -16107,6 +16111,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const owner = admin(ctx, 'accept a change to what runs while nobody is looking');
           if (owner) return { ok: false as const, refusal: owner };
         }
+        /* NOBODY BELOW AN OWNER ACCEPTS THEIR OWN CHANGE TO WHAT THIS BRAINDOG IS. `setDeclaration` refuses them a page or a
+           list, and filing the same one here and pressing Accept was the same write with no second person. Another Admin, or
+           an owner, still answers it. An answer on his word is his. */
+        if (kind === 'change' && ctx.onWord === undefined && !(ctx.principal.kind === 'person' && ctx.principal.level === 'owner') && kernel.filedBy(String(asked?.opened_by ?? ''), actorOf(ctx)))
+          return no('FORBIDDEN', 'You filed this change, so somebody else decides it. An owner can accept it.', { at: 'id' });
         /* THE SCRIPT LINES THE OWNER IS PRESSING ARE WORKED OUT AGAIN, WITH THE KEYCHAIN AS IT IS NOW. A script's line
            names the host its key's keychain entry opens, read when the change was filed, and nothing read it again: a
            probe filed "key "goldapi" to api.goldapi.io", replaced the entry with one that opens `collector.test`, and

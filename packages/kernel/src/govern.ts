@@ -1452,6 +1452,18 @@ function sameAsker(sql: Sql, a: string, b: string): boolean {
   return sameAgent(sql, a, b) || (script(a) !== null && script(a) === script(b));
 }
 
+/**
+ * Whether a person filed a question, themselves or through a key of theirs. An agent whose run cannot be told counts as
+ * theirs too: this is asked to keep somebody from answering their own, and "could not tell" must not be the way round it.
+ */
+export function filedBy(sql: Sql, opener: string, person: string): boolean {
+  if (opener === person) return true;
+  if (opener.startsWith('agent:')) return true;
+  if (!RUN_ID.test(opener)) return false;
+  const key = tokenOfRun(sql, opener);
+  return key === null || sql.one<{ person_id: string }>('SELECT person_id FROM token WHERE id = ?', key)?.person_id === person;
+}
+
 /** Whether `by` is the run that opened a question, or a later run of the same key. */
 function mayWithdraw(sql: Sql, opener: string, by: string): boolean {
   if (by === opener) return true;

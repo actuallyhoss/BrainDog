@@ -148,9 +148,11 @@ for (const [name, kind, body, id] of [
 
 /* NOT WIDENED PAST WHAT RUNS UNATTENDED. A change to a list's fields is what `decide` was given for, and a register
    runs nothing on its own. */
-test('A CHANGE TO A LIST’S FIELDS IS STILL THE COLLEAGUE’S TO ACCEPT', async () => {
-  const { sql, file, accept, live } = await record();
-  const out = await accept(await file('change', { declaration_id: 'register.notes', to: { declarations: [NOTES_WITH_DUE] } }), colleague);
+test('A CHANGE TO A LIST’S FIELDS IS STILL THE COLLEAGUE’S TO ACCEPT, when somebody else filed it', async () => {
+  const { sql, api, accept, live } = await record();
+  const filed = await api.propose({ question: 'Add a due day?', body_kind: 'change', body: { declaration_id: 'register.notes', to: { declarations: [NOTES_WITH_DUE] } } } as never, owner);
+  assert.ok(filed.ok, JSON.stringify(filed));
+  const out = await accept((filed as { value: { id: string } }).value.id, colleague);
   assert.ok(out.ok, JSON.stringify(out));
   assert.equal(live('register.notes')?.v, 2);
   sql.close();

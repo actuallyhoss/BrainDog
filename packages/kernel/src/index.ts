@@ -154,6 +154,7 @@ import {
   answeredInOf,
   deciderOf as deciderOfIn,
   deciderFault as deciderFaultIn,
+  filedBy as filedByIn,
   countGovernance,
   countOpenQuestions,
   sweepStale,
@@ -12438,6 +12439,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* WHERE A PRESS CAME FROM (`govern.ts` `answeredIn`): the app a card was pressed in, kept on the decision it made. */
     answeredIn: (decision: string, app: string, by: string, batch?: string) => transaction(() => answeredInIn(governDeps(), decision, app, by, batch)),
     answeredInOf: (decision: string) => answeredInOf(sql, decision),
+    /** Whether this person filed this question, or a key of theirs did (`filedBy` in `govern.ts`). */
+    filedBy: (opener: string, person: string): boolean => filedByIn(sql, opener, person),
     deciderFault: (id: string, actor: string, isOwner: boolean, nameOf?: (person: string) => string) => deciderFaultIn(sql, id, actor, isOwner, nameOf),
 
     /**

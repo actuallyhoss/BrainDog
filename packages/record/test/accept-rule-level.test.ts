@@ -97,7 +97,7 @@ test('A RULE INSIDE A BUNDLE IS HELD THE SAME, and a bundle with no rule is not'
 
   /* NOT WIDENED PAST RULES. A change to a list's fields is what `decide` was given for, and stays so until a D-number
      says otherwise. */
-  const list = await file(colleague, 'register.obligations', { declarations: [WITH_DUE] });
+  const list = await file(owner, 'register.obligations', { declarations: [WITH_DUE] });
   value(await accept(list, colleague));
   sql.close();
 });
@@ -120,5 +120,17 @@ test('A RULE FILED AS A PATTERN IS NOT FILED AT ALL, by the colleague or the own
   assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM suggestion')?.n, 0);
   assert.equal(installed(), false);
   assert.equal(await asks(), 0, 'the rule asked Slash on the owner’s key');
+  sql.close();
+});
+
+test("A COLLEAGUE AT DECIDE DOES NOT ACCEPT HER OWN CHANGE TO A LIST OR A PAGE: setDeclaration refuses her, and filing it was the same write", async () => {
+  const { api, sql, file, accept } = await record();
+  const mine = await file(colleague, 'register.obligations', { declarations: [WITH_DUE] });
+  const refused = await accept(mine, colleague);
+  assert.equal(refused.ok, false, 'she accepted her own change');
+  assert.equal(refused.refusal?.code, 'FORBIDDEN');
+  /* THE QUESTION STAYS OPEN FOR SOMEBODY ELSE, and an owner answers it. */
+  value(await accept(mine, owner));
+  void api;
   sql.close();
 });
