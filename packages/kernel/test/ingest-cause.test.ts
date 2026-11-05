@@ -43,7 +43,7 @@ const CARD: Declaration = {
   body: {
     ingest: 'bank-card-used',
     channel: 'email',
-    match: { all: [{ field: 'body', contains: 'card ending' }] },
+    match: { all: [{ field: 'from_address', is: 'alerts@bank.example' }, { field: 'body', contains: 'card ending' }] },
     extract: {
       merchant: { text: { between: ['at ', ' for'] } },
       amount: { money: { after: 'EGP ', currency: 'EGP' } },

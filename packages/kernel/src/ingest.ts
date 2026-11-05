@@ -1241,13 +1241,19 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
     if (agent !== undefined)
       return ok(holdTail(deps, { at, raw, door: doorOf, matched, register, extracted, text, tail: agent, suggested: agent.row, store, note }));
 
+    /* A SENDER NOBODY HAS SAID YES TO (`senderToAsk`): a stranger's own signed mail is verified, and a pattern that reads
+       only the words would have filed it. Never filed by BrainDog on its own, whatever else reads clearly. */
+    const unknownSender = senderToAsk(deps, arrival, matched, headers);
+    /* A REPEAT OF A ROW ALREADY THERE WRITES NOTHING, so it asks nothing: it is set aside as any repeat is, and only a
+       sender somebody vouched for may add what the row never said (`nearFill`, below). */
+    const newSender = unknownSender !== null && (matched.on_conflict ?? 'skip') === 'skip' && existingRow(deps, register, matched.dedupe, extracted) ? null : unknownSender;
     const confidence = worse(
-      missed.length ? 'needs-review' : soft.length || pending.length ? 'proposed' : 'exact',
+      missed.length ? 'needs-review' : soft.length || pending.length || newSender !== null ? 'proposed' : 'exact',
       lid,
     );
     /* A CARD TEXT THAT IS SURE IS FILED WITH A MARK, not asked about (`arrivalSure`). */
     const sure =
-      deps.settle !== undefined && confidence === 'proposed' && pending.length > 0
+      deps.settle !== undefined && confidence === 'proposed' && pending.length > 0 && newSender === null
         ? arrivalSure({
             ruleTrusted: lid === 'exact',
             missed: missed.length + invalid.length,
@@ -1331,7 +1337,9 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
       const byTail = pending.length
         ? `${pending.map((t) => `Filed to ${rowNamed(deps.sql, t)} by its last digits ${t.digits}.`).join(' ')} Confirm it once and later ones file straight away.`
         : '';
-      const reason = [cause, byTail].filter((part) => part !== '').join(' ');
+      /* AND THE SENDER, IN WORDS THAT CARRY NOTHING OUT OF THE PAYLOAD (`43 §6`): the question names it, for whoever answers. */
+      const bySender = newSender === null ? '' : 'Nobody has said yes to this sender yet, so what it read is proposed rather than written.';
+      const reason = [cause, byTail, bySender].filter((part) => part !== '').join(' ');
       store(state, reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', confidence);
 
@@ -1341,7 +1349,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
          or that its ceiling holds, joins the shape's one open question, whose count and samples grow; with none open and
          the pattern accepted it waits, and nothing new is asked by itself. A tail to confirm keeps its own question,
          because accepting that one is what confirms the account. */
-      if (pending.length === 0) {
+      if (pending.length === 0 && newSender === null) {
         const one = patternWaits(deps, matched.ingest, shapeOf(arrival.channel, headers), raw);
         if (one !== undefined) return ok<Arrived>({ raw, ingest: matched.ingest, state, wrote: [], reason, confidence, ...(one === null ? {} : { suggestion: one }) });
       }
@@ -1354,8 +1362,11 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
         register,
         rows: [extracted],
         raw,
-        ...(lookupMissed ? { joins: JSON.stringify(['door', doorOf, ...[...missed].sort()]) } : {}),
-        ...(sure?.sure
+        ...(lookupMissed ? { joins: JSON.stringify(['door', doorOf, ...[...missed].sort()]) } : newSender === null ? {} : { joins: JSON.stringify(['sender', newSender]) }),
+        ...(newSender === null ? {} : { sender: newSender }),
+        ...(newSender !== null && missed.length === 0 && invalid.length === 0 && soft.length === 0
+          ? senderAsked(words, newSender)
+          : sure?.sure
           ? {
               question: fit(words, [(_s, _l, n) => `Filed by BrainDog: matched ${n} by its last digits`], rowNamed(deps.sql, pending[0]!)),
               context: `A text from a sender you set up, with its amount and shop read clearly and the account matched by its last digits ${pending[0]!.digits}.`,
@@ -1413,7 +1424,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
          is written beside it (review of 30 October, R11), and the balance after it (recheck of 30 October). A refusal
          leaves the row as it was: the skip stands. WHAT WAS WRITTEN IS NAMED on a `filled` line before the
          repeat mark, so "It is a second one" takes exactly that back (R12). */
-      const fill = nearFill(deps, register, existing, matched.dedupe, extracted);
+      const fill = unknownSender === null ? nearFill(deps, register, existing, matched.dedupe, extracted) : null;
       if (fill !== null && deps.write(register, existing.id, fill, `ingest:${matched.ingest}`).ok)
         note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', JSON.stringify(Object.keys(fill).sort()), { field: 'filled', from: existing.id });
       store('skipped', reason);
@@ -1575,6 +1586,8 @@ export function openRowset(
     confident?: boolean;
     /** A doubtful arrival waits in To review and not in Needs you; the body says so (`review`) and the queue reads stop at it. */
     review?: boolean;
+    /** The mail address this waits on: accepting it is the yes `confirmedSender` reads, as a tail's is `confirmedTail`'s. */
+    sender?: string;
   },
 ): string {
   const context = item.context ?? '';
@@ -1638,6 +1651,7 @@ export function openRowset(
       ...(item.resembles === undefined ? {} : { resembles: item.resembles }),
       /* THE TAILS THIS ONE WAITS ON, so accepting it is the confirmation `confirmedTail` reads, with no table beside it. */
       ...(item.tails === undefined ? {} : { tails: item.tails }),
+      ...(item.sender === undefined ? {} : { sender: item.sender }),
       ...(item.raw === undefined ? {} : { raws: [item.raw] }),
       ...(item.confident ? { confident: true, why: [context] } : {}),
       ...(item.review ? { review: true } : {}),
@@ -4557,6 +4571,88 @@ export function confirmedTail(sql: Sql, tail: { digits: string; row: string }): 
     CONFIRMS_READ,
   );
   return asked.some((q) => settledAnswer(sql, q.id) === tail.row);
+}
+
+/**
+ * THE ADDRESS MAIL IS FROM, WHEN IT STILL NEEDS A PERSON'S YES BEFORE ITS MONEY IS WRITTEN, or `null`.
+ *
+ * `verified` SAYS THE SENDER IS WHO ITS `From:` SAYS, AND NOT THAT IT IS THE BANK. A mailbox address is handed to third
+ * parties by design and a pattern's `match:` may read only the words. Measured through the real mail door with the Card
+ * alerts file: `From: bot@evil.example`, signed correctly by `evil.example`, whose body said "Your card ending 4471 was
+ * debited GBP 9999.00 at ATTACKER LTD", was stored `matched` and wrote that debit to the ledger at `exact`, with nobody
+ * asked. The forgeries DKIM alignment closes are the ones that claim somebody else's domain; this one claims nobody's.
+ *
+ * SO A VERIFIED MAIL IS FILED ONLY FROM AN ADDRESS SOMEBODY VOUCHED FOR: a pattern whose `match:` names that sender
+ * exactly, on the fields read from the address and never its display name (`namesSender`), or a yes a person gave
+ * (`confirmedSender`). Anything else is one question, joined per address so a flood is one card, and the next mail
+ * from an address he said yes to files straight away.
+ *
+ * ADDRESS AND NOT DOMAIN, because a person forwards their own mail: a yes to `me@gmail.com` is no yes to all of Gmail.
+ *
+ * ONLY WHAT A HOST CHECKED (`verified: true`). A webhook's token or signature names its one sender, and `undefined` is a
+ * caller the record already authenticated, as `Arrival.verified` says.
+ */
+function senderToAsk(deps: IngestDeps, arrival: Arrival, matched: IngestDecl, headers: Record<string, string>): string | null {
+  if (arrival.channel !== 'email' || arrival.verified !== true) return null;
+  const { address } = senderOf(headers.from);
+  /* NO ADDRESS CANNOT BE VERIFIED AT THE DOOR, and a host that said so anyway gets the safe answer. */
+  if (address === '') return 'an unknown sender';
+  if (matched.match !== undefined && namesSender(matched.match)) return null;
+  return confirmedSender(deps.sql, address, matched.ingest) ? null : address;
+}
+
+/**
+ * Whether a `match:` itself says who the mail is from: `from`, `from_address` or `from_domain` exactly, reached only through
+ * `all`. `from is` holds the whole line, every domain of which the door aligned with the signer.
+ *
+ * NOT `contains`: `From: "hsbc.example" <bot@evil.example>` signed by `evil.example` is verified, and `from contains
+ * hsbc.example` is true of it, and `hsbc.evil.example` contains `hsbc`. And not under `any` or `none`, which do not say
+ * every mail it reads is from there.
+ */
+export function namesSender(match: Predicate): boolean {
+  const node = match as { all?: unknown; field?: unknown; is?: unknown; in?: unknown };
+  if (Array.isArray(node.all)) return node.all.some((one) => one !== null && typeof one === 'object' && namesSender(one as Predicate));
+  return (node.field === 'from_address' || node.field === 'from_domain' || node.field === 'from') && (typeof node.is === 'string' || Array.isArray(node.in));
+}
+
+/**
+ * Whether a person has said yes to mail from this address: by accepting a rowset that waited on it, by accepting the
+ * pattern drawn from its mail, or, for a record older than this question, by a message from it already filed by a pattern.
+ * A rejection, and a question reopened and answered no, read as not confirmed, as `confirmedTail` reads them.
+ */
+export function confirmedSender(sql: Sql, address: string, ingest: string): boolean {
+  const answered = sql.all<{ id: string; body: string }>(
+    `SELECT id, body FROM suggestion WHERE body_kind = 'rowset' AND opened_by LIKE 'ingest:%' AND status = 'resolved'
+       AND resolved_as = 'addressed' AND json_valid(body) AND json_extract(body, '$.sender') = ? ORDER BY opened_at DESC LIMIT ?`,
+    address,
+    CONFIRMS_READ,
+  );
+  if (answered.some((row) => settledAnswer(sql, row.id) === 'accept')) return true;
+  const from = (headers: string | null): string => senderOf(((parsed(headers) ?? {}) as Record<string, string>).from).address;
+  for (const q of patternAsked(sql, ingest)) {
+    if (!accepted(sql, q)) continue;
+    const drawn = [...stringsOf(q.body.samples), ...stringsOf(q.body.joined)];
+    const rows = sql.all<{ headers: string | null }>('SELECT headers FROM inbox_raw WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(drawn));
+    if (rows.some((r) => from(r.headers) === address)) return true;
+  }
+  /* FILED BEFORE THIS QUESTION EXISTED, or after a yes: the arrival `matched` and has a receipt naming the rows it wrote. */
+  return sql
+    .all<{ headers: string | null }>(
+      `SELECT x.headers AS headers FROM inbox_raw x JOIN ingest_receipt r ON r.raw_id = x.id
+        WHERE x.channel = 'email' AND x.state = 'matched' AND instr(lower(x.headers), ?) > 0 ORDER BY x.rowid DESC LIMIT ?`,
+      address,
+      CONFIRMS_READ,
+    )
+    .some((r) => from(r.headers) === address);
+}
+
+/** What the question says about a new sender: its address, only where it reads as one, and what a yes does. */
+function senderAsked(words: Words, sender: string): { question: string; context: string } {
+  const named = /^[a-z0-9._%+-]+@[a-z0-9.-]+$/.test(sender) ? sender : 'an unknown sender';
+  return {
+    question: fit(words, [(s, l, n) => `Add ${s} to ${l}? It is from ${n}, which is new here.`], named),
+    context: cutTo(`Anyone can sign mail from their own address. Say yes only if ${named} is yours or your bank's, and later mail from it is added straight away.`, 280),
+  };
 }
 
 /** The option a person picked on a question, from the decision its latest `resolve` follows, or `null`. */

@@ -5,7 +5,7 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
-    "test": "node --test card-alerts.test.ts",
+    "test": "node --test card-alerts.test.ts new-sender.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }
 }

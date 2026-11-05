@@ -120,16 +120,27 @@ const transactions = (sql: NodeSql): Txn[] =>
   sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'transactions' AND deleted_at IS NULL ORDER BY seq").map((r) => JSON.parse(r.fields) as Txn);
 /** Who People holds: the record's own sample person is there from the first-party packs. */
 const people = (sql: NodeSql): number => Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM entry WHERE register = 'people' AND deleted_at IS NULL")?.n);
+/**
+ * His yes to the new sender (`senderToAsk`): the first verified mail from an address asks once, as any stranger's own
+ * signed mail does, and the rest of this file reads what happens after that yes.
+ */
+async function sayYes(api: Api, sql: NodeSql): Promise<void> {
+  const asked = sql.one<{ id: string }>("SELECT id FROM suggestion WHERE body_kind = 'rowset' AND status = 'open' AND json_extract(body, '$.sender') IS NOT NULL");
+  assert.ok(asked, 'the first mail from a new sender did not ask');
+  said(await api.decide({ id: asked.id, decide: { option: 'accept', reason: '' } } as never, owner));
+}
 const mailArrivals = (sql: NodeSql) => sql.all<{ state: string; reason: string | null; body: string }>("SELECT state, reason, body FROM inbox_raw WHERE channel = 'email' ORDER BY ts, rowid");
 
 /* ── what happens ────────────────────────────────────────────────────────── */
 
 test("A BANK'S ALERT IN GMAIL LANDS IN MONEY, on the account whose digits it prints, and only a mail a pattern may read is fetched whole", async () => {
-  const { sql, w, conn, accounts } = await record();
+  const { api, sql, w, conn, accounts } = await record();
   const before = people(sql);
   assert.ok(w.hints.includes('hsbc'), `the pack's name is not among what its patterns look for: ${w.hints.join(', ')}`);
   const { send, whole } = gmail(MAILS);
   await syncOnce(conn, 'access', w, send, NOW);
+  assert.equal(transactions(sql).length, 0, 'a new sender filed money with nobody asked');
+  await sayYes(api, sql);
 
   const filed = transactions(sql);
   assert.equal(filed.length, 1, 'the alert was not filed, or was filed twice');
@@ -140,7 +151,7 @@ test("A BANK'S ALERT IN GMAIL LANDS IN MONEY, on the account whose digits it pri
   assert.deepEqual(whole.sort(), ['alert', 'offer'], 'a mail no pattern could read was fetched whole, or one it could was not');
   const arrived = mailArrivals(sql);
   assert.equal(arrived.length, 1, 'the bank offer no pattern reads reached the mail door');
-  assert.equal(arrived[0]?.state, 'matched');
+  assert.equal(arrived[0]?.state, 'proposed');
   assert.match(arrived[0]?.body ?? '', /^From: HSBC <alerts@hsbc\.example>\r\n/u);
   assert.match(conn.last?.said ?? '', /3 mails, 1 also read by a pattern/u);
   /* AND THE BANK'S SENDER IS NOBODY IN PEOPLE: a machine's address is an organisation speaking. */
@@ -152,6 +163,7 @@ test('READ AGAIN, OR FORWARDED BY HAND AS WELL, THE ALERT IS FILED ONCE', async 
   const { api, sql, w, conn } = await record();
   const first = gmail(MAILS);
   await syncOnce(conn, 'access', w, first.send, NOW);
+  await sayYes(api, sql);
 
   /* GMAIL'S HISTORY IS GONE (404), so the window is read again from the start: the alert is not fetched whole again. */
   const again = gmail(MAILS);

@@ -95,7 +95,7 @@ test('A NAMED INGEST THAT DOES NOT MATCH IS NOT RESCUED BY ANOTHER THAT DOES', a
 
 test('MAIL NAMES NO INGEST AND IS STILL OFFERED TO EACH IN DECLARATION ORDER', async () => {
   const { k, sql } = await record([HOOK('first-mail', 'email', 'one'), HOOK('second-mail', 'email', 'two')]);
-  const out = arrived(k.arrive({ channel: 'email', headers: { From: 'bank@example.com' }, body: TEXT, sha256: 'm1', verified: true }));
+  const out = arrived(k.arrive({ channel: 'email', headers: { From: 'bank@example.com' }, body: TEXT, sha256: 'm1' }));
 
   assert.equal(out.ingest, 'first-mail');
   assert.deepEqual(written(k), { one: 1, two: 0 });

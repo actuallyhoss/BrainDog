@@ -54,7 +54,7 @@ rather than by an incident, which is the only good way to find it.
 | A person, invited | the owner mints a single-use invitation link (24 h, bound to one address) — `invite`, an ADMIN method. The record stores only `sha256(secret)` and answers the link once; no host mails it, and the owner sends it. The link is `<origin>/invite#<token>` (at the root since 29 Oct, under `/app` from push A of the one-domain move until then, and with no slug, because the token names its record), the fragment keeping the token out of logs, proxies and `Referer`; the page posts it to `POST /auth/invite`, which signs the invitee in — an address that can already sign in here signs in first — and calls `acceptInvite` — INTERNAL — with the Directory's verified person, and that writes the `member` rows and one `access.grant` event per register, as `system` ([20-COLLABORATION](20-COLLABORATION.md) §1) |
 | **A machine the customer connected** — the tier-C runner | **the device grant of §6.1** with `reach = runner` (RFC 8628): six-digit code, owner approves in the browser, a 90-day bearer stored as `token_hash`, auto-deregistered after 14 silent days; the `runner` principal kind. It reaches the JOBS group's three runner methods — `claimJob` · `postJobEvent` · `readCancel` ([30-BLUEPRINT](30-BLUEPRINT.md) §5) — and, per job, a job bearer that `claimJob` mints as a `token` row: scope `propose` (which reads), labelled `job:<id>`, audience one job, expiring with the job ([46-SPEC-SLASH](46-SPEC-SLASH.md) §4.7). Never `write`. See [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 |
 | Inbound webhook | the URL is `/in/webhook/<rec_id>/<ingest-id>/<token>` — a random path token per ingest — and a declared `verify: { kind: hmac_sha256, header: X-Signature, grant: <label> }` ([25-CONNECTORS](25-CONNECTORS.md) §3.2) is checked in the host through the record's `ingestVerify`, since the record never decrypts ([51-SPEC-WORKER](51-SPEC-WORKER.md) §5.4); an unverified payload is stored `untriaged` and never matched |
-| Inbound email | the per-record address is the capability; a DKIM/SPF pass is required to match, else the payload is quarantined `untriaged` |
+| Inbound email | the per-record address is the capability; a DKIM/SPF pass is required to match, else the payload is quarantined `untriaged`. A pass says the sender is who its `From:` says, and not that it is the bank, so a verified mail from an address nobody has said yes to writes nothing: it is one question per address, unless the pattern itself names that sender exactly (`senderToAsk`, `packages/kernel/src/ingest.ts`) |
 | Self-host, single user | `BRAINDOG_TOKEN` for a private instance — owner level, everything; self-host single-user only — exchanged at `POST /auth/token` for a session, behind which passkeys are registered (ES256 and RS256, no attestation); the magic link and an invitation's mailbox proof work once `BRAINDOG_SMTP_URL` and `BRAINDOG_MAIL_FROM` name a submission server, over TLS or not at all, and are off without them ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.6, §5.20) |
 
 > **One row above deserves a note, because an earlier draft made it different in kind.** That draft
@@ -651,9 +651,10 @@ open one:
   installs, and every fetch with that key is then refused at run time, three refused runs pausing it. Nothing at
   install or in Decide compares the two, for the same reason: the check that sees the declaration does not see the
   Keychain.
-- **A scheduled `call`, `poll` or `pull` does not read `opens` either.** Its declaration has one host and one grant,
-  and its install line names both together, so the owner sees the pairing; but a key sent by an action is not
-  compared with what its Keychain entry says it opens.
+- **A scheduled `call`, `poll` or `pull`, and a connector that pages, hold a key to the host its entry names, and to nothing
+  while the entry names none.** `sendAction` and the kernel's connector lease each refuse another host before the key is
+  opened. An entry in words ("the shop's test account") is held to nothing until a press approves a line that sends it
+  somewhere, and that press pins it (`pinHost`), through Decide's `change` and `pattern` and through an install alike.
 - **The scrub catches the spellings above and no others.** A key re-encoded another way (hex, `\u` escapes of
   ordinary characters, a hash of it) is not caught, and neither is a derived spelling shorter than eight characters,
   which only a key of five bytes or fewer has; the bytes as sent are always scrubbed, however short.

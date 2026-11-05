@@ -340,7 +340,7 @@ test('AND AN ACCEPTED PATTERN INSTALLS, which is the loop the whole product is f
   // decision that resolved before its change landed would be a lie.
   assert.ok((await k.install([out.install as never])).ok);
   // And the next alert of that shape is filed by the pattern, with nobody asked.
-  value(k.arrive({ channel: 'email', headers: { From: 'bank@example.com' }, body: 'You paid Invoice 9 today.', sha256: 'm1', verified: true }));
+  value(k.arrive({ channel: 'email', headers: { From: 'bank@example.com' }, body: 'You paid Invoice 9 today.', sha256: 'm1' }));
   assert.equal(k.get('obligations#1')?.fields.what, 'Invoice 9');
   sql.close();
 });
