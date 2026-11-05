@@ -731,7 +731,15 @@ export function ingestBudget(now: () => number): (key: string) => number | null 
     if (door.n >= IN_DOOR_PER_MINUTE) return Math.max(1, Math.ceil((door.until - at) / 1000));
     const row = seen.get(key);
     if (row === undefined) {
-      if (seen.size >= IN_KEYS_MOST) return Math.ceil(IN_WINDOW_MS / 1000);
+      /* THE OLDEST GOES, AS ON THE SELF-HOST, AND NOBODY IS REFUSED FOR THE TABLE BEING FULL. This answered a window's wait
+         here, so a thousand made-up paths in a minute, seventeen a second from anywhere, told every real sender on the
+         isolate to wait, and a phone's Shortcut does not send a bank text again. The door's own ceiling above is what
+         holds a flood; an evicted key only starts its count again. */
+      while (seen.size >= IN_KEYS_MOST) {
+        const oldest = seen.keys().next();
+        if (oldest.done === true) break;
+        seen.delete(oldest.value);
+      }
       seen.set(key, { n: 1, until: at + IN_WINDOW_MS });
       door.n += 1;
       return null;

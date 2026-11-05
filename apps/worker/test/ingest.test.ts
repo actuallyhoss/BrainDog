@@ -237,43 +237,27 @@ test('THE WHOLE DOOR HAS A CEILING, because varying the path is how a per-path c
   assert.equal(spend('webhook:rec_01J8ZC0000000000000000000A/statements'), null);
 });
 
-test('THE KEY TABLE IS BOUNDED, because the key is a path a stranger types', () => {
+test('THE KEY TABLE IS BOUNDED, AND A FULL ONE TURNS NOBODY AWAY: its oldest goes, as on the self-host', () => {
   const spend = ingestBudget(() => 1_000_000);
   const known = `webhook:${REC}/statements`;
-  assert.equal(spend(known), null);
+  for (let i = 0; i < 121; i++) spend(known);
+  assert.ok((spend(known) ?? 0) > 0, 'a path past its minute was let through');
 
-  /* A FLOOD OF INVENTED IDS IS A MAP THAT GROWS UNTIL THE ISOLATE DIES, which is a denial of service
-     paid for with no credential at all. Full, an unknown key waits a window. */
+  /* A FLOOD OF INVENTED IDS IS A MAP THAT GROWS UNTIL THE ISOLATE DIES, so the table holds a thousand: the first key in it
+     has gone, which is how this reads that it was bounded, and only starts its count again. The door's ceiling holds. */
   for (let i = 0; i < 1_000; i++) spend(`webhook:${REC}/guess-${String(i)}`);
-  assert.ok((spend(`webhook:${REC}/guess-fresh`) ?? 0) > 0, 'an unknown key was admitted to a full table');
-
-  /* AND A SENDER THAT ALREADY ARRIVED INSIDE THIS WINDOW KEEPS ITS SLOT, which is the half that
-     makes the ceiling a defence rather than an outage a stranger can cause. It is the window and
-     not the configuration that decides, and the test below is what that costs. */
-  assert.equal(spend(known), null);
+  assert.equal(spend(known), null, 'the table did not let its oldest go');
 });
 
-test('AND A SENDER QUIET FOR LONGER THAN A WINDOW HAS TO WIN ITS SLOT BACK FROM THE FLOOD', () => {
+test('A THOUSAND MADE-UP PATHS DO NOT TURN A REAL SENDER AWAY, however quiet it has been', () => {
   let at = 1_000_000;
   const spend = ingestBudget(() => at);
   const real = `webhook:${REC}/statements`;
   assert.equal(spend(real), null);
 
-  /* THE TABLE HOLDS THE LAST MINUTE'S SENDERS AND NOT THE CONFIGURED ONES, which the header over
-     the ceiling first claimed the opposite of. A bank that sends twice an hour is not in the table
-     when it sends again, so with all thousand slots taken by invented paths it waits a window, and
-     waits again the window after. Stated here because it is the cost of the ceiling and a reader
-     deciding the number needs it in front of them. */
+  /* IT WAITED A WINDOW HERE, AND AGAIN THE WINDOW AFTER, while seventeen requests a second from anywhere held the table:
+     a bank that sends twice an hour is not in it when it sends again, and a phone's Shortcut does not send a text twice. */
   at += 120_000;
   for (let i = 0; i < 1_200; i++) spend(`webhook:${OTHER}/guess-${String(i)}`);
-  assert.ok((spend(real) ?? 0) > 0, 'a path idle for two minutes was let through a full table');
-
-  at += 60_001;
-  for (let i = 0; i < 1_200; i++) spend(`webhook:${OTHER}/again-${String(i)}`);
-  assert.ok((spend(real) ?? 0) > 0, 'the flood stopped holding the table on its own');
-
-  /* AND A FLOOD THAT STOPS IS A DOOR THAT OPENS, so this is a brake and never a fuse somebody has
-     to go and reset. */
-  at += 60_001;
-  assert.equal(spend(real), null);
+  assert.equal(spend(real), null, 'a real door was told to wait because strangers filled the table');
 });
