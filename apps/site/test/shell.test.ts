@@ -97,7 +97,6 @@ test('SignIn is drawn only while signed out, and the early access strip ends on 
   assert.match(render(SignIn, { props: { class: 'menu-link' } }).body, /<a class="when-out menu-link" href="https:\/\/app\.brain\.dog\/signin" rel="external">Sign in<\/a>/);
   const EarlyStrip = await component<Record<string, never>>('EarlyStrip');
   const strip = render(EarlyStrip, { props: {} }).body;
-  assert.ok(strip.includes(shell.early.strong) && strip.includes(shell.early.rest), 'the strip does not say early access');
   assert.ok(strip.includes(shell.nav.start) && strip.includes('Open BrainDog'), 'the strip does not end on Start');
   assert.doesNotMatch(strip, /<h2/, 'the strip is one line, not a huge close');
 });

@@ -59,7 +59,6 @@
       <Start />
       <a class="btn ghost" href="/agents">{home.hero.secondary}<Icon name="arrow-right" size="s" /></a>
     </div>
-    <p class="early"><b>{site.early.strong}</b> {site.early.rest}</p>
   </div>
   <div class="stage">
     <div class="wrap">
@@ -134,17 +133,6 @@
     flex-wrap: wrap;
     gap: 8px;
     margin-block-start: 32px;
-  }
-
-  .early {
-    margin: 16px 0 0;
-    color: var(--on-night-2);
-    font-size: var(--t-meta);
-  }
-
-  .early b {
-    color: var(--on-night);
-    font-weight: 600;
   }
 
   /* THE DESK ACROSS THE HERO'S EDGE: the next band's ground comes up under its lower 40%. */

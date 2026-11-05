@@ -37,6 +37,8 @@
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
   import { site } from '$lib/copy.ts';
+  import { LAUNCH } from '$lib/launch.ts';
+  import { SOURCE } from '$lib/links.ts';
   import { LIVE } from '$lib/nav.ts';
   import { footerGroups } from '$lib/site/footer.ts';
   import SignIn from '$lib/site/SignIn.svelte';
@@ -124,6 +126,13 @@
       {#if under}<span class="links-under" data-moving={sliding ? '' : undefined} aria-hidden="true" style:translate="{under.x}px {under.y}px" style:inline-size="{under.w}px" style:opacity={under.w > 0 ? 1 : 0}></span>{/if}
     </nav>
 
+    {#if LAUNCH.repo && SOURCE}
+      <a class="gh" href={SOURCE} rel="external" aria-label={site.nav.source} title={site.nav.source}>
+        <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true"
+          ><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" /></svg
+        >
+      </a>
+    {/if}
     <div class="go"><Start size="md" /></div>
 
     <!-- THE PHONE'S HEADER IS ONE ROW: the brand, the start button and this 44px button, which holds the links. -->
@@ -141,6 +150,7 @@
           >
         {/each}
         <SignIn class="menu-link" />
+        {#if LAUNCH.repo && SOURCE}<a class="menu-link" href={SOURCE} rel="external">{site.nav.source}<Icon name="chevron-right" size="m" /></a>{/if}
       </nav>
     </details>
   </div>
@@ -306,6 +316,30 @@
   .go {
     display: flex;
     flex: none;
+  }
+
+  /* THE REPOSITORY, A MARK AND NOT A WORD, beside the start button. On a phone it is a line in the menu instead. */
+  .gh {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 36px;
+    block-size: 36px;
+    border-radius: 50%;
+    color: var(--on-night-2);
+    transition: color 120ms ease;
+  }
+
+  @media (hover: hover) {
+    .gh:hover {
+      color: var(--on-night);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .gh {
+      display: none;
+    }
   }
 
   @media (pointer: coarse) {

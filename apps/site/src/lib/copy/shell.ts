@@ -80,12 +80,6 @@ export const shell = {
     all: 'Every page',
   },
 
-  /** The early access line: the hero's under its buttons, and the strip that closes an inner page. */
-  early: {
-    strong: 'Open to everyone.',
-    rest: 'Free to start, no card.',
-  },
-
   /** The dark footer: the brand with no blurb, three groups of plain links (`lib/site/footer.ts`) and the owner. */
   footer: {
     groups: {

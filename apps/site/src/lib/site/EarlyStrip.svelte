@@ -1,16 +1,15 @@
 <!--
-  The close of an inner page: one slim strip on the paper, the early access line on the left and the start
-  button on the right; on a phone the line, then the button at full width. It replaced the huge centred close, which
-  said the page's recap again. The home page has none: its free tile is its last ask.
+  The close of an inner page: one slim strip on the paper with the start button in the middle, at full width on a phone.
+  It replaced the huge centred close, which said the page's recap again. The home page has none: its free tile is its
+  last ask.
 -->
 <script lang="ts">
   import { shell } from '../copy/shell.ts';
   import Start from './Start.svelte';
 </script>
 
-<section class="early" aria-label={shell.early.strong}>
+<section class="early" aria-label={shell.nav.start}>
   <div class="wrap strip">
-    <p><b>{shell.early.strong}</b> {shell.early.rest}</p>
     <div class="go"><Start /></div>
   </div>
 </section>
@@ -24,29 +23,14 @@
   .strip {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 24px;
+    justify-content: center;
     min-block-size: 120px;
-  }
-
-  p {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-say);
-    line-height: 1.5;
-    text-wrap: pretty;
-  }
-
-  b {
-    color: var(--ink);
-    font-weight: 600;
   }
 
   @media (max-width: 760px) {
     .strip {
       flex-direction: column;
       align-items: stretch;
-      gap: 16px;
       padding-block: 32px;
     }
 
