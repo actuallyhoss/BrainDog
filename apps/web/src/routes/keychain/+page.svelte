@@ -1666,10 +1666,6 @@
     display: none;
   }
 
-  .code-said[data-intent='good'] .code-glyph {
-    color: var(--good);
-  }
-
   .code-said[data-intent='bad'] .code-glyph {
     color: var(--red);
   }
