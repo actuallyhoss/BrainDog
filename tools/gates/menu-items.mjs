@@ -116,7 +116,4 @@ export default function menuItems(root) {
   return 1;
 }
 
-export default menuItems;
-
-/* AND IT IS STILL A SCRIPT, for `self-test` and the command line above. */
 if (import.meta.main) process.exitCode = menuItems(process.argv[2]);
