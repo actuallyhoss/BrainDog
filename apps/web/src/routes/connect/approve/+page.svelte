@@ -77,6 +77,8 @@
   /* ── approved ───────────────────────────────────────────────────────── */
 
   let done = $state<Approved | null>(null);
+  /* THE SHEET IS UP: the lede, the waiting list and the safety line step back, so the question is alone on the page. */
+  let looking = $state(false);
   let heading = $state<HTMLHeadingElement | undefined>();
 
   function approved(a: Approved) {
@@ -136,11 +138,11 @@
       {#if !owner}
         <p class="entry-lede">{copy.codeNotOwner(shell.index.name || copy.product)}</p>
       {:else}
-        <p class="entry-lede">{copy.codeLede}</p>
-        <CodeForm id="user-code" size="lead" autofocus {approve} onapproved={approved} />
+        {#if !looking}<p class="entry-lede">{copy.codeLede}</p>{/if}
+        <CodeForm id="user-code" size="lead" autofocus {approve} onapproved={approved} bind:looking />
 
         <!-- ONLY WHEN A MACHINE WAITS: with none, the six boxes are the whole page and nothing says so twice. -->
-        {#if machines !== null && asking.length > 0}
+        {#if !looking && machines !== null && asking.length > 0}
           <section class="asking" aria-labelledby="asking-title">
             <h2 class="fact-label" id="asking-title">{copy.codeWaitingTitle}</h2>
             <ul class="ask-rows">
@@ -158,10 +160,10 @@
           </section>
         {/if}
 
-        <p class="quiet safe">
+        {#if !looking}<p class="quiet safe">
           <span class="safe-mark" aria-hidden="true"><Icon name="lock" size="s" /></span>
           <span>{copy.codeSafe}</span>
-        </p>
+        </p>{/if}
       {/if}
     {/if}
   </div>
