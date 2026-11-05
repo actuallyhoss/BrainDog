@@ -456,13 +456,20 @@ async function getWaiting(door: Door, ask: { label: string } | { credential: str
   return got;
 }
 
+/** A BrainDog bearer in this process's own environment, which `exec` keeps from the command it starts. */
+const NOT_HANDED_ON = ['BRAINDOG_TOKEN', 'BRAINDOG_JOB_BEARER'];
+
 /**
  * Start the command with the key under one variable. THE ONE PLACE A KEY READ BACK LEAVES, and `secret-grep` names
  * this function as its exemption. The variables are a copy, so this process's own environment never holds the key,
  * and the copy's entry is deleted as soon as the command has been started with it.
  */
 function execOne(run: Launch & { name: string }, value: Plaintext, io: KeysIo): Promise<number> {
-  const handed: Record<string, string | undefined> = { ...io.env, [run.name]: value };
+  const handed: Record<string, string | undefined> = { ...io.env };
+  /* THE COMMAND GETS THE ONE KEY IT WAS HANDED AND NOT THE WAY INTO THE RECORD. Whatever is in this shell goes along, and a
+     login in `BRAINDOG_TOKEN` or a job's bearer would go to a tool that was only ever asked to use one key. */
+  for (const held of NOT_HANDED_ON) delete handed[held];
+  handed[run.name] = value;
   const exited = io.spawn(run.command, run.args, handed, run.verbatim);
   delete handed[run.name];
   return exited;

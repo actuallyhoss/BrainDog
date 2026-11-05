@@ -13,6 +13,7 @@
  * `09-ALARMS` spends a paragraph forbidding.
  */
 
+import { messageOf } from '@braindog/host/log-floor';
 import type { OutboxRow } from '@braindog/kernel';
 
 /**
@@ -151,7 +152,9 @@ function safely(fn: () => void, log: (line: string) => void): void {
   }
 }
 
-const said = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+/* THROUGH THE FLOOR, BECAUSE THIS SENTENCE IS KEPT: on the outbox row, shown on a screen and carried in every export. A thrown
+   fetch names the whole address it asked, and an address can hold a key. */
+const said = (e: unknown): string => messageOf(e);
 
 /* The default log, named so a test can pass its own and read what was said. */
 const warn = (line: string): void => console.error(line);

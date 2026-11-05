@@ -300,7 +300,8 @@ record DEK, the connector DEK (§7) and the signing key ([03-DOG-FORMAT](03-DOG-
 ([30-BLUEPRINT](30-BLUEPRINT.md) §1). It travels in an export, sealed — a wrapped key is nothing without the
 KEK, and a record restored from its own backup must be able to open its own Keychain (§8).
 
-**Rotation is two slots.** The root key has a current slot and a previous one — `KEK` and `KEK_PREV`;
+**Rotation is two slots.** The root key has a current slot and a previous one, both in the one `KEK` secret, the new key,
+a space and the old one (`keyStoreOf` in `apps/worker/src/keys.ts`; no `KEK_PREV` is read by anything);
 `rewrapKeys` re-wraps every `vault_key` row from the old to the new, `kek_id` tells the rows apart during
 the walk, rotations are at least 30 days apart, and the previous slot is retired 30 days after the first
 clean night. The age identity that seals the nightly backups lives outside Cloudflare altogether — the

@@ -88,6 +88,7 @@ import {
   type Resolve,
   type Send,
 } from './actions.ts';
+import { messageOf } from '@braindog/host/log-floor';
 import { pagedRunner } from '@braindog/host/connector';
 import { replayUsage } from '@braindog/host/actions';
 import { serveAsks } from '@braindog/host/slash-answers';
@@ -1729,7 +1730,8 @@ export async function start(options: {
         } else await options.deliver(job, postKeys(api, options.keys, job));
         sent = true;
       } catch (e) {
-        why = e instanceof Error ? e.message : String(e);
+        /* THROUGH THE FLOOR: this sentence is kept on the outbox row, and a thrown fetch names the whole address. */
+        why = messageOf(e);
       }
 
       try {

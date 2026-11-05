@@ -473,3 +473,17 @@ test('ON A REAL WINDOWS MACHINE a .cmd found on PATH starts, every argument arri
     assert.deepEqual(run.said, []);
   }
 });
+
+test('EXEC HANDS ON THE ONE KEY AND NOT THE WAY INTO THE RECORD: a login or a job bearer in this shell stays here', async (t) => {
+  const value = fakeValue();
+  const host = await stub(t, value);
+  const { file } = config(t, host.base, fakeGrant());
+  const env = { PLAIN: 'kept', BRAINDOG_TOKEN: 'a-login-in-this-shell', BRAINDOG_JOB_BEARER: 'a-job-bearer-in-this-shell' };
+  const run = io(file, { env });
+  assert.equal(await keys(['exec', 'Kiln deploy', '--', 'deploy'], run.io), 0, run.said.join('\n'));
+  const vars = run.started[0]?.vars ?? {};
+  assert.equal(vars.KILN_DEPLOY, value);
+  assert.equal(vars.PLAIN, 'kept');
+  assert.equal(vars.BRAINDOG_TOKEN, undefined);
+  assert.equal(vars.BRAINDOG_JOB_BEARER, undefined);
+});

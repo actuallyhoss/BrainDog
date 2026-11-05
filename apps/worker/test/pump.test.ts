@@ -211,3 +211,12 @@ test('and when that one pass fails, every message that rang for it goes back', a
   assert.equal(bells.retried.length, 3, 'a message was acked for a drain that never happened');
   assert.equal(bells.acked.length, 0);
 });
+
+test('A FAILED DELIVERY KEEPS ITS SENTENCE AND NOT THE KEY IN IT: the row is shown on a screen and travels in an export', async () => {
+  const key = `sk_${'live'}_Q7d9Xk2Lm4Zp8Rt6Vb3Nc1Hs5Jf0Gw2Y`;
+  const r = record([job('o_1')]);
+  const out = await pump(r, () => Promise.reject(new Error(`Network connection lost: https://hooks.example/send?token=${key}`)));
+  assert.equal(out.failed, 1);
+  assert.match(r.acks[0]?.error ?? '', /Network connection lost: https:\/\/hooks\.example\/send/u);
+  assert.ok(!(r.acks[0]?.error ?? '').includes(key), 'the key reached the row');
+});
