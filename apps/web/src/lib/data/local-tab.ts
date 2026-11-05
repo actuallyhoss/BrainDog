@@ -142,8 +142,9 @@ export function claimLocal(
      in, on any way in, which is why it is here and not only on the sign-in screen): the claim below clears the copy, and the
      worker's copy with Today's picture and the keys kept beside it go with it. Today's picture is keyed by the address alone,
      so a colleague on the same BrainDog would be painted it. */
-  const cleared = keptForOther(me.person) ? forgetOffline().catch(() => undefined) : Promise.resolve();
-  if (keptForOther(me.person)) forgetSignedOut();
+  const other = keptForOther(me.person);
+  const cleared = other ? forgetOffline().catch(() => undefined) : Promise.resolve();
+  if (other) forgetSignedOut();
   /* SOMEBODY ONLY SHARES LET IN (a grant, and no role on the whole record) IS A GUEST HERE, whose copy is drawn a day at
      most and never past their last share's end, in the local copy and in the worker's (`markGuest`). */
   const guest = me.grant !== undefined && !me.owner && me.lists !== null ? { until: me.grant.until } : null;
