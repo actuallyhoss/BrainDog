@@ -447,7 +447,7 @@ test('ANOTHER PERSON SIGNING IN WITH NO SIGN-OUT BETWEEN TAKES WHAT WAS KEPT, an
   try {
     await forgetIfOther('p_1');
     assert.equal(b.held.has('braindog.boot-copy'), true);
-    assert.deepEqual(b.gone, []);
+    assert.equal(b.gone.length, 0);
     await forgetIfOther('p_2');
     assert.equal(b.held.has('braindog.boot-copy'), false);
     assert.ok(b.gone.includes('braindog-copy'));
