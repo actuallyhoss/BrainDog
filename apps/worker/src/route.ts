@@ -394,9 +394,14 @@ export function appPath(pathname: string): AppPath | null {
  *
  * MEASURED ON PRODUCTION: NONE OF THEM ON ANY ANSWER, the shell and the sign-in page included. They are
  * set here because this is the only place certain to reach a page: whether `apps/web/static/_headers` survives a
- * response fetched through the `ASSETS` binding was not measured. HSTS is not among them, because it is a zone setting
- * whose `max-age` browsers never give back. None of the four touches the passkey ceremony, which runs in the top-level
- * page and posts to its own origin, where `same-origin` still sends both `Origin` and `Referer`.
+ * response fetched through the `ASSETS` binding was not measured. None of them touches the passkey ceremony, which runs in
+ * the top-level page and posts to its own origin, where `same-origin` still sends both `Origin` and `Referer`.
+ *
+ * AND HSTS, COOP AND PERMISSIONS-POLICY (`PAGE_HARDENING`). HSTS was left to a zone setting nobody turned on: measured on
+ * 5 Nov, neither `app.brain.dog` nor `brain.dog` sent it, so a first visit typed without `https://` went out in the clear.
+ * It names this host alone and carries no `includeSubDomains`, since a name somebody once pointed elsewhere must not stop
+ * answering for it. `same-origin` on the opener means a page this one opens, or that opened it, holds no handle to it.
+ * The app asks for no camera, microphone or place, so a frame or a script that got in cannot either.
  *
  * THE POLICY IS THE ONE THE PAGE ALREADY CARRIES (`pagePolicy`), so it names the very hashes of the build it rides on
  * and no deploy of the Worker can fall out of step with a build of the app. `path` is the address asked for, which
@@ -418,12 +423,20 @@ export async function asPage(out: Response, path?: string): Promise<Response> {
   page.headers.set('x-frame-options', 'DENY');
   page.headers.set('x-content-type-options', 'nosniff');
   page.headers.set('referrer-policy', 'same-origin');
+  for (const [name, value] of PAGE_HARDENING) page.headers.set(name, value);
   /* NO PAGE OF THE APP IS FOR A SEARCH ENGINE: every one is a record, a sign-in or a door to one, and the site at
      brain.dog is what is indexed. A header and not a `robots.txt` disallow, because a crawler kept out never reads
      the noindex and may still list the bare address. */
   page.headers.set('x-robots-tag', 'noindex, nofollow');
   return page;
 }
+
+/** What every page says of how it is reached and what it may ask for. The self-host keeps the last two in `shell.ts`. */
+export const PAGE_HARDENING = [
+  ['strict-transport-security', 'max-age=31536000'],
+  ['cross-origin-opener-policy', 'same-origin'],
+  ['permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), bluetooth=(), midi=()'],
+] as const;
 
 /** Cloudflare Turnstile's origin, for its script and its frame, which only the sign-up page loads. */
 const TURNSTILE = 'https://challenges.cloudflare.com';

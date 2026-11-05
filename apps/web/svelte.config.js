@@ -102,6 +102,9 @@ export default {
         'frame-src': ['self', 'blob:', ...EMBEDS, TURNSTILE],
         'object-src': ['none'],
         'base-uri': ['none'],
+        /* NO FORM OF THE APP POSTS ANYWHERE: every one is sent by `fetch`. `default-src` does not cover this directive, so a form
+           that markup somehow put on the page could otherwise post what it asked for to any host. */
+        'form-action': ['self'],
       },
     },
   },

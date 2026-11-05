@@ -66,7 +66,7 @@ export default {
        `test/one-origin.test.mjs` holds both halves. */
     csp: {
       mode: 'hash',
-      directives: { 'script-src': ['self'], 'object-src': ['none'], 'base-uri': ['self'] },
+      directives: { 'script-src': ['self'], 'object-src': ['none'], 'base-uri': ['self'], 'form-action': ['self'] },
     },
   },
   compilerOptions: {

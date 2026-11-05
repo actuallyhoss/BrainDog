@@ -22,7 +22,7 @@ import { EMBED_PROVIDERS } from 'braindog-render';
 
 /* A PATH IN A VARIABLE, so `svelte-check` does not ask for a declaration file for a config written in JavaScript. */
 const CONFIG = '../svelte.config.js';
-type Csp = { mode?: string; directives?: Partial<Record<'default-src' | 'script-src' | 'style-src-elem' | 'style-src-attr' | 'frame-src', string[]>> };
+type Csp = { mode?: string; directives?: Partial<Record<'default-src' | 'script-src' | 'style-src-elem' | 'style-src-attr' | 'frame-src' | 'form-action', string[]>> };
 
 const SHELL = new URL('../build/index.html', import.meta.url);
 const TURNSTILE = 'https://challenges.cloudflare.com';
@@ -47,6 +47,7 @@ test('THE POLICY FRAMES EXACTLY ITS OWN DRAWN FRAME, THE EMBED PROVIDERS AND TUR
   assert.deepEqual(d['frame-src'], ['self', 'blob:', ...EMBED_PROVIDERS.map((p) => p.origin), TURNSTILE], "frame-src is not 'self', blob:, EMBED_PROVIDERS and Turnstile");
   assert.equal(config.kit?.csp?.mode, 'hash');
   assert.deepEqual(d['style-src-attr'], ['unsafe-inline']);
+  assert.deepEqual(d['form-action'], ['self'], 'a form on the page could post to any host: default-src does not cover form-action');
   for (const name of ['default-src', 'script-src', 'style-src-elem'] as const)
     assert.ok(!(d[name] ?? []).some((s) => s === 'unsafe-inline' || s === 'unsafe-eval'), `${name} allows inline or eval`);
 });

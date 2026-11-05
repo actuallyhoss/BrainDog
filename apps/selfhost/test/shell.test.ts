@@ -202,3 +202,14 @@ test('A PAGE CARRIES THE POLICY IN ITS OWN META, LESS TURNSTILE AND WITH FRAME-A
     b.clean();
   }
 });
+
+test('A PAGE SAYS WHO MAY FRAME IT, WHAT IT SENDS AS A REFERRER, AND THAT IT ASKS FOR NO CAMERA, as the Worker\'s do; and no HSTS, which is whoever runs it to say', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bd-shell-headers-'));
+  writeFileSync(join(dir, 'index.html'), '<!doctype html><title>x</title>');
+  const out = shellOf(dir)(new Request('http://localhost:8080/'), 'http://localhost:8080');
+  assert.equal(out.headers.get('x-frame-options'), 'DENY');
+  assert.equal(out.headers.get('referrer-policy'), 'same-origin');
+  assert.equal(out.headers.get('cross-origin-opener-policy'), 'same-origin');
+  assert.match(out.headers.get('permissions-policy') ?? '', /camera=\(\)/u);
+  assert.equal(out.headers.get('strict-transport-security'), null);
+});

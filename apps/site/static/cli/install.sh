@@ -37,9 +37,9 @@ node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.ex
   die "braindog runs on Node.js 24.13 or later, and this node is $(node --version). Update it from https://nodejs.org, then run this again."
 
 if command -v curl >/dev/null 2>&1; then
-  fetch() { curl -fsSL --retry 2 -o "$2" "$1"; }
+  fetch() { curl -fsSL --proto '=https' --tlsv1.2 --retry 2 -o "$2" "$1"; }
 elif command -v wget >/dev/null 2>&1; then
-  fetch() { wget -q -O "$2" "$1"; }
+  fetch() { wget -q --https-only -O "$2" "$1"; }
 else
   die 'Downloading braindog needs curl or wget, and this machine has neither.'
 fi

@@ -76,12 +76,33 @@ test('the page policy is a hash policy from kit.csp, so the start script SvelteK
   assert.deepEqual(csp.directives['script-src'], ['self']);
   assert.deepEqual(csp.directives['object-src'], ['none']);
   assert.deepEqual(csp.directives['base-uri'], ['self']);
+  assert.deepEqual(csp.directives['form-action'], ['self']);
 });
 
 test("_headers forbids framing on every path, with frame-ancestors 'none'", () => {
   const all = rules().find((r) => r.path === '/*');
   const policy = all?.headers.find((h) => h.name === 'content-security-policy')?.value ?? '';
   assert.match(policy, /(^|;)\s*frame-ancestors 'none'\s*(;|$)/, `no /* rule carries frame-ancestors 'none' (found ${JSON.stringify(policy)})`);
+});
+
+test('_headers says how every page is reached and what it may ask for, as every page of the app does (sec-web, 5 Nov)', () => {
+  const all = rules().find((r) => r.path === '/*');
+  const said = Object.fromEntries((all?.headers ?? []).map((h) => [h.name, h.value]));
+  assert.equal(said['strict-transport-security'], 'max-age=31536000');
+  assert.equal(said['x-content-type-options'], 'nosniff');
+  assert.equal(said['x-frame-options'], 'DENY');
+  assert.equal(said['cross-origin-opener-policy'], 'same-origin');
+  assert.match(said['permissions-policy'] ?? '', /camera=\(\)/u);
+  assert.match(said['referrer-policy'] ?? '', /strict-origin-when-cross-origin/u);
+});
+
+test('install.sh and install.ps1 never fall back to plain http, on a redirect or at the start', () => {
+  const sh = readFileSync(new URL('../static/cli/install.sh', import.meta.url), 'utf8');
+  assert.match(sh, /curl -fsSL --proto '=https' --tlsv1\.2/u, 'curl follows a redirect to http without --proto');
+  assert.match(sh, /wget -q --https-only/u, 'wget follows a redirect to http without --https-only');
+  assert.match(sh, /BASE='https:\/\//u);
+  const ps = readFileSync(new URL('../static/cli/install.ps1', import.meta.url), 'utf8');
+  assert.match(ps, /\$base = 'https:\/\//u);
 });
 
 test('robots.txt keeps every crawler out of the app, its API, sign-in and the account pages', () => {

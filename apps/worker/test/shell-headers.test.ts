@@ -3,9 +3,8 @@
  *
  * MEASURED ON PRODUCTION BEFORE THIS: NOT ONE OF THEM ON ANY ANSWER. `/app/`, `/app/signin`, `/app/acme/` (the app was
  * under `/app` then) and every other page of `app.brain.dog` came back with a `Cache-Control` and a content type and
- * nothing that says who may frame it. The four headers here are the ones that are safe to ship without touching the build: a full
- * `script-src` needs the shell's two inline scripts hashed through `kit.csp`, and HSTS is a zone setting that browsers
- * never forget, so both are somebody's decision and not a line in a Worker.
+ * nothing that says who may frame it. A full `script-src` needs the shell's inline scripts hashed through `kit.csp`, which
+ * the build does, and HSTS was a zone setting nobody had turned on (measured 5 Nov), so it is a header now, for this host alone.
  *
  * THE WORKER SETS THEM, BECAUSE IT IS THE ONLY PLACE CERTAIN TO REACH THE PAGE. `apps/web/static/_headers` is read by
  * the static assets, and whether its rules survive a response fetched through the `ASSETS` binding and handed back by
@@ -28,6 +27,9 @@ const PAGE = {
   'x-frame-options': 'DENY',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'same-origin',
+  'strict-transport-security': 'max-age=31536000',
+  'cross-origin-opener-policy': 'same-origin',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), bluetooth=(), midi=()',
 } as const;
 
 /**

@@ -140,6 +140,12 @@ export function shellOf(dir: string): (request: Request, origin: string) => Resp
     const headers = new Headers({
       'x-content-type-options': 'nosniff',
       'content-security-policy': "frame-ancestors 'none'",
+      'x-frame-options': 'DENY',
+      'referrer-policy': 'same-origin',
+      /* AS THE WORKER SAYS (`PAGE_HARDENING`), LESS HSTS: this host may be plain http on a machine's own name, and whether it
+         stays https is whoever runs it to say. */
+      'cross-origin-opener-policy': 'same-origin',
+      'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), bluetooth=(), midi=()',
     });
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       headers.set('allow', 'GET, HEAD');
