@@ -16,12 +16,18 @@
 # serves, who could change both. It is computed with Node, which the command needs anyway, because macOS has
 # shasum and not sha256sum and some Linux images have neither.
 #
+# AND TO ITS SIGNATURE BEFORE IT RUNS, once PIN holds a key (apps/cli/src/release-key.ts, tools/ship/cli-key.mjs): one made at
+# release with a key that is not on the site. Empty, the sum alone. THIS SCRIPT COMES FROM THE SITE TOO, so the pin holds
+# against the bundle being swapped on its own, and against somebody who can rewrite the site only if you read this
+# script before running it, or compare PIN with the key published in the repository's README.
+#
 # NODE IS NOT INSTALLED FOR YOU. The command runs on Node 24.13 or later (apps/cli/package.json, engines), and which
 # Node a machine has is its owner's choice, so a missing or older one stops this with the address to get one.
 
 set -eu
 
 BASE='https://brain.dog/cli'
+PIN=''
 
 say() { printf '%s\n' "$*"; }
 die() {
@@ -37,7 +43,7 @@ node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.ex
   die "braindog runs on Node.js 24.13 or later, and this node is $(node --version). Update it from https://nodejs.org, then run this again."
 
 if command -v curl >/dev/null 2>&1; then
-  fetch() { curl -fsSL --proto '=https' --tlsv1.2 --retry 2 -o "$2" "$1"; }
+  fetch() { curl -fsSL --proto "=${BASE%%:*}" --tlsv1.2 --retry 2 -o "$2" "$1"; }
 elif command -v wget >/dev/null 2>&1; then
   fetch() { wget -q --https-only -O "$2" "$1"; }
 else
@@ -61,6 +67,13 @@ esac
 [ "${#want}" -eq 64 ] || die "The checksum at $BASE/braindog.mjs.sha256 is not a SHA-256, so nothing was installed."
 got=$(node -e 'process.stdout.write(require("node:crypto").createHash("sha256").update(require("node:fs").readFileSync(process.argv[1])).digest("hex"))' "$TMP/braindog.mjs")
 [ "$got" = "$want" ] || die "The download does not match its checksum (expected $want, got $got), so nothing was installed. Run this again to download it afresh."
+
+if [ -n "$PIN" ]; then
+  fetch "$BASE/braindog.mjs.sig" "$TMP/braindog.mjs.sig" || die "This build has no signature at $BASE/braindog.mjs.sig, so nothing was installed. Run this again in a few minutes; if it says the same, do not install it another way."
+  fetch "$BASE/braindog.mjs.build" "$TMP/braindog.mjs.build" || die "The build could not be read from $BASE/braindog.mjs.build, so nothing was installed."
+  node -e 'const c=require("node:crypto"),f=require("node:fs");const [pin,sum,build,sig]=process.argv.slice(1);const s=Buffer.from(f.readFileSync(sig,"utf8").trim(),"base64url");const m=Buffer.from("braindog-cli release\n"+sum+"\n"+build+"\n");process.exit(s.length===64&&pin.split(" ").some((x)=>{try{return c.verify(null,m,{key:{kty:"OKP",crv:"Ed25519",x},format:"jwk"},s)}catch(e){return false}})?0:1)' "$PIN" "$got" "$(tr -d '[:space:]' <"$TMP/braindog.mjs.build")" "$TMP/braindog.mjs.sig" ||
+    die 'The signature on this build is not BrainDog'"'"'s, so nothing was installed and it did not run. Run this again in a few minutes; if it says the same, do not install it another way.'
+fi
 
 # ASKED BEFORE IT IS PUT IN PLACE, so a file this Node cannot run never replaces one that works.
 node "$TMP/braindog.mjs" --version >/dev/null 2>&1 || die 'The downloaded braindog did not run under this Node, so nothing was installed.'

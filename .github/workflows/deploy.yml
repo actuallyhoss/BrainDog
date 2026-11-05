@@ -48,8 +48,9 @@ jobs:
       - name: Build the CLI for the site
         run: |
           pnpm --filter braindog-cli build
+          node tools/ship/cli-sign.mjs
           mkdir -p apps/site/static/cli
-          cp apps/cli/dist/braindog.mjs apps/cli/dist/braindog.mjs.sha256 apps/cli/dist/braindog.mjs.build apps/site/static/cli/
+          cp apps/cli/dist/braindog.mjs apps/cli/dist/braindog.mjs.sha256 apps/cli/dist/braindog.mjs.build apps/cli/dist/braindog.mjs.sig apps/site/static/cli/
 
       - name: Record what is live
         continue-on-error: true

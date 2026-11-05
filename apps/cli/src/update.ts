@@ -13,6 +13,11 @@
  * the installed name always holds a whole command. Any failure deletes the download and leaves the installed file as
  * it was, so no temporary file is left on any path, and one rename of `.prev` brings the last build back by hand.
  *
+ * AND TO ITS SIGNATURE, ONCE THIS COMMAND IS PINNED (`release-key.ts`). The sum is served from the same place as the file, so it
+ * says nothing about somebody who can change what the site serves; `braindog.mjs.sig` is made at release with a key that is
+ * not there. Checked before the download is ever started, because the `--version` below runs it. With no key pinned, the sum
+ * alone, as every build before the pin, which is how one of those reaches the first pinned build.
+ *
  * THE FILE'S OWN BUILD MUST BE THE ONE THE SITE NAMED. A deploy copies the three files one after another, so a read in
  * between can pair a new `.build` with an old bundle. The downloaded file's `--version` is compared with the build that
  * was read, and a mismatch is refused, rather than an update that reports one build and installs another.
@@ -30,6 +35,7 @@ import { basename } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { placeAgain, type Placed } from './placed.ts';
+import { RELEASE_KEYS, signedBy } from './release-key.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -56,6 +62,8 @@ export interface UpdateIo {
   base?: string;
   home?: string;
   fetch?: typeof fetch;
+  /** The keys a build must be signed by; `RELEASE_KEYS` unless a test holds its own. */
+  keys?: readonly string[];
   /** Places the skill and hooks again from the new file; `placeAgain` unless a test holds it. */
   place?: (file: string) => Placed;
   /** The rename that swaps the download into place; `renameSync` unless a test makes it fail. */
@@ -149,8 +157,11 @@ export async function update(args: string[], io: UpdateIo): Promise<number> {
   try {
     let want: string;
     let bytes: Buffer;
+    const keys = io.keys ?? RELEASE_KEYS;
+    let signature = '';
     try {
       want = (await text(get, `${base}/braindog.mjs.sha256`, 10_000)).split(/\s+/)[0] ?? '';
+      if (keys.length > 0) signature = await text(get, `${base}/braindog.mjs.sig`, 10_000).catch(() => '');
       const res = await reached(get, `${base}/braindog.mjs`, 120_000);
       if (!res.ok) throw new Error(`${base}/braindog.mjs answered ${res.status}`);
       bytes = Buffer.from(await res.arrayBuffer());
@@ -167,6 +178,16 @@ export async function update(args: string[], io: UpdateIo): Promise<number> {
     const got = createHash('sha256').update(bytes).digest('hex');
     if (got !== want) {
       io.err('The download does not match its checksum, so nothing changed. Run braindog update again to download it afresh.');
+      return 1;
+    }
+    /* BEFORE IT RUNS. A deploy copying its files can pair a new bundle with an old signature, so this one is worth a second try
+       and is said as such; a build nobody signed stays refused however often it is asked. */
+    if (keys.length > 0 && !signedBy(keys, want, served, signature)) {
+      io.err(
+        signature === ''
+          ? `${base} serves this build with no signature, so nothing changed and it did not run. This command takes only a build signed at release. Run braindog update again in a few minutes; if it says the same, do not install it by hand, and tell whoever runs that host.`
+          : `The signature on this build is not BrainDog's, so nothing changed and it did not run. It can happen for a moment while a deploy is copying its files, so run braindog update again in a few minutes; if it says the same, do not install it by hand, and tell whoever runs that host.`,
+      );
       return 1;
     }
     /* ASKED BEFORE IT IS PUT IN PLACE, so a file this Node cannot run never replaces one that works. */

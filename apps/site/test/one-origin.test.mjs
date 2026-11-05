@@ -98,7 +98,7 @@ test('_headers says how every page is reached and what it may ask for, as every 
 
 test('install.sh and install.ps1 never fall back to plain http, on a redirect or at the start', () => {
   const sh = readFileSync(new URL('../static/cli/install.sh', import.meta.url), 'utf8');
-  assert.match(sh, /curl -fsSL --proto '=https' --tlsv1\.2/u, 'curl follows a redirect to http without --proto');
+  assert.match(sh, /curl -fsSL --proto "=\$\{BASE%%:\*\}" --tlsv1\.2/u, 'curl follows a redirect to http without --proto');
   assert.match(sh, /wget -q --https-only/u, 'wget follows a redirect to http without --https-only');
   assert.match(sh, /BASE='https:\/\//u);
   const ps = readFileSync(new URL('../static/cli/install.ps1', import.meta.url), 'utf8');

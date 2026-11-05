@@ -296,6 +296,11 @@ for (const [n, step] of job.steps.entries()) {
       env[k] = value;
     }
     let skipRun = false;
+    /* A DRY RUN OPENS NO KEY: `--check` says whether it could sign, and signs nothing. A copy of a signature that is not there
+       would stop the step, so the name is taken off that line for this one run. */
+    if (DRY && step.run.includes('tools/ship/cli-sign.mjs')) {
+      script = script.replace('node tools/ship/cli-sign.mjs', 'node tools/ship/cli-sign.mjs --check').replace(' apps/cli/dist/braindog.mjs.sig', '');
+    }
     if (DRY && isWrite(script)) {
       const line = script.split('\n').find((l) => isWrite(l));
       would = true;
@@ -392,7 +397,7 @@ say(`  log: ${relative(ROOT, LOG)}\n`);
 
 /* THE CLI COPIES "Build the CLI for the site" PUT IN THE SITE. On a runner the next checkout's clean removes them; here
    nothing would, and gates that read the tree (`refusals`) then read a bundle as though it were source. */
-for (const name of ['braindog.mjs', 'braindog.mjs.sha256', 'braindog.mjs.build']) rmSync(join(ROOT, 'apps/site/static/cli', name), { force: true });
+for (const name of ['braindog.mjs', 'braindog.mjs.sha256', 'braindog.mjs.build', 'braindog.mjs.sig']) rmSync(join(ROOT, 'apps/site/static/cli', name), { force: true });
 if (lockHeld) rmSync(LOCK, { force: true });
 rmSync(TMP, { recursive: true, force: true });
 process.exitCode = state.failed || refusals.length > 0 || afterRed ? 1 : 0;

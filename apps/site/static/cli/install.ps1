@@ -14,6 +14,11 @@
 # download cut short or altered on the way; it does not defend against someone able to change what the site serves,
 # who could change both.
 #
+# AND TO ITS SIGNATURE BEFORE IT RUNS, once $pin holds a key (apps/cli/src/release-key.ts, tools/ship/cli-key.mjs): one made at
+# release with a key that is not on the site. Empty, the sum alone. THIS SCRIPT COMES FROM THE SITE TOO, so the pin holds
+# against the bundle being swapped on its own, and against somebody who can rewrite the site only if you read this script
+# before running it, or compare $pin with the key published in the repository's README.
+#
 # NODE IS NOT INSTALLED FOR YOU. The command runs on Node 24.13 or later (apps/cli/package.json, engines), and which
 # Node a machine has is its owner's choice, so a missing or older one stops this with the address to get one.
 #
@@ -29,6 +34,7 @@
   [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
   $base = 'https://brain.dog/cli'
+  $pin = ''
   $dir = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.braindog\bin'
   $say = { param([string]$line) [Console]::Out.WriteLine($line) }
   $fail = { param([string]$line) [Console]::Error.WriteLine($line) }
@@ -69,6 +75,26 @@
     if ($got -ne $want) {
       & $fail "The download does not match its checksum (expected $want, got $got), so nothing was installed. Run this again to download it afresh."
       return
+    }
+
+    # A FILE FOR THE CHECK AND NOT node -e, because Windows PowerShell 5.1 strips the double quotes from an argument it hands on.
+    if ($pin -ne '') {
+      $sigFile = Join-Path $tmp 'braindog.mjs.sig'
+      $buildFile = Join-Path $tmp 'braindog.mjs.build'
+      try {
+        Invoke-WebRequest -UseBasicParsing -Uri "$base/braindog.mjs.sig" -OutFile $sigFile
+        Invoke-WebRequest -UseBasicParsing -Uri "$base/braindog.mjs.build" -OutFile $buildFile
+      } catch {
+        & $fail "This build has no signature at $base/braindog.mjs.sig, so nothing was installed. Run this again in a few minutes; if it says the same, do not install it another way."
+        return
+      }
+      $check = Join-Path $tmp 'check.cjs'
+      [IO.File]::WriteAllText($check, 'const c=require("node:crypto"),f=require("node:fs");const [pin,sum,build,sig]=process.argv.slice(2);const s=Buffer.from(f.readFileSync(sig,"utf8").trim(),"base64url");const m=Buffer.from("braindog-cli release\n"+sum+"\n"+build+"\n");process.exit(s.length===64&&pin.split(" ").some((x)=>{try{return c.verify(null,m,{key:{kty:"OKP",crv:"Ed25519",x},format:"jwk"},s)}catch(e){return false}})?0:1)')
+      $null = & $node.Source $check $pin $got ((Get-Content -Raw -LiteralPath $buildFile).Trim()) $sigFile
+      if ($LASTEXITCODE -ne 0) {
+        & $fail "The signature on this build is not BrainDog's, so nothing was installed and it did not run. Run this again in a few minutes; if it says the same, do not install it another way."
+        return
+      }
     }
 
     # ASKED BEFORE IT IS PUT IN PLACE, so a file this Node cannot run never replaces one that works. Standard error is

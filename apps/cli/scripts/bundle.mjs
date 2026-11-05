@@ -40,6 +40,8 @@
  * first from the address the install script downloads from, so a command that is already the served build says so
  * without fetching the bundle, and one that is behind names the build it is about to become.
  *
+ * AND NOT ITS SIGNATURE. `braindog.mjs.sig` is made at release by `tools/ship/cli-sign.mjs`, with a key this build never sees.
+ *
  * AND THE HOOKS' OWN ENTRY INSIDE IT. The prompt, tool and stop hooks, and Codex's turn end, read one local file and
  * print; starting Node on the whole bundle for that cost 77 ms where the reader alone costs 20. So
  * `src/inbox-file.ts`, which imports nothing but Node's own modules, is built first on its own and defined into the
@@ -200,6 +202,8 @@ const bytes = readFileSync(OUT);
 const hex = createHash('sha256').update(bytes).digest('hex');
 writeFileSync(SUM, `${hex}  braindog.mjs\n`);
 writeFileSync(STAMP, `${tuple}\n`);
+/* AN OLD SIGNATURE IS NOT THIS BUILD'S (`tools/ship/cli-sign.mjs` makes the new one, at release, and nothing here can). */
+rmSync(`${OUT}.sig`, { force: true });
 
 /* THE PUBLISHED MANIFEST (see the top): only what a person installing it needs, read from this workspace's manifest. */
 const own = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));

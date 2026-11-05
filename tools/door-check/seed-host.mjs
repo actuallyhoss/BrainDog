@@ -81,7 +81,7 @@ export async function startSeedHost({ port = 0, grow } = {}) {
     if (!existsSync(BUNDLE)) return null;
     if (path === 'braindog.mjs') return { type: 'text/javascript', body: readFileSync(BUNDLE) };
     if (path === 'braindog.mjs.sha256') return { type: 'text/plain', body: `${createHash('sha256').update(readFileSync(BUNDLE)).digest('hex')}  braindog.mjs\n` };
-    if (path === 'install.sh') return { type: 'text/x-shellscript', body: readFileSync(INSTALL, 'utf8').replace(/^BASE=.*$/mu, `BASE='${base}/cli'`) };
+    if (path === 'install.sh') return { type: 'text/x-shellscript', body: readFileSync(INSTALL, 'utf8').replace(/^BASE=.*$/mu, `BASE='${base}/cli'`).replace(/^PIN=.*$/mu, "PIN=''") };
     return null;
   };
 
