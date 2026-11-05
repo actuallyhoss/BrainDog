@@ -170,6 +170,8 @@ export const ANSWERS_MOST = 10;
 /** The line on an instruction that names its questions (`field`), and the line on it that spends one. */
 export const ANSWERS_FIELD = 'answers';
 export const ANSWERED_FIELD = 'answered';
+/** When he closed a finished one, which takes it off his list. */
+export const CLOSED_FIELD = 'closed_at';
 
 /** The lines on an instruction that name the rows sent with it, and whether it may change files (`sendTo`). */
 export const ATTACH_FIELD = 'attach';
@@ -796,6 +798,22 @@ export function withdrawInstruction(d: InstructionDeps, actor: string, ref: stri
         if (!lifted.ok) return lifted as Result<never>;
       }
     }
+    return ok(instructionOf(d.sql, i.row)!);
+  });
+}
+
+/**
+ * HE CLOSES ONE THAT IS OVER, and it leaves the list of what he told agents. Nothing about it is lost: it stays on the
+ * record with its history, and the stamp only says he has finished looking at it. One still in a run's hands, or waiting
+ * on him, is not over.
+ */
+export function closeInstruction(d: InstructionDeps, actor: string, ref: string): Result<Instr> {
+  return d.sql.transactionSync((): Result<Instr> => {
+    const i = instructionOf(d.sql, ref);
+    if (!i) return no('ROW_UNKNOWN', `There is no instruction called ${ref.trim()}.`, { at: 'id' });
+    if (OPEN_STATES.includes(i.state) || i.state === 'needs_you') return no('TRANSITION_ILLEGAL', `${i.id} is not finished yet, so it stays open.`, { at: 'id' });
+    const closed = d.write(i.row, { patch: {}, stamp: { [CLOSED_FIELD]: new Date(d.now).toISOString() }, note: null, actor });
+    if (!closed.ok) return closed;
     return ok(instructionOf(d.sql, i.row)!);
   });
 }

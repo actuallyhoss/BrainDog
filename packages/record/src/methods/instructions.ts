@@ -753,6 +753,20 @@ export function methods(deps: RecordDeps) {
       return tail(out.ok ? ok(toldOf(sql, out.value)) : out);
     },
 
+    /** He closes a finished instruction, and it leaves his list. DATA, and a person's alone. */
+    async closeInstruction(args: { id?: unknown } | undefined, ctx: CallContext): Promise<Result<Told>> {
+      const stop = guard(ctx, 'owner');
+      if (ctx.principal.kind === 'token') return no('NEEDS_BROWSER_SESSION', 'Only the person who told it closes an instruction, in BrainDog.', { at: 'principal' });
+      if (stop) return { ok: false, refusal: stop };
+      const a = (args ?? {}) as Record<string, unknown>;
+      const stray = strayOf('closeInstruction', a, ['id']);
+      if (stray) return stray;
+      const id = text(a.id);
+      if (id === null) return no('REQUIRED_MISSING', 'Say which instruction to close, as IN4.', { at: 'id' });
+      const out = kernel.closeInstruction(personOf(ctx), id);
+      return tail(out.ok ? ok(toldOf(sql, out.value)) : out);
+    },
+
     /**
      * His read of what he told agents, newest first: each thread with who was shown it and how ("Seen by S883 at start"),
      * and the receipts of the run that took it. In one state (`open` for Sent, Seen and Working together), on one
@@ -788,7 +802,7 @@ export function methods(deps: RecordDeps) {
       const runRow = run === null ? null : ((r) => (r !== null && sight.admits(ctx, r) ? r : null))(kernel.get(run, { includeDeleted: true }));
       const runSaid = run === null ? null : runRow === null ? run : kernel.nameOf(runRow.id);
 
-      const where: string[] = ["register = 'instructions'", 'deleted_at IS NULL'];
+      const where: string[] = ["register = 'instructions'", 'deleted_at IS NULL', "json_extract(fields, '$.closed_at') IS NULL"];
       const params: (string | number)[] = [];
       if (state === 'open') where.push("state IN ('sent', 'seen', 'working')");
       else if (state !== null) {

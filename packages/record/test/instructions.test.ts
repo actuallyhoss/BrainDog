@@ -188,6 +188,10 @@ test('HIS THREADS: newest first, who saw each and how, filtered by state and run
 
   /* WITHDRAWN BEFORE A RUN TAKES IT, and refused once one has. */
   assert.equal(value<{ state: string }>(await api.withdrawInstruction({ id: 'IN2' }, owner)).state, 'withdrawn');
+  /* CLOSING ONE THAT IS OVER TAKES IT OFF HIS LIST; A TOKEN CANNOT, AND THE ROW STAYS ON THE RECORD. */
+  assert.equal(value<{ state: string }>(await api.closeInstruction({ id: 'IN2' }, owner)).state, 'withdrawn');
+  assert.ok(!value<{ rows: { id: string }[] }>(await api.instructionList({}, owner)).rows.some((r) => r.id === 'IN2'));
+  assert.equal(refusal(await api.closeInstruction({ id: 'IN2' }, ctx)).code, 'NEEDS_BROWSER_SESSION');
   assert.equal(refusal(await api.withdrawInstruction({ id: 'IN1' }, owner)).code, 'TRANSITION_ILLEGAL');
   sql.close();
 });

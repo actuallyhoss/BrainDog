@@ -2895,6 +2895,7 @@ export function createClient(options: ClientOptions) {
     }) => call<Answer<'instruct'>>('instruct', args as Record<string, unknown>),
     /** Take back an instruction no run has taken yet. A person only. DATA. */
     withdrawInstruction: (args: { id: string }) => call<Answer<'withdrawInstruction'>>('withdrawInstruction', args as Record<string, unknown>),
+    closeInstruction: (args: { id: string }) => call<Answer<'closeInstruction'>>('closeInstruction', args as Record<string, unknown>),
     /**
      * What he told agents, newest first, each with who saw it and how and the receipts: in one state (`open` is Sent,
      * Seen and Working), on a project or task, or to or by a run. `cursor` is the one the page above answered with. READ+.

@@ -782,6 +782,7 @@ export function threadOf(
     reply,
     receipts,
     takeBack: t.state === 'sent' || t.state === 'seen',
+    close: !OPEN.includes(t.state) && t.state !== 'needs_you',
     sending: false,
     busy: ctx.busy?.has(t.id) ?? false,
   };
@@ -812,6 +813,7 @@ export function sendingOf(key: string, said: string, view: Omit<InstructView, 'b
     reply: null,
     receipts: null,
     takeBack: false,
+    close: false,
     sending: true,
     busy: false,
   };
@@ -880,6 +882,10 @@ export function control(base: string, io?: Fetch) {
     },
     async takeBack(id: string): Promise<Out<Thread>> {
       return outOf<Thread>(await c.withdrawInstruction({ id }), 'That could not be taken back.');
+    },
+    /** Close one that is finished, and it leaves his list. */
+    async close(id: string): Promise<Out<Thread>> {
+      return outOf<Thread>(await c.closeInstruction({ id }), 'That could not be closed.');
     },
     /** Stop, pause or resume one run now, with why in his words or the plain default. */
     async hold(run: string, kind: 'stop' | 'pause' | 'resume', why: string): Promise<Out<Thread>> {

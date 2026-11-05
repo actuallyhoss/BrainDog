@@ -23,6 +23,7 @@
     mark,
     more = 0,
     ontakeback,
+    onclose,
     onundo,
     onmore,
   }: {
@@ -31,6 +32,7 @@
     /** How many older threads are not drawn. */
     more?: number;
     ontakeback?: ((key: string) => void) | undefined;
+    onclose?: ((key: string) => void) | undefined;
     onundo?: ((key: string) => void) | undefined;
     onmore?: (() => void) | undefined;
   } = $props();
@@ -76,6 +78,8 @@
         {/if}
         {#if t.takeBack && ontakeback}
           <div class="told-do"><button type="button" class="told-btn" disabled={t.busy || t.sending} onclick={() => ontakeback(t.key)}>Take back</button></div>
+        {:else if t.close && onclose}
+          <div class="told-do"><button type="button" class="told-btn" disabled={t.busy || t.sending} onclick={() => onclose(t.key)}>Close</button></div>
         {/if}
       </li>
     {/each}

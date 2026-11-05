@@ -6,7 +6,7 @@
   one never claims append-only. This one is append-only BY CONSTRUCTION, because there is one write
   path, not because a policy says so (20 §9).
 
-  Which is why there is no delete control on this screen and no filter that can hide a row. A
+  Which is why there is no delete control on this screen, and what the stream leaves out (`isBookkeeping`) is one press away under Everything. A
   history you can edit is a history, and a history you cannot is a record.
 
   THE SHAPE, as the design system draws Activity: the title and its sentence, the filters as one segmented control in

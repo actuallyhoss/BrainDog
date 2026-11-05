@@ -282,6 +282,8 @@ export type ThreadView = {
   receipts: ThreadReceipts | null;
   /** Whether it can still be taken back: no run has taken it. */
   takeBack: boolean;
+  /** Whether it is over, so he can close it off the list. */
+  close: boolean;
   /** Written here and not yet answered by the record. */
   sending: boolean;
   /** Pressing Take back or Undo all now. */

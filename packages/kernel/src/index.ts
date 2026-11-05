@@ -345,6 +345,7 @@ import {
   stopOf as runStopOf,
   takeInstruction as takeInstructionFor,
   withdrawInstruction as withdrawInstructionFor,
+  closeInstruction as closeInstructionFor,
   type Delta,
   type InstructInput,
   type InstructionDeps,
@@ -14176,6 +14177,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (w.principal?.kind === 'token')
         return no('NEEDS_BROWSER_SESSION', 'Only the person who told it takes an instruction back, in BrainDog.', { at: 'principal' });
       return attempt(sql, transaction, () => withdrawInstructionFor(instructionDeps(), w.actor, typeof id === 'string' ? id : ''));
+    },
+    /** He closes a finished instruction, which takes it off his list. */
+    closeInstruction: (w: WriteContext, id: string): Result<Instr> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      if (w.principal?.kind === 'token') return no('NEEDS_BROWSER_SESSION', 'Only the person who told it closes an instruction, in BrainDog.', { at: 'principal' });
+      return attempt(sql, transaction, () => closeInstructionFor(instructionDeps(), w.actor, typeof id === 'string' ? id : ''));
     },
     /** The open instructions for run `runId`, a stop or pause first: `instructionFor(hints, runId) → Instr[]`. */
     instructionFor: (hints: RunHints, runId: string): Instr[] => instructionsFor(sql, hints ?? {}, runId, clock.now()),

@@ -143,6 +143,7 @@ const THREAD: ThreadView = {
   reply: { by: 'Claude at 14:14', text: 'Merged. Wave 2 waits on the migration.' },
   receipts: { said: '4 changes', names: ['Ship the specimen'], more: null, undo: true, undone: null, commits: 'New commits on axis-qa' },
   takeBack: false,
+  close: false,
   sending: false,
   busy: false,
 };

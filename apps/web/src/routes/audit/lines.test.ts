@@ -536,3 +536,9 @@ test('who worked over the month is the record’s figure, BrainDog’s own work 
   assert.equal(whoPartsOf({ ok: false }), null);
   assert.equal(whoPartsOf({ ok: true, value: { groups: groups.map((g) => ({ ...g, value: 0 })) } }), null);
 });
+
+test('a key being read waits under Everything; storing, rotating or revoking one stays in the stream', () => {
+  const at = { by: 'p1', target: 'grant:g1', note: '' };
+  assert.equal(isBookkeeping({ ...at, kind: 'grant.read' }), true);
+  for (const kind of ['grant.add', 'grant.rotate', 'grant.revoke', 'grant.bind'] as const) assert.equal(isBookkeeping({ ...at, kind }), false);
+});

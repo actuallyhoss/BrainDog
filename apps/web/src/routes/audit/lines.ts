@@ -150,6 +150,9 @@ const STAMP_SAID = /^(?:last seen|seen) (?:set to |from |cleared$)/u;
  */
 export function isBookkeeping(e: Pick<AuditEvent, 'by' | 'kind' | 'target' | 'note'> & { field?: string | null | undefined }): boolean {
   if (listOf(e.target) === RUNS) return true;
+  /* A KEY BEING READ IS THE RECORD DOING ITS JOB, many times a day, and it buried what changed (5 Nov). Every read is still
+     written and shown under Everything; storing, rotating or revoking one is a change and stays. */
+  if (e.kind === 'grant.read') return true;
   if (e.kind !== 'edit' || runOf(e.by) === null) return false;
   if (typeof e.field === 'string') return STAMPS.has(e.field);
   return STAMP_SAID.test(e.note.trim().toLowerCase());

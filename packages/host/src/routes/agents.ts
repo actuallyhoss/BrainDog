@@ -38,6 +38,7 @@ export const ROUTES: readonly Route[] = [
     takes: { project: 'text', repo: 'text' } },
   { name: 'instruct', group: 'DATA', writes: true, what: 'Tell an agent something: a run, a kind of agent, whoever is next, or a task; or stop, pause, resume or redirect a run. A person only.' },
   { name: 'withdrawInstruction', group: 'DATA', writes: true, what: 'Take back an instruction no run has taken yet. A person only.' },
+  { name: 'closeInstruction', group: 'DATA', writes: true, what: 'Close an instruction that is finished, which takes it off the list. A person only.', takes: { id: 'text' } },
   { name: 'instructionList', group: 'READ+', writes: false, what: 'What you told agents, newest first: each with who saw it and how, the reply, and what the run changed. The owner only.',
     takes: { state: 'text', project: 'text', task: 'text', run: 'text', limit: 'integer', cursor: 'text' } },
   { name: 'sendTargets', group: 'READ+', writes: false, what: 'Who you can send a request to from a row now: Slash, Claude on each machine heard from in two minutes, each session open now, and whoever starts next. The owner only.',

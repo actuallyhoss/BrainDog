@@ -390,3 +390,18 @@ test('ON A MACHINE, AS A PROFILE: an instruction naming either reaches only the 
   assert.equal(refusal(k.instruct(OWNER, { said: 'x', machine: 'two words' })).at, 'machine');
   sql.close();
 });
+
+test('CLOSE: one that is over leaves his list, and one still going stays', async () => {
+  const { k, sql, work } = await record();
+  const s1 = work('one');
+  value(k.instruct(OWNER, { said: 'One', when: 'now', repo: 'braindog' }));
+  assert.equal(refusal(k.closeInstruction(OWNER, 'IN1')).code, 'TRANSITION_ILLEGAL');
+  value(k.takeInstruction('IN1', s1));
+  assert.equal(refusal(k.closeInstruction(OWNER, 'IN1')).code, 'TRANSITION_ILLEGAL');
+  value(k.instruct(OWNER, { said: 'Two', when: 'now', repo: 'braindog' }));
+  value(k.withdrawInstruction(OWNER, 'IN2'));
+  assert.equal(refusal(k.closeInstruction(as('one'), 'IN2')).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(value<Instr>(k.closeInstruction(OWNER, 'IN2')).state, 'withdrawn');
+  assert.equal(refusal(k.closeInstruction(OWNER, 'IN99')).code, 'ROW_UNKNOWN');
+  sql.close();
+});

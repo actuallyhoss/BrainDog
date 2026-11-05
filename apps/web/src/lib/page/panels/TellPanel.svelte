@@ -217,6 +217,18 @@
     told.say();
   }
 
+  /* THE LIST LOSES IT AT ONCE; a refusal puts it back and says why. */
+  async function close(key: string): Promise<void> {
+    const before = threads;
+    threads = threads.filter((t) => t.id !== key);
+    const out = await io.close(key);
+    if (!out.ok) {
+      threads = before;
+      fault = out.fix;
+    }
+    told.say();
+  }
+
   async function undo(key: string): Promise<void> {
     const t = threads.find((x) => x.id === key);
     if (!t?.receipts) return;
@@ -270,7 +282,7 @@
     {#if drawn.length > 0}
       <div class="tell-told">
         <h3 class="told-head">What you told agents</h3>
-        <Instructions threads={drawn} {mark} more={Math.max(0, ordered.length - shown)} ontakeback={(k) => void takeBack(k)} onundo={(k) => void undo(k)} onmore={() => (shown += STEP)} />
+        <Instructions threads={drawn} {mark} more={Math.max(0, ordered.length - shown)} ontakeback={(k) => void takeBack(k)} onclose={(k) => void close(k)} onundo={(k) => void undo(k)} onmore={() => (shown += STEP)} />
       </div>
     {/if}
   </div>

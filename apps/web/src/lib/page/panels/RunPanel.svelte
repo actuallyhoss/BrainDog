@@ -349,6 +349,12 @@
     told.say();
   }
 
+  async function closeIt(key: string) {
+    const out = await io.close(key);
+    if (!out.ok) toasts.push(out.fix, { intent: 'warn' });
+    told.say();
+  }
+
   async function undoIt(key: string) {
     const t = toldIt?.find((x) => x.id === key);
     if (!t?.receipts) return;
@@ -419,7 +425,7 @@
   {#if toldViews.length > 0}
     <div class="run-part" role="group" aria-label="What you told it">
       <h3 class="run-meta run-head">What you told it</h3>
-      <div class="run-body"><Instructions threads={toldViews} {mark} ontakeback={(k) => void takeBackIt(k)} onundo={(k) => void undoIt(k)} /></div>
+      <div class="run-body"><Instructions threads={toldViews} {mark} ontakeback={(k) => void takeBackIt(k)} onclose={(k) => void closeIt(k)} onundo={(k) => void undoIt(k)} /></div>
     </div>
   {/if}
   {@render spoken(BEFORE)}
