@@ -702,7 +702,16 @@ export async function yankIn(index: CatalogueIndex, request: YankRequest, now: D
 export function mergeIndexes(bundled: CatalogueIndex | null, kennel: CatalogueIndex | null): CatalogueIndex {
   const first = bundled?.entries ?? [];
   const taken = new Set(first.map((e) => e.id));
-  const entries = [...first, ...(kennel?.entries ?? []).filter((e) => !taken.has(e.id))].sort(byKindAndId);
+  /* BRAINDOG'S OWN IS WHAT THE BUNDLED CATALOGUE LISTS, AND NO OTHER FILE MAY SAY SO. An entry from the Kennel's side saying
+     `publisher: braindog` drew "Made by BrainDog" and went in on its own at night (`nightKeeps`, `firstParty`), with no
+     question, so one write to a bucket, or a self-host's `BRAINDOG_KENNEL` naming somebody else's, ran new code on every
+     record holding that add-on. No submission earns it (`acceptSubmission`), so only a forged index ever carried it. */
+  const outside = (kennel?.entries ?? []).filter((e) => !taken.has(e.id)).map((e): CatalogueEntry => {
+    if (e.publisher?.kind !== 'braindog') return e;
+    const { publisher: _claimed, categories, ...rest } = e;
+    return { ...rest, ...(categories === undefined ? {} : { categories: categories.filter((c) => c !== 'made-by-braindog') }) };
+  });
+  const entries = [...first, ...outside].sort(byKindAndId);
   const rotations = [...(bundled?.keys?.rotations ?? []), ...(kennel?.keys?.rotations ?? [])].filter(
     (r, i, all) => all.findIndex((s) => s.from_key_id === r.from_key_id && s.to_key_id === r.to_key_id) === i,
   );
