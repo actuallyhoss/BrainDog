@@ -8644,7 +8644,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    *   - `title`, on a list whose title field is another (`what` on tasks), is that field, when the call left it empty.
    *   - A field named by its label (`known_by` for "Known by") is that field.
-   *   - A link given by its name (`thing: "Koala"`) is the one live row of that list with that title the caller may see,
+   *   - A link given by its name (`thing: "Marrow"`) is the one live row of that list with that title the caller may see,
    *     by its handle. ONLY ONE THEY MAY SEE, asked as `refsNamed` asks it: read past the caller, the name of a row a member
    *     kept private was taken where a name nobody holds was refused, so an agent could try names and learn who is there.
    *   - A bare address in a person's keys (`ana@x.com`) is the key `email:ana@x.com`.

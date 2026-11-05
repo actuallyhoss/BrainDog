@@ -639,7 +639,7 @@ const SUMMARY_MOST = 180;
 /**
  * A RUN'S WORDS AS ONE SUMMARY LINE (Q14 of 29 October): a project drew a run's whole handoff, three thousand words of
  * env codes (`NODE_USE_ENV_PROXY`), commits and paths, as one line of What happened, and Marrow's Agents tile ended on
- * `~/Developer/koala`. The first sentence, said as `happenedSaid` says it, with a setting's code as "a setting" and
+ * `~/Developer/marrow`. The first sentence, said as `happenedSaid` says it, with a setting's code as "a setting" and
  * no code marks, cut at a word past `SUMMARY_MOST`. The whole stays on the run, under Show the data.
  */
 export function summarySaid(text: string): string {
