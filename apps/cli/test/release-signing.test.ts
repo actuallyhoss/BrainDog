@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -243,6 +243,11 @@ test('install.sh TAKES A SIGNED BUILD, REFUSES AN UNSIGNED ONE AND ANOTHER KEY\'
     assert.equal(existsSync(join(root, 'ran')), false, `${why}: it ran`);
   }
 
+  /* A PIN THAT STARTS WITH A DASH IS A KEY AND NOT AN OPTION: one key in sixty-four does, and node took it for one and refused a good build. */
+  const dashed = scratch(t);
+  const leads = await runSh(dashed, await serve(t, served(body, key.signs(sha(body), NEW))), `-${'A'.repeat(42)} ${key.x}`);
+  assert.equal(leads.status, 0, leads.said);
+
   const none = scratch(t);
   const unpinned = await runSh(none, await serve(t, served(body)), '');
   assert.equal(unpinned.status, 0, unpinned.said);
@@ -283,11 +288,19 @@ test('install.ps1 DOES THE SAME, WHERE THIS MACHINE HAS PowerShell', { skip: spa
 
 const PINS = /RELEASE_KEYS: readonly string\[\] = \[(.*)\]/u;
 
+/* THE TOOLS ARE TESTED FROM NO KEY MADE, whatever this checkout has pinned since. */
+const unpinned = (text: string): string =>
+  text
+    .replace(/^(export const RELEASE_KEYS: readonly string\[\] = )\[.*\];$/mu, '$1[];')
+    .replace(/^PIN='[^']*'$/mu, "PIN=''")
+    .replace(/^( {2}\$pin = )'[^']*'$/mu, "$1''")
+    .replace(/<!-- release-keys -->[\s\S]*?<!-- \/release-keys -->/u, '<!-- release-keys -->\nNone yet.\n<!-- /release-keys -->');
+
 function tree(t: { after: (f: () => void) => void }, opts: { keeps?: boolean; locked?: boolean } = {}) {
   const root = scratch(t);
   for (const path of ['apps/cli/src/release-key.ts', 'apps/cli/README.md', 'apps/site/static/cli/install.sh', 'apps/site/static/cli/install.ps1']) {
     mkdirSync(join(root, path, '..'), { recursive: true });
-    cpSync(repo(path), join(root, path));
+    writeFileSync(join(root, path), unpinned(readFileSync(repo(path), 'utf8')));
   }
   mkdirSync(join(root, 'apps/cli/dist'), { recursive: true });
   writeFileSync(join(root, 'apps/cli/dist/braindog.mjs'), bundle(NEW));

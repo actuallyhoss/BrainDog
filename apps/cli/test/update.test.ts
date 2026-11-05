@@ -68,7 +68,8 @@ function machine(t: { after: (f: () => void) => void }) {
 function io(m: ReturnType<typeof machine>, base: string, build = OLD): UpdateIo & { said: string[]; refused: string[] } {
   const said: string[] = [];
   const refused: string[] = [];
-  return { file: m.file, build, env: m.env, base, home: m.env.HOME, out: (l) => said.push(l), err: (l) => refused.push(l), said, refused };
+  /* THE SWAP IS WHAT THIS FILE TESTS, so no key is pinned here; `release-signing.test.ts` holds the signature. */
+  return { keys: [], file: m.file, build, env: m.env, base, home: m.env.HOME, out: (l) => said.push(l), err: (l) => refused.push(l), said, refused };
 }
 
 test('a good swap puts the new build in place, keeps the old as .prev, places the profile again and leaves no temporary file', async (t) => {
