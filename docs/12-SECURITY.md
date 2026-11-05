@@ -88,7 +88,7 @@ a revoke button. A credential you cannot see being used is a credential you cann
 
 - **User verification is required** in both passkey ceremonies and the flag is checked, so a key that does not
   verify its holder is refused; a security key with no PIN is one, and the mailed link is the way in for it.
-- **A session ends 90 days after its last proof** (`authed_at`), however often it was rotated. `/auth/sessions` lists
+- **A session lives 90 days from its last use and ends 180 days after its last proof** (`PROOF_LIFE`, `authed_at`), however often it was rotated. `/auth/sessions` lists
   every live session by a short reference, never its id, and `/auth/logout/all` ends the others or all of them.
 - **Step-up**: registering or removing a passkey, `invite`, `createToken`, `restore`, `deleteRecord` and closing an
   account need a proof within 15 minutes, and answer `401` with reason `stale` or `NEEDS_BROWSER_SESSION` otherwise.
