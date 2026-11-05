@@ -336,7 +336,7 @@
      what Today would. A read that fails leaves the marks to the pins the chooser holds. */
   async function todayShowing(): Promise<readonly string[]> {
     const { numbersTile } = await import('$lib/home/default-home.ts');
-    const body = { page: 'today-numbers', title: 'Numbers', blocks: [numbersTile()] };
+    const body = { page: 'today-numbers', title: 'Numbers', board: true, blocks: [numbersTile()] };
     const out = await createClient({ base: apiBase() })
       .call<{ blocks?: { kpis?: { kpi?: unknown }[] }[] }>('previewPage', { body })
       .catch(() => null);

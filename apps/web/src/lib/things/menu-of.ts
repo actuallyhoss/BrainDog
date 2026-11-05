@@ -48,7 +48,7 @@ import { askSheet } from './asks.svelte.ts';
 import { dotOf } from './state-dot.ts';
 import { thingOf, type Thing } from './thing.ts';
 import { quick } from '../money/quick.svelte.ts';
-import { pageOfLedger } from '../money/ledger.ts';
+import { pageOfLedger, type Ledger } from '../money/ledger.ts';
 import { actorOf, mutedOf, tellsQuietly } from '../../routes/settings/[area]/muted.ts';
 import { VERB_ICONS, linkWords, thingWords, type VerbId } from './verbs.ts';
 
@@ -276,12 +276,21 @@ function pageBody(slug: string): Promise<PageBody | null> {
   return body;
 }
 
+/* THE LEDGER AS THE TAB FOUND IT, OR ASKED ONCE: a link to Money is right-clicked from pages that have not looked for it. */
+let ledgerAsked: { base: string; found: Promise<Ledger | null> } | null = null;
+function ledgerHere(lists: readonly string[]): Promise<Ledger | null> {
+  const base = apiBase();
+  if (quick.base === base && quick.ledger) return Promise.resolve(quick.ledger);
+  if (ledgerAsked?.base !== base) ledgerAsked = { base, found: import('../money/read.ts').then((m) => m.findLedger(base, lists)).catch(() => null) };
+  return ledgerAsked.found;
+}
+
 /** What a page of money offers: where a statement comes in, and what its figures are counted in. */
-function moneyItems(t: Extract<Thing, { kind: 'page' }>, shell: Shell, body: PageBody | null): ThingItem[] {
+async function moneyItems(t: Extract<Thing, { kind: 'page' }>, shell: Shell, body: PageBody | null): Promise<ThingItem[]> {
   if (!body) return [];
   const out: ThingItem[] = [];
-  /* THE LEDGER AS THE TAB FOUND IT (`money/quick.svelte.ts`), and the same question the page's own "…" asks of it. */
-  const ledger = quick.base === apiBase() ? quick.ledger : null;
+  /* THE SAME QUESTION THE PAGE'S OWN "…" ASKS OF IT. */
+  const ledger = await ledgerHere((shell.index?.registers ?? []).map((r) => r.id));
   if (ledger && pageOfLedger(body.requires, ledger) && may(shell, 'append', ledger.list)) out.push(item('statement', 'add', thingWords.statement, G.page, { href: '/add/statement', icon: 'upload' }));
   const money = body.nav?.section?.toLowerCase() === 'money' || /^money(-|$)/u.test(body.page ?? '');
   const currency = shell.index?.currency ?? null;
@@ -305,7 +314,7 @@ async function pageThing(t: Extract<Thing, { kind: 'page' }>, shell: Shell, from
     }
     out.push(item('details', 'edit', project ? thingWords.details : pageWords.showData, G.change, { href: rowScreen(about.list, about.seq) }));
     out.push(...row);
-    out.push(...moneyItems(t, shell, body));
+    out.push(...(await moneyItems(t, shell, body)));
     out.push(...pageItems(t.href, shell, from, body?.look ?? null));
     if (project && shell.me?.owner === true) {
       const on = pageBoards.of(t.slug) !== null;
@@ -313,7 +322,7 @@ async function pageThing(t: Extract<Thing, { kind: 'page' }>, shell: Shell, from
     }
     return out;
   }
-  out.push(...moneyItems(t, shell, body));
+  out.push(...(await moneyItems(t, shell, body)));
   out.push(...pageItems(t.href, shell, from, body?.look ?? null));
   if (t.slug === 'money' && shell.me?.owner === true) {
     const on = pageBoards.of(t.slug) !== null;
@@ -423,10 +432,13 @@ export async function itemsOf(address: string, shell: Shell, from: ThingFrom, na
       const rule = opened.first.value.find((r) => r.id === t.id);
       if (!rule) return [];
       const owns = shell.me?.owner === true;
+      /* THE LIST LEAVES A RULE'S BODY OUT, AND WHETHER IT TELLS ANYBODY IS IN THE BODY: asked of the one rule, as its page reads it. */
+      const whole = await opened.source.automation(rule.id).catch(() => null);
+      const tells = whole?.ok === true && tellsQuietly(whole.value.body);
       out = [
         item('rename', 'rename', editWords.rename, G.change, { run: () => askPage(t.href, 'rename') }),
         ...(owns ? [item('toggle', rule.enabled ? 'stop' : 'run', rule.enabled ? editWords.turnOff : editWords.turnOn, G.change, { icon: rule.enabled ? 'pause' : 'play', run: () => askPage(t.href, 'toggle') })] : []),
-        ...(tellsQuietly(rule.body)
+        ...(tells
           ? [
               item('tell', 'notify', mutedOf((shell.me as { prefs?: Record<string, unknown> } | undefined)?.prefs?.['notify.muted']).includes(actorOf(rule.id)) ? thingWords.tellAgain : thingWords.stopTelling, G.change, {
                 run: () => askPage(t.href, 'tell'),
