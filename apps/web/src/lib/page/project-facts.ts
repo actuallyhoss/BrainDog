@@ -603,7 +603,7 @@ export function sessionsOf(f: Pick<FactsIn, 'runs' | 'today' | 'name'>, most = 4
 
 /* ── what happened ─────────────────────────────────────────────────────── */
 
-export type HappenedLine = { at: string; day: string; text: string; by: string | null; tone: 'plain' | 'warn' };
+export type HappenedLine = { at: string; day: string; text: string; by: string | null; tone: 'plain' | 'warn'; kind: 'done' | 'added' | 'run' | 'numbers' | 'edit' | 'import' };
 
 /**
  * WHAT HAPPENED ON IT, IN WORDS, newest first: work finished and added, sessions and what they left, the last numbers
@@ -653,12 +653,38 @@ export function summarySaid(text: string): string {
   return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), SUMMARY_MOST / 2)).replace(/[\s,;:.\u2013\u2014-]+$/u, '')}…`;
 }
 
+/** The part of a row an edit's note names, when it names one: "Note from … to …", "Next step changed". */
+const EDITED = /^(next step|status|lane|due|note)\b/iu;
+/** A value short and plain enough to say on the line. A note's whole body, with its Markdown, is neither. */
+const SAYABLE = (t: string) => t.length <= 80 && !/[\n`#|]/u.test(t);
+
+/**
+ * AN EDIT TO THE ROW, IN ONE LINE (5 Nov): "Note changed to" followed by the whole note, fenced blocks and all, filled the
+ * tile with a page of raw source. A short value is said; a long one is that the field changed, and the row holds the rest.
+ * Several on one day say which fields moved, and a count only for what names none.
+ */
+export function editsSaid(notes: readonly string[]): string | null {
+  const said = notes.map((n) => n.trim()).filter((n) => n !== '');
+  if (said.length === 0) return null;
+  if (notes.length === 1) {
+    const one = happenedSaid(`${said[0]!.charAt(0).toUpperCase()}${said[0]!.slice(1)}`);
+    const changed = /^(next step|status|lane|due|note) changed to (.+)$/isu.exec(one);
+    if (changed && !SAYABLE(changed[2]!)) return `${changed[1]} changed.`;
+    return summarySaid(/[.!?…]$/u.test(one) ? one : `${one}.`);
+  }
+  const fields = [...new Set(said.flatMap((n) => EDITED.exec(n)?.[1]?.toLowerCase() ?? []))];
+  const named = said.filter((n) => EDITED.test(n)).length;
+  const list = fields.length > 1 ? `${fields.slice(0, -1).join(', ')} and ${fields.at(-1)}` : (fields[0] ?? '');
+  if (fields.length > 0 && named === notes.length) return `Its ${list} changed.`;
+  return fields.length > 0 ? `${notes.length} changes, including its ${list}.` : `${notes.length} changes.`;
+}
+
 export function happenedOf(f: FactsIn, numbers: Numbers, most = 6): HappenedLine[] {
   const out: HappenedLine[] = [];
   /* TASKS ADDED, ONE LINE A DAY: a plan written in one sitting is one line, its first two named. */
   const added = new Map<string, string[]>();
   for (const t of f.tasks) {
-    if (t.done && t.doneOn) out.push({ at: t.doneOn, day: daySaid(t.doneOn, f.today), text: `Finished: ${t.title}.`, by: null, tone: 'plain' });
+    if (t.done && t.doneOn) out.push({ at: t.doneOn, day: daySaid(t.doneOn, f.today), text: `Finished: ${t.title}.`, by: null, tone: 'plain', kind: 'done' });
     else if (t.created) added.set(t.created.slice(0, 10), [...(added.get(t.created.slice(0, 10)) ?? []), t.title]);
   }
   for (const [d, titles] of added) {
@@ -666,18 +692,20 @@ export function happenedOf(f: FactsIn, numbers: Numbers, most = 6): HappenedLine
       titles.length === 1
         ? `${upper(article(f.called.one))} ${f.called.one} was added: ${titles[0]}.`
         : `${plural(titles.length, f.called.one, f.called.many)} were added: ${titles.slice(0, 2).join(', ')}${titles.length > 2 ? ` and ${titles.length - 2} more` : ''}.`;
-    out.push({ at: d, day: daySaid(d, f.today), text, by: null, tone: 'plain' });
+    out.push({ at: d, day: daySaid(d, f.today), text, by: null, tone: 'plain', kind: 'added' });
   }
   for (const r of f.runs.slice(0, 6)) {
     const d = day10(r.at);
     if (!d) continue;
     const what = r.notes[0] ?? (r.doing.trim() !== '' && !/ run$/iu.test(r.doing) ? r.doing : null);
-    const text = what ? summarySaid(/[.!?]$/u.test(what) ? what : `${what}.`) : `A run ${endedAs({ state: r.state, closedAs: r.closedAs, handed: r.next !== '' }).said}.`;
+    /* A RUN'S OWN TITLE SAYS NOTHING ("Claude Code in Crumb.gg", with "Claude" under it): it worked on this, and that is the line. */
+    const titled = what !== null && what.length < 60 && /\s(?:in|on)\s/u.test(what) && what.toLowerCase().startsWith(agentName(r.agent).toLowerCase());
+    const text = titled ? 'Worked on it.' : what ? summarySaid(/[.!?]$/u.test(what) ? what : `${what}.`) : `A run ${endedAs({ state: r.state, closedAs: r.closedAs, handed: r.next !== '' }).said}.`;
     /* IMPORTED RUNS ARE ONE LINE, on the newest of their days: four of "Mara Brain run S87" read as a story of ids. */
     if (text === 'Imported from your old notes.' && out.some((o) => o.text === text)) continue;
-    out.push({ at: d, day: daySaid(d, f.today), text, by: text === 'Imported from your old notes.' ? null : agentName(r.agent), tone: 'plain' });
+    out.push({ at: d, day: daySaid(d, f.today), text, by: text === 'Imported from your old notes.' ? null : agentName(r.agent), tone: 'plain', kind: text === 'Imported from your old notes.' ? 'import' : 'run' });
   }
-  if (numbers.newest && numbers.banner) out.push({ at: numbers.newest, day: daySaid(numbers.newest, f.today), text: 'The last numbers arrived. Nothing since.', by: null, tone: 'warn' });
+  if (numbers.newest && numbers.banner) out.push({ at: numbers.newest, day: daySaid(numbers.newest, f.today), text: 'The last numbers arrived. Nothing since.', by: null, tone: 'warn', kind: 'numbers' });
   /* THE ROW'S OWN EDITS, ONE LINE A DAY: a tidy that rewrote its note and its next step is one line, not five. */
   const edits = new Map<string, string[]>();
   for (const h of f.history) {
@@ -685,11 +713,8 @@ export function happenedOf(f: FactsIn, numbers: Numbers, most = 6): HappenedLine
     if (d) edits.set(d, [...(edits.get(d) ?? []), h.note.trim()]);
   }
   for (const [d, notes] of edits) {
-    const said = notes.find((n) => n !== '') ?? '';
-    const first = said.charAt(0).toUpperCase() + said.slice(1);
-    const plainFirst = first === '' ? '' : happenedSaid(first).replace(/[.]$/u, '');
-    const text = notes.length === 1 && plainFirst !== '' ? `${plainFirst}.` : `${plural(notes.length, 'change', 'changes')} to it${plainFirst !== '' ? `, among them: ${plainFirst}` : ''}.`;
-    out.push({ at: d, day: daySaid(d, f.today), text, by: null, tone: 'plain' });
+    const text = editsSaid(notes) ?? `${plural(notes.length, 'change', 'changes')} to it.`;
+    out.push({ at: d, day: daySaid(d, f.today), text, by: null, tone: 'plain', kind: 'edit' });
   }
   return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, most);
 }

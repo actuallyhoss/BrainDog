@@ -246,7 +246,6 @@ function pageItems(href: string, shell: Shell, from: ThingFrom, look: unknown, h
     const held = isPinned(look as Parameters<typeof isPinned>[0]);
     out.push(item('keepLayout', 'keepLayout', held ? pageWords.unpin : pageWords.pin, G.page, { run: () => askPage(href, 'keepLayout'), icon: held ? 'lock-open' : 'lock' }));
   }
-  if (!home) out.push(item('source', 'source', copy.pageSource, G.page, { href: `${href.split('?')[0]}?src=1` }));
   if (shell.me?.owner !== false && from.wide) out.push(item('arrange', 'layout', copy.arrange, G.page, { run: () => askPage(href, 'arrange') }));
   return out;
 }

@@ -678,10 +678,6 @@
         <ask.default
           page={slug}
           {model}
-          onsource={() => {
-            changingOpen = false;
-            void goto(at(`${c.href}?src=1`));
-          }}
           onkept={kept}
         />
       {/await}

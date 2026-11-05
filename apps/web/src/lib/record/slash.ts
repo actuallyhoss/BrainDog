@@ -166,8 +166,7 @@ export const changeWords = {
   noPage: 'This draft changes no page, so there is nothing to draw. What it changes is in its question.',
   unDrawn: 'This draft could not be drawn here. You can still ask about it in Needs you, where it is drawn again.',
   unreached: 'BrainDog could not be reached.',
-  noModel: 'Slash changes a page from a description only when this BrainDog has a model set up. You can still change how the page is built yourself.',
-  source: 'Change how this is built',
+  noModel: 'Slash changes a page from a description only when this BrainDog has a model set up.',
   /** The reason an owner's own keep is decided with, which Decide's history shows beside it. */
   reason: 'Kept from what Slash drafted on the page.',
 } as const;

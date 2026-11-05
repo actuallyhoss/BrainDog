@@ -204,7 +204,6 @@ export const pages = {
   declarationOf: (page: string) => `How ${page} is built`,
   /* The toggle top right of every page. `Source` was a developer's word for it, read by somebody
      who does not write code as an origin or a supplier. */
-  pageSource: 'How this is built',
   pageBack: 'Back to the page',
   openTheRest: (register: string) => `Open ${register} for the rest`,
   /** A list's door at a tile's foot, with how many it holds: "All 36 in Ledger" said what "30 more" left to sums. */

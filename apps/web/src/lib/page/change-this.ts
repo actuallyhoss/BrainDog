@@ -50,7 +50,7 @@ export const changeThisWords = {
   pinned: 'You pinned this block. Change it anyway?',
   pinnedGo: 'Change it anyway',
   leave: 'Leave it',
-  cannot: 'That is not one I can make from a line. Ask in the page sheet, or edit how it is built.',
+  cannot: 'That is not one I can make from a line. Ask in the page sheet.',
   nothing: 'That would not change anything here.',
   asking: 'Reading it with the model.',
   notYours: 'This page came with a plugin, so hide the block instead.',

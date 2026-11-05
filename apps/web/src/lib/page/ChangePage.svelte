@@ -359,7 +359,7 @@
   );
 
   /** Whether the menu holds anything at this width; one that would open on nothing is not drawn. */
-  const offers = $derived(extra.length > 0 || mayChange || mayPin || source !== null || (onarrange !== null && wide.current) || (board !== null && mayPin) || (here !== null && mayPin));
+  const offers = $derived(extra.length > 0 || mayChange || mayPin || (source === 'here' && showSource) || (onarrange !== null && wide.current) || (board !== null && mayPin) || (here !== null && mayPin));
 </script>
 
 <!-- `page-more` and `data-arrange` NAME THE WAY INTO EDIT LAYOUT for a gate, which opened it from its own button. -->
@@ -401,12 +401,8 @@
       {/if}
     {/if}
   {/if}
-  {#if source === 'here'}
-    <button type="button" class="mi" role="menuitem" onclick={() => toggle(!showSource)}
-      ><Icon name="code" size="s" />{showSource ? copy.pageBack : copy.pageSource}</button
-    >
-  {:else if source}
-    <button type="button" class="mi" role="menuitem" onclick={toSource}><Icon name="code" size="s" />{copy.pageSource}</button>
+  {#if source === 'here' && showSource}
+    <button type="button" class="mi" role="menuitem" onclick={() => toggle(false)}><Icon name="code" size="s" />{copy.pageBack}</button>
   {/if}
   {#if onarrange && wide.current && !board?.on}
     <button type="button" class="mi" role="menuitem" data-arrange onclick={() => onarrange?.()}><Icon name="grid" size="s" />{copy.arrange}</button>
@@ -441,8 +437,8 @@
          each line Slash hands over, so a second line is read afresh. -->
     {#key `${slug}:${lines}`}
       {#await import('./AskPage.svelte') then { default: AskPage }}
-        {#if built !== null && !change}<AskPage page={slug} {model} onsource={toSource} onkept={keptFirst} {built} ask={line} />
-        {:else}<AskPage page={slug} {model} onsource={toSource} onkept={reread} say={sayCtx} ask={line} />{/if}
+        {#if built !== null && !change}<AskPage page={slug} {model} onkept={keptFirst} {built} ask={line} />
+        {:else}<AskPage page={slug} {model} onkept={reread} say={sayCtx} ask={line} />{/if}
       {/await}
     {/key}
   </Sheet>

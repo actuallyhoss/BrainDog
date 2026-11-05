@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checklistOf, datesOf, happenedOf, heroFactsOf, numbersOf, runSaid, runsOnOf, sessionsOf, sideOf, stripName, type FactTask, type FactsIn } from './project-facts.ts';
+import { checklistOf, datesOf, editsSaid, happenedOf, heroFactsOf, numbersOf, runSaid, runsOnOf, sessionsOf, sideOf, stripName, type FactTask, type FactsIn } from './project-facts.ts';
 
 const NOW = Date.UTC(2026, 9, 27, 10);
 const TODAY = '2026-10-27';
@@ -220,7 +220,7 @@ test('sessions say how each ended, and what happened folds the record edits into
     { note: 'Note rewritten', by: 'Claude', at: '2026-10-25T08:01:00Z' },
   ];
   const lines = happenedOf(base({ history }), numbersOf(base()));
-  assert.deepEqual(lines, [{ at: '2026-10-25', day: '25 Oct', text: '2 changes to it, among them: Next step changed.', by: null, tone: 'plain' }]);
+  assert.deepEqual(lines, [{ at: '2026-10-25', day: '25 Oct', text: 'Its next step and note changed.', by: null, tone: 'plain', kind: 'edit' }]);
   /* A PLAN WRITTEN IN ONE SITTING IS ONE LINE, its first two tasks named. */
   const at = '2026-10-24T09:00:00Z';
   const tasks = ['Wave one', 'Wave two', 'Wave three', 'Wave four'].map((t, n) => task(n + 1, t, { created: at }));
@@ -228,6 +228,15 @@ test('sessions say how each ended, and what happened folds the record edits into
     happenedOf(base({ tasks }), numbersOf(base())).map((l) => l.text),
     ['4 tasks were added: Wave one, Wave two and 2 more.'],
   );
+});
+
+test('an edit never says a whole note: a long value is that the field changed, and several name their fields', () => {
+  const page = `Cozy game.\n# Bake\n\n\`\`\`bar | Daily\n1 | 2\n\`\`\`\n${'more words '.repeat(40)}`;
+  assert.equal(editsSaid([`Note from old to ${page}`]), 'Note changed.');
+  assert.equal(editsSaid(['Status from open to shipped']), 'Status changed to shipped.');
+  assert.equal(editsSaid([`Note from old to ${page}`, 'Status from open to shipped']), 'Its note and status changed.');
+  assert.equal(editsSaid(['Note rewritten', 'Tidied the row']), '2 changes, including its note.');
+  assert.equal(editsSaid(['', '']), null);
 });
 
 test('a run is said from when it was last heard: working, gone quiet, or how it ended (AG14)', () => {

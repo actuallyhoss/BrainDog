@@ -176,7 +176,7 @@ export const palette = {
     /* WHAT THE BOX SAYS ONCE "Rename Money" IS PRESSED: the sentence, waiting for its last word. */
     renameFill: (name: string) => `Rename ${name} to `,
     page: 'Customise this page',
-    pageDetail: 'Its layout, what it shows, how it is built',
+    pageDetail: 'Its layout and what it shows',
     quiet: 'Quiet hours',
     quietDetail: 'Settings › Notifications',
   },

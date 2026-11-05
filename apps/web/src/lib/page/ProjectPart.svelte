@@ -78,6 +78,8 @@
     if (!m) return happenedSaid(t);
     return m[1]!.toLowerCase() === agent.toLowerCase() ? `${m[1]} run` : 'Imported from your old notes';
   };
+  /* EACH KIND OF THING THAT HAPPENED HAS ITS OWN MARK ON THE LINE DOWN THE TILE. */
+  const HAPPENED_ICON = { done: 'check', added: 'plus', run: 'bot', numbers: 'history', edit: 'pencil', import: 'download' } as const;
   const singular = (kind: string | undefined) => (kind ?? '').replace(/s$/u, '');
   /* THE BARS OF ITS MONTHS, in a 336 by 72 box, the last one in the project's colour. */
   const barsOf = (values: readonly number[]): { x: number; y: number; h: number; last: boolean }[] => {
@@ -462,9 +464,10 @@
     <Tile icon="history" title="What happened" class="t-happened" id="part-happened" data-part="What happened" data-part-icon="history">
       <ul class="li-list">
         {#each hold.happened as h, n (n)}
-          <li class="li" data-tone={h.tone}>
-            <span class="li-when num">{h.day}</span>
-            <span class="li-text own-dir">{h.text}{#if h.by}<span class="li-sub">{h.by}</span>{/if}</span>
+          <li class="li" data-tone={h.tone} data-kind={h.kind}>
+            <span class="li-when num">{n === 0 || hold.happened[n - 1]?.day !== h.day ? h.day : ''}</span>
+            <span class="li-rail" aria-hidden="true"><span class="li-mark"><Icon name={HAPPENED_ICON[h.kind]} size="s" /></span></span>
+            <span class="hp-text own-dir">{h.text}{#if h.by}<span class="li-sub">{h.by}</span>{/if}</span>
           </li>
         {/each}
       </ul>
@@ -1118,17 +1121,83 @@
      in the narrow column into three. One column for every row (`subgrid`), so a day with its year ("3 Sep 2025") widens
      them all together and the lines still start on one edge. */
   :global(.t-happened) .li-list {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto 24px minmax(0, 1fr);
     column-gap: var(--sp-3);
   }
 
+  /* A LINE DOWN THE TILE, not a rule under every row: a day is said once beside its first line, each thing has its mark,
+     and the marks are joined, so a week reads as one story and not a table (5 Nov). */
   :global(.t-happened) .li {
     grid-column: 1 / -1;
     grid-template-columns: subgrid;
+    align-items: stretch;
+    padding-block: 0;
+  }
+
+  :global(.t-happened) .li + .li {
+    border-block-start: 0;
   }
 
   :global(.t-happened) .li-when {
     min-inline-size: 0;
+    line-height: 24px;
+  }
+
+  /* NOT `.li-text`: a line that opens nothing takes no hover wash, and the wash's own margin would eat this gap. */
+  .hp-text {
+    display: grid;
+    align-content: start;
+    gap: 2px;
+    min-inline-size: 0;
+    padding-block: 2px 18px;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: calc(20px * var(--type, 1));
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+  }
+
+  .li:last-child .hp-text {
+    padding-block-end: 0;
+  }
+
+  .li[data-tone='warn'] .hp-text {
+    color: var(--warn);
+  }
+
+  .li-rail {
+    display: grid;
+    grid-template-rows: 24px minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  /* THE RAIL'S LINE, from under this mark to the next one. The last has none to reach. */
+  .li-rail::after {
+    content: '';
+    inline-size: 1px;
+    background: var(--sep, var(--rule));
+  }
+
+  .li:last-child .li-rail::after {
+    content: none;
+  }
+
+  .li-mark {
+    display: grid;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    border-radius: 50%;
+    color: var(--ink-2);
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+
+  .li[data-kind='done'] .li-mark {
+    color: var(--good);
+  }
+
+  .li[data-tone='warn'] .li-mark {
+    color: var(--warn);
   }
 
   .li[data-tone='late'] .li-when,

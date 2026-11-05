@@ -178,7 +178,6 @@ export const BINDINGS: Binding[] = [
   { id: 'block-link', scope: 'page', key: 'y', label: 'Copy a link to this part of the page', bare: true },
   // Shift, not bare `e`: bare `e` means edit in place inside a grid, and a key's meaning must be a
   // function of the object in focus, not of the page you happen to be on.
-  { id: 'block-source-code', scope: 'page', key: '⇧E', label: 'Open the source', bare: false },
   /* THE QUICK ADD (`lib/money/QuickHost.svelte`): one line of money out, in, or between your own accounts, on any page
      while the record keeps a ledger. A single character, so the Character keys switch silences it with the rest. */
   { id: 'money-add', scope: 'page', key: '+', label: 'Add money out, money in, or a move between your accounts', bare: true },

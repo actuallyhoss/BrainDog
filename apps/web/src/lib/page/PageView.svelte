@@ -56,7 +56,6 @@
   import { page as route } from '$app/state';
   import { Filters } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { covered, typing } from '$lib/a11y/keys.svelte.ts';
   import { hueOf, iconFor } from '$lib/record/api.ts';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { askWalk, blockOf, forgetWalks, walkAsked, type LiveBlock, type Opened, type Walked } from '$lib/record/page-live.ts';
@@ -953,26 +952,6 @@
     return hit && writes.capturable(hit.block) ? hit : null;
   });
 
-  /**
-   * ⇧E toggles the declaration, on a page at its own address. Shift, not a bare `e`, because bare `e` means
-   * edit-in-place inside a grid and a key's meaning must be a function of the object in focus rather than of the page
-   * you happen to be on. The block keys are the body's (`PageBody.svelte`).
-   */
-  function onkeydown(e: KeyboardEvent) {
-    if (mode !== 'page') return;
-    if (typing()) return;
-    if (e.metaKey || e.ctrlKey) return;
-    /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`. */
-    if (covered()) return;
-    if (e.shiftKey && e.key.toLowerCase() === 'e') {
-      e.preventDefault();
-      /* THE FILTERS IN THE ADDRESS STAY: the source of a narrowed page is the same page, narrowed. */
-      const q = new URLSearchParams(route.url.searchParams);
-      q.set('src', showSource ? '0' : '1');
-      void goto(`?${q}`, { replaceState: true, noScroll: true });
-    }
-  }
-
   /* ── the look ──────────────────────────────────────────────────────────────
      HOW THE ENGINE ARRANGED THE PAGE (`look.ts`), and the page it is the look of: the page the record answered, which on
      a home is the page Home read (`home`) and not the screen's own address. */
@@ -1106,7 +1085,7 @@
   {#if mode === 'page'}<title>{titleOf(tabTitle)}</title>{/if}
 </svelte:head>
 
-<svelte:window {onkeydown} ontouchstart={pullStart} ontouchmove={pullMove} ontouchend={pullEnd} ontouchcancel={pullEnd} />
+<svelte:window ontouchstart={pullStart} ontouchmove={pullMove} ontouchend={pullEnd} ontouchcancel={pullEnd} />
 
 <!-- THE QUICK ADD (`lib/money`): the `+` key and the palette's money rows on every page drawn here, and the floating +
      on a page of Money's that draws the ledger or its accounts. NOT ON A PAGE THAT ONLY HOLDS A MONEY TILE (audit 31 Oct,

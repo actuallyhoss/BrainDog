@@ -32,7 +32,6 @@
     page: about,
     model,
     ask,
-    onsource,
     onkept,
     built,
     say,
@@ -43,8 +42,6 @@
     model: boolean;
     /** A line already typed (a block's "Change this" the rules could not read), sent once on opening. */
     ask?: string | undefined;
-    /** Opens how the page is built, the other way to change it, offered when Slash cannot draft. */
-    onsource?: (() => void) | undefined;
     /** Called once a draft is kept, so the page behind reads itself again. */
     onkept?: (() => void | Promise<void>) | undefined;
     /**
@@ -285,9 +282,8 @@
 <div class="ask">
   {#if !model && !say}
     <!-- NO FIELD THAT COULD NEVER WORK. Slash's own rules read how the record is used and cannot read a sentence, so
-         with no model the sheet says so and offers the one other way to change a page. -->
+         with no model the sheet says so. -->
     <p class="ask-said">{words.noModel}</p>
-    {#if onsource}<div><Button onclick={onsource}>{words.source}</Button></div>{/if}
   {:else}
     <form
       class="ask-form"
@@ -323,10 +319,6 @@
 
     {#if cost !== null}
       <p class="ask-said ask-cost">{cost}</p>
-    {/if}
-
-    {#if rules && onsource}
-      <div><Button onclick={onsource}>{words.source}</Button></div>
     {/if}
 
     {#if answered && fix === null && shown.length === 0 && dropped.length === 0}

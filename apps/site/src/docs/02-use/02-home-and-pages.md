@@ -91,7 +91,7 @@ When a list grows, or you keep asking the same question, BrainDog can offer a pa
 
 ## How a page is built
 
-Every page is written in a small text format: Markdown, with fenced blocks for the figures. **How this is built** on a page shows its source, and you can download it as a file. This page of the docs is written in the same format. The [page dialect](/docs/dialect/overview) section describes it.
+Every page is written in a small text format: Markdown, with fenced blocks for the figures. This page of the docs is written in the same format. The [page dialect](/docs/dialect/overview) section describes it.
 
 ## Share one page
 
