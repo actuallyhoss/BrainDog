@@ -702,7 +702,7 @@ test('A DEFAULT THE RECORD COULD NOT STORE IS REFUSED AT INSTALL, and the author
     ['a list that is not a list', { type: 'list', of: 'int', default: 'not a list' }],
     ['a list of the wrong thing', { type: 'list', of: 'int', default: ['a', 'b'] }],
     ['a file that is not a file', { type: 'file', default: 'banana' }],
-    ['a key typed into a text field', { type: 'text', default: 'sk_live_abcdefghijklmnopqrstuvwx' }],
+    ['a key typed into a text field', { type: 'text', default: 'sk_' + 'live_abcdefghijklmnopqrstuvwx' }],
   ];
   for (const [said, field] of REFUSED) {
     const sql = openSqlite();

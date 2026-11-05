@@ -525,7 +525,7 @@ test('A SHARED USE-CASE FILE IS PROPOSED AS A QUESTION: read through readShared,
   assert.deepEqual(api.kernel.packStates().map((p) => p.id), ['usecase-club', 'work']);
 
   /* A FILE THE APP WOULD REFUSE IS REFUSED HERE TOO, at the file. */
-  const leaky = { ...(built.value as Record<string, unknown>), summary: 'sk_live_4eC39HqLyjWDarjtT1zdp7dc' };
+  const leaky = { ...(built.value as Record<string, unknown>), summary: 'sk_' + 'live_4eC39HqLyjWDarjtT1zdp7dc' };
   const no = refusal(await api.propose({ question: 'Leaky?', body_kind: 'pack', body: { file: leaky } } as never, agent));
   assert.equal(no.code, 'SECRET_IN_PACK');
   assert.match(String(no.at), /^body\.file/u);

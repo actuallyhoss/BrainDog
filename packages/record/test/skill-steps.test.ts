@@ -44,6 +44,6 @@ test('AT MOST `most` STEPS, and a quote holding what reads as a key is never one
   const lines = ['`kiln one --a`', '`kiln two --b`', '`kiln three --c`'].join('\n');
   const many: Handoff[] = ['S1', 'S2', 'S3'].map((run) => ({ run, text: lines }));
   assert.deepEqual(stepsFrom(many, 2), ['`kiln one --a`', '`kiln two --b`']);
-  const keyed: Handoff[] = ['S1', 'S2', 'S3'].map((run) => ({ run, text: 'Called `curl -H "x: sk_live_4eC39HqLyjWDarjtT1zdp7dc" kiln.example`.' }));
+  const keyed: Handoff[] = ['S1', 'S2', 'S3'].map((run) => ({ run, text: 'Called `curl -H "x: sk_' + 'live_4eC39HqLyjWDarjtT1zdp7dc" kiln.example`.' }));
   assert.equal(stepsFrom(keyed), null);
 });

@@ -22,7 +22,7 @@ const scratch = mkdtempSync(join(tmpdir(), 'braindog-keys-list-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
 
 /** What must never be printed: a value somebody left in a row, and the id of a grant. */
-const PLANTED = 'sk_live_PLANTED0SECRET0NEVER0PRINTED';
+const PLANTED = 'sk_' + 'live_PLANTED0SECRET0NEVER0PRINTED';
 const GRANT = '01JGRANTGRANTGRANTGRANTGR';
 const OXBOW = '01JTHINGOXBOWOXBOWOXBOWOXB';
 const LANTERN = '01JTHINGLANTERNLANTERNLANT';

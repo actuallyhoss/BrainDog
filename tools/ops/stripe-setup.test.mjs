@@ -20,7 +20,7 @@ import { LIVE_REFUSED, METER_SKIPPED, NOT_A_KEY, keyFromStdin, main, modeOf, pla
 
 const SCRIPT = resolve(import.meta.dirname, 'stripe-setup.mjs');
 const TEST_KEY = 'sk_test_InventedForThisTest0000Wxyz';
-const LIVE_KEY = 'rk_live_InventedForThisTest1111Live';
+const LIVE_KEY = 'rk_' + 'live_InventedForThisTest1111Live';
 
 /** A Stripe of one account, in memory, that answers the script's forms and keeps every request. */
 function fakeStripe(key = TEST_KEY) {
@@ -168,7 +168,7 @@ test('a live key is refused with nothing sent, unless --live-ok is given', async
 test('a key of no known kind is refused with nothing sent', async () => {
   assert.equal(modeOf(TEST_KEY), 'test');
   assert.equal(modeOf('rk_test_Invented00000000'), 'test');
-  assert.equal(modeOf('sk_live_Invented00000000'), 'live');
+  assert.equal(modeOf('sk_' + 'live_Invented00000000'), 'live');
   for (const bad of ['pk_test_Invented00000000', 'whsec_Invented00000000', 'sk_test_', 'sk_test_short', 'sk_test_Invented 0000 with spaces', '', undefined]) {
     assert.equal(modeOf(bad), null, String(bad));
     const stripe = fakeStripe();

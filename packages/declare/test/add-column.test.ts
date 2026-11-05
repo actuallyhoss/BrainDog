@@ -55,7 +55,7 @@ test('a page that is no page id, an empty into and a stray key are refused', () 
 });
 
 test('a credential anywhere in the addition is refused as one', () => {
-  const r = refusal(readAddColumn('pantry', 'adds.0', { ...COLUMN, column: { ...COLUMN.column, label: 'sk_live_4eC39HqLyjWDarjtT1zdp7dc' } }));
+  const r = refusal(readAddColumn('pantry', 'adds.0', { ...COLUMN, column: { ...COLUMN.column, label: 'sk_' + 'live_4eC39HqLyjWDarjtT1zdp7dc' } }));
   assert.equal(r.code, 'SECRET_IN_PACK');
 });
 

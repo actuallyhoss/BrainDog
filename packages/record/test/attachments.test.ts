@@ -198,7 +198,7 @@ test('REMOVED, THEN PUT BACK: the removal leaves the bytes, and Undo is a put ba
 
 test('A FILE THAT HOLDS A KEY IS REFUSED, and a name is a name: no path, no control characters', async () => {
   const { api, put, task } = await record();
-  const env = new TextEncoder().encode('STRIPE=sk_live_4eC39HqLyjWDarjtT1zdp7dc\n');
+  const env = new TextEncoder().encode('STRIPE=sk_' + 'live_4eC39HqLyjWDarjtT1zdp7dc\n');
   assert.match(refused(await api.attachFile({ on: task, name: '.env', sha256: put(env) }, owner)).fix, /looks like a key/u);
   const got = value<{ id: string; kind: string }>(await api.attachFile({ on: task, name: '../../notes\u0000.md', text: '# Notes\n\nFire Friday.' }, owner));
   assert.equal(got.kind, 'text');

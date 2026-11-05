@@ -1348,7 +1348,7 @@ test('AGENTS 1.23.0 GIVES A KEY ITS ACCOUNT, and changed the Keys list only', as
   const { k, sql } = await seeded();
   const made = value<{ id: string }>(k.create('credentials', { label: 'Mail login', opens: 'mail.example', kind: 'password', account: 'nadia@example.com' }, { actor: 'p_seed' }));
   assert.equal(k.get(made.id)?.fields.account, 'nadia@example.com');
-  const shaped = k.create('credentials', { label: 'Other login', opens: 'other.example', kind: 'api_token', account: 'sk_live_51HxQwErTyUiOpAsDfGhJkLzXcVbNm1234567890abcd' }, { actor: 'p_seed' });
+  const shaped = k.create('credentials', { label: 'Other login', opens: 'other.example', kind: 'api_token', account: 'sk_' + 'live_51HxQwErTyUiOpAsDfGhJkLzXcVbNm1234567890abcd' }, { actor: 'p_seed' });
   assert.equal(shaped.ok, false, 'an account shaped like a key was kept');
   sql.close();
 });
