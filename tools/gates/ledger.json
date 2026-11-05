@@ -638,6 +638,7 @@
       ]
     },
     "tools/gates/board-yes.mjs": { "owes": "proof", "file": "tools/gates/board-yes.mjs", "lines": [ { "at": 6, "on": "2026-10-09", "why": "The four widths a yes must be seen at, 390, 1440, 1512 and 1728, as tools/look/board.mjs draws them; the 8000 bytes read to tell a binary file; and exit 3 for a gate that read nothing." } ] },
+    "tools/gates/public-repo.mjs": { "owes": "proof", "file": "tools/gates/public-repo.mjs", "lines": [ { "at": 3, "on": "2026-11-05", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it; a day in minutes for pnpm's release age; and the lengths of a whole commit sha and a sha256." } ] },
     "tools/gates/commits.mjs": { "owes": "proof", "file": "tools/gates/commits.mjs", "lines": [ { "at": 4, "on": "2026-10-09", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it; and the five fields of one commit as git log prints them, said three times." } ] },
     "tools/gates/hygiene.mjs": { "owes": "proof", "file": "tools/gates/hygiene.mjs", "lines": [ { "at": 1, "on": "2026-10-09", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it." } ] },
     "tools/gates/sight.mjs": { "owes": "sharing", "file": "tools/gates/sight.mjs", "lines": [ { "at": 1, "on": "2026-10-20", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it." } ] },
