@@ -1169,8 +1169,11 @@
     {tiled}
   >
     {#snippet actions()}
-      {#if !tiled && !buttonsTaken && !besideLead}{@render pageButtons()}{/if}
-      <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
+      <!-- THE BAR DRAWS THIS OUTSIDE THE PAGE, so it runs on for a beat after a move has taken the page's answer away. -->
+      {#if live}
+        {#if !tiled && !buttonsTaken && !besideLead}{@render pageButtons()}{/if}
+        <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
+      {/if}
     {/snippet}
   </PageHead>
   {#if accountPage && about && sharable && !arranging}{#await import('$lib/money/AccountShare.svelte') then { default: AccountShare }}<AccountShare part="line" seq={about.seq} name={about.title} />{/await}{/if}

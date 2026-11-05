@@ -75,7 +75,9 @@
     </ol>
   </div>
   <!-- THE PAGE'S OWN BUTTONS BESIDE ITS NAME, where its head says no sentence (`PageHead`'s `inBar`). -->
-  {#if frame.actions}<span class="bar-page">{@render frame.actions()}</span>{/if}
+  <!-- A BOUNDARY, BECAUSE THEY ARE ANOTHER SCREEN'S SNIPPET drawn out here: one that throws as its page goes (its answer read
+       after the move took it) leaves the bar with no buttons, and never stops the move. -->
+  {#if frame.actions}<span class="bar-page">{#key frame.actions}<svelte:boundary onerror={(e) => console.error(e)}>{@render frame.actions()}{#snippet failed()}{/snippet}</svelte:boundary>{/key}</span>{/if}
 
   <!-- THE ONE WAY TO ASK, drawn as the field the palette opens out of (`data-palette-from`), its key at rest: `/` finds,
        and ⌘J (Ctrl J off a Mac) opens straight into Ask, which is the key the hint names. -->
