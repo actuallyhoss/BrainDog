@@ -172,11 +172,11 @@ plan.
 | Test runner | **Vitest 4.1.11** + **`@cloudflare/vitest-plugin` 1.1.2** — for `apps/worker/test` alone; every package's own `test` is `node --test` ([52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §13 D5) | renamed from `@cloudflare/vitest-pool-workers` on 2026-08-19. Peers `vitest ^4.1.0` **exactly** — Vitest 5 RC is out of range. **The repo's hardest external pin** |
 | Property testing | **fast-check 4.9.0** | inspected: zero Node built-ins, one zero-dep dependency. **Runs unchanged inside workerd**, which matters because the compiler must be property-tested against a real Durable Object |
 | Lint | ESLint flat + **`eslint-plugin-import-x`** — **deferred** until a rule needs an AST; `tools/gates/graph.mjs` covers layers 3–5 below until then. **No Stylelint**: the CSS gates are the twelve rules of `css-rules.mjs`, one regex tokeniser, zero dependencies ([52-SPEC-TESTING-AND-CI](52-SPEC-TESTING-AND-CI.md) §13 D10, D11) | when it lands, never `eslint-plugin-import`: no release since 2025-06-20, 581 open issues |
-| E2E | **Playwright 1.62.1** + **axe-core 4.13.0** | the rendered-box and contrast gates run in a real browser ([18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6); Playwright specs are the one gate family that is not a zero-dependency script |
-| Deploy | **wrangler 4.128.0** | read from the registry 2026-09-02 |
-| UI | **Svelte 5.57.0 / SvelteKit 2.70.3** | [22-FRONTEND](22-FRONTEND.md) §2; read from the registry 2026-09-02 |
+| E2E | **Playwright 1.64.1** + **axe-core 4.14.0** | the rendered-box and contrast gates run in a real browser ([18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6); Playwright specs are the one gate family that is not a zero-dependency script |
+| Deploy | **wrangler 4.157.0** | read from the registry 2026-09-02 |
+| UI | **Svelte 5.57.3 / SvelteKit 2.70.3** | [22-FRONTEND](22-FRONTEND.md) §2; read from the registry 2026-09-02 |
 | Node | **24.13.0**, pinned to the minor | `node:sqlite` is the self-host default driver (§5) and is still **Stability 1.1** — an earlier draft said 1.2 (RC) — and still emits `ExperimentalWarning`; FTS5 is present in the official build (measured 2026-09-02, §10) and the boot probe re-measures it on every start |
-| Runtime, `declare` | **valibot 1.4.2** (§9) · **`yaml` 2.9.0**, behind `@braindog/declare/yaml` and on the CLI and self-host paths only | [ADR-046](16-DECISIONS.md) enumerates both; [ADR-063](16-DECISIONS.md) is the parser's own decision |
+| Runtime, `declare` | **valibot 1.4.2** (§9) · **`yaml` 2.9.1**, behind `@braindog/declare/yaml` and on the CLI and self-host paths only | [ADR-046](16-DECISIONS.md) enumerates both; [ADR-063](16-DECISIONS.md) is the parser's own decision |
 | Build, dev only | **esbuild** — the CLI bundles to one file, `--platform=node --format=esm --target=node24` · **`@sveltejs/adapter-static`** · **`@valibot/to-json-schema`** — the tool-schema generator, at build | pinned in the catalog from the registry at the first commit; none ships ([48-SPEC-CLI](48-SPEC-CLI.md) §13 D4; [50-SPEC-WEB](50-SPEC-WEB.md) §13 D2; [44-SPEC-MCP](44-SPEC-MCP.md) §13 D1) |
 
 ### Three pnpm 11 defaults that are load-bearing
