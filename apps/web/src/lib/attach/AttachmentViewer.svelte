@@ -24,7 +24,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { scrims, settled } from '$lib/ui/panel.ts';
-  import { since } from 'braindog-render';
+  import { attachedDocument, since } from 'braindog-render';
   import { attachWords as words, bytesOf, download, fileAt, kindWord, readOne, sizeOf, type Opened } from './attached.ts';
 
   let {
@@ -85,7 +85,7 @@
         fix = words.notReached;
         return;
       }
-      if (kind === 'page') doc = new TextDecoder().decode(bytes);
+      if (kind === 'page') doc = attachedDocument(new TextDecoder().decode(bytes));
       /* A PDF AND NOTHING ELSE: the type is written here, never read from the file or the door. */
       else if (kind === 'pdf') pdf = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
       else text = new TextDecoder().decode(bytes);

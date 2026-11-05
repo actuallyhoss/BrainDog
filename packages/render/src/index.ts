@@ -371,7 +371,7 @@ export {
 } from './drawn.ts';
 export { DRAWN_ROWS_MOST, drawnData, type DrawnData, type DrawnRow, type DrawnValue } from './drawn-data.ts';
 /* A visual a thing carries, drawn in the same frame: its page with its pictures inline, whole width. */
-export { pictureData, swapPictures, visualDocument } from './visual.ts';
+export { attachedDocument, pictureData, swapPictures, visualDocument } from './visual.ts';
 /* The widget catalogue (widgets plan §7.2): the core's own widgets, their sizes, and a block's
    reading distilled to what a preview draws. */
 export * from './widgets.ts';

@@ -80,3 +80,40 @@ export function visualDocument(page: string, pictures: Readonly<Record<string, s
     '</body></html>',
   ].join('');
 }
+
+/**
+ * Where a page's own doctype ends, with any space and comments before it, or 0 where it has none. WALKED AND NOT A SINGLE
+ * PATTERN, because a lazy comment inside a repeat backtracks without end on a page of comments with no doctype after them.
+ */
+function afterDoctype(page: string): number {
+  const space = /\s*/uy;
+  const skip = (at: number): number => {
+    space.lastIndex = at;
+    space.test(page);
+    return space.lastIndex;
+  };
+  let at = skip(0);
+  while (page.startsWith('<!--', at)) {
+    const shut = page.indexOf('-->', at + 4);
+    if (shut === -1) return 0;
+    at = skip(shut + 3);
+  }
+  const doctype = /<!doctype\b[^>]*>/iuy;
+  doctype.lastIndex = at;
+  return doctype.test(page) ? doctype.lastIndex : 0;
+}
+
+/**
+ * A page somebody attached (a Claude artifact, any `.html`), as the frame is handed it: the page itself, as it came, with
+ * the guard its frame's policy cannot do without. An attached page sees no row of the record, but it can see who opened it
+ * and when, and "the internet beyond its libraries" is what its viewer says it cannot reach: measured, it sent a TURN
+ * server a username from a frame under `FILE_FRAME_POLICY`.
+ *
+ * THE GUARD GOES AFTER THE DOCTYPE, WHERE THERE IS ONE, since a script ahead of it would put the page in quirks mode and
+ * change how it draws. A DECLARATIVE SHADOW ROOT IS TAKEN OUT BY NAME, because the parser opens one with no call the guard
+ * could refuse, and a frame inside it is where the guard's watch cannot see.
+ */
+export function attachedDocument(page: string): string {
+  const end = afterDoctype(page);
+  return `${page.slice(0, end)}<script>${DRAWN_GUARD}</script>${page.slice(end).replace(/\bshadowroot(mode|clonable|delegatesfocus|serializable)\b/giu, 'data-shadowroot$1')}`;
+}

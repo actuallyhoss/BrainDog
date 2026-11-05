@@ -115,32 +115,43 @@ export function drawnTheme(mode: 'light' | 'dark', read: (name: string) => strin
 const scriptJson = (v: unknown): string => JSON.stringify(v).replace(/</gu, '\\u003c');
 
 /**
- * THE GUARD, written before anything else into every document drawn in the frame, a drawn block's and a visual's: it
- * takes away the ways out the policy does not close, before any author's script runs.
+ * THE GUARD, written before anything else into every document drawn in the frame, a drawn block's, a visual's and an
+ * attached page's: it takes away the ways out the policy does not close, before any author's script runs.
  *
- * No browser enforces a policy on a peer connection (`connect-src` does not cover one, and `webrtc 'block'` is in no
- * engine), and a component's ICE servers are hosts it names: measured, Chromium sent UDP to a TURN server the code named,
- * from a frame under `DRAWN_POLICY`, and so did a `srcdoc` frame the code made, whose window holds constructors of its
- * own. So the constructors are gone from the window for good, a frame the code makes is taken out again before any task
- * can run in it, and a shadow root or a second document, where that watch cannot see, is refused. Navigating the frame
- * is held by the page around it, whose `frame-src` names only BrainDog and the embed providers.
+ * No browser enforces a policy on a peer connection (`connect-src` does not cover one, and `webrtc 'block'` is an
+ * unrecognised directive in Chromium, measured 5 November 2026), and a component's ICE servers are hosts it names:
+ * measured, Chromium sent a row's text as the username to a TURN server the code named, from a frame under `DRAWN_POLICY`,
+ * and so did a `srcdoc` frame the code made, whose window holds constructors of its own. So the constructors are gone
+ * from the window for good, a frame the code makes is taken out again before any task can run in it, and a shadow root or
+ * a second document, where that watch cannot see, is refused. Navigating the frame is held by the page around it, whose
+ * `frame-src` names only BrainDog, so no blob and no provider's address loads in its place with no guard in it.
+ *
+ * EVERYTHING THE WATCH CALLS IS TAKEN NOW AND CALLED BY `Reflect.apply`. The author's script runs after this one and can
+ * replace anything on a prototype: measured, `Element.prototype.remove = function () {}`, or a getter of its own for
+ * `MutationRecord.prototype.addedNodes`, left the frame standing and its script sent the row to TURN.
  */
 export const DRAWN_GUARD = `(function () {
+  var apply = Reflect.apply, own = Object.getOwnPropertyDescriptor, define = Object.defineProperty;
   ['RTCPeerConnection', 'webkitRTCPeerConnection', 'mozRTCPeerConnection'].forEach(function (n) {
-    try { Object.defineProperty(window, n, { value: undefined, writable: false, configurable: false }); } catch (e) {}
+    try { define(window, n, { value: undefined, writable: false, configurable: false }); } catch (e) {}
   });
-  var FRAMES = 'iframe,frame,object,embed';
+  var FRAMES = 'iframe,frame,object,embed,fencedframe';
+  var isA = Element.prototype.matches, within = Element.prototype.querySelectorAll, take = Element.prototype.remove;
+  var kind = own(Node.prototype, 'nodeType').get, added = own(MutationRecord.prototype, 'addedNodes').get;
+  var size = own(NodeList.prototype, 'length').get, at = NodeList.prototype.item;
+  function each(list, fn) { for (var i = 0, n = apply(size, list, []); i < n; i++) fn(apply(at, list, [i])); }
+  function gone(f) { apply(take, f, []); }
   function unframe(n) {
-    if (!n || n.nodeType !== 1) return;
-    if (n.matches(FRAMES)) n.remove();
-    else n.querySelectorAll(FRAMES).forEach(function (f) { f.remove(); });
+    if (!n || apply(kind, n, []) !== 1) return;
+    if (apply(isA, n, [FRAMES])) gone(n);
+    else each(apply(within, n, [FRAMES]), gone);
   }
   new MutationObserver(function (records) {
-    records.forEach(function (r) { r.addedNodes.forEach(unframe); });
+    for (var i = 0; i < records.length; i++) each(apply(added, records[i], []), unframe);
   }).observe(document, { childList: true, subtree: true });
   function refuse() { throw new Error('A drawn component draws in its own page, with no shadow root and no second document.'); }
-  [[Element.prototype, 'attachShadow'], [Element.prototype, 'setHTMLUnsafe'], [window.ShadowRoot && ShadowRoot.prototype, 'setHTMLUnsafe'], [Document, 'parseHTMLUnsafe'], [Document.prototype, 'write'], [Document.prototype, 'writeln'], [document, 'write'], [document, 'writeln']].forEach(function (at) {
-    if (at[0] && at[1] in at[0]) Object.defineProperty(at[0], at[1], { value: refuse, writable: false, configurable: false });
+  [[Element.prototype, 'attachShadow'], [Element.prototype, 'setHTMLUnsafe'], [window.ShadowRoot && ShadowRoot.prototype, 'setHTMLUnsafe'], [Document, 'parseHTMLUnsafe'], [Document.prototype, 'write'], [Document.prototype, 'writeln'], [document, 'write'], [document, 'writeln']].forEach(function (place) {
+    if (place[0] && place[1] in place[0]) define(place[0], place[1], { value: refuse, writable: false, configurable: false });
   });
 })();`;
 
