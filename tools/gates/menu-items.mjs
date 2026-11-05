@@ -82,7 +82,7 @@ const wordsOf = (body, rel) => {
   return /^\{words\.[A-Za-z]+\}$/u.test(t) ? `${rel} ${t}` : null;
 };
 
-export function menuItems(root) {
+export default function menuItems(root) {
   const web = join(root ?? join(HERE, '..', '..'), 'apps/web/src');
   const findings = [];
   const said = new Map();
