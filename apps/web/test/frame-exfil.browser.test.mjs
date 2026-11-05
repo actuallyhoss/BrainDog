@@ -88,6 +88,9 @@ before(async () => {
       s.end(parent);
     } else if (path === '/doc') {
       s.end(doc);
+    } else if (path === '/unguarded') {
+      s.setHeader('content-type', 'text/html');
+      s.end(doc);
     } else if (path === '/drawn-frame' || path === '/drawn-frame/file') {
       for (const [k, v] of path.endsWith('file') ? fileFrameHeaders() : drawnFrameHeaders()) s.setHeader(k, v);
       s.end(DRAWN_FRAME_HTML);
@@ -143,7 +146,8 @@ const drawnIn = async (frame, written) => {
 
 test('THE CANARY HEARS A PAGE WITH NO GUARD, so a silence below means something', { skip: false }, async (t) => {
   if (browser === null) return t.skip('no browser to open');
-  const heard = await drawnIn('/drawn-frame/file', `<!doctype html><html><body>${script(peer())}`);
+  /* NOT ONE OF OUR FRAMES: since the file frame took the peer connection away itself, a frame of ours is no unguarded page. */
+  const heard = await drawnIn('/unguarded', `<!doctype html><html><body>${script(peer())}`);
   assert.ok(heard.includes('udp:the row'), `a page with no guard did not reach the canary: ${heard.join(', ') || 'nothing'}`);
 });
 
