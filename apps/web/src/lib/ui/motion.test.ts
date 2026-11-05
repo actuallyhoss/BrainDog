@@ -53,7 +53,7 @@ test('the arrival steps are six 40ms apart and done by 450ms, and Today draws st
   const { ARRIVAL, arrivalDelay } = await import('./motion.ts');
   const tokens = readFileSync(fileURLToPath(new URL('../../../../../packages/skin/tokens.css', import.meta.url)), 'utf8');
   assert.match(tokens, /--d-stagger: 40ms;/u);
-  assert.match(tokens, /--d-page: 200ms;/u);
+  assert.match(tokens, /--d-page: 100ms;/u);
   assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 9].map(arrivalDelay), [0, 40, 80, 120, 160, 200, null, null]);
   assert.ok((arrivalDelay(ARRIVAL.most - 1) ?? 0) + ARRIVAL.page <= ARRIVAL.by, 'the last tile is still by 450ms');
 

@@ -140,7 +140,7 @@
       --d-menu: 120ms;
       --d-swap: 120ms;
       --d-rows: 120ms;
-      --d-page: 120ms;
+      --d-page: 100ms;
       --d-recompose: 120ms;
       --d-panel: 120ms;
       --d-stagger: 0ms;

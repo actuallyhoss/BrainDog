@@ -76,6 +76,7 @@
   import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
   import { frameGone, pageOpened } from '$lib/shell/first-frame.ts';
+  import { goOnPress, pressLanded } from '$lib/motion/press.ts';
   import { KEYS_REGISTER } from '$lib/record/keys-register.ts';
   import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, litOfUp, rowsAsLists, sideModel, sideOrder, upFirst, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
@@ -101,7 +102,7 @@
   import { drewFirst } from '$lib/data/first-drawn.ts';
   import { tick, untrack, type Snippet } from 'svelte';
   import type { FrameData } from '$lib/shell/light.ts';
-  import { afterNavigate, beforeNavigate, goto, invalidate, invalidateAll, onNavigate } from '$app/navigation';
+  import { afterNavigate, beforeNavigate, goto, invalidate, invalidateAll } from '$app/navigation';
   import { noteOpened } from '$lib/palette/opened.ts';
   import { heard, quietFocus } from '$lib/ui/quiet-focus.ts';
   import { hush } from '$lib/motion/index.ts';
@@ -970,7 +971,10 @@
     /* A NEW SCREEN ONLY (skills pass follow-up, 2 Nov). A changed `?view=` or filter is the same screen answering, and a
        view that reads nothing new (Tasks' Board) never said it drew again, so `data-screen` stayed off for good and
        `calm()` held every arrival on it still. A read the change starts still takes the mark away until it lands. */
-    if (newScreen(nav.from?.url, nav.to?.url)) leaving();
+    if (newScreen(nav.from?.url, nav.to?.url)) {
+      leaving();
+      screenOpening();
+    }
     /* The dev timing hook measures the next screen from here (`timing.ts`); off, it does nothing. */
     timingOpened();
     overLeft = sideOver;
@@ -1123,31 +1127,24 @@
        a moment after the move a focus dropped on the body goes back to the `h1` there now. Never once the reader has
        pressed or typed anything, and never off something they moved to.
 
-       AFTER THE CROSS-FADE, NOT DURING IT: focus given inside a running view transition did not hold, so a press on a
-       list item left focus on the body with motion on (VERIFY H3). The 1.5s is counted from when the fade ends.
-
        EVERY PAGE NAME TAKES IT, not only `PageHead`'s: an `h1` with no `tabindex` (a project's hero) is made focusable
        by script here, with no ring for a pointer (the rule at the foot of this file). */
     let touched = false;
     const touch = (): void => void (touched = true);
     addEventListener('pointerdown', touch, { capture: true, once: true });
     addEventListener('keydown', touch, { capture: true, once: true });
-    const fade = crossing;
-    void (fade ? fade.finished.catch(() => undefined) : Promise.resolve())
-      .then(() =>
-        waitFor(() => {
-          if (touched) return true;
-          const h1 = scroller()?.querySelector<HTMLElement>('h1');
-          const now = document.activeElement;
-          if (h1 && (now === null || now === document.body)) {
-            if (!h1.hasAttribute('tabindex')) h1.tabIndex = -1;
-            /* QUIET UNLESS THE LAST THING WAS A KEY (`quiet-focus.ts`): script focus with no press before it counts as
-               `:focus-visible`, so a cold open drew a ring round the name. */
-            quietFocus(h1);
-          }
-          return false;
-        }, 1500),
-      )
+    void waitFor(() => {
+      if (touched) return true;
+      const h1 = scroller()?.querySelector<HTMLElement>('h1');
+      const now = document.activeElement;
+      if (h1 && (now === null || now === document.body)) {
+        if (!h1.hasAttribute('tabindex')) h1.tabIndex = -1;
+        /* QUIET UNLESS THE LAST THING WAS A KEY (`quiet-focus.ts`): script focus with no press before it counts as
+           `:focus-visible`, so a cold open drew a ring round the name. */
+        quietFocus(h1);
+      }
+      return false;
+    }, 1500)
       .then(() => {
         removeEventListener('pointerdown', touch, { capture: true });
         removeEventListener('keydown', touch, { capture: true });
@@ -1155,73 +1152,44 @@
   });
 
   /**
-   * A NEW SCREEN CROSS-FADES IN, AND ONLY THE WORK MOVES (the shell holds still, what fills it recomposes).
+   * A NEW SCREEN IS SIMPLY THERE, AND ONLY THE WORK CHANGES (the shell holds still, what fills it recomposes).
    *
-   * Where the browser has the View Transitions API, a navigation to another screen is wrapped in one: the browser
-   * takes a picture of the work as it was, Kit draws the new screen, the screen is given a moment to draw
-   * (`DRAWN_WITHIN_MS`), and the old picture leaves over `--d-exit` before the new one rises in, the two together
-   * lasting `--d-page` (`app.css`). The tab bar and the toasts are named and held still. `#main` is
-   * named `page` for as long as that takes and the root is told not to animate (`app.css`), so the rail, the strip and
-   * a docked panel do not take part. A browser without it gets the cut it always had, with `arrive`'s settle.
+   * THE CROSS-FADE WENT (6 Nov, "very very slow and not snappy at all"). A view transition held the finished page back for
+   * 200ms behind a fade, the browser drew nothing at all while it waited for the screen (so a second press had no way to
+   * show), and its pictures stretched the bar's words and showed the next page's outline through the old one. A move now
+   * lands in the frame the screen is drawn in, as it did for somebody who asks for less motion.
    *
-   * THE NAME IS WORN ONLY WHILE A TRANSITION RUNS (`data-moving` on the root). A named element is a stacking context
-   * and a backdrop root, and worn all the time that would put the docked panel inside the work's stacking order and cut
-   * its glass off from the ground. The newest transition takes the name off, so one that is skipped for a second
-   * navigation does not take it from the one that replaced it.
-   *
-   * ONLY WHEN THE SCREEN CHANGES. `{#key}` redraws the work on a new path and nothing else, and a filter written to
-   * the query is the same screen answering, which a fade would make look like a page load.
-   *
-   * NOTHING IS LEFT TO REJECT. A navigation that fails, or a transition the browser skips (a hidden tab, a second
-   * navigation before the first one drew), ends the transition and says nothing on the console.
+   * `data-opening` IS UP UNTIL THE SCREEN HAS SAID IT DREW, as the fade's `data-moving` was: what is drawn then is the page
+   * as it stands, so nothing in it fades up (`[data-arrive]`, `motion.css`).
    */
-  let crossing: ViewTransition | null = null;
-  /* HOW LONG THE FADE WAITS FOR THE NEW SCREEN TO SAY IT HAS DRAWN. The browser draws nothing while it waits, so the wait is
-     a freeze (fluid F1): a screen this tab has seen draws within a frame or two, and one that must read first never does. */
-  const DRAWN_WITHIN_MS = 50;
-  onNavigate((nav) => {
-    if (typeof document.startViewTransition !== 'function') return;
-    /* Asked for less motion: the page just changes, no fade stands in for it. */
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    /* A PLACE, NOT A PATH (skills pass, 2 Nov): Work (`/?work`) and the phone's Menu (`/?menu`) are places of their own
-       at Today's path, and they cut while every other place cross-faded. `placeOf` tells them apart; any other query is
-       the same screen answering a filter, and stays still. */
-    if (nav.from === null || nav.to === null) return;
-    if (placeOf(here(nav.from.url.pathname), nav.from.url.searchParams) === placeOf(here(nav.to.url.pathname), nav.to.url.searchParams)) return;
-    const root = document.documentElement;
-    return new Promise<void>((done) => {
-      root.dataset.moving = '';
-      const moving = document.startViewTransition(async () => {
-        done();
-        await nav.complete.catch(() => undefined);
-        /* THE NEW PICTURE IS THE REAL PAGE when it is quick to draw: the screen is given `DRAWN_WITHIN_MS` to say so
-           (`data-screen`), so the fade does not end on a half-built page it had in hand (motion F6). */
-        await waitFor(() => scroller()?.dataset.screen !== undefined, DRAWN_WITHIN_MS);
-        /* A ROW OF TABS PRESSED TO GET HERE IS ONE PICTURE ON BOTH SIDES (`pressTab` below), found on the new screen by
-           its name, so it holds still while the work under it changes. */
-        const was = tabsHeld;
-        const label = was?.getAttribute('aria-label');
-        if (was && label) {
-          const find = (): HTMLElement | undefined => [...(scroller()?.querySelectorAll<HTMLElement>('[data-tabs]') ?? [])].find((r) => r.getAttribute('aria-label') === label);
-          /* A ROW THE NEXT SCREEN DRAWS A BEAT AFTER ITS FIRST FRAME (Money's book row waits on the page's declaration) is
-             waited for a moment: the old picture already shows the press answered, so the wait is not a silence. */
-          await waitFor(() => find() !== undefined, TAB_ROW_WITHIN_MS);
-          const now = find();
-          if (now && now !== was) now.style.viewTransitionName = TAB_ROW;
-        }
-      });
-      crossing = moving;
-      moving.ready.catch(() => undefined);
-      void moving.finished
-        .catch(() => undefined)
-        .then(() => {
-          for (const r of document.querySelectorAll<HTMLElement>('[data-tabs]')) if (r.style.viewTransitionName === TAB_ROW) r.style.viewTransitionName = '';
-          tabsHeld = null;
-          if (crossing !== moving) return;
-          crossing = null;
-          delete root.dataset.moving;
-        });
-    });
+  const OPENING_MS = 2000;
+  let openingTimer: ReturnType<typeof setTimeout> | undefined;
+  const openingDone = (): void => {
+    clearTimeout(openingTimer);
+    delete document.documentElement.dataset.opening;
+  };
+  function screenOpening(): void {
+    document.documentElement.dataset.opening = '';
+    clearTimeout(openingTimer);
+    openingTimer = setTimeout(openingDone, OPENING_MS);
+  }
+  $effect(() => {
+    if (settled() === undefined) return;
+    /* TWO FRAMES ON, so the first paint of what it drew is behind it. */
+    let gone = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (!gone) openingDone();
+    }));
+    return () => {
+      gone = true;
+    };
+  });
+
+  /* A RAIL ROW OR A FILTER CHIP GOES ON THE WAY DOWN (`press.ts`), its mark up until the move has landed. */
+  $effect(() => goOnPress());
+  afterNavigate((nav) => {
+    /* A FRAME ON, so the rail's lit row has moved by the time the mark goes and the two never leave a gap. */
+    requestAnimationFrame(() => pressLanded(nav.to?.url));
   });
 
   /**
@@ -1230,22 +1198,16 @@
    * Money's book tabs, a section's page tabs, the Keychain's views, the automations hub, Usage's months: each tab is a
    * link (`data-tabs` on the row, which `Segmented` gives every `nav` track), and the next page has to read before it
    * draws. Until it did, nothing moved: the press showed nothing for about 240ms, and inside a view transition the
-   * browser holds the old picture, so the tab could not even be drawn chosen. Now, on the press itself:
+   * browser held the old picture, so the tab could not even be drawn chosen. Now, on the press itself:
    *
    *   - the pressed tab takes the chosen mark (`data-on` where the row uses it, `aria-current`), so the thumb slides to
-   *     it on its own steps and the old picture the browser keeps already shows it;
+   *     it on its own steps;
    *   - what the row stands over goes quiet (`data-waiting`: 0.6 after `--d-exit`, so a page that draws at once never
-   *     dims) and the work says it is busy (`aria-busy`), until the next screen is drawn;
-   *   - the row is named for the move (`TAB_ROW`), and the same row on the next screen too, so it holds still while the
-   *     work under it cross-fades rather than fading out and back in.
+   *     dims) and the work says it is busy (`aria-busy`), until the next screen is drawn.
    *
    * A NAVIGATION THAT FAILS OR IS TURNED ELSEWHERE PUTS IT ALL BACK. A press with a modifier, a link that opens
    * elsewhere, or the tab already chosen is left alone.
    */
-  const TAB_ROW = 'tab-row';
-  /** How long the fade waits for the pressed row to be drawn on the next screen. */
-  const TAB_ROW_WITHIN_MS = 120;
-  let tabsHeld: HTMLElement | null = null;
   let tabPress: { href: string; undo: () => void; settle: () => void } | null = null;
 
   function pressTab(e: MouseEvent): void {
@@ -1275,10 +1237,6 @@
       for (const sib of at.parentElement?.children ?? []) if (sib !== at && !sib.contains(row)) quiet.push(sib);
     for (const q of quiet) q.setAttribute('data-waiting', '');
     main.setAttribute('aria-busy', 'true');
-    if (typeof document.startViewTransition === 'function') {
-      row.style.viewTransitionName = TAB_ROW;
-      tabsHeld = row;
-    }
 
     const settle = (): void => {
       for (const q of quiet) q.removeAttribute('data-waiting');
@@ -1292,10 +1250,6 @@
         else a.setAttribute('data-on', on);
         if (current === null) a.removeAttribute('aria-current');
         else a.setAttribute('aria-current', current);
-      }
-      if (tabsHeld === row && !document.documentElement.hasAttribute('data-moving')) {
-        row.style.viewTransitionName = '';
-        tabsHeld = null;
       }
     };
     tabPress = { href: to.href, undo, settle };
@@ -2215,8 +2169,8 @@
    * rail and 28 from the window, set here over the skin's, which made a 1,728 laptop's page the same tight frame as a
    * 1,280 one's.
    *
-   * NAMED `page` WHILE ONE SCREEN CROSS-FADES TO THE NEXT (`onNavigate` above, `app.css`): the work is the one part of
-   * the window that takes part in it, and only for as long as it does.
+   * NAMED `page` WHILE A SCREEN CROSS-FADES A CHANGE OF ITS OWN (`motion/transition.ts`, `app.css`): the work is the one part
+   * of the window that takes part in it, and only for as long as it does.
    */
   :global(html[data-moving]) .body {
     view-transition-name: page;

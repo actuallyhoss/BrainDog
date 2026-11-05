@@ -23,6 +23,7 @@
 -->
 <script lang="ts">
   import { litSlide } from '../motion/lit.ts';
+  import { pressedWithin } from '../motion/press.ts';
   import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import { markOf } from 'braindog-render';
@@ -307,16 +308,34 @@
   const projectLit = $derived(lit === null || lit === model.projects?.href ? (split ? [...split.play, ...split.parked, ...split.finished].find(openOf)?.href : undefined) : undefined);
   const isLit = (href: string): boolean => (projectLit !== undefined ? href === projectLit : href === lit);
 
+  /* THE ROWS HOLD STILL UNDER A PRESS. A place's own rows open as you get there, and the rows under them move: at once, a
+     second press a moment later landed on whichever row had moved under the pointer, and flicking down the rail ended
+     somewhere nobody pressed. So after a press the rail opens and closes what it should once the hand has stopped for
+     `RAIL_REST_MS`; the row pressed is lit from the press (`motion/press.ts`), and anything else that moves it goes at once. */
+  const RAIL_REST_MS = 220;
+  const PRESS_NEAR_MS = 1000;
+  let openOn = $state.raw(untrack(() => ({ lit, project: projectLit })));
+  $effect(() => {
+    const now = { lit, project: projectLit };
+    if (!pressedWithin(PRESS_NEAR_MS)) {
+      openOn = now;
+      return;
+    }
+    const wait = setTimeout(() => (openOn = now), RAIL_REST_MS);
+    return () => clearTimeout(wait);
+  });
+  const opensFor = (href: string): boolean => (openOn.project !== undefined ? href === openOn.project : href === openOn.lit);
+
   /* WHICH FOLDS ARE OPEN. Parked and Finished are shut on every load, and open by themselves on a project of theirs. */
   /** Each place's own More, opened or shut by a press; `null` follows the row in view. */
   let placeMore = $state<Record<string, boolean | null>>({});
   let folds = $state<{ more: boolean | null }>({ more: null });
   /* OPEN ON THE PHONE'S MENU (audit 31 Oct m, AM13): the Menu is a page with room, and an add-on just installed (Pad,
      Reading) sat shut inside More lists, so Menu read as though it had no way in. A press still shuts it. */
-  const moreOpen = $derived(folds.more ?? (phone || model.more.some((l) => isLit(l.href))));
+  const moreOpen = $derived(folds.more ?? (phone || model.more.some((l) => opensFor(l.href))));
   /* A PLACE'S OWN ROWS SHOW WHILE YOU ARE THERE; on a phone each opens by its own button. */
   let opens = $state<Record<string, boolean>>({});
-  const placeOpen = (p: SidePlace): boolean => (phone ? (opens[p.key] ?? false) : isLit(p.href) || p.kids.some((k) => isLit(k.href)));
+  const placeOpen = (p: SidePlace): boolean => (phone ? (opens[p.key] ?? false) : opensFor(p.href) || p.kids.some((k) => opensFor(k.href)));
 
   /* THE COUNT A PLACE SAYS: what the sidebar read for it, else the shell's. */
   const countOf = (p: SidePlace): number | null => {
@@ -457,7 +476,7 @@
     return onProject && !pinned.some((p) => isLit(p.href));
   });
   const projectsOpen = $derived(
-    phone ? (opens['#projects'] ?? false) : model.projects !== null && ((model.projects.href !== null && isLit(model.projects.href)) || model.projects.kids.some((k) => isLit(k.href))),
+    phone ? (opens['#projects'] ?? false) : model.projects !== null && ((model.projects.href !== null && opensFor(model.projects.href)) || model.projects.kids.some((k) => opensFor(k.href))),
   );
   /* MORE LISTS FOLDS ONLY WHAT IS WORTH A FOLD (plan F2): one or two lists stand in the rail as rows of their own, and a
      fold that opened on one row is a press for one thing. From three they fold as before. */
@@ -1002,14 +1021,33 @@
   }
 
   /* THE ONE LIT ROW: the nav's chosen fill, the words in ink at 600. */
-  .s-row[aria-current='page'] {
+  .s-row[aria-current='page'],
+  .s-row[data-going] {
     background: var(--chosen);
     color: var(--ink);
     font-weight: var(--fw-medium);
   }
 
-  .s-row[aria-current='page'] :global(.icon) {
+  .s-row[aria-current='page'] :global(.icon),
+  .s-row[data-going] :global(.icon) {
     color: var(--ink);
+  }
+
+  /* THE PRESS ANSWERS ON THE WAY DOWN: a finger's as a press on the row (a mouse's goes at once, `motion/press.ts`), and the
+     row pressed is chosen from then, the one it leaves let go. */
+  .s-row:active:not(button, [aria-current='page']) {
+    background: var(--chosen);
+    color: var(--ink);
+  }
+
+  .s-scroll:has(.s-row[data-going]) .s-row[aria-current='page']:not([data-going]) {
+    background: none;
+    color: var(--ink-2);
+    font-weight: var(--fw-regular);
+  }
+
+  .s-scroll:has(.s-row[data-going]) .s-row[aria-current='page']:not([data-going]) :global(.icon) {
+    color: inherit;
   }
 
   /* A NAME SOMEBODY TYPED takes its direction from its own first letter, as `dir="auto"` did, but from the sheet: the
@@ -1342,9 +1380,16 @@
     cursor: pointer;
   }
 
-  .s-ricon[aria-current='page'] {
+  .s-ricon[aria-current='page'],
+  .s-ricon[data-going],
+  a.s-ricon:active {
     background: var(--chosen);
     color: var(--ink);
+  }
+
+  .s-rail:has(.s-ricon[data-going]) .s-ricon[aria-current='page']:not([data-going]) {
+    background: none;
+    color: var(--ink-2);
   }
 
   .s-rbadge {

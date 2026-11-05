@@ -52,9 +52,9 @@ details[open]::details-content {
 
 /**
  * WHAT ARRIVES IN THE PLACE OF A SKELETON FADES IN (`data-arrive`): the skeleton holds the geometry, so nothing jumps,
- * and the answer comes up over `--d-swap` instead of switching on. Not while a page change cross-fades
- * (`data-moving` on the root, `AppFrame.svelte`): the view transition already takes the new picture, and a fade inside
- * it would take that picture at nothing.
+ * and the answer comes up over `--d-swap` instead of switching on. Not on a new screen's first draw (`data-opening` on
+ * the root, `AppFrame.svelte`), which is the page as it stands and lands in one frame; and not while a change cross-fades
+ * (`data-moving`, `transition.ts`), where a fade inside the view transition would take the new picture at nothing.
  */
 [data-arrive] {
   transition: opacity var(--d-swap) var(--ease-standard);
@@ -66,7 +66,7 @@ details[open]::details-content {
   }
 }
 
-:root[data-moving] [data-arrive] {
+:root:is([data-moving], [data-opening]) [data-arrive] {
   transition: none;
 }
 

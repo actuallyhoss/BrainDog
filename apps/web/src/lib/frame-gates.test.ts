@@ -243,7 +243,7 @@ const SHADOWS: Record<string, readonly string[]> = {
   'packages/skin/kinds/board.css': ['.board-col[data-drop]'], // edge
   'packages/skin/kinds/calendar.css': ['.calendar-day .calendar-item::after'], // edge
   'packages/skin/kinds/feed.css': ['.feed-row[data-focused]'], // ring
-  'packages/skin/kinds/filters.css': ['.filters-group[data-control=\'segmented\'] .filters-choice:is([aria-pressed=\'true\'], [data-on]), .filters-group[data-control=\'segmented\'] button.filters-choice[aria-pressed=\'true\']:hover', '.filters-choice:is([aria-pressed=\'true\'], [data-on]), button.filters-choice[aria-pressed=\'true\']:hover'], // edge, edge
+  'packages/skin/kinds/filters.css': ['.filters-group[data-control=\'segmented\'] .filters-choice:is([aria-pressed=\'true\'], [data-on]), .filters-group[data-control=\'segmented\'] button.filters-choice[aria-pressed=\'true\']:hover, .filters-group[data-control=\'segmented\'] button.filters-choice:is(:active, [data-going])', '.filters-choice:is([aria-pressed=\'true\'], [data-on]), button.filters-choice[aria-pressed=\'true\']:hover, button.filters-choice:is(:active, [data-going])'], // edge, edge
   'packages/skin/kinds/queue.css': ['.queue-card[data-focused]', '.queue-options:has(.queue-because) > .queue-option', '.queue-options:has(.queue-because) > .queue-option:has(> .queue-act[data-on])', '.queue-card[data-selected]:not([data-focused])'], // edge, ring
   'apps/web/src/lib/agents/CodeForm.svelte': ['.code-box'], // edge
   'apps/web/src/lib/agents/ConnectSheet.svelte': ['.step-item::before'], // edge

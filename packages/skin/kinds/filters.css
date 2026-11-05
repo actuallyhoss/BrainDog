@@ -103,7 +103,8 @@
      a strip of filters stays quieter than the page's one primary. `data-on` is the mirror's spelling of the same
      fact. */
   .filters-choice:is([aria-pressed='true'], [data-on]),
-  button.filters-choice[aria-pressed='true']:hover {
+  button.filters-choice[aria-pressed='true']:hover,
+  button.filters-choice:is(:active, [data-going]) {
     background: var(--tile-2);
     box-shadow: inset 0 0 0 1px var(--rule-strong);
     color: var(--ink);
@@ -120,7 +121,8 @@
   }
 
   .filters-group[data-control='segmented'] .filters-choice:is([aria-pressed='true'], [data-on]),
-  .filters-group[data-control='segmented'] button.filters-choice[aria-pressed='true']:hover {
+  .filters-group[data-control='segmented'] button.filters-choice[aria-pressed='true']:hover,
+  .filters-group[data-control='segmented'] button.filters-choice:is(:active, [data-going]) {
     background: var(--tile);
     box-shadow: 0 0 0 1px var(--rule);
     color: var(--ink);

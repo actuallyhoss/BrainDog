@@ -1,8 +1,8 @@
 /**
  * The shell's moves stay smooth (fluid F1).
  *
- * A press lights at once and the page changes with no pause: the shell waits only a moment for a new screen to say it
- * has drawn, the old picture leaves before the new one arrives (never two titles), a stale shell is replaced only when
+ * A press lights at once and the page changes with no pause and no fade, a change a screen cross-fades itself sends the
+ * old picture out before the new one arrives (never two titles), a stale shell is replaced only when
  * nothing is moving (or it takes the tap that came with it), and a theme change fades the old window over the new one.
  * Read out of the shell and the sheet as text, and the one rule that is code is cut out and run (`place-arrived.test.ts`).
  */
@@ -17,7 +17,7 @@ const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.met
 const shell = read('../lib/shell/AppFrame.svelte');
 const code = shell.replace(/<!--[\s\S]*?-->/gu, '').replace(/\/\*[\s\S]*?\*\//gu, '');
 /* The view transitions' rules left `app.css` for a sheet asked after the first draw (speed4, 2 Nov); both are read. */
-const sheet = read('../app.css') + read('../lib/motion/transitions.css');
+const sheet = read('../app.css') + read('../lib/motion/transitions.css') + read('../lib/motion/motion.css');
 const css = sheet.replace(/\/\*[\s\S]*?\*\//gu, '');
 
 const tokens = read('../../../../packages/skin/tokens.css');
@@ -27,11 +27,11 @@ const token = (name: string): number => {
   return Number(m[1]);
 };
 
-test('a new screen is given a moment to say it has drawn, not a quarter second', () => {
-  const wait = /const DRAWN_WITHIN_MS = (\d+);/u.exec(code);
-  assert.ok(wait, 'the wait has a name');
-  assert.ok(Number(wait[1]) <= 60, 'a press never freezes for long');
-  assert.match(code, /await waitFor\(\(\) => scroller\(\)\?\.dataset\.screen !== undefined, DRAWN_WITHIN_MS\);/u);
+test('a move between screens is a cut: no fade holds the page back, and the browser never stops drawing for one', () => {
+  assert.doesNotMatch(code, /onNavigate/u);
+  assert.doesNotMatch(code, /startViewTransition/u);
+  assert.match(code, /document\.documentElement\.dataset\.opening = '';/u);
+  assert.match(sheet, /:root:is\(\[data-moving\], \[data-opening\]\) \[data-arrive\] \{\s*transition: none;/u);
 });
 
 test('a stale shell is replaced once the record has answered and nothing is moving', () => {
@@ -49,13 +49,13 @@ test('a stale shell is replaced once the record has answered and nothing is movi
 });
 
 test('the old picture leaves before the new one arrives, and the two last no longer than a page change', () => {
-  const old = /::view-transition-old\(page\) \{\s*animation: page-out var\((--d-\w+)\)/u.exec(css);
-  const now = /::view-transition-new\(page\) \{\s*animation: page-in calc\(var\((--d-\w+)\) - var\((--d-\w+)\)\) var\(--ease-out\) var\((--d-\w+)\) both;/u.exec(css);
+  const old = /::view-transition-old\(page\) \{\s*animation: page-out var\((--d-[\w-]+)\)/u.exec(css);
+  const now = /::view-transition-new\(page\) \{\s*animation: page-in calc\(var\((--d-[\w-]+)\) - var\((--d-[\w-]+)\)\) var\(--ease-out\) var\((--d-[\w-]+)\) both;/u.exec(css);
   assert.ok(old && now, 'both pictures are timed');
   assert.equal(now[2], old[1], 'the new picture takes what is left after the old one');
   assert.equal(now[3], old[1], 'and starts when the old one has gone');
   assert.equal(token(now[1]!), token('--d-page'));
-  assert.ok(token('--d-page') <= 250, 'nothing is over 250ms');
+  assert.ok(token('--d-page') <= 100, 'nothing is over 100ms');
   assert.match(css, /prefers-reduced-motion: reduce\) \{\s*::view-transition-old\(page\),\s*::view-transition-new\(page\) \{\s*animation: none;/u);
 });
 
