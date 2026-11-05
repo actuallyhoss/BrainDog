@@ -67,7 +67,7 @@ const EASY: { row: string; said: string; fields: Said }[] = [
   { row: 'Review the contract', said: 'update the contract review: note check clause nine', fields: { note: 'Check clause nine' } },
   { row: 'Bake server numbers', said: 'mark the bake numbers done', fields: { state: 'done' } },
   { row: 'Pay Ada', said: 'find the task to pay Ada and mark it open', fields: { state: 'open' } },
-  { row: 'Sketchpad trailer', said: 'set the sketchpad trailer to due tomorrow', fields: { by: '2026-09-04' } },
+  { row: 'Harbour trailer', said: 'set the harbour trailer to due tomorrow', fields: { by: '2026-09-04' } },
   { row: 'Sign the lease', said: 'open the lease task and mark it done', fields: { state: 'done' } },
 ];
 
