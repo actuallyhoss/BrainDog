@@ -25,7 +25,7 @@
 <script lang="ts">
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { inIosApp } from '$lib/shell.ts';
+  import { inStoreApp } from '$lib/shell.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { ONLY_WIDE, rowsOf, type AreaGroup } from './place.ts';
@@ -39,7 +39,7 @@
       <h2 class="group-title">{g.title}</h2>
       <ul class="area-rows">
         {#each rowsOf(g) as a (a.href)}
-          {#if inIosApp && a.id === 'billing'}
+          {#if inStoreApp && a.id === 'billing'}
             <li><p class="area-said">{copy.planManaged}</p></li>
           {:else}
           <!-- `wide-only` is one of `settings.css`'s shared rules: the row is not drawn below 900px. -->

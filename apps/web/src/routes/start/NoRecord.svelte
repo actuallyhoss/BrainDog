@@ -21,7 +21,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { copy } from '$lib/copy.ts';
-  import { inIosApp } from '$lib/shell.ts';
+  import { inStoreApp } from '$lib/shell.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { billing, checkout, hold, zone, type Held } from '$lib/signup.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -88,7 +88,7 @@
     <div class="own-lead"><Button weight="primary" href="/signup">{firstRun.noRecordDescribe}</Button></div>
   {/if}
 
-  {#if inIosApp}
+  {#if inStoreApp}
     <p class="own-why">{copy.planManaged}</p>
   {:else if open === false}
     {#if !describe}<p class="own-why">{copy.signupClosedWhy}</p>{/if}

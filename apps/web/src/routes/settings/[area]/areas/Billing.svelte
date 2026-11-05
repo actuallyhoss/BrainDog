@@ -12,7 +12,7 @@
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { apiBase } from '$lib/at.ts';
-  import { inIosApp, openOutside } from '$lib/shell.ts';
+  import { inStoreApp, openOutside } from '$lib/shell.ts';
   import { readUsage, words as actionWords, type Meter, type UsageView } from '$lib/record/actions.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import {
@@ -45,7 +45,7 @@
   /* THE CLOUD IS THE ONLY HOST THAT BILLS, and the only one with `/account/billing`: a self-host answers 404, which
      `read()` would draw as a refusal on a screen that has nothing wrong with it. So the question is asked only where
      `boot` said the host is the Cloud, and everywhere else the key is `null` and nothing is asked. */
-  const hosted = $derived(!inIosApp && hostedHere(shell));
+  const hosted = $derived(!inStoreApp && hostedHere(shell));
   const bill = read(() => (hosted ? 'account-billing' : null), readBilling, { empty: (v) => v.records.length === 0 });
 
   /**
@@ -233,7 +233,7 @@
 </div>
 {/snippet}
 
-{#if inIosApp}
+{#if inStoreApp}
   <Tile icon="money" title={tileWords.planTitle}>
     <p class="hint">{copy.planManaged}</p>
   </Tile>

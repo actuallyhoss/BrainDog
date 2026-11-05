@@ -73,6 +73,12 @@ export function shellKind(): ShellKind {
 /** In the native iPhone app, where native draws the bars, the tabs and the sign-in, and the web draws the work. */
 export const inIosApp: boolean = shellKind() === 'ios';
 
+/**
+ * An app Apple's store sells, the iPhone's or the Mac's, where a plan is never bought or managed inside the app and no
+ * press leads out to a payment page (App Review 3.1.1 and 3.1.3). Windows and the web take the card as usual.
+ */
+export const inStoreApp: boolean = shellKind() === 'ios' || shellKind() === 'mac';
+
 /** In the native Mac app, which keeps the web's own frame under its title bar. */
 export const inMacApp: boolean = shellKind() === 'mac';
 

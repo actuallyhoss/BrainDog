@@ -26,7 +26,7 @@
 
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
-  import { inIosApp, openOutside } from '$lib/shell.ts';
+  import { inStoreApp, openOutside } from '$lib/shell.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere, lapseLines, paymentPage, thisRecord } from '../../routes/settings/billing.ts';
@@ -89,9 +89,9 @@
 
 {#if lines && here}
   <Banner tone="late" icon="lock">
-    {lines.fix}{#if lines.deletes}{' '}{lines.deletes}{/if}{#if inIosApp}{' '}{copy.planManaged}{/if}
+    {lines.fix}{#if lines.deletes}{' '}{lines.deletes}{/if}{#if inStoreApp}{' '}{copy.planManaged}{/if}
     {#snippet actions()}
-      {#if !inIosApp}
+      {#if !inStoreApp}
         <Button weight="primary" onclick={payAgain} aria-busy={going} disabled={going}
           >{going ? copy.billingOpening : copy.billingPayAgain}</Button
         >
@@ -100,7 +100,7 @@
     {/snippet}
   </Banner>
 {/if}
-{#if behind && here && !lines && !inIosApp}
+{#if behind && here && !lines && !inStoreApp}
   <Banner tone="warn" icon="money">
     {copy.billingPastDueLine}
     {#snippet actions()}

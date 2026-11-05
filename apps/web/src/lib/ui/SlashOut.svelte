@@ -10,10 +10,10 @@
 <script lang="ts">
   import { page } from '$app/state';
   import Button from '$lib/ui/Button.svelte';
-  import { inIosApp } from '$lib/shell.ts';
+  import { inStoreApp } from '$lib/shell.ts';
   import { outOfAsks, words } from '$lib/ui/slash-asks.ts';
 
-  const cloud = $derived(page.data.host === 'cloud' && !inIosApp);
+  const cloud = $derived(page.data.host === 'cloud' && !inStoreApp);
 </script>
 
 <div class="slash-out">

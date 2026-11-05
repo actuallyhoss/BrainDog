@@ -60,7 +60,7 @@
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
   import { saidRowPages } from '$lib/record/row-href.ts';
   import { put } from '$lib/clipboard.ts';
-  import { inIosApp } from '$lib/shell.ts';
+  import { inStoreApp } from '$lib/shell.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
 
   /* THE MONTH AND THE PROJECT ARE THE ADDRESS'S, so the switcher is two links, Back returns to the month before, and
@@ -404,9 +404,9 @@
               <!-- THE PLAN'S LIMITS IN ONE SENTENCE, then extra usage: its running amount, and the cap where one may be set. -->
               {#if r.planLine}<p class="aside-line">{r.planLine}</p>{/if}
               <!-- NEITHER IN THE IPHONE APP (App Store 3.1.1): what extra usage costs and the cap on it are bought at brain.dog. -->
-              {#if r.extraUse && capOffered(r.record) && !inIosApp}
+              {#if r.extraUse && capOffered(r.record) && !inStoreApp}
                 <ExtraCap record={r.record} on={r.extraUse.on} cap={r.extraUse.cap} said={r.extra} onset={usage.reread} />
-              {:else if r.extra && !inIosApp}
+              {:else if r.extra && !inStoreApp}
                 <p class="aside-line">{r.extra}</p>
               {/if}
             </div>

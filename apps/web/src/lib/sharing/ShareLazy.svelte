@@ -24,7 +24,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { inIosApp } from '$lib/shell.ts';
+  import { inStoreApp } from '$lib/shell.ts';
   import { hostedHere, type BillingAnswer } from '../../routes/settings/billing.ts';
   import { canShare, needsPlus } from './may-share.ts';
   import { seeingAs } from './see-as.svelte.ts';
@@ -55,7 +55,7 @@
   $effect(() => {
     if (open && plus) {
       open = false;
-      toasts.push(inIosApp ? copy.shareNotOnPlan : copy.shareNeedsPlus);
+      toasts.push(inStoreApp ? copy.shareNotOnPlan : copy.shareNeedsPlus);
     }
   });
   /* ONCE OPENED, KEPT: the sheet stays mounted so it can close the way it came and open again at once. */
@@ -66,7 +66,7 @@
 </script>
 
 {#if allowed}
-  {#if trigger && plus && inIosApp}
+  {#if trigger && plus && inStoreApp}
     <!-- NOTHING TO PRESS AND NO PLAN NAMED. -->
   {:else if trigger && plus}
     <span class="share-plus">{copy.shareNeedsPlus}</span>
