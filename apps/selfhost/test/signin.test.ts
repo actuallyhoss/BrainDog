@@ -161,12 +161,13 @@ test('METHODS, THE LOCKOUT WITH Retry-After, AND THE WINDOW THAT FORGETS IT', as
       assert.equal(wrong.status, 401);
       assert.deepEqual(wrong.body?.refusal, NOT_YOU);
     }
-    /* THE ELEVENTH IS NOT COMPARED, and the right key is refused like any other while the lock holds. */
-    const locked = await s.call('/auth/token', { body: { serverKey: s.serverKey } });
+    /* THE ELEVENTH WRONG KEY IS A 429, AND THE RIGHT KEY IS NOT HELD BY IT (RG14), tried below once the window has gone by too. */
+    const locked = await s.call('/auth/token', { body: { serverKey: 'wrong-again' } });
     assert.equal(locked.status, 429);
     assert.equal(locked.headers.get('retry-after'), '900');
     assert.deepEqual(locked.body, { ok: false, retryAfter: 900 });
     assert.deepEqual(locked.cookies, []);
+    assert.equal((await s.call('/auth/token', { body: { serverKey: s.serverKey } })).status, 200, 'the right key was held by the lock');
 
     s.advance(15 * MINUTE + 1);
     const sid = await s.keyIn();
