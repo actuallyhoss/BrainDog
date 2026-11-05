@@ -6,6 +6,9 @@
  * row's version, so the row is read once, and the write is held to what it read: somebody else's change in between is a
  * conflict that is said, never a quiet overwrite. Only the state moves, so nothing else of the row is sent.
  *
+ * THE LINE IS DRAWN FINISHED ON THE PRESS (`LateNow.svelte`), and this goes behind it: a refusal puts the line back and says
+ * why, and the Undo here takes it back as the record's own write.
+ *
  * LOADED ON THE PRESS AND NEVER WITH TODAY: the front door carries none of it.
  */
 
@@ -36,10 +39,10 @@ const isRow = (v: unknown): v is Row => v !== null && typeof v === 'object' && t
 
 /**
  * Finish the row `handle` names, at `base`, and say so with an Undo. `again` reads Today again once the record has it,
- * and once more after an Undo. A list with no way to finish a row (one finished state that may be an ending, or none)
- * answers `open`: its own page is where it is changed.
+ * and once more after an Undo; `undone` has the line drawn as it was the moment Undo is pressed. A list with no way to
+ * finish a row (one finished state that may be an ending, or none) answers `open`: its own page is where it is changed.
  */
-export async function finishLate(base: string, handle: string, again: () => void): Promise<Finished> {
+export async function finishLate(base: string, handle: string, again: () => void, undone: () => void = () => {}): Promise<Finished> {
   const at = rowOf(handle);
   if (at === null) return { ok: false, open: true };
   const client = createClient({ base });
@@ -61,13 +64,15 @@ export async function finishLate(base: string, handle: string, again: () => void
     const version = typeof wrote?.version === 'number' ? wrote.version : undefined;
     const before = { ...(row.fields as Fields) };
     toasts.push(to.done, {
-      undo: () =>
+      undo: () => {
+        undone();
         void client
           .update({ register: at.register, seq: at.seq, patch: putBackOf(before, patch, decl), ...(version === undefined ? {} : { version }) })
           .then((back) => {
             if (!back.ok) toasts.push('refusal' in back ? back.refusal.fix : copy.writeRaced, { intent: 'warn' });
             again();
-          }),
+          });
+      },
     });
     return { ok: true };
   } catch {
