@@ -1022,31 +1022,31 @@
 
   /* THE ONE LIT ROW: the nav's chosen fill, the words in ink at 600. */
   .s-row[aria-current='page'],
-  .s-row[data-going] {
+  .s-row:global([data-going]) {
     background: var(--chosen);
     color: var(--ink);
     font-weight: var(--fw-medium);
   }
 
   .s-row[aria-current='page'] :global(.icon),
-  .s-row[data-going] :global(.icon) {
+  .s-row:global([data-going]) :global(.icon) {
     color: var(--ink);
   }
 
   /* THE PRESS ANSWERS ON THE WAY DOWN: a finger's as a press on the row (a mouse's goes at once, `motion/press.ts`), and the
      row pressed is chosen from then, the one it leaves let go. */
-  .s-row:active:not(button, [aria-current='page']) {
+  a.s-row:active {
     background: var(--chosen);
     color: var(--ink);
   }
 
-  .s-scroll:has(.s-row[data-going]) .s-row[aria-current='page']:not([data-going]) {
+  .s-scroll:global(:has([data-going])) .s-row[aria-current='page']:global(:not([data-going])) {
     background: none;
     color: var(--ink-2);
     font-weight: var(--fw-regular);
   }
 
-  .s-scroll:has(.s-row[data-going]) .s-row[aria-current='page']:not([data-going]) :global(.icon) {
+  .s-scroll:global(:has([data-going])) .s-row[aria-current='page']:global(:not([data-going])) :global(.icon) {
     color: inherit;
   }
 
@@ -1381,13 +1381,13 @@
   }
 
   .s-ricon[aria-current='page'],
-  .s-ricon[data-going],
+  .s-ricon:global([data-going]),
   a.s-ricon:active {
     background: var(--chosen);
     color: var(--ink);
   }
 
-  .s-rail:has(.s-ricon[data-going]) .s-ricon[aria-current='page']:not([data-going]) {
+  .s-rail:global(:has([data-going])) .s-ricon[aria-current='page']:global(:not([data-going])) {
     background: none;
     color: var(--ink-2);
   }
