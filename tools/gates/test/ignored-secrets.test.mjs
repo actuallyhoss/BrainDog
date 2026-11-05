@@ -10,6 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
@@ -55,4 +56,33 @@ test('nothing the repository tracks is one of these', () => {
   const listed = spawnSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout.split('\n').filter(Boolean);
   const held = listed.filter((path) => /(^|\/)(\.dev\.vars(\.(?!example$)[^/]+)?|\.secrets(\/.*)?|\.env(\.(?!example$)[^/]+)?|[^/]+\.(pem|p8|p12|pfx|keystore|jks|mobileprovision)|age-identity[^/]*|kek-[^/]*\.txt|hosts\.json)$/u.test(path));
   assert.deepEqual(held, []);
+});
+
+/*
+ * THE SCAN'S IGNORE LIST ONLY EXCUSES WHAT A READER CAN CHECK. Its lines named commits a rewrite had replaced, so they
+ * matched nothing and the scan's findings were either all noise or, with the list believed, unread. Each line now names
+ * one commit and one test file, and nothing but the public half of a push key is excused outside a test.
+ */
+test('every line of .gitleaksignore is one commit and a test file, or the public key in the Worker config', () => {
+  const lines = readFileSync(`${ROOT}/.gitleaksignore`, 'utf8').split('\n').filter((line) => line !== '' && !line.startsWith('#'));
+  assert.ok(lines.length > 0);
+  for (const line of lines) {
+    const read = /^([0-9a-f]{40}):(.+):([a-z-]+):(\d+)$/u.exec(line);
+    assert.ok(read !== null, `${line} is not commit:file:rule:line`);
+    const [, , file, rule] = read;
+    const testPath = /(^|\/)test\/|\.test\.[a-z]+$/u.test(file);
+    assert.ok(testPath || (file === 'apps/worker/wrangler.jsonc' && rule === 'generic-api-key'), `${file} is not a test`);
+  }
+  assert.equal(new Set(lines).size, lines.length);
+});
+
+test('the public push keys in the Worker config are public keys: 65 bytes starting 04, a point on a curve', () => {
+  const config = readFileSync(`${ROOT}/apps/worker/wrangler.jsonc`, 'utf8');
+  const keys = [...config.matchAll(/"VAPID_PUBLIC":\s*"([^"]+)"/gu)].map((m) => m[1]);
+  assert.ok(keys.length >= 2);
+  for (const key of keys) {
+    const bytes = Buffer.from(key, 'base64url');
+    assert.equal(bytes.length, 65);
+    assert.equal(bytes[0], 4);
+  }
 });
