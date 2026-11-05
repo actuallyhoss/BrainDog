@@ -5,8 +5,8 @@
 
   THE LOOK IS THE ENTRY SCREENS' (`signin/Entry.svelte`), as the consent screen beside it is: the lit ground, the brand at
   the top, and one sheet. In the sheet, the terminal's well and the one heading, the sentence saying what to type, the
-  six boxes (`CodeForm.svelte` at its `lead` size), and under them who is waiting now, so he can see what he is about to
-  approve before the sixth digit sends it.
+  six boxes (`CodeForm.svelte` at its `lead` size), and under them who is waiting now. The sixth digit lets nothing in: the
+  form then says what the code names, and its Approve is the only thing that does.
 
   APPROVED, THE SHEET SAYS WHAT WAS APPROVED IN PLAIN WORDS: the command and the machine it ran on, what it can now do
   and for how long, and what happens next, which is nothing here: the terminal carries on by itself. Then how to undo it.

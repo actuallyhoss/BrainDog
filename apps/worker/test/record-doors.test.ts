@@ -78,11 +78,19 @@ test('AN EXPORT OPERATION BEARER EXPORTS ONCE AND IS REFUSED THE SECOND TIME, an
   const started = (await object.deviceStart({ reach: 'export', label: 'test-box · braindog-cli' }, '203.0.113.7')) as { ok: boolean; value: { user_code: string; device_code: string } };
   assert.ok(started.ok, JSON.stringify(started));
   const owner = { principal: { kind: 'person', id: c.person, level: 'owner' }, credentialed: true, provedAt: Date.now() };
+  const looked = await object.fetch(
+    new Request('https://app.example.test/api/deviceLook', {
+      method: 'POST',
+      headers: { 'x-braindog-ctx': JSON.stringify(owner), 'content-type': 'application/json' },
+      body: JSON.stringify({ user_code: started.value.user_code }),
+    }),
+  );
+  const handle = ((await looked.json()) as { value: { handle: string } }).value.handle;
   const approved = await object.fetch(
     new Request('https://app.example.test/api/deviceApprove', {
       method: 'POST',
       headers: { 'x-braindog-ctx': JSON.stringify(owner), 'content-type': 'application/json' },
-      body: JSON.stringify({ user_code: started.value.user_code }),
+      body: JSON.stringify({ user_code: started.value.user_code, handle }),
     }),
   );
   assert.equal(approved.status, 200, await approved.clone().text());
@@ -107,11 +115,19 @@ test('AN IMPORT BEARER PRESENTED AT /api/export IS REFUSED, and the record is no
   const object = c.record(REC);
   const started = (await object.deviceStart({ reach: 'import', label: 'test-box · braindog-cli' }, '203.0.113.7')) as { value: { user_code: string; device_code: string } };
   const owner = { principal: { kind: 'person', id: c.person, level: 'owner' }, credentialed: true, provedAt: Date.now() };
+  const looked = await object.fetch(
+    new Request('https://app.example.test/api/deviceLook', {
+      method: 'POST',
+      headers: { 'x-braindog-ctx': JSON.stringify(owner), 'content-type': 'application/json' },
+      body: JSON.stringify({ user_code: started.value.user_code }),
+    }),
+  );
+  const handle = ((await looked.json()) as { value: { handle: string } }).value.handle;
   await object.fetch(
     new Request('https://app.example.test/api/deviceApprove', {
       method: 'POST',
       headers: { 'x-braindog-ctx': JSON.stringify(owner), 'content-type': 'application/json' },
-      body: JSON.stringify({ user_code: started.value.user_code }),
+      body: JSON.stringify({ user_code: started.value.user_code, handle }),
     }),
   );
   const polled = (await object.devicePoll({ device_code: started.value.device_code })) as { value: { bearer: string } };

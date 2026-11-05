@@ -38,7 +38,11 @@ const row = (over: Partial<DeviceRow>): DeviceRow => ({
 
 test('a malformed code is refused before anything is sent', async () => {
   let sent = 0;
-  const client = { deviceApprove: async () => ((sent++, { ok: true as const, value: { handle: 'h', reach: 'vault' as const, scope: '*', label: null, ua: null } })) };
+  const row = { handle: 'h', reach: 'vault' as const, scope: '*', label: null, ua: null };
+  const client = {
+    deviceLook: async () => ((sent++, { ok: true as const, value: { ...row, expires: '', project: null, keys: [], more: 0 } })),
+    deviceApprove: async () => ((sent++, { ok: true as const, value: row })),
+  };
   assert.deepEqual(await approve('12 34', client), { kind: 'malformed', why: 'short', digits: 4 });
   assert.deepEqual(await approve('', client), { kind: 'malformed', why: 'empty', digits: 0 });
   assert.equal(sent, 0);
@@ -64,17 +68,28 @@ test('the sample is gone from this module: nothing here builds a Keychain that i
 
 test('the code is sent without its separators, and each answer is read the way Settings reads it', async () => {
   const asked: string[] = [];
-  const ok = { deviceApprove: async (a: { user_code: string }) => (asked.push(a.user_code), { ok: true as const, value: { handle: 'h', reach: 'vault' as const, scope: '*', label: 'Laptop', ua: null } }) };
-  const approved = await approve('123 456', ok);
-  assert.deepEqual(asked, ['123456']);
+  const row = { handle: 'h', reach: 'vault' as const, scope: '*', label: 'Laptop', ua: null };
+  const ok = {
+    deviceLook: async (a: { user_code: string }) => (asked.push(a.user_code), { ok: true as const, value: { ...row, expires: '', project: null, keys: ['A key'], more: 0 } }),
+    deviceApprove: async (a: { user_code: string; handle: string }) => (asked.push(`${a.user_code}/${a.handle}`), { ok: true as const, value: row }),
+  };
+  /* THE CODE ALONE LOOKS. Only the handle that look answered approves. */
+  assert.equal((await approve('123 456', ok)).kind, 'looked');
+  assert.equal(answerLine(await approve('123 456', ok)), null);
+  const approved = await approve('123 456', ok, 'h');
+  assert.deepEqual(asked, ['123456', '123456', '123456/h']);
   assert.equal(approved.kind, 'approved');
   assert.deepEqual(answerLine(approved), { tone: 'good', line: copy.approvedNow('Laptop', copy.reachMeans.vaultAll ?? '') });
 
-  const no = (code: string) => ({ deviceApprove: async () => ({ ok: false as const, refusal: { code, fix: `said ${code}` } }) });
+  const no = (code: string) => {
+    const out = async () => ({ ok: false as const, refusal: { code, fix: `said ${code}` } });
+    return { deviceLook: out, deviceApprove: out };
+  };
   assert.equal(answerLine(await approve('123456', no('FORBIDDEN')))?.line, copy.codeWrong);
   assert.equal(answerLine(await approve('123456', no('NEEDS_BROWSER_SESSION')))?.line, copy.signInAgainWhy);
   assert.equal(answerLine(await approve('123456', no('SOMETHING_NOBODY_MAPPED')))?.line, 'said SOMETHING_NOBODY_MAPPED');
-  assert.deepEqual(await approve('123456', { deviceApprove: async () => ({ ok: false as const, conflict: {} }) }), { kind: 'wrong' });
+  const conflict = async () => ({ ok: false as const, conflict: {} });
+  assert.deepEqual(await approve('123456', { deviceLook: conflict, deviceApprove: conflict }), { kind: 'wrong' });
   assert.equal(answerLine(null), null);
 });
 

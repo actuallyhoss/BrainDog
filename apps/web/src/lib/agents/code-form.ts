@@ -16,11 +16,14 @@ import { answerLine, approve, type Approver } from '../record/keychain.ts';
 /** What the empty field shows: six noughts, which say how many digits belong in it without a word. */
 export const CODE_PLACEHOLDER = '0'.repeat(CODE_DIGITS);
 
-/** One approval, as the form calls it: the typed text in, what came back out. Nothing malformed is sent. */
-export type Approve = (typed: string) => Promise<Answer>;
+/**
+ * One send, as the form calls it: the typed text in, what came back out. Nothing malformed is sent. With no handle it looks
+ * at what is asking and lets nothing in; with the handle that look answered, it is the press of Approve.
+ */
+export type Approve = (typed: string, handle?: string) => Promise<Answer>;
 
 /** The approval over one client, or over none, which answers "sign in again" (`keychain.ts` `approve`). */
-export const approverOf = (client: Approver | null): Approve => (typed) => approve(typed, client);
+export const approverOf = (client: Approver | null): Approve => (typed, handle) => approve(typed, client, handle);
 
 /** What the field holds and what the last press answered. */
 export type CodeState = { typed: string; answer: Answer | null };
@@ -29,12 +32,12 @@ export type CodeState = { typed: string; answer: Answer | null };
 export const retyped = (value: string): CodeState => ({ typed: value, answer: null });
 
 /**
- * One press of Approve: what the field holds after it, and whether the connected list changed.
+ * One send, a look or a press of Approve: what the field holds after it, and whether the connected list changed.
  *
  * THE CODE STAYS IN THE FIELD ON A REFUSAL: six digits with one wrong is a thing to correct. An approval empties it.
  */
-export async function sent(typed: string, send: Approve): Promise<CodeState & { changed: boolean }> {
-  const answer = await send(typed);
+export async function sent(typed: string, send: Approve, handle?: string): Promise<CodeState & { changed: boolean }> {
+  const answer = await send(typed, handle);
   const changed = answer.kind === 'approved';
   return { typed: changed ? '' : typed, answer, changed };
 }

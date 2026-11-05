@@ -13,19 +13,28 @@ import { CODE_PLACEHOLDER, approverOf, retyped, saidOf, sent } from './code-form
 /* An invented machine; never a real one's name. */
 const LAPTOP = 'Wren on Larkspur';
 
-/** A fake client that records every code it was sent and answers with `answer`. */
+/** A fake client that records every code it was sent, looked at or pressed, and answers with `answer`. */
 function fake(answer: (code: string) => Awaited<ReturnType<Approver['deviceApprove']>>) {
   const asked: string[] = [];
-  return { asked, client: { deviceApprove: async (a: { user_code: string }) => (asked.push(a.user_code), answer(a.user_code)) } };
+  const pressed: string[] = [];
+  const client: Approver = {
+    deviceLook: async (a) => {
+      asked.push(a.user_code);
+      const out = answer(a.user_code);
+      return out.ok ? { ok: true as const, value: { ...out.value, expires: '2026-11-05T12:10:00.000Z', project: null, keys: [], more: 0 } } : out;
+    },
+    deviceApprove: async (a) => (pressed.push(a.handle), answer(a.user_code)),
+  };
+  return { asked, pressed, client };
 }
 
 const yes = () => ({ ok: true as const, value: { handle: 'h1', reach: 'login' as const, scope: null, label: LAPTOP, ua: null } });
-const no = (code: string) => () => ({ ok: false as const, refusal: { code, fix: `said ${code}` } });
+const no = (code: string): (() => Awaited<ReturnType<Approver['deviceApprove']>>) => () => ({ ok: false as const, refusal: { code, fix: `said ${code}` } });
 
 test('the CLI prints the code in two groups, and the two are read as one code', async () => {
   const { asked, client } = fake(yes);
   const approve = approverOf(client);
-  for (const typed of ['123 456', '123 456', ' 123-456 ', '123456']) assert.equal((await approve(typed)).kind, 'approved', typed);
+  for (const typed of ['123 456', '123 456', ' 123-456 ', '123456']) assert.equal((await approve(typed)).kind, 'looked', typed);
   assert.deepEqual(asked, ['123456', '123456', '123456', '123456']);
   assert.equal(CODE_PLACEHOLDER, '000000');
 });
@@ -41,8 +50,29 @@ test('seven digits is refused out loud, never trimmed to a different code, and n
   assert.deepEqual(asked, []);
 });
 
+test('TYPING A CODE LETS NOTHING IN: it looks, says nothing under the boxes, and only the handle it answered approves', async () => {
+  const { pressed, client } = fake(yes);
+  const looked = await approverOf(client)('123456');
+  assert.equal(looked.kind, 'looked');
+  assert.deepEqual(pressed, [], 'typing the code pressed Approve');
+  assert.equal(saidOf(looked), null);
+  const typed = await sent('123456', approverOf(client));
+  assert.equal(typed.typed, '123456', 'the code stays for the press');
+  assert.equal(typed.changed, false);
+  assert.equal((await approverOf(client)('123456', 'h1')).kind, 'approved');
+  assert.deepEqual(pressed, ['h1']);
+});
+
+test('THE SHEET AFTER THE DIGITS SAYS WHAT IS ASKING, Approve is the one press that lets it in, and the focus is not on it', () => {
+  const form = markup(read('./CodeForm.svelte'));
+  for (const said of ['copy.confirmMachine', 'copy.confirmClient', 'copy.confirmCan', 'copy.confirmKeys', 'copy.confirmProject', 'copy.confirmSelf']) assert.ok(form.includes(said), said);
+  assert.equal(form.match(/onclick=\{\(\) => void pressed\(\)\}/gu)?.length, 1);
+  assert.ok(form.indexOf('copy.confirmApprove') > form.indexOf('</form>'), 'Approve is on the sheet, out of the form an Enter submits');
+  assert.match(read('./CodeForm.svelte'), /sheetHead\?\.focus\(\)/u);
+});
+
 test('the answer says its own line and tone, from what deviceApprove answered', async () => {
-  const approved = await approverOf(fake(yes).client)('123456');
+  const approved = await approverOf(fake(yes).client)('123456', 'h1');
   const said = saidOf(approved);
   assert.equal(said?.tone, 'good');
   assert.equal(said?.invalid, false);
@@ -67,7 +97,7 @@ test('a refusal keeps the code typed, an approval empties the field, and a keyst
   const kept = await sent('123 456', approverOf(fake(no('FORBIDDEN')).client));
   assert.equal(kept.typed, '123 456');
   assert.equal(kept.changed, false);
-  const done = await sent('123 456', approverOf(fake(yes).client));
+  const done = await sent('123 456', approverOf(fake(yes).client), 'h1');
   assert.equal(done.typed, '');
   assert.equal(done.changed, true);
   assert.deepEqual(retyped('12'), { typed: '12', answer: null });

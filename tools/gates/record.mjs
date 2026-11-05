@@ -204,7 +204,8 @@ async function connect(port, key) {
     return said.value;
   };
   const laptop = await send('/auth/device', { reach: 'runner', label: 'Studio laptop' });
-  await send('/api/deviceApprove', { user_code: laptop.user_code }, true);
+  const looked = await send('/api/deviceLook', { user_code: laptop.user_code }, true);
+  await send('/api/deviceApprove', { user_code: laptop.user_code, handle: looked.handle }, true);
   await send('/auth/device/token', { device_code: laptop.device_code });
   await send('/auth/device', { reach: 'login', label: 'Claude Code, this laptop' });
   await send('/api/createToken', { scope: 'read', label: 'Nightly export' }, true);

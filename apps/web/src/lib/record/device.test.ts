@@ -120,7 +120,7 @@ test('every scope a token can hold is said as what it can do', () => {
 test('the words on this screen carry no em dash and no schema word', () => {
   const words = [
     ...Object.values(copy.deviceState), ...Object.values(copy.reachMeans), ...Object.values(copy.keyCan),
-    copy.approveTitle, copy.codeLabel, copy.codeGo, copy.codeEmpty, copy.codeOther, copy.codeWrong, copy.codeTries,
+    copy.approveTitle, copy.codeLabel, copy.codeContinue, copy.confirmApprove, copy.codeEmpty, copy.codeOther, copy.codeWrong, copy.codeTries,
     copy.codeExpired, copy.signInAgainWhy, copy.signInAgain, copy.connectedNone,
     copy.connectedNoneWhy, copy.connectTitle, copy.doorKeyLabel, copy.doorKeyGo, copy.tokenOnce, copy.copyKey,
     copy.connectDone, copy.unnamedMachine, copy.unnamedKey,

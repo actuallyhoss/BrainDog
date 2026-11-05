@@ -44,7 +44,9 @@ async function record() {
   const grant = async (reach: string, scope?: string): Promise<string> => {
     const started = await api.deviceStart({ reach, label: `studio mac · ${reach}`, ...(scope === undefined ? {} : { scope }) }, ADDRESS);
     if (!started.ok) return assert.fail(JSON.stringify(started));
-    const approved = await api.deviceApprove({ user_code: started.value.user_code }, { ...owner, provedAt: now });
+    const looked = await api.deviceLook({ user_code: started.value.user_code }, { ...owner, provedAt: now });
+    if (!looked.ok) return assert.fail(JSON.stringify(looked));
+    const approved = await api.deviceApprove({ user_code: started.value.user_code, handle: looked.value.handle }, { ...owner, provedAt: now });
     assert.ok(approved.ok, JSON.stringify(approved));
     const polled = await api.devicePoll({ device_code: started.value.device_code });
     if (!polled.ok || polled.value.pending) return assert.fail(JSON.stringify(polled));

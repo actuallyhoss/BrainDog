@@ -40,7 +40,9 @@ async function two() {
 async function machine(s: Awaited<ReturnType<typeof two>>, ask: { reach: string; scope?: string; label: string }): Promise<string> {
   const object = s.c.record(REC) as any;
   const started = await object.deviceStart(ask, '203.0.113.7');
-  const approved = await s.call(s.boCookie, 'deviceApprove', { user_code: started.value.user_code });
+  const looked = await s.call(s.boCookie, 'deviceLook', { user_code: started.value.user_code });
+  assert.equal(looked.status, 200, JSON.stringify(looked.out));
+  const approved = await s.call(s.boCookie, 'deviceApprove', { user_code: started.value.user_code, handle: looked.out.value.handle });
   assert.equal(approved.status, 200, JSON.stringify(approved.out));
   const polled = await s.c.ask('/auth/device/token', { method: 'POST', body: JSON.stringify({ slug: 'studio', device_code: started.value.device_code }) });
   return ((await polled.json()) as any).value.bearer as string;

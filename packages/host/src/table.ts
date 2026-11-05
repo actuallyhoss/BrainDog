@@ -262,7 +262,8 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'revokeToken', group: 'ADMIN', writes: true, what: 'Revoke one. The second call says the same as the first.' },
   { name: 'createReportKey', group: 'ADMIN', writes: true, what: 'Mint a report key: a token that sends rows to one list, with the fields it always carries, and reaches nothing else. The secret is in the answer only.' },
   { name: 'reportKeys', group: 'ADMIN', writes: false, what: 'Every report key, with the list it sends rows to and the fields it fixes. Never the key.' },
-  { name: 'deviceApprove', group: 'ADMIN', writes: true, what: 'Let in the device showing these six digits. A sign-in in the last fifteen minutes.' },
+  { name: 'deviceLook', group: 'ADMIN', writes: true, what: 'What is asking in under these six digits, with nothing let in: its name, what it could do, which keys. A wrong code costs a try. A sign-in in the last fifteen minutes.' },
+  { name: 'deviceApprove', group: 'ADMIN', writes: true, what: 'Let in the device deviceLook showed, by its six digits and handle. A sign-in in the last fifteen minutes.' },
   { name: 'listDevices', group: 'ADMIN', writes: false, what: 'Every device grant by its handle, with when it was last heard from. Never the id it polls with.' },
   { name: 'revokeDevice', group: 'ADMIN', writes: true, what: 'Revoke one device by its handle. A login grant takes its token with it.' },
   /* THE SHORTCUT'S DOOR, AND AN OWNER'S IN A BROWSER for `deviceApprove`'s reason: whoever holds the token can put a

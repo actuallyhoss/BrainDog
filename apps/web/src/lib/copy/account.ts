@@ -317,8 +317,22 @@ export const account = {
 
   /* The code entry: the `verification_uri` every device flow prints. */
   approveTitle: 'Approve a machine',
+  /* The sheet after the six digits, the only place a machine is let in from. */
+  confirmTitle: 'Is this what you started?',
+  confirmMachine: 'Machine',
+  confirmClient: 'Client',
+  confirmCan: 'What it will be able to do',
+  confirmProject: 'Project',
+  confirmNoProject: 'No project',
+  confirmKeys: 'Keys it could open',
+  confirmNoKeys: 'None yet. It could open any added here later.',
+  confirmLaterKeys: 'And any added here later.',
+  confirmMoreKeys: (n: number) => `and ${n} more`,
+  confirmSelf: 'The machine and client are what it says about itself. Approve only if you started this yourself, just now. Nobody from BrainDog will ever ask you to.',
+  confirmApprove: 'Approve',
+  confirmNot: 'Not this one',
+  codeContinue: 'Continue',
   codeLabel: 'The six digits it is showing',
-  codeGo: 'Approve',
   codeEmpty: 'Type the six digits the machine is showing.',
   codeShort: (n: number) => `That is ${n} digit${n === 1 ? '' : 's'}. A code is six.`,
   codeLong: (n: number) => `That is ${n} digits. A code is six.`,

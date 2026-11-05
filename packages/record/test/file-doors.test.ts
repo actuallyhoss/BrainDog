@@ -74,7 +74,9 @@ const manifestOf = (lines: readonly string[]): string[] => {
 async function bearerFor(api: Awaited<ReturnType<typeof record>>['api'], reach: string): Promise<string> {
   const started = await api.deviceStart({ reach, label: 'test-box · braindog-cli' }, '203.0.113.7');
   if (!started.ok) return assert.fail(JSON.stringify(started));
-  assert.ok((await api.deviceApprove({ user_code: started.value.user_code }, { ...owner, provedAt: NOW })).ok);
+  const looked = await api.deviceLook({ user_code: started.value.user_code }, { ...owner, provedAt: NOW });
+  if (!looked.ok) return assert.fail(JSON.stringify(looked));
+  assert.ok((await api.deviceApprove({ user_code: started.value.user_code, handle: looked.value.handle }, { ...owner, provedAt: NOW })).ok);
   const polled = await api.devicePoll({ device_code: started.value.device_code });
   if (!polled.ok || polled.value.pending) return assert.fail(JSON.stringify(polled));
   return polled.value.bearer;

@@ -47,6 +47,17 @@ export function askerOf(label: string | null, reach: DeviceRow['reach']): string
   return copy.askerOn(agent ?? COMMANDS[reach] ?? CLI, machineSaid(machine));
 }
 
+/** The machine a grant says it is on, as a person says it, or that it named none. */
+export function machineOf(label: string | null): string {
+  const { machine, whole } = partsOfLabel(label);
+  return machine !== null ? machineSaid(machine) : (whole ?? copy.unnamedMachine);
+}
+
+/** The app or agent that asked: the agent its label names, else the command its reach comes from. */
+export function clientOf(label: string | null, reach: DeviceRow['reach']): string {
+  return partsOfLabel(label).agent ?? COMMANDS[reach] ?? CLI;
+}
+
 /** What a grant may do, as a sentence starting with a capital: "Take one copy of your BrainDog, once, ...". */
 export function canOf(reach: DeviceRow['reach'], scope: string | null): string {
   const means = copy.reachMeans[reachKey(reach, scope)] ?? reach;

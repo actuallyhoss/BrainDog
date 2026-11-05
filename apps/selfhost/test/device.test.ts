@@ -126,7 +126,9 @@ test('START, APPROVE FROM A SESSION, AND POLL TO A BEARER THAT READS THE RECORD,
     assert.deepEqual(waiting.body?.value, { pending: true, interval: 5 });
 
     const sid = await s.signIn();
-    const approved = await s.call('/api/deviceApprove', { sid, body: { user_code: code.user_code } });
+    const looked = await s.call('/api/deviceLook', { sid, body: { user_code: code.user_code } });
+    assert.equal(looked.status, 200, looked.raw);
+    const approved = await s.call('/api/deviceApprove', { sid, body: { user_code: code.user_code, handle: looked.body?.value?.handle } });
     assert.equal(approved.status, 200, approved.raw);
     const handle = String(approved.body?.value?.handle);
 
@@ -178,18 +180,18 @@ test('FIVE WRONG CODES DENY THE WAITING DEVICE, AND THE RIGHT CODE DOES NOTHING 
     const sid = await s.signIn();
     const wrong = String((Number(code.user_code) + 1) % 1_000_000).padStart(6, '0');
     for (let i = 0; i < 4; i++) {
-      const miss = await s.call('/api/deviceApprove', { sid, body: { user_code: wrong } });
+      const miss = await s.call('/api/deviceLook', { sid, body: { user_code: wrong } });
       assert.equal(miss.status, 403, miss.raw);
       assert.equal(miss.body?.refusal?.code, 'FORBIDDEN');
     }
-    const fifth = await s.call('/api/deviceApprove', { sid, body: { user_code: wrong } });
+    const fifth = await s.call('/api/deviceLook', { sid, body: { user_code: wrong } });
     assert.equal(fifth.status, 422);
     assert.equal(fifth.body?.refusal?.code, 'DEVICE_CODE_TRIES');
 
     const denied = await s.call('/auth/device/token', { body: { device_code: code.device_code } });
     assert.equal(denied.status, 422);
     assert.equal(denied.body?.refusal?.code, 'DEVICE_CODE_TRIES');
-    assert.equal((await s.call('/api/deviceApprove', { sid, body: { user_code: code.user_code } })).status, 403);
+    assert.equal((await s.call('/api/deviceLook', { sid, body: { user_code: code.user_code } })).status, 403);
     s.clean();
   } finally {
     await s.close();

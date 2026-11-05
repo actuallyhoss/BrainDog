@@ -19,12 +19,12 @@
  * for and these are read by two routes that are not the home page.
  */
 
-import type { DeviceApproved, DeviceRow } from '@braindog/client';
+import type { DeviceApproved, DeviceLooked, DeviceRow } from '@braindog/client';
 
 import { BASE, signinFor } from '../at.ts';
 import { copy } from '../copy.ts';
 import { list } from '../copy/english.ts';
-import { answerOf, codeOf, reachKey, type Answer, type Refusal } from './device.ts';
+import { answerOf, codeOf, lookedOf, reachKey, type Answer, type Refusal } from './device.ts';
 import { REGISTERS } from './held.ts';
 import { KEYS_REGISTER } from './keys-register.ts';
 import type { Scope } from './scope-move.ts';
@@ -157,21 +157,32 @@ export const words = {
 
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown };
 
-/** The one client method an approval calls. */
-export type Approver = { deviceApprove(args: { user_code: string }): Promise<Wire<DeviceApproved>> };
+/** The two client methods an approval calls. */
+export type Approver = {
+  deviceLook(args: { user_code: string }): Promise<Wire<DeviceLooked>>;
+  deviceApprove(args: { user_code: string; handle: string }): Promise<Wire<DeviceApproved>>;
+};
 
 /**
  * The six digits, sent or refused. Nothing malformed is sent.
+ *
+ * WITH NO HANDLE IT ONLY LOOKS: typing a code answers what is asking in, and lets nothing in. WITH THE HANDLE THAT LOOK
+ * ANSWERED it is the press of Approve, the only thing that does. The record refuses an approval with no handle, so a code
+ * alone approves nothing on any page.
  *
  * NO CLIENT IS NOBODY SIGNED IN TO APPROVE AS, so the answer is `signin`: the one refusal with a way forward on
  * this screen, drawn with its Sign in again button. It answered `demo` while the bare address with no session was the sample
  * record, and "The demo has no account" would now be said to a person whose only problem is a missing sign-in.
  */
-export async function approve(typed: string, client: Approver | null): Promise<Answer> {
+export async function approve(typed: string, client: Approver | null, handle?: string): Promise<Answer> {
   const entry = codeOf(typed);
   if (!entry.ok) return { kind: 'malformed', why: entry.why, digits: entry.digits };
   if (!client) return { kind: 'signin' };
-  const out = await client.deviceApprove({ user_code: entry.code });
+  if (handle === undefined) {
+    const out = await client.deviceLook({ user_code: entry.code });
+    return 'conflict' in out ? { kind: 'wrong' } : lookedOf(out);
+  }
+  const out = await client.deviceApprove({ user_code: entry.code, handle });
   /* `deviceApprove` carries no version, so a conflict cannot come back; it is read as a miss rather than drawn blank. */
   return 'conflict' in out ? { kind: 'wrong' } : answerOf(out);
 }
@@ -180,6 +191,9 @@ export async function approve(typed: string, client: Approver | null): Promise<A
 export function answerLine(a: Answer | null): { tone: 'good' | 'bad'; line: string } | null {
   if (!a) return null;
   switch (a.kind) {
+    /* WHAT IS ASKING IS DRAWN AS ITS OWN SHEET (`CodeForm.svelte`), not as a line under the boxes. */
+    case 'looked':
+      return null;
     case 'approved':
       return { tone: 'good', line: copy.approvedNow(a.label ?? copy.unnamedMachine, copy.reachMeans[reachKey(a.reach, a.scope)] ?? a.reach) };
     case 'malformed':

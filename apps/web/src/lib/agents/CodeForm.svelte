@@ -10,23 +10,29 @@
   paste of `325 684` or `325684` lands whole, and a screen reader reads one field with one label. The box the next
   digit goes in carries the focus ring and a caret.
 
-  THE SIXTH DIGIT SENDS IT. Reaching six from fewer approves at once; the same six held again after a refusal wait for
-  Enter or the button, so a wrong code is never sent twice by itself. A refusal keeps the code and selects it, so the
-  next keystroke starts over. Seven digits, or a letter, is refused out loud and not taken (`approve.ts` `enteredOf`):
+  THE SIXTH DIGIT LOOKS, AND LETS NOTHING IN. Reaching six from fewer asks what that code names; the same six held again
+  after a refusal wait for Enter or the button, so a wrong code is never sent twice by itself. A refusal keeps the code and
+  selects it, so the next keystroke starts over.
+
+  THEN THE SHEET SAYS WHAT IS ASKING, and Approve on it is the only thing that lets it in: the machine, the client, what it
+  will be able to do, and for a keychain request which keys. A phisher who starts a grant and talks somebody into typing
+  six digits gets a page that says what they are about to hand over. The focus goes to the sheet's heading and not to
+  Approve, so an Enter still held from the digits presses nothing, and the sheet is not in the `<form>`. Seven digits, or a letter, is refused out loud and not taken (`approve.ts` `enteredOf`):
   nothing is ever trimmed into a different code.
 
   A `<form>`, so Enter sends it. ITS STYLES ARE ITS OWN, because Home's sheet has no `settings.css`. It is loaded with
   the sheet or the page, never with what every screen loads.
 -->
 <script lang="ts">
+  import { tick } from 'svelte';
   import { TONES } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
-  import { codeOf, CODE_DIGITS, normalise, type Answer } from '$lib/record/device.ts';
+  import { codeOf, CODE_DIGITS, normalise, type Answer, type DeviceLooked } from '$lib/record/device.ts';
   import { reprove } from '$lib/record/keychain.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
-  import { cellsOf, enteredOf } from './approve.ts';
+  import { canOf, cellsOf, clientOf, enteredOf, machineOf } from './approve.ts';
   import { saidOf, sent, type Approve } from './code-form.ts';
 
   type Approved = Extract<Answer, { kind: 'approved' }>;
@@ -39,7 +45,7 @@
     size = 'inline',
     autofocus = false,
   }: {
-    /** One approval of what was typed (`code-form.ts` `approverOf`). */
+    /** One send of what was typed, a look or a press of Approve (`code-form.ts` `approverOf`). */
     approve: Approve;
     /** A machine was approved, so the connected list changed; awaited before the form is ready again. */
     onchanged?: (() => unknown) | undefined;
@@ -58,6 +64,13 @@
   let approving = $state(false);
   let focused = $state(false);
   let input = $state<HTMLInputElement | undefined>();
+  /* WHAT THE CODE NAMES, once it has been looked at: drawn in place of the boxes until Approve or Not this one. */
+  let looked = $state<DeviceLooked | null>(null);
+  let sheetHead = $state<HTMLHeadingElement | undefined>();
+
+  $effect(() => {
+    if (looked !== null) sheetHead?.focus();
+  });
 
   const cells = $derived(cellsOf(typed));
   /* THE BOX THE NEXT DIGIT GOES IN; six when the boxes are full, which marks none. */
@@ -93,23 +106,53 @@
 
   async function tryCode(e?: SubmitEvent) {
     e?.preventDefault();
+    await send();
+  }
+
+  /** The press of Approve on the sheet: this code, and the row the sheet showed. */
+  const pressed = () => send(looked?.handle);
+
+  async function send(handle?: string) {
     if (approving) return;
     /* NOTHING TYPED YET: the press goes to the field and says why, as a primary does everywhere. */
     if (normalise(typed) === '') input?.focus();
     approving = true;
     const busy = opened();
-    const out = await sent(typed, approve);
+    const out = await sent(typed, approve, handle);
     closed(true, busy);
     approving = false;
     ({ typed, answer } = out);
-    if (input) input.value = typed;
+    if (out.answer?.kind === 'looked') {
+      looked = out.answer.looked;
+      return;
+    }
+    /* ANYTHING ELSE ENDS THE SHEET: approved, or a refusal said under the boxes with the code still in them. */
+    looked = null;
     if (out.answer?.kind === 'approved') {
+      if (input) input.value = typed;
       onapproved?.(out.answer);
       if (out.changed) await onchanged?.();
       return;
     }
-    /* A REFUSAL SELECTS THE CODE, so the next keystroke or paste replaces it. */
-    if (input && document.activeElement === input) input.select();
+    /* A REFUSAL SELECTS THE CODE, so the next keystroke or paste replaces it. The boxes were put away while the sheet was up. */
+    await tick();
+    if (input) {
+      input.value = typed;
+      if (handle !== undefined || document.activeElement === input) {
+        input.focus();
+        input.select();
+      }
+    }
+  }
+
+  /** Not this one: nothing was let in, and the field is empty for the code they meant. The machine's request lapses by itself. */
+  async function notThis() {
+    looked = null;
+    typed = '';
+    answer = null;
+    await tick();
+    if (input) input.value = '';
+    input?.focus();
   }
 
   /* What the status line under the boxes says, or nothing. A page that says "Approved" itself takes that line. */
@@ -127,7 +170,7 @@
   }
 </script>
 
-<form class="code-form" data-size={size} data-shape={shape} onsubmit={tryCode} novalidate>
+<form class="code-form" data-size={size} data-shape={shape} data-looking={looked !== null ? '' : undefined} onsubmit={tryCode} novalidate>
   <label class="code-label" for={id}>{copy.codeLabel}</label>
   <div class="code-row">
     <div class="code-boxes" data-focused={focused ? '' : undefined}>
@@ -155,7 +198,7 @@
         aria-busy={approving || undefined}
       />
     </div>
-    <Button weight="primary" type="submit" disabled={approving} aria-busy={approving || undefined}>{approving ? copy.codeChecking : copy.codeGo}</Button>
+    <Button weight="primary" type="submit" disabled={approving} aria-busy={approving || undefined}>{approving ? copy.codeChecking : copy.codeContinue}</Button>
   </div>
   <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. The mark
        beside the sentence carries its tone, so the tone is never colour alone. -->
@@ -168,8 +211,140 @@
     </div>
   {/if}
 </form>
+{#if looked !== null}
+  <section class="code-sheet" aria-labelledby="{id}-sheet">
+    <h2 class="code-sheet-title" id="{id}-sheet" tabindex="-1" bind:this={sheetHead}>{copy.confirmTitle}</h2>
+    <dl class="code-facts">
+      <div class="code-fact">
+        <dt>{copy.confirmMachine}</dt>
+        <dd dir="auto">{machineOf(looked.label)}</dd>
+      </div>
+      <div class="code-fact">
+        <dt>{copy.confirmClient}</dt>
+        <dd dir="auto">{clientOf(looked.label, looked.reach)}</dd>
+      </div>
+      <div class="code-fact">
+        <dt>{copy.confirmCan}</dt>
+        <dd>{canOf(looked.reach, looked.scope)}</dd>
+      </div>
+      {#if looked.reach === 'vault'}
+        <div class="code-fact">
+          <dt>{copy.confirmProject}</dt>
+          <dd dir="auto">{looked.project ?? copy.confirmNoProject}</dd>
+        </div>
+        <div class="code-fact">
+          <dt>{copy.confirmKeys}</dt>
+          <dd>
+            {#if looked.keys.length === 0}
+              {copy.confirmNoKeys}
+            {:else}
+              <ul class="code-keys">
+                {#each looked.keys as key, i (i)}<li dir="auto">{key}</li>{/each}
+                {#if looked.more > 0}<li>{copy.confirmMoreKeys(looked.more)}</li>{/if}
+              </ul>
+              {copy.confirmLaterKeys}
+            {/if}
+          </dd>
+        </div>
+      {/if}
+    </dl>
+    <p class="code-self">{copy.confirmSelf}</p>
+    <div class="code-sheet-acts">
+      <Button weight="primary" disabled={approving} aria-busy={approving || undefined} onclick={() => void pressed()}>{approving ? copy.codeChecking : copy.confirmApprove}</Button>
+      <Button weight="quiet" disabled={approving} onclick={() => void notThis()}>{copy.confirmNot}</Button>
+    </div>
+  </section>
+{/if}
 
 <style>
+  /* THE BOXES STAND ASIDE FOR THE SHEET. The form stays in the document, with its live region, so a refusal after a press
+     of Approve is announced as any other. */
+  .code-form[data-looking] {
+    margin-block-start: 0;
+  }
+
+  .code-form[data-looking] .code-label,
+  .code-form[data-looking] .code-row {
+    display: none;
+  }
+
+  /* WHAT IS ASKING, ONE COLUMN: the question, the facts in a well, the warning, and the two presses. */
+  .code-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    margin-block-start: var(--sp-3);
+    max-inline-size: var(--measure);
+    min-inline-size: 0;
+  }
+
+  .code-sheet-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 600;
+    line-height: var(--lead-ui);
+  }
+
+  .code-sheet-title:focus {
+    /* focus-ok: the heading takes focus only by script, so a reader is told and an Enter still held presses nothing; it is
+       never in the tab order, and a ring there would read as a control. */
+    outline: none;
+  }
+
+  .code-facts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: var(--sp-4);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
+  }
+
+  .code-fact {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .code-fact dt {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+    line-height: var(--lead-meta);
+  }
+
+  .code-fact dd {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: calc(22px * var(--type, 1));
+    overflow-wrap: anywhere;
+  }
+
+  .code-keys {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .code-self {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+    text-wrap: pretty;
+  }
+
+  .code-sheet-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
   /* THE COLUMN: the label, the boxes with their button, and the sentence under them, 8 apart. */
   .code-form {
     --box-w: 40px;

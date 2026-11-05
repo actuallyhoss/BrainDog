@@ -65,6 +65,8 @@ export type DeviceCode = { device_code: string; user_code: string; expires: stri
 export type Waiting = { pending: true; interval: typeof POLL_INTERVAL };
 export type Exchanged = { pending: false; bearer: string; reach: Reach; scope: string | null; expires: string };
 export type Approved = { handle: string; reach: Reach; scope: string | null; label: string | null; ua: string | null };
+/** What `deviceLook` shows the person before they approve: the row a code names, and until when it waits. */
+export type Looked = Approved & { expires: string };
 
 /** What a listing shows: never the poll id, the code's hash or the bearer's. */
 export type DeviceRow = {
@@ -261,28 +263,36 @@ export async function deviceStart(
 /**
  * The owner types the code. A browser session only; the record's group gate sees to that.
  *
+ * TYPING IT APPROVES NOTHING. Six digits say which machine is asking, and a phisher who starts a grant and talks an owner
+ * into typing them got a keychain or a ninety-day key from that alone (RFC 8628 §5.4). So this answers what is asking and
+ * writes nothing but the try a wrong code costs, and only `deviceApprove`, sent with the handle this answered, lets it in.
+ *
  * A MISS COSTS EVERY PENDING ROW A TRY. A guesser cannot spread guesses across requests to stay
  * under the count, and the fifth denies them all. A malformed entry costs nothing, because a typo
  * should not spend somebody else's enrolment.
  */
-export async function deviceApprove(
+export async function deviceLook(
   deps: TokenDeps,
-  person: string,
   args: { user_code: string },
-  /**
-   * What the approver's own sign-in still lacks for the grant this code names, asked once the code has matched and before
-   * anything is approved: the record's keychain asks a proof inside its own lock window for `vault`, which is shorter than
-   * the fifteen minutes every other approval takes. A refusal here spends no try, because the code was right.
-   */
+  /** What the approver's own sign-in still lacks for the grant this code names (`deviceApprove`), asked here too, so it is asked before the page shows Approve. */
   held?: (reach: Reach) => Refusal | null,
-): Promise<Result<Approved>> {
+): Promise<Result<Looked>> {
   const code = typeof args?.user_code === 'string' ? args.user_code : '';
   if (!/^\d{6}$/.test(code)) return no('VALUE_MALFORMED', 'A device code is six digits.', { at: 'user_code' });
+  const hit = await matchedCode(deps, code);
+  if (!hit) return missedCode(deps);
+  const stop = held?.(hit.reach) ?? null;
+  if (stop) return { ok: false, refusal: stop };
+  if (hit.reach === 'vault' && hit.scope !== '*' && !isProject(deps, hit.scope ?? ''))
+    return no('REF_UNKNOWN', `${hit.scope} is not a project here.`, { at: 'scope' });
+  return ok({ handle: await handleOf(deps, hit.id), reach: hit.reach, scope: hit.scope, label: hit.label, ua: hit.ua, expires: hit.expires });
+}
 
+/** The one waiting row a code names, or nothing. */
+async function matchedCode(deps: TokenDeps, code: string): Promise<Stored | undefined> {
   const now = instant(deps.nowMs);
   deps.sql.exec("UPDATE device_grant SET status = 'expired' WHERE status IN ('pending', 'approved') AND expires <= ?", now);
   const pending = deps.sql.all<Stored>(`SELECT ${VISIBLE}, code_hash, token_hash FROM device_grant WHERE status = 'pending'`);
-
   /* EVERY ROW IS HASHED, a match or not, so the time taken says nothing about which row was close. */
   let hit: Stored | undefined;
   let hits = 0;
@@ -292,39 +302,63 @@ export async function deviceApprove(
       hit ??= row;
     }
   /* TWO GRANTS UNDER ONE CODE ARE NEITHER APPROVED: which terminal the person meant cannot be told. */
-  if (hits > 1) hit = undefined;
+  return hits > 1 ? undefined : hit;
+}
 
-  if (hit) {
-    const stop = held?.(hit.reach) ?? null;
-    if (stop) return { ok: false, refusal: stop };
-    if (hit.reach === 'vault' && hit.scope !== '*' && !isProject(deps, hit.scope ?? ''))
-      return no('REF_UNKNOWN', `${hit.scope} is not a project here.`, { at: 'scope' });
-    const at = instant(deps.nowMs);
-    deps.sql.exec(
-      "UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ? AND status = 'pending'",
-      person,
-      at,
-      hit.id,
-    );
-    const handle = await handleOf(deps, hit.id);
-    deps.sql.exec(
-      "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'access.grant', ?, 'device_grant', ?, ?)",
-      deps.mint(),
-      at,
-      person,
-      `device:${handle}`,
-      hit.reach,
-      (hit.label ?? '').slice(0, 280) || null,
-    );
-    return ok({ handle, reach: hit.reach, scope: hit.scope, label: hit.label, ua: hit.ua });
-  }
-
+/** What a code that names nothing costs: a try on every waiting row, and the fifth denies them all. */
+function missedCode<T>(deps: TokenDeps): Result<T> {
   deps.sql.exec("UPDATE device_grant SET tries = tries + 1 WHERE status = 'pending'");
   if (deps.sql.one("SELECT 1 AS hit FROM device_grant WHERE status = 'pending' AND tries >= ?", CODE_TRIES)) {
     deps.sql.exec("UPDATE device_grant SET status = 'denied' WHERE status = 'pending'");
     return no('DEVICE_CODE_TRIES', 'Five wrong codes denied every waiting device, so ask the device to start again.', { at: 'user_code' });
   }
   return no('FORBIDDEN', 'No device is waiting with that code.', { at: 'user_code' });
+}
+
+/**
+ * The owner presses Approve on what `deviceLook` showed them. `handle` says which row they were shown: a code that has
+ * since come to name another is refused, costing no try, because the code was right. The record's door requires it.
+ */
+export async function deviceApprove(
+  deps: TokenDeps,
+  person: string,
+  args: { user_code: string; handle?: string },
+  /**
+   * What the approver's own sign-in still lacks for the grant this code names, asked once the code has matched and before
+   * anything is approved: the record's keychain asks a proof inside its own lock window for `vault`, which is shorter than
+   * the fifteen minutes every other approval takes. A refusal here spends no try, because the code was right.
+   */
+  held?: (reach: Reach) => Refusal | null,
+): Promise<Result<Approved>> {
+  const code = typeof args?.user_code === 'string' ? args.user_code : '';
+  if (!/^\d{6}$/.test(code)) return no('VALUE_MALFORMED', 'A device code is six digits.', { at: 'user_code' });
+  const hit = await matchedCode(deps, code);
+  if (!hit) return missedCode(deps);
+
+  const stop = held?.(hit.reach) ?? null;
+  if (stop) return { ok: false, refusal: stop };
+  if (hit.reach === 'vault' && hit.scope !== '*' && !isProject(deps, hit.scope ?? ''))
+    return no('REF_UNKNOWN', `${hit.scope} is not a project here.`, { at: 'scope' });
+  const handle = await handleOf(deps, hit.id);
+  if (args.handle !== undefined && args.handle !== handle)
+    return no('FORBIDDEN', 'That code now names another device, so nothing was approved. Look at it again.', { at: 'handle' });
+  const at = instant(deps.nowMs);
+  deps.sql.exec(
+    "UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ? AND status = 'pending'",
+    person,
+    at,
+    hit.id,
+  );
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'access.grant', ?, 'device_grant', ?, ?)",
+    deps.mint(),
+    at,
+    person,
+    `device:${handle}`,
+    hit.reach,
+    (hit.label ?? '').slice(0, 280) || null,
+  );
+  return ok({ handle, reach: hit.reach, scope: hit.scope, label: hit.label, ua: hit.ua });
 }
 
 /**

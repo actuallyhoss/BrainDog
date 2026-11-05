@@ -284,7 +284,8 @@ them. `ROUTES` in `@braindog/host` routes 68 of the ninety at `/api/<method>`, 3
 | ADMIN | `createToken` | `{ scope, name }` — one scope word, the ladder's top | the bearer `<rec_id>.<secret>`, shown once; the row stores `sha256(secret)` |
 | ADMIN | `listTokens` | `{}` | the tokens with `last_used_at`, `last_surface`; never a secret |
 | ADMIN | `revokeToken` | `{ id }` | nothing |
-| ADMIN | `deviceApprove` | `{ user_code }`, by the owner from a sign-in proved in the last 15 minutes; five wrong codes deny every waiting device | `{ handle, reach, scope, label, ua }`; an `access.grant` event names the approver |
+| ADMIN | `deviceLook` | `{ user_code }`, by whoever may approve; a wrong code costs a try and nothing is let in | `{ handle, reach, scope, label, ua, expires, project, keys, more }` |
+| ADMIN | `deviceApprove` | `{ user_code, handle }`, the handle `deviceLook` answered, by the owner from a sign-in proved in the last 15 minutes; five wrong codes deny every waiting device | `{ handle, reach, scope, label, ua }`; an `access.grant` event names the approver |
 | ADMIN | `listDevices` | `{}` | every device grant by its handle, with its status, reach, label and last use; never a poll id, a code or a bearer |
 | ADMIN | `revokeDevice` | `{ handle }` | the row, now `revoked`, and a login's token revoked with it; an unknown handle is `OUT_OF_BOUNDS` |
 | ADMIN | `deleteRecord` | `{ slug }` — typed to confirm; a browser session, re-authenticated | the record is gone: the Worker `destroy()`s the object and removes the R2 prefix (§10). A self-host removes the record file, its copies and its Directory name, and answers 503 after; the Worker refuses `NOT_IN_THIS_BUILD` until the sealed final snapshot is wired |

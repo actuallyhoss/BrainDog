@@ -117,9 +117,10 @@ test('A REFUSED PRESS SAYS THE RECORD SENTENCE, and one that threw says the reco
 
 test('THE SIX DIGITS SETUP SHOWS ARE APPROVED ON THIS PAGE: one approval, of the code as typed in two groups', async () => {
   const sent: unknown[] = [];
-  /* ONLY THE ONE METHOD AN APPROVAL CALLS (`keychain.ts` `Approver`); what it answers is not read here. */
+  /* ONLY THE TWO METHODS AN APPROVAL CALLS (`keychain.ts` `Approver`); what it answers is not read here. */
   const approver = (into: unknown[]): Approver => ({
-    deviceApprove: async (args) => (into.push(args), { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No machine is waiting with that code.' } }),
+    deviceLook: async (args) => (into.push(args), { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No machine is waiting with that code.' } }),
+    deviceApprove: async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'No machine is waiting with that code.' } }),
   });
   assert.equal((await approverFor(BASE, { client: approver(sent) })('123 456')).kind, 'wrong', 'a code that matches nothing is said as wrong');
   assert.deepEqual(sent, [{ user_code: '123456' }]);

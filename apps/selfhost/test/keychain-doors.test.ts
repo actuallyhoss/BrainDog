@@ -154,7 +154,9 @@ async function stack() {
       const started = await call('/auth/device', { body: { reach: 'vault', label: 'test-laptop · braindog-cli', scope } });
       assert.equal(started.status, 200, started.raw);
       const code = started.body?.value as { device_code: string; user_code: string };
-      const approved = await call('/api/deviceApprove', { sid: await signIn(), body: { user_code: code.user_code } });
+      const sid = await signIn();
+      const looked = await call('/api/deviceLook', { sid, body: { user_code: code.user_code } });
+      const approved = await call('/api/deviceApprove', { sid, body: { user_code: code.user_code, handle: looked.body?.value?.handle } });
       assert.equal(approved.status, 200, approved.raw);
       const exchanged = await call('/auth/device/token', { body: { device_code: code.device_code } });
       assert.equal(exchanged.status, 200, exchanged.raw);

@@ -10,8 +10,8 @@
   NEVER A VALUE, A CODE OR A HANDLE. A key row says whether a value is sealed, how often it was opened
   and when; the six digits are typed here and never printed; a machine is named by its label.
 
-  THE APPROVAL IS SETTINGS', NOT A COPY OF IT. `record/keychain.ts` holds the one `approve`, the one
-  `answerLine` and the one `reprove`, and `/settings/agents` calls the same three.
+  THE APPROVAL IS SETTINGS', NOT A COPY OF IT. `CodeForm.svelte` is the one form for the six digits, here and on
+  `/settings/agents`, and `record/keychain.ts` holds the one `approve`, `answerLine` and `reprove` behind it.
 
   THE INDEX AND THE MACHINES HAVE TWO DIFFERENT CEILINGS, AND THAT IS THE DECISION. What the registers
   index is what a key OPENS and never the key, and a credential never goes in the record, so reading
@@ -40,9 +40,11 @@
   import { since, relative, TONES } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
-  import { CODE_DIGITS, type Answer, type DeviceRow } from '$lib/record/device.ts';
+  import type { DeviceRow } from '$lib/record/device.ts';
+  import CodeForm from '$lib/agents/CodeForm.svelte';
+  import { approverOf, type Approve } from '$lib/agents/code-form.ts';
   import {
-    answerLine, approve, asks, daysFor, holders, keysOf, lastUsers, retiredOf, lockOf, namesOf, readAll, reconnectFrom, reconnectOf, reprove, revoke, runPath,
+    asks, daysFor, holders, keysOf, lastUsers, retiredOf, lockOf, namesOf, readAll, reconnectFrom, reconnectOf, reprove, revoke, runPath,
     scopeName, wantsPassphrase, withPassphrase, words, RECONNECT_STATE,
     type GrantState, type KeyRow, type Lock, type ProjectMark, type UsedByRun,
   } from '$lib/record/keychain.ts';
@@ -291,39 +293,12 @@
   }
 
   /* ── the code ── */
-  let typed = $state('');
-  let approving = $state(false);
-  let answer = $state<Answer | null>(null);
-  let reproving = $state(false);
-  const said = $derived(answerLine(answer));
+  /* THE SIX DIGITS ARE THE ONE FORM (`CodeForm.svelte`): typing them says what is asking, and its Approve lets it in. */
+  const approveCode: Approve = (typed, handle) => approverOf(client)(typed, handle);
 
-  function retype(value: string) {
-    typed = value;
-    answer = null;
-  }
-
-  async function tryCode(e?: SubmitEvent) {
-    e?.preventDefault();
-    if (approving) return;
-    approving = true;
-    const at = opened();
-    answer = await approve(typed, client);
-    closed(true, at);
-    approving = false;
-    /* THE CODE STAYS IN THE FIELD ON A REFUSAL: six digits with one wrong is a thing to correct. */
-    if (answer.kind === 'approved' && client) {
-      typed = '';
-      const again = await client.listDevices();
-      if (again.ok) machines = again.value;
-    }
-  }
-
-  async function signInAgain() {
-    if (reproving) return;
-    reproving = true;
-    const back = await reprove({ support, methods, passkeySignIn }, (href) => location.assign(href));
-    reproving = false;
-    if (back) await tryCode();
+  async function machinesAgain() {
+    const again = await client?.listDevices();
+    if (again?.ok) machines = again.value;
   }
 
   /**
@@ -805,36 +780,7 @@
         {/each}
       </ul>
 
-      <form class="code-form" onsubmit={tryCode} novalidate>
-        <label class="field-label" for="keychain-code">{copy.codeLabel}</label>
-        <div class="code-row">
-          <div class="field code-field">
-            <input
-              class="field-input code-input"
-              id="keychain-code"
-              type="text"
-              inputmode="numeric"
-              autocomplete="one-time-code"
-              autocapitalize="off"
-              spellcheck="false"
-              placeholder={'0'.repeat(CODE_DIGITS)}
-              value={typed}
-              oninput={(e) => retype((e.currentTarget as HTMLInputElement).value)}
-              aria-describedby="keychain-code-said"
-              aria-invalid={said?.tone === 'bad' ? 'true' : undefined}
-            />
-          </div>
-          <Button weight="primary" type="submit" disabled={approving}>{copy.codeGo}</Button>
-        </div>
-        <p class="code-said" id="keychain-code-said" role="status" data-intent={said?.tone}>
-          {#if said}<span class="code-glyph" role="img" aria-label={TONES[said.tone].label}>{TONES[said.tone].glyph}</span>{said.line}{/if}
-        </p>
-        {#if answer?.kind === 'signin'}
-          <div class="row-actions">
-            <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
-          </div>
-        {/if}
-      </form>
+      <CodeForm id="keychain-code" approve={approveCode} onchanged={machinesAgain} />
     </Tile>
   {/if}
 
@@ -1705,31 +1651,7 @@
 
   /* ── the request ──────────────────────────────────────────────────────── */
 
-  .code-form {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .code-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  /* SIX DIGITS WIDE, in the mono face a code is set in, spaced so each digit reads on its own. */
-  .code-field {
-    flex: 0 1 16ch;
-  }
-
-  .code-input {
-    font-family: var(--font-mono);
-    font-size: var(--fs-body);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.18em;
-  }
-
-  .code-said {
+    .code-said {
     display: flex;
     align-items: baseline;
     gap: calc(6px * var(--dense, 1));
@@ -1901,13 +1823,6 @@
       margin-inline: var(--sp-3);
     }
 
-    .code-field {
-      flex: 1 1 100%;
-    }
-
-    .code-row :global(.btn) {
-      flex: 1 1 auto;
-    }
   }
 
   /* ON A PHONE THE SENTENCE TAKES ITS OWN LINE (G24): "6 keys. 3 have no value yet." wrapped in a third of the row beside

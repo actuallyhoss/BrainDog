@@ -20,7 +20,9 @@ async function machine() {
   assert.ok(made.ok, JSON.stringify(made));
   const started = await api.deviceStart({ reach: 'login', label: 'test-laptop · braindog-cli' }, '203.0.113.7');
   if (!started.ok) return assert.fail(JSON.stringify(started));
-  const approved = await api.deviceApprove({ user_code: started.value.user_code }, owner);
+  const looked = await api.deviceLook({ user_code: started.value.user_code }, owner);
+  if (!looked.ok) return assert.fail(JSON.stringify(looked));
+  const approved = await api.deviceApprove({ user_code: started.value.user_code, handle: looked.value.handle }, owner);
   if (!approved.ok) return assert.fail(JSON.stringify(approved));
   return { api, handle: approved.value.handle };
 }

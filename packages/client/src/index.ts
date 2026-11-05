@@ -718,6 +718,9 @@ export type DeviceRow = {
 /** `deviceApprove`: the device that was let in, as the person approving it should see it. */
 export type DeviceApproved = Pick<DeviceRow, 'handle' | 'reach' | 'scope' | 'label' | 'ua'>;
 
+/** `deviceLook`: what is asking in, nothing let in yet, and for a keychain request the project and the names of the keys it would open. */
+export type DeviceLooked = DeviceApproved & { expires: string; project: string | null; keys: string[]; more: number };
+
 /** One page of rows, with the keyset cursor that reaches the next one. */
 export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
 
@@ -2995,7 +2998,8 @@ export function createClient(options: ClientOptions) {
     listTokens: () => call<unknown[]>('listTokens'),
     /* ADMIN, SO A BROWSER SESSION, and approving also asks for a sign-in in the last fifteen minutes. */
     listDevices: () => call<DeviceRow[]>('listDevices'),
-    deviceApprove: (args: { user_code: string }) => call<DeviceApproved>('deviceApprove', args as Record<string, unknown>),
+    deviceLook: (args: { user_code: string }) => call<DeviceLooked>('deviceLook', args as Record<string, unknown>),
+    deviceApprove: (args: { user_code: string; handle: string }) => call<DeviceApproved>('deviceApprove', args as Record<string, unknown>),
     revokeDevice: (args: { handle: string }) => call<DeviceRow>('revokeDevice', args as Record<string, unknown>),
     /** Rename one machine by its handle (`id`): its sign-in and its key read the new name. */
     renameDevice: (args: { id: string; label: string }) => call<DeviceRow>('renameDevice', args as Record<string, unknown>),

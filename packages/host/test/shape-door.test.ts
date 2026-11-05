@@ -29,7 +29,9 @@ async function host() {
   const grant = async (reach: string): Promise<string> => {
     const started = await api.deviceStart({ reach, label: `studio mac · ${reach}` }, '203.0.113.7');
     if (!started.ok) return assert.fail(JSON.stringify(started));
-    assert.ok((await api.deviceApprove({ user_code: started.value.user_code }, owner)).ok);
+    const looked = await api.deviceLook({ user_code: started.value.user_code }, owner);
+    if (!looked.ok) return assert.fail(JSON.stringify(looked));
+    assert.ok((await api.deviceApprove({ user_code: started.value.user_code, handle: looked.value.handle }, owner)).ok);
     const polled = await api.devicePoll({ device_code: started.value.device_code });
     if (!polled.ok || polled.value.pending) return assert.fail(JSON.stringify(polled));
     return polled.value.bearer;

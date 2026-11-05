@@ -522,6 +522,7 @@ never opened the Keychain all ask the same way.
 
 | Rule | Why |
 |---|---|
+| **Typing the code lets nothing in.** Six digits answer what is asking (`deviceLook`): the machine and client it says it is, what it could do, and for a keychain request which keys. Only Approve on that sheet lets it in (`deviceApprove`, with the handle the look answered) | a phisher who starts a grant and talks an owner into typing six digits got a keychain or a ninety-day key from that alone (RFC 8628 §5.4) |
 | The device polls with a **long random id, never the code** | conflating them makes polling a million-guess oracle |
 | The code is stored **hashed, never in clear** — `code_hash = sha256(id ‖ ':' ‖ user_code)`, the long random poll id as its salt; the record has no `SESSION_SECRET` and depends on no host secret to check it ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.11) | a pending row is readable by anything that reads the database. *An earlier draft hashed it under the session secret* |
 | **One row, two lives**: pending → approved → active | two tables would mean delete-and-reinsert at approval, and a crash between them loses the approval he just gave |

@@ -407,6 +407,7 @@ export type RecordSurface = {
   revokeToken(args: never, ctx: never): Promise<Result<unknown>>;
   createReportKey(args: never, ctx: never): Promise<Result<unknown>>;
   reportKeys(ctx: never): Promise<Result<unknown>>;
+  deviceLook(args: never, ctx: never): Promise<Result<unknown>>;
   deviceApprove(args: never, ctx: never): Promise<Result<unknown>>;
   listDevices(ctx: never): Promise<Result<unknown>>;
   revokeDevice(args: never, ctx: never): Promise<Result<unknown>>;
@@ -541,6 +542,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     revokeToken: (a, ctx) => api.revokeToken(a as never, ctx as never),
     createReportKey: (a, ctx) => api.createReportKey(a as never, ctx as never),
     reportKeys: (_a, ctx) => api.reportKeys(ctx as never),
+    deviceLook: (a, ctx) => api.deviceLook(a as never, ctx as never),
     deviceApprove: (a, ctx) => api.deviceApprove(a as never, ctx as never),
     listDevices: (_a, ctx) => api.listDevices(ctx as never),
     revokeDevice: (a, ctx) => api.revokeDevice(a as never, ctx as never),

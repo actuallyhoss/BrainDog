@@ -19,7 +19,7 @@
  * `connected` folds the record's two lists, and the runs they opened, into rows that answer those four.
  */
 
-import type { DeviceApproved, DeviceRow } from '@braindog/client';
+import type { DeviceApproved, DeviceLooked, DeviceRow } from '@braindog/client';
 
 import { BASE } from '../at.ts';
 import { copy } from '../copy.ts';
@@ -29,7 +29,7 @@ import { REGISTERS } from './held.ts';
    function declarations called only after both modules have loaded. */
 import { partsOf } from './apps.ts';
 
-export type { DeviceRow };
+export type { DeviceLooked, DeviceRow };
 
 /** Six digits is a million, which is only safe beside five tries and ten minutes (`12 §6.1`). */
 export const CODE_DIGITS = 6;
@@ -121,6 +121,7 @@ export function codeOf(typed: string): Entry {
  * reached included. There is no `demo` kind: with no sample there is no screen a stranger approves on.
  */
 export type Answer =
+  | { kind: 'looked'; looked: DeviceLooked }
   | { kind: 'approved'; label: string | null; reach: DeviceRow['reach']; scope: string | null }
   | { kind: 'malformed'; why: 'empty' | 'short' | 'long' | 'other'; digits: number }
   | { kind: 'wrong' }
@@ -129,6 +130,7 @@ export type Answer =
   | { kind: 'signin' }
   | { kind: 'refused'; fix: string };
 
+/** A press of Approve answered. A look at what is asking is `lookedOf`, which refuses in these same words. */
 export function answerOf(out: { ok: true; value: DeviceApproved } | { ok: false; refusal: Refusal }): Answer {
   if (out.ok) return { kind: 'approved', label: out.value.label, reach: out.value.reach, scope: out.value.scope };
   switch (out.refusal.code) {
@@ -150,6 +152,10 @@ export function answerOf(out: { ok: true; value: DeviceApproved } | { ok: false;
       return { kind: 'refused', fix: out.refusal.fix };
   }
 }
+
+/** Six digits typed, answered: what is asking in, nothing let in yet, or the same refusal a press would get. */
+export const lookedOf = (out: { ok: true; value: DeviceLooked } | { ok: false; refusal: Refusal }): Answer =>
+  out.ok ? { kind: 'looked', looked: out.value } : answerOf(out);
 
 /**
  * The key a reach's sentence is filed under. Keychain access lasts as long as its scope says: `*` is the

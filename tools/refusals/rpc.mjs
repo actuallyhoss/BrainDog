@@ -446,7 +446,7 @@ export const SCENES = new Map([
         const code = await deviceWaiting(running);
         const wrong = String((Number(code.user_code) + 1) % 1_000_000).padStart(6, '0');
         let last = null;
-        for (let i = 0; i < CODE_TRIES; i++) last = await call('/api/deviceApprove', { user_code: wrong });
+        for (let i = 0; i < CODE_TRIES; i++) last = await call('/api/deviceLook', { user_code: wrong });
         return last;
       }),
   ],

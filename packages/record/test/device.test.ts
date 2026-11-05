@@ -36,19 +36,24 @@ async function record() {
     return out.value;
   };
   const refusalOf = (out: object) => ('refusal' in out ? (out.refusal as { code: string; fix: string; at?: string }) : null);
-  return { api, owner, start, refusalOf, now: () => now, advance: (ms: number) => void (now += ms) };
+  /** Six digits typed and Approve pressed on what they showed. A code that names nothing answers the look's refusal. */
+  const approve = async (user_code: string, ctx: CallContext) => {
+    const looked = await api.deviceLook({ user_code }, ctx);
+    return looked.ok ? api.deviceApprove({ user_code, handle: looked.value.handle }, ctx) : looked;
+  };
+  return { api, approve, owner, start, refusalOf, now: () => now, advance: (ms: number) => void (now += ms) };
 }
 
 test('A SIGN-IN FIFTEEN MINUTES OLD APPROVES, AND ONE A MILLISECOND OLDER IS SENT TO SIGN IN AGAIN', async () => {
   const r = await record();
   const code = await r.start();
 
-  const stale = await r.api.deviceApprove({ user_code: code.user_code }, r.owner(r.now() - 15 * MINUTE - 1));
+  const stale = await r.approve(code.user_code, r.owner(r.now() - 15 * MINUTE - 1));
   assert.deepEqual(r.refusalOf(stale), AGAIN);
   const still = await r.api.devicePoll({ device_code: code.device_code });
   assert.deepEqual(still.ok && still.value, { pending: true, interval: 5 }, 'a stale approval let the device in');
 
-  const approved = await r.api.deviceApprove({ user_code: code.user_code }, r.owner(r.now() - 15 * MINUTE));
+  const approved = await r.approve(code.user_code, r.owner(r.now() - 15 * MINUTE));
   if (!approved.ok) return assert.fail(JSON.stringify(approved));
   assert.match(approved.value.handle, /^[0-9a-f]{16}$/);
   assert.equal(approved.value.reach, 'login');
@@ -78,13 +83,13 @@ test('A TOKEN IS REFUSED, SO IS A CALLER WHO PRESENTED NOTHING, AND SO IS A PERS
   assert.deepEqual(waiting.ok && waiting.value, { pending: true, interval: 5 }, 'a refused approval changed the grant');
 
   /* The server key carries no `provedAt`: it is proved on the request that presents it. */
-  assert.ok((await r.api.deviceApprove(args, r.owner())).ok);
+  assert.ok((await r.approve(code.user_code, r.owner())).ok);
 });
 
 test('LISTED AND REVOKED BY HANDLE, NEVER BY THE ID A DEVICE POLLS WITH, AND THE TOKEN GOES WITH IT', async () => {
   const r = await record();
   const code = await r.start();
-  const approved = await r.api.deviceApprove({ user_code: code.user_code }, r.owner(r.now()));
+  const approved = await r.approve(code.user_code, r.owner(r.now()));
   if (!approved.ok) return assert.fail(JSON.stringify(approved));
   const exchanged = await r.api.devicePoll({ device_code: code.device_code });
   if (!exchanged.ok || exchanged.value.pending) return assert.fail(JSON.stringify(exchanged));
@@ -147,16 +152,16 @@ test('A KEYCHAIN GRANT ASKS A SIGN-IN INSIDE THE KEYCHAIN’S LOCK WINDOW; A LOG
   if (!vault.ok) return assert.fail(JSON.stringify(vault));
   const login = await r.start();
 
-  const stale = await r.api.deviceApprove({ user_code: vault.value.user_code }, r.owner(r.now() - 10 * MINUTE));
+  const stale = await r.approve(vault.value.user_code, r.owner(r.now() - 10 * MINUTE));
   assert.equal(r.refusalOf(stale)?.code, 'NEEDS_BROWSER_SESSION');
   assert.equal(r.refusalOf(stale)?.at, 'proof');
   const still = await r.api.devicePoll({ device_code: vault.value.device_code });
   assert.deepEqual(still.ok && still.value, { pending: true, interval: 5 }, 'a sign-in the keychain refuses let a machine into it');
 
-  const loginApproved = await r.api.deviceApprove({ user_code: login.user_code }, r.owner(r.now() - 10 * MINUTE));
+  const loginApproved = await r.approve(login.user_code, r.owner(r.now() - 10 * MINUTE));
   assert.ok(loginApproved.ok, JSON.stringify(loginApproved));
 
-  const fresh = await r.api.deviceApprove({ user_code: vault.value.user_code }, r.owner(r.now() - 4 * MINUTE));
+  const fresh = await r.approve(vault.value.user_code, r.owner(r.now() - 4 * MINUTE));
   assert.ok(fresh.ok, JSON.stringify(fresh));
 });
 
@@ -168,4 +173,55 @@ test('A /64 IS ONE PLACE TO THE DEVICE DOOR: walking one IPv6 network does not b
     limited = !out.ok && 'retryAfter' in out;
   }
   assert.ok(limited, 'every address of the network counted as a new one');
+});
+
+test('TYPING THE CODE LETS NOTHING IN: a look says what is asking, and only a press naming what was shown approves', async () => {
+  const r = await record();
+  const code = await r.start();
+  const owner = r.owner(r.now());
+
+  /* A CODE WITH NO HANDLE IS REFUSED, whatever page sent it, and the machine is still waiting. */
+  assert.equal(r.refusalOf(await r.api.deviceApprove({ user_code: code.user_code } as never, owner))?.at, 'handle');
+  const before = await r.api.devicePoll({ device_code: code.device_code });
+  assert.deepEqual(before.ok && before.value, { pending: true, interval: 5 });
+
+  /* THE LOOK ANSWERS WHAT IS ASKING, AND THE MACHINE IS STILL WAITING. */
+  const looked = await r.api.deviceLook({ user_code: code.user_code }, owner);
+  assert.ok(looked.ok, JSON.stringify(looked));
+  assert.equal(looked.value.label, 'test-laptop · braindog-cli');
+  assert.equal(looked.value.reach, 'login');
+  const after = await r.api.devicePoll({ device_code: code.device_code });
+  assert.deepEqual(after.ok && after.value, { pending: true, interval: 5 }, 'looking let the device in');
+
+  /* NOT THE ROW THAT WAS SHOWN: refused, no try spent, nothing let in. */
+  assert.equal(r.refusalOf(await r.api.deviceApprove({ user_code: code.user_code, handle: 'not-it' }, owner))?.at, 'handle');
+  const stale = await r.api.devicePoll({ device_code: code.device_code });
+  assert.deepEqual(stale.ok && stale.value, { pending: true, interval: 5 });
+
+  assert.ok((await r.api.deviceApprove({ user_code: code.user_code, handle: looked.value.handle }, owner)).ok);
+  const done = await r.api.devicePoll({ device_code: code.device_code });
+  assert.ok(done.ok && 'bearer' in done.value, 'the press did not let it in');
+});
+
+test('A LOOK IS HELD AS AN APPROVAL IS: the owner, a fresh sign-in, a wrong code costs a try, and a keychain request names its keys', async () => {
+  const r = await record();
+  const code = await r.start();
+  const agent = await r.api.deviceLook({ user_code: code.user_code }, { principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_owner', level: 'owner' }, provedAt: r.now() });
+  assert.equal(r.refusalOf(agent)?.code, 'NEEDS_BROWSER_SESSION');
+  const writer = await r.api.deviceLook({ user_code: code.user_code }, { principal: { kind: 'person', id: 'p_2', level: 'write' }, credentialed: true, provedAt: r.now() });
+  assert.ok(r.refusalOf(writer));
+  assert.deepEqual(r.refusalOf(await r.api.deviceLook({ user_code: code.user_code }, r.owner(r.now() - 15 * MINUTE - 1))), AGAIN);
+  const wrong = String((Number(code.user_code) + 1) % 1_000_000).padStart(6, '0');
+  for (let i = 0; i < 4; i++) assert.equal(r.refusalOf(await r.api.deviceLook({ user_code: wrong }, r.owner(r.now())))?.code, 'FORBIDDEN');
+  assert.equal(r.refusalOf(await r.api.deviceLook({ user_code: wrong }, r.owner(r.now())))?.code, 'DEVICE_CODE_TRIES');
+
+  const v = await r.api.kernel.install([{ id: 'register.credentials', kind: 'register', body: { id: 'credentials', name: 'Keys', title: 'label', fields: [{ id: 'label', type: 'text', required: true }, { id: 'project', type: 'text' }] } } as never]);
+  assert.ok(v.ok, JSON.stringify(v));
+  assert.ok(r.api.kernel.create('credentials', { label: 'Stripe' }, { actor: 'p_owner' }).ok);
+  assert.ok(r.api.kernel.create('credentials', { label: 'Elsewhere', project: 'p_other' }, { actor: 'p_owner' }).ok);
+  const vault = await r.api.deviceStart({ reach: 'vault', scope: '*', label: 'box' }, '203.0.113.7');
+  assert.ok(vault.ok);
+  const said = await r.api.deviceLook({ user_code: vault.value.user_code }, r.owner(r.now()));
+  assert.ok(said.ok, JSON.stringify(said));
+  assert.deepEqual([said.value.project, said.value.keys, said.value.more], [null, ['Stripe'], 0]);
 });

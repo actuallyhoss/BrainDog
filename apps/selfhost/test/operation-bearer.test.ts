@@ -72,7 +72,8 @@ async function stack() {
     const code = started.body?.value as { device_code: string; user_code: string };
     const signed = await call('/auth/token', { body: { serverKey }, page: true });
     const sid = /^bd_s=([A-Za-z0-9_-]{43});/.exec(signed.headers.getSetCookie()[0] ?? '')?.[1] ?? assert.fail(signed.raw);
-    const approved = await call('/api/deviceApprove', { sid, body: { user_code: code.user_code } });
+    const looked = await call('/api/deviceLook', { sid, body: { user_code: code.user_code } });
+    const approved = await call('/api/deviceApprove', { sid, body: { user_code: code.user_code, handle: looked.body?.value?.handle } });
     assert.equal(approved.status, 200, approved.raw);
     const polled = await call('/auth/device/token', { body: { device_code: code.device_code } });
     assert.equal(polled.status, 200, polled.raw);

@@ -120,7 +120,10 @@ async function record(store: KeyStore | null) {
     async grant(scope: string): Promise<string> {
       const started = await api.deviceStart({ reach: 'vault', label: 'test-laptop', scope }, '127.0.0.1');
       assert.ok(started.ok, JSON.stringify(started));
-      const approved = await api.deviceApprove({ user_code: started.value.user_code }, { principal: { kind: 'person', id: OWNER, level: 'owner' } });
+      const person = { principal: { kind: 'person' as const, id: OWNER, level: 'owner' as const } };
+      const looked = await api.deviceLook({ user_code: started.value.user_code }, person);
+      assert.ok(looked.ok, JSON.stringify(looked));
+      const approved = await api.deviceApprove({ user_code: started.value.user_code, handle: looked.value.handle }, person);
       assert.ok(approved.ok, JSON.stringify(approved));
       const out = await api.devicePoll({ device_code: started.value.device_code });
       assert.ok(out.ok, JSON.stringify(out));

@@ -110,6 +110,7 @@ import {
   type CopyFacts,
   PEOPLE,
   type Approved,
+  type Looked,
   type Arrival,
   type Arrived,
   type DeviceCode,
@@ -878,6 +879,11 @@ export type OpenedForGrant = SealedGrant & { credential: string; label: string }
 
 /** The register a keychain door deposits into and opens from, and its sealed field. */
 const KEYS = 'credentials';
+/** The most keys named on the page a machine asking for the keychain is approved from. */
+const KEYS_SHOWN = 20;
+
+/** `deviceLook`: what is asking in, and for a keychain request the project and the names of the keys it would open. */
+export type DeviceLooked = Looked & { project: string | null; keys: string[]; more: number };
 const KEY_FIELD = 'value';
 /** The key numbers and their readings, by the lists Portfolio declares (`KPI_LIST` in the seed's portfolio module). */
 const KPIS = 'kpis';
@@ -8336,6 +8342,39 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * member who can only add. Agents choose these ids, so they are not secrets, and one person's never meets another's.
    */
   const opIdOf = (ctx: CallContext, op: string): string => `${actorOf(ctx)}|${op}`;
+
+  /**
+   * Who may look at a waiting device or let it in: an owner, in a browser, signed in within fifteen minutes.
+   *
+   * AN OWNER, AND NOT ANY PERSON, because a login approval mints a ninety-day write token owned by the approver, which is
+   * `createToken` by another road. A browser left signed in for a month should not be enough to let a machine in, and
+   * `provedAt` comes only from a session row. Nothing presented is no sign-in at all, for the reason `createToken` gives.
+   */
+  const approvesDevice = (ctx: CallContext): Refusal | null => {
+    const stop = admin(ctx) ?? keyOutOfReach(ctx);
+    if (stop) return stop;
+    if (ctx.credentialed === false)
+      return {
+        code: 'NEEDS_BROWSER_SESSION',
+        fix: 'Approving a device hands out a bearer that works from anywhere, so it needs a credential. Sign in, or send the server key as the bearer.',
+        at: 'principal',
+      };
+    if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
+      return { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to approve a device.', at: 'proof' };
+    return null;
+  };
+
+  /**
+   * AND A DEVICE LET INTO THE KEYCHAIN IS HELD TO THE KEYCHAIN'S OWN LOCK WINDOW (`keychain`), which the owner may have set
+   * to five minutes: approving a `vault` grant hands a machine what opening the keychain here would, so a proof the
+   * keychain itself would refuse does not approve one either.
+   */
+  const deviceLocked = (ctx: CallContext) => (reach: string): Refusal | null =>
+    reach === 'vault' && ctx.principal.kind === 'token'
+      ? { code: 'NEEDS_BROWSER_SESSION', fix: 'Only you let a device into the keychain, signed in to BrainDog. An agent never does.', at: 'principal' }
+      : reach === 'vault' && ctx.provedAt !== undefined && clock.now() - ctx.provedAt > kernel.lockAfter() * 60_000
+        ? { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to let a device into the keychain.', at: 'proof' }
+        : null;
 
   /**
    * A file field naming a file this caller is kept from, as a refusal, or `null`.
@@ -17426,33 +17465,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * machine in. `provedAt` comes only from a session row: the server key carries none, and is proved on the
      * request that presents it.
      */
-    async deviceApprove(args: { user_code: string }, ctx: CallContext): Promise<Result<Approved>> {
-      const stop = admin(ctx) ?? keyOutOfReach(ctx);
+    async deviceApprove(args: { user_code: string; handle?: string }, ctx: CallContext): Promise<Result<Approved>> {
+      const stop = approvesDevice(ctx);
       if (stop) return { ok: false as const, refusal: stop };
-      /* Nothing presented is no sign-in at all, for the reason `createToken` gives. */
-      if (ctx.credentialed === false)
-        return {
-          ok: false as const,
-          refusal: {
-            code: 'NEEDS_BROWSER_SESSION',
-            fix: 'Approving a device hands out a bearer that works from anywhere, so it needs a credential. Sign in, or send the server key as the bearer.',
-            at: 'principal',
-          },
-        };
-      if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
-        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to approve a device.', at: 'proof' } };
-      /* AND A DEVICE LET INTO THE KEYCHAIN IS HELD TO THE KEYCHAIN'S OWN LOCK WINDOW (`keychain` above), which the owner
-         may have set to five minutes: approving a `vault` grant hands a machine what opening the keychain here would, so
-         a proof the keychain itself would refuse does not approve one either. */
-      const proved = ctx.provedAt;
-      const agent = ctx.principal.kind === 'token';
-      const locked = (reach: string): Refusal | null =>
-        reach === 'vault' && agent
-          ? { code: 'NEEDS_BROWSER_SESSION', fix: 'Only you let a device into the keychain, signed in to BrainDog. An agent never does.', at: 'principal' }
-          : reach === 'vault' && proved !== undefined && clock.now() - proved > kernel.lockAfter() * 60_000
-          ? { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to let a device into the keychain.', at: 'proof' }
-          : null;
-      return tail(await kernel.deviceApprove(actorOf(ctx), args ?? ({} as never), locked));
+      /* THE HANDLE SAYS WHICH MACHINE THEY WERE SHOWN (`deviceLook`). Six digits alone approve nothing, on any page: a tab
+         left open on an older build is told, and the phisher's code still needs a press on what it really is. */
+      if (typeof args?.handle !== 'string' || args.handle === '')
+        return no('REQUIRED_MISSING', 'Look at what is asking first, then approve that one: send the handle deviceLook answered. Nothing was approved.', { at: 'handle' });
+      return tail(await kernel.deviceApprove(actorOf(ctx), args, deviceLocked(ctx)));
+    },
+
+    /**
+     * The six digits typed: what is asking in, said plainly, with nothing let in. A wrong code costs a try here as it does at
+     * `deviceApprove`, and the same people ask it, since a code is a guess wherever it is sent.
+     *
+     * FOR A KEYCHAIN REQUEST, WHICH KEYS. A grant opens the keys of one project, or of no project for `*` (`keyFor`), so the
+     * person is shown their names as they stand now, the most `KEYS_SHOWN`. Names and never values, and they are the owner's.
+     */
+    async deviceLook(args: { user_code: string }, ctx: CallContext): Promise<Result<DeviceLooked>> {
+      const stop = approvesDevice(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const out = await kernel.deviceLook(args ?? ({} as never), deviceLocked(ctx));
+      if (!out.ok) return tail(out);
+      const scope = out.value.scope;
+      if (out.value.reach !== 'vault' || scope === null) return tail(ok({ ...out.value, project: null, keys: [], more: 0 }));
+      const named = sql
+        .all<{ label: string | null }>(
+          `SELECT json_extract(fields, '$.label') AS label FROM entry
+            WHERE register = ? AND deleted_at IS NULL AND COALESCE(json_extract(fields, '$.state'), '') <> 'retired'
+              AND ${scope === '*' ? "COALESCE(json_extract(fields, '$.project'), '') = ''" : "json_extract(fields, '$.project') = ?"}
+            ORDER BY seq`,
+          KEYS,
+          ...(scope === '*' ? [] : [scope]),
+        )
+        .map((r) => r.label)
+        .filter((l): l is string => typeof l === 'string' && l !== '');
+      return tail(ok({ ...out.value, project: scope === '*' ? null : (kernel.titleOfRow(scope) ?? null), keys: named.slice(0, KEYS_SHOWN), more: Math.max(0, named.length - KEYS_SHOWN) }));
     },
 
     /**

@@ -51,7 +51,9 @@ async function ready() {
     value: { user_code: string; device_code: string };
   };
   assert.ok(started.ok, JSON.stringify(started));
-  const approved = await call('/api/deviceApprove', { user_code: started.value.user_code });
+  const looked = await call('/api/deviceLook', { user_code: started.value.user_code });
+  assert.equal(looked.status, 200, await looked.clone().text());
+  const approved = await call('/api/deviceApprove', { user_code: started.value.user_code, handle: ((await looked.json()) as { value: { handle: string } }).value.handle });
   assert.equal(approved.status, 200, await approved.clone().text());
   const polled = (await c.record(REC).devicePoll({ device_code: started.value.device_code })) as { ok: boolean; value: { bearer: string } };
   assert.ok(polled.ok && polled.value.bearer, JSON.stringify(polled));
