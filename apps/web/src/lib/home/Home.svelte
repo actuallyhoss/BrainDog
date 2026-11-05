@@ -1588,7 +1588,9 @@
     const ver = asOf();
     /* THE BOARD'S LAST CELL, asked apart from Today's read once it has landed (`askOffer`), once a version. */
     void import('./today-read.ts')
-      .then((t) => tileOnce('offer', base, ver, () => t.askOffer(createClient({ base }), base)))
+      /* ONCE AN HOUR AND AFTER A WRITE OF THIS TAB'S: what Slash would add from use is no live number, and asked once a version
+         it was one more read of the record on every move an agent made. */
+      .then((t) => tileOnce('offer', base, `${Math.floor(Date.now() / 3_600_000)} ${wrote()}`, () => t.askOffer(createClient({ base }), base)))
       .catch(() => undefined);
     void import('./today-read.ts')
       .then((t) => t.todayHeld(base))

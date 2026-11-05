@@ -18,7 +18,7 @@ import type { createClient } from '@braindog/client';
 import { dev } from '$app/environment';
 import { tick } from 'svelte';
 
-import { endedBy, newerBuild, poller, regranted, Wait, type LiveState, type Visibility } from './live.ts';
+import { endedBy, newerBuild, paced, poller, regranted, Wait, type LiveState, type Visibility } from './live.ts';
 /* THE LOCAL COPY IS ASKED FOR WHEN THE POLL HAS SOMETHING TO TELL IT, never with the shell: its reader carries the
    predicate engine, and the first paint draws nothing from it. Each of the three is fire-and-forget already. */
 const localTab = () => import('./local-tab.ts');
@@ -159,6 +159,9 @@ if (typeof window !== 'undefined') {
   window.addEventListener('keydown', touch, { once: true, capture: true, passive: true });
 }
 
+/** How often the screens may hear the record moved. */
+const SCREENS_EVERY_MS = 5_000;
+
 const timers = {
   after(fn: () => void, ms: number): () => void {
     const h = setTimeout(fn, ms);
@@ -266,16 +269,18 @@ export function follow(base: string | null): void {
     hearing = true;
     hear((at) => (live.from = live.from === null ? at : Math.min(live.from, at)));
   }
-  following = {
-    base,
-    stop: poller({
+  /* A RECORD ITS AGENTS ARE WRITING TO MOVES SEVERAL TIMES A SECOND, and every move asked the shell, every read on screen and
+     the board again. So the screens hear of it at most once in `SCREENS_EVERY_MS`: the first move at once, what follows
+     after the wait (`paced`, `live.ts`). */
+  const told = paced((version: number) => (live.version = version), SCREENS_EVERY_MS, timers);
+  const stopPoll = poller({
       ask: asker(base),
       timers,
       visible: tab,
       onChange: (version) => {
         /* THE LOCAL COPY ASKS THE LOG WHAT CHANGED, beside the screens asking their own questions again. */
         void localTab().then((m) => m.heardLocal(version));
-        live.version = version;
+        told.hear(version);
       },
       onState: (state) => {
         live.state = state;
@@ -286,7 +291,13 @@ export function follow(base: string | null): void {
           void reread();
         }
       },
-    }),
+  });
+  following = {
+    base,
+    stop: () => {
+      told.stop();
+      stopPoll();
+    },
   };
 }
 
