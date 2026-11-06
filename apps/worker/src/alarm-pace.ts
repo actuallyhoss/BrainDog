@@ -28,7 +28,7 @@ export const ASIDE_MOST_MS = 60_000;
  * The most of its share a page-drawing step spends between two breaths, in the units of `TickBudget`. A step that is
  * asked again goes on from where it kept, so this costs one more look at its own place and no work twice.
  */
-export const ALARM_SLICE_UNITS = 2;
+export const ALARM_SLICE_UNITS = 1;
 
 /** One turn of the event loop behind a timer: requests waiting get in, and the clock moves. */
 export const breathe = (): Promise<void> => new Promise((done) => setTimeout(done, 1));
