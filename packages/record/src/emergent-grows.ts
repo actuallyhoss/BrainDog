@@ -24,7 +24,7 @@
 import type { Json, RegisterDecl } from '@braindog/kernel';
 
 import { LAPSE_DAYS, type Offer as Weighed } from './design-agent.ts';
-import { PEN_COLUMNS_MOST, PEN_ROWS_DRAWN, PEN_YOUNG_DAYS, manySaid, saidWords, signatureOf, usedOf, type PenDeps, type PenItem } from './emergent.ts';
+import { PEN_COLUMNS_MOST, PEN_ROWS_DRAWN, PEN_YOUNG_DAYS, manySaid, saidWords, signatureOf, usedIn, type PenDeps, type PenItem } from './emergent.ts';
 
 /** The entries a list holds before its table is worth grouping: a long list read by headings, not by scrolling. */
 export const GROUP_ROWS_FEWEST = 300;
@@ -114,7 +114,7 @@ function oneOf(declared: readonly { id: string; kind: string; body: string }[], 
 /** Whether the record is still too young to read growth into: no person has used it, or the first did under a fortnight ago. */
 function young(deps: PenDeps): boolean {
   if (!deps.use) return true;
-  const first = usedOf(deps.use.sql).first;
+  const first = usedIn(deps.use).first;
   return first === null || deps.use.nowMs - Date.parse(first) < PEN_YOUNG_DAYS * DAY_MS;
 }
 
@@ -221,17 +221,20 @@ function endsOf(decl: RegisterDecl, state: Field): string[] {
  * `before`, leaving out the example entries a pack seeds, which nobody added and nobody has to finish.
  */
 function openSince(deps: PenDeps, list: string, state: string, ends: readonly string[], before: string): number {
-  const r = deps.use!.sql.one<{ n: number }>(
-    `SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND created_at <= ?
+  const read = (): number =>
+    Number(
+      deps.use!.sql.one<{ n: number }>(
+        `SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND created_at <= ?
       AND coalesce(json_extract(fields, '$.tags'), '') NOT LIKE '%"example"%'
       AND (json_extract(fields, ?) IS NULL OR json_extract(fields, ?) NOT IN (${ends.map(() => '?').join(', ')}))`,
-    list,
-    before,
-    `$.${state}`,
-    `$.${state}`,
-    ...ends,
-  );
-  return Number(r?.n ?? 0);
+        list,
+        before,
+        `$.${state}`,
+        `$.${state}`,
+        ...ends,
+      )?.n ?? 0,
+    );
+  return deps.held === undefined ? read() : deps.held(JSON.stringify(['pen.open', list, state, ends, before]), read);
 }
 
 /**
@@ -248,7 +251,8 @@ export function openRowsOffered(deps: PenDeps): PenItem[] {
   const taken = new Set([...pages.map((p) => p.slug), ...held.map((p) => p.slug)]);
   const lastIn = new Map<string, number>();
   for (const p of pages) if (p.nav) lastIn.set(p.nav.section, Math.max(lastIn.get(p.nav.section) ?? 0, p.nav.order));
-  const before = new Date(use.nowMs - OPEN_DAYS * DAY_MS).toISOString();
+  /* THE DAY IT BEGINS AND NOT THE MILLISECOND, so the count can be held while the list stands (`openSince`): "made a fortnight ago or more", to the day. */
+  const before = new Date(use.nowMs - OPEN_DAYS * DAY_MS).toISOString().slice(0, 10);
   const lapses = dayOf(use.nowMs + LAPSE_DAYS * DAY_MS);
   const out: PenItem[] = [];
 

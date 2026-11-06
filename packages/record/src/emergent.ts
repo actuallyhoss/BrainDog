@@ -141,7 +141,12 @@ export type PenDeps = {
    * What an offer drawn from use reads: the record's store, for the day the record was made and the days each list was
    * read on (`observation`), and the record's clock. Absent, no offer drawn from use is made.
    */
-  use?: { sql: Sql; nowMs: number } | undefined;
+  use?: { sql: Sql; nowMs: number; used?: Used | undefined } | undefined;
+  /**
+   * A fact about one list held while that list stands (`heldFacts`), by a key that says all it depends on. The pen read the
+   * same few counts over the whole ledger on every `boot` after a write anywhere. Absent, each is read each time.
+   */
+  held?: (<T>(key: string, make: () => T) => T) | undefined;
   /**
    * The words the record speaks for its lists, by label key as `declare`'s `labelsOf` answers them: `orders` for the
    * list's name (Settings, Words), `orders:one` for one of its entries. Absent, every list is said as it is declared.
@@ -578,10 +583,10 @@ function heldPages(declared: readonly { id: string; kind: string; body: string }
 /**
  * What a list's rows say, each asked of the record once however many pages draw the list.
  *
- * `filled` IS HOW MANY ROWS HOLD EVERY ONE OF THE FIELDS, from the `matched` of a one-row read, so the record counts in
- * SQL and no row is carried here to be counted.
+ * `filled` IS HOW MANY ROWS HOLD EVERY ONE OF THE FIELDS, from `kernel.count`, so the record counts in SQL and no row is
+ * carried here to be counted.
  */
-function factsOf(kernel: PenDeps['kernel']) {
+function factsOf(kernel: PenDeps['kernel'], held?: PenDeps['held']) {
   const rows = new Map<string, number>();
   const filled = new Map<string, number>();
   const pictured = new Map<string, boolean>();
@@ -598,8 +603,8 @@ function factsOf(kernel: PenDeps['kernel']) {
       const known = filled.get(key);
       if (known !== undefined) return known;
       const each = fields.map((field) => ({ field, present: true }));
-      const got = kernel.list({ register: list, where: (each.length === 1 ? each[0]! : { all: each }) as Where, limit: 1 });
-      const n = got.ok ? got.value.matched : 0;
+      const read = (): number => kernel.count(list, (each.length === 1 ? each[0]! : { all: each }) as never);
+      const n = held === undefined ? read() : held(JSON.stringify(['pen.filled', list, fields]), read);
       filled.set(key, n);
       return n;
     },
@@ -766,7 +771,7 @@ function columnAskedFor(page: HeldPage, list: string, decl: RegisterDecl, rows: 
 function shapesOffered(deps: PenDeps): Offer[] {
   const { kernel, reads, dismissed } = deps;
   const lists = new Map(kernel.registers());
-  const facts = factsOf(kernel);
+  const facts = factsOf(kernel, deps.held);
 
   const perPage: Offer[][] = [];
   for (const page of heldPages(kernel.declarations())) {
@@ -865,6 +870,13 @@ export type Used = { first: string | null; days: number };
  * own events, which are their use. One query over the actor index, the range `p_` up to the next character.
  */
 export function usedOf(sql: Sql): Used {
+  return usedRead(sql);
+}
+
+/** `usedOf` for one read of the pen, which asks it of each kind of offer. */
+export const usedIn = (use: NonNullable<PenDeps['use']>): Used => (use.used ??= usedRead(use.sql));
+
+function usedRead(sql: Sql): Used {
   const r = sql.one<{ first: string | null; days: number }>(
     'SELECT min(ts) AS first, count(DISTINCT substr(ts, 1, 10)) AS days FROM event WHERE actor >= ? AND actor < ?',
     'p_',
@@ -1097,7 +1109,7 @@ export const weekSaid = (n: number, name: string, one: string | undefined, due: 
 function weeksOffered(deps: PenDeps): Made[] {
   const { kernel, reads, pages, dismissed, use, labels } = deps;
   if (!use) return [];
-  const first = usedOf(use.sql).first;
+  const first = usedIn(use).first;
   if (first === null || use.nowMs - Date.parse(first) < PEN_YOUNG_DAYS * DAY_MS) return [];
 
   const declared = kernel.declarations();
@@ -1127,8 +1139,9 @@ function weeksOffered(deps: PenDeps): Made[] {
     /* WHAT IS DUE IS WHAT IS NOT FINISHED, in the count said and in the table drawn. A day that is not a due day keeps
        every entry: an order made on Monday and sent is still one of this week's. */
     const toDo = due ? finished : null;
-    const got = kernel.list({ register: id, where: weekOf(day.id, dayOf(use.nowMs), toDo) as Where, limit: 1 });
-    const n = got.ok ? got.value.matched : 0;
+    const inWeek = weekOf(day.id, dayOf(use.nowMs), toDo);
+    const readWeek = (): number => kernel.count(id, inWeek as never);
+    const n = deps.held === undefined ? readWeek() : deps.held(JSON.stringify(['pen.week', id, inWeek]), readWeek);
     const drawnBy = pages.filter((p) => p.registers.includes(id));
     if (n < PEN_WEEK_FEWEST || weeksRead(use.sql, id, drawnBy.map((p) => p.slug), since) < PEN_WEEKS_READ) continue;
 

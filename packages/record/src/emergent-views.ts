@@ -22,7 +22,7 @@
 import type { Json } from '@braindog/kernel';
 
 import { LAPSE_DAYS, TIER, type Offer as Weighed } from './design-agent.ts';
-import { PEN_YOUNG_DAYS, signatureOf, usedOf, type PenDeps, type PenItem } from './emergent.ts';
+import { PEN_YOUNG_DAYS, signatureOf, usedIn, type PenDeps, type PenItem } from './emergent.ts';
 
 /** The nav section a saved view is written under, as `rows-write.ts` writes it (the web's `copy.viewsSection`). */
 export const VIEWS_SECTION = 'Views';
@@ -98,7 +98,7 @@ function viewDeclared(declared: readonly { id: string; kind: string; body: strin
 export function viewPlacesOffered(deps: PenDeps): PenItem[] {
   const { kernel, reads, pages, dismissed, use } = deps;
   if (!use) return [];
-  const first = usedOf(use.sql).first;
+  const first = usedIn(use).first;
   if (first === null || use.nowMs - Date.parse(first) < PEN_YOUNG_DAYS * DAY_MS) return [];
 
   const views = pages.filter((p) => p.nav?.section === VIEWS_SECTION && p.registers.length === 1 && reads(p.registers[0]!) && !dismissed.has(signatureOf('place', p.slug)));
