@@ -305,6 +305,11 @@
     }
   }
 
+  /* IT OPENS ON THE LIFT, SO IT ANSWERS ON THE WAY DOWN. */
+  .bar-ask:active {
+    background: var(--tile-2);
+  }
+
   .bar-ask-words {
     flex: 1;
     min-inline-size: 0;

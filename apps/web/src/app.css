@@ -21,6 +21,12 @@
 }
 
 @layer components {
+  /* A LINK IN THE WORK ANSWERS ON THE WAY DOWN, in the press fill every control takes (`tokens.css`): a row or a person's card
+     showed nothing until the lift. The fill and nothing else: nothing scales, nothing dims. */
+  main a[href]:active {
+    background-color: var(--tile-2);
+  }
+
   /* THE WINDOW IS THE GROUND, and `base.css` paints it on `body` with its one soft light from the top.
      This sheet used to paint `body` flat `--board` over that, from the days of the board, and so took the light away on
      every screen. `html` carries the plain ground, for the frame before `body` has a size.
