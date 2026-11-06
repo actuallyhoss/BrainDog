@@ -451,6 +451,19 @@ CREATE TABLE IF NOT EXISTS dir_door (
   PRIMARY KEY (record, ingest)
 ) WITHOUT ROWID;
 
+-- WHAT A RECORD LAST SAID IT HOLDS OF ITS PLAN'S ROOM, for the operator's People tile (apps/worker/src/people.ts): its
+-- own name, its live agent keys and the bytes of its files, each only a count or the name its owner gave it. A CACHE AND
+-- NO MORE, so opening Admin wakes only the records that have not been asked lately. Written by that door and no other,
+-- and left out of every copy, since a record asked again says the same. A NEW TABLE AND NOT A COLUMN, for the reason
+-- dir_inbound gives above: created on the next open, DIRECTORY_VERSION unmoved, and no CHECK.
+CREATE TABLE IF NOT EXISTS dir_ops_held (
+  record TEXT PRIMARY KEY,                  -- rec_...
+  name   TEXT,                              -- the record's own name, or null for none
+  agents INTEGER NOT NULL,                  -- live agent keys, as the plan counts them
+  files  INTEGER NOT NULL,                  -- bytes of files, as the plan's room counts them
+  at     INTEGER NOT NULL                   -- when the record was asked, epoch ms
+) WITHOUT ROWID;
+
 -- One row per record somebody pays for. A record with no row is not billed and never lapses: every record the
 -- operator provisioned has none, and a row is written only when a Stripe checkout for that record completes.
 CREATE TABLE IF NOT EXISTS dir_billing (
@@ -701,6 +714,60 @@ export type SlashTally = { taken: number; old: number; malformed: number };
 
 /** Everything a person owns, summed. What `GET /account/usage` answers. */
 export type AccountUsage = { from: string; to: string; totals: UsageTotals; records: RecordUsage[] };
+
+/** The most people `people` answers: the newest sign-ups, and the operator's tile says when there are more. */
+export const PEOPLE_MOST = 500;
+
+/**
+ * One record as the operator's People tile reads it, from the account's own tables: who is on it, its plan, and the
+ * allowance ledger. `name`, `agents`, `files` and `asked_at` are what the record last said (`dir_ops_held`), `null` until
+ * it has been asked. Nothing here is a row, a project, an action's name or a sum of money.
+ */
+export type PeopleRecord = {
+  record: string;
+  slug: string | null;
+  role: 'owner' | 'member';
+  members: number;
+  plan: Plan;
+  /** `dir_billing`'s state: `active` is paid, `comp` a gift. `null`: no row, so nobody pays and nothing lapses. */
+  pay: string | null;
+  since: number;
+  name: string | null;
+  agents: number | null;
+  files: number | null;
+  asked_at: number | null;
+  agents_most: number | null;
+  files_most: number | null;
+  /** Runs inside the allowance, over the last 7 and 30 days, and how many different actions those 30 days ran. */
+  runs_7: number;
+  runs_30: number;
+  actions_30: number;
+  month: UsageTotals;
+  allowance: Allowance | null;
+  /** Slash's month: the questions the ledger holds, the plan's credits, and whether packs and all are spent. */
+  asks: number;
+  credits: number | null;
+  asks_spent: boolean;
+};
+
+/** One person as the operator's People tile reads them. */
+export type PeopleLine = {
+  email: string;
+  name: string | null;
+  created_at: number;
+  suspended: boolean;
+  passkeys: number;
+  /** The newest of their sessions' last use and their passkeys' last use. `null`: no session is left to say. */
+  seen: number | null;
+  /** How they came: by a sign-up code, invited into somebody's record, or neither. */
+  came: 'code' | 'invited' | 'open';
+  records: PeopleRecord[];
+};
+
+export type PeopleRead = { total: number; records: number; people: PeopleLine[] };
+
+/** What a record said it holds, kept for the People tile (`dir_ops_held`). */
+export type PeopleHeld = { record: string; name: string | null; agents: number; files: number };
 
 /** What one `meterMany` did with the runs it was handed: counted new, already held, too old to count, and not runs at all. */
 export type MeterTally = { counted: number; already: number; old: number; malformed: number };
@@ -955,7 +1022,7 @@ export const CARRIED = [
  * absent from `CARRIED`, so a table added to `SCHEMA` later has to be put in one list or the other: the test reads
  * `sqlite_master` and fails for a table in neither.
  */
-export const LEFT_OUT = ['dir_session', 'dir_app_session', 'dir_link', 'dir_app_code', 'dir_challenge', 'dir_fail', 'dir_pending', 'dir_invite', 'dir_invite_mailed', 'dir_left'] as const;
+export const LEFT_OUT = ['dir_session', 'dir_app_session', 'dir_link', 'dir_app_code', 'dir_challenge', 'dir_fail', 'dir_pending', 'dir_invite', 'dir_invite_mailed', 'dir_left', 'dir_ops_held'] as const;
 
 type Carried = (typeof CARRIED)[number];
 
@@ -3250,6 +3317,129 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       const totals = totalsOf({});
       for (const r of records) for (const k of Object.keys(totals) as (keyof UsageTotals)[]) totals[k] += r.totals[k];
       return ok({ from: range.from, to: range.to, totals, records });
+    },
+
+    /**
+     * The operator's People tile (`apps/worker/src/people.ts`): the newest `PEOPLE_MOST` people and the records each is
+     * on, all from this object's own tables, so no record is woken to answer.
+     *
+     * THE ACCOUNT'S TABLES ONLY, AND ONLY WHAT THE PRIVACY POLICY SAYS THEY HOLD: an address, how many passkeys and never
+     * their labels, when a session was last used, which records and who founded them, a plan and whether it is paid,
+     * and the allowance ledger as totals. `dir_step` IS NOT READ: its first-run steps are counted for the funnel on the
+     * promise that those counts name nobody, and here they would have a name beside them. An action's id and its project
+     * are never selected, only how many different actions there were.
+     *
+     * ONE OBJECT EVERY RECORD SHARES, so each small table is read once and grouped here rather than asked per person
+     * (`dir_session` has no index on `person`), and the ledger is sought by its `record` key, once per record.
+     */
+    people: (most: number = PEOPLE_MOST): PeopleRead => {
+      const now = clock.now();
+      const top = Math.min(Math.max(1, Math.trunc(most)), PEOPLE_MOST);
+      const total = Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_person')?.n ?? 0);
+      const records = Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_record WHERE closed_at IS NULL')?.n ?? 0);
+      const persons = sql.all<{ id: string; email: string; name: string | null; created_at: string; suspended_at: string | null }>(
+        'SELECT id, email, name, created_at, suspended_at FROM dir_person ORDER BY created_at DESC, id LIMIT ?',
+        top,
+      );
+      const seen = new Map<string, number>();
+      const saw = (person: string, at: unknown): void => {
+        const ms = Number(at ?? 0);
+        if (ms > (seen.get(person) ?? 0)) seen.set(person, ms);
+      };
+      for (const s of sql.all<{ person: string; at: number }>('SELECT person, MAX(rotated_at) AS at FROM dir_session GROUP BY person')) saw(s.person, s.at);
+      const passkeys = new Map<string, number>();
+      for (const k of sql.all<{ person: string; n: number; at: number | null }>('SELECT person, COUNT(*) AS n, MAX(last_used) AS at FROM dir_passkey GROUP BY person')) {
+        passkeys.set(k.person, Number(k.n));
+        saw(k.person, k.at);
+      }
+      const coded = new Set(sql.all<{ person: string }>('SELECT DISTINCT person FROM dir_invite WHERE person IS NOT NULL').map((i) => i.person));
+      const open = new Map(sql.all<{ id: string; owner: string; plan: string; created_at: string }>('SELECT id, owner, plan, created_at FROM dir_record WHERE closed_at IS NULL').map((r) => [r.id, r]));
+      const slugs = new Map(sql.all<{ record: string; slug: string }>('SELECT record, slug FROM dir_slug WHERE released_at IS NULL ORDER BY rowid').map((n) => [n.record, n.slug]));
+      const pays = new Map(sql.all<{ record: string; state: string }>('SELECT record, state FROM dir_billing').map((b) => [b.record, b.state]));
+      const asked = new Map(sql.all<{ record: string; name: string | null; agents: number; files: number; at: number }>('SELECT record, name, agents, files, at FROM dir_ops_held').map((h) => [h.record, h]));
+      const onRecord = new Map<string, string[]>();
+      const headcount = new Map<string, number>();
+      for (const m of sql.all<{ person: string; record: string }>('SELECT person, record FROM dir_member ORDER BY added_at, record')) {
+        if (!open.has(m.record)) continue;
+        onRecord.set(m.person, [...(onRecord.get(m.person) ?? []), m.record]);
+        headcount.set(m.record, (headcount.get(m.record) ?? 0) + 1);
+      }
+      const start = dayOf(monthStart(now));
+      const resets = dayOf(nextMonth(now));
+      const week = dayOf(now - 6 * DAY_MS);
+      const thirty = dayOf(now - 29 * DAY_MS);
+      /* A RECORD WITH THREE PEOPLE IS READ ONCE: its figures are its own, whoever's line they are drawn on. */
+      const figures = new Map<string, Omit<PeopleRecord, 'role'>>();
+      const figuresOf = (id: string, row: { plan: string; created_at: string }): Omit<PeopleRecord, 'role'> => {
+        const known = figures.get(id);
+        if (known !== undefined) return known;
+        const plan = planOf(row.plan);
+        const ran = sql.one<{ week: number | null; thirty: number | null; actions: number }>(
+          `SELECT SUM(CASE WHEN day >= ? THEN runs ELSE 0 END) AS week, SUM(runs) AS thirty, COUNT(DISTINCT action) AS actions
+             FROM dir_usage_day WHERE record = ? AND day >= ? AND ${LIMITED}`,
+          week,
+          id,
+          thirty,
+        );
+        const slash = slashMonth(id, plan, now);
+        const said = asked.get(id);
+        const out: Omit<PeopleRecord, 'role'> = {
+          record: id,
+          slug: slugs.get(id) ?? null,
+          members: headcount.get(id) ?? 0,
+          plan,
+          pay: pays.get(id) ?? null,
+          since: Date.parse(row.created_at) || 0,
+          name: said?.name ?? null,
+          agents: said === undefined ? null : Number(said.agents),
+          files: said === undefined ? null : Number(said.files),
+          asked_at: said === undefined ? null : Number(said.at),
+          agents_most: PLAN_TABLE[plan].agents,
+          files_most: PLAN_TABLE[plan].files,
+          runs_7: Number(ran?.week ?? 0),
+          runs_30: Number(ran?.thirty ?? 0),
+          actions_30: Number(ran?.actions ?? 0),
+          month: totalsOf(sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ? AND ${LIMITED}`, id, start, resets)),
+          allowance: ALLOWANCE[plan],
+          asks: slash.used,
+          credits: slash.included,
+          asks_spent: slash.left === 0,
+        };
+        figures.set(id, out);
+        return out;
+      };
+      const people = persons.map((p): PeopleLine => {
+        const mine = (onRecord.get(p.id) ?? []).flatMap((id) => {
+          const row = open.get(id);
+          return row === undefined ? [] : [{ ...figuresOf(id, row), role: row.owner === p.id ? ('owner' as const) : ('member' as const) }];
+        });
+        /* THE ONE THEY FOUNDED FIRST: the line the tile draws names one BrainDog, and that is the one that is theirs. */
+        mine.sort((a, b) => (a.role === b.role ? a.since - b.since : a.role === 'owner' ? -1 : 1));
+        return {
+          email: p.email,
+          name: p.name,
+          created_at: Date.parse(p.created_at) || 0,
+          suspended: p.suspended_at !== null,
+          passkeys: passkeys.get(p.id) ?? 0,
+          seen: seen.get(p.id) ?? null,
+          came: coded.has(p.id) ? 'code' : mine.length > 0 && mine.every((r) => r.role === 'member') ? 'invited' : 'open',
+          records: mine,
+        };
+      });
+      return { total, records, people };
+    },
+
+    /**
+     * What records said they hold, kept so the next read of the People tile need not ask them again. A record closed since
+     * has its row taken away here, so the cache never outlives what it describes.
+     */
+    peopleKeep: (held: readonly PeopleHeld[], at: number): void => {
+      sql.transactionSync(() => {
+        for (const h of held) {
+          sql.exec('INSERT OR REPLACE INTO dir_ops_held (record, name, agents, files, at) VALUES (?, ?, ?, ?, ?)', h.record, h.name, h.agents, h.files, at);
+        }
+        sql.exec('DELETE FROM dir_ops_held WHERE record NOT IN (SELECT id FROM dir_record WHERE closed_at IS NULL)');
+      });
     },
 
     /**

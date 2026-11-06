@@ -43,7 +43,7 @@ import { withCalls } from '@braindog/mcp';
 /* The oldest command this door still works with, one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
 import { slashTools } from '@braindog/mcp/slash-tools';
-import { INVITE_GONE, UNBOUND_REFUSED, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type KeychainGrant, type Waiting } from '@braindog/kernel';
+import { ATTACHED_WEIGHT, INVITE_GONE, UNBOUND_REFUSED, liveAgents, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type KeychainGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, tickBudget, type CallContext, type TickBudget, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
@@ -54,7 +54,7 @@ import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall, SeenAnswers, S
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
 import type { Plan } from '@braindog/record/directory';
-import type { DrillCall, HostDrill } from '@braindog/record/directory';
+import type { DrillCall, HostDrill, PeopleHeld, PeopleRead } from '@braindog/record/directory';
 import { answerOAuth, type OAuthAnswers, type OAuthCall } from '@braindog/record/oauth';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
@@ -120,6 +120,7 @@ import { applyDoor, notHere, opsApplications, opsInvite, type OpsApplyDeps } fro
 import { seenDoor, servesSeen } from './seen.ts';
 import { stepDoor, servesStep } from './step.ts';
 import { opsFunnel } from './funnel.ts';
+import { opsPeople } from './people.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { LAPSED_FIX, lapseDrops } from './lapse.ts';
@@ -2059,6 +2060,23 @@ export class Record$ extends DurableObject<Env> {
     return out.ok ? out.value : null;
   }
 
+  /**
+   * What this record holds of its plan's room, for the operator's People tile (`people.ts`): its own name, how many agent
+   * keys are live and how many bytes of files it has. COUNTS AND THE ONE NAME, never a label, a row or a person, asked as
+   * the host and written nowhere. `null` for a record deleted or refused by this build, which the tile counts as missed.
+   */
+  async opsHeld(): Promise<{ name: string | null; agents: number; files: number } | null> {
+    if (this.#gone) return null;
+    const api = await this.#record();
+    if (api.kernel.refused()) return null;
+    const sql = guardedSql(this.ctx.storage);
+    return {
+      name: api.kernel.identity()?.name ?? null,
+      agents: liveAgents({ sql, nowMs: Date.now(), validFrom: validFromOf(this.env) }),
+      files: Number(sql.one<{ next: number }>('SELECT next FROM counter WHERE name = ?', ATTACHED_WEIGHT)?.next ?? 0),
+    };
+  }
+
   /** How many people are on this record, suspended ones left out: whether a cancelled plan fits Free (billing.ts fitsFree). `null` for a record deleted or refused by this build. */
   async walkPeople(): Promise<number | null> {
     if (this.#gone) return null;
@@ -3004,6 +3022,16 @@ export class Directory$ extends DurableObject<Env> {
   /** A visit counted (`seen.count`, from `/api/seen`) and the operator's week totals (`funnel.read`, from `/account/ops/funnel`). */
   seen<C extends SeenCall>(call: C): SeenAnswers[C['flow']] {
     return this.#directory().seen(call);
+  }
+
+  /** Who has an account and how each of their records stands, from the Directory's own tables: `/account/ops/people` only. */
+  peopleRead(): PeopleRead {
+    return this.#directory().people();
+  }
+
+  /** What records said they hold, kept so the next read of the People tile need not ask them: `/account/ops/people` only. */
+  peopleKeep(held: readonly PeopleHeld[], at: number): void {
+    this.#directory().peopleKeep(held, at);
   }
 
   /** The host's last restore drill: `put` by the operator's door only (`/account/ops/drill`), `read` for `GET /account/drill`. */
@@ -5072,7 +5100,7 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     const held = await operatorKeyHeld(request, env);
     if (held !== null) return held;
   }
-  const seen = OPS_ME.test(path) || OPS_INVITE.test(path) || OPS_APPLICATIONS.test(path) || OPS_FUNNEL.test(path) ? await operatorSeen(request, env) : NOBODY;
+  const seen = OPS_ME.test(path) || OPS_INVITE.test(path) || OPS_APPLICATIONS.test(path) || OPS_FUNNEL.test(path) || OPS_PEOPLE.test(path) ? await operatorSeen(request, env) : NOBODY;
   if (OPS_ME.test(path)) return withCookie(await opsMe(request, env, seen), seen.cookie);
   if (OPS_INVITE.test(path)) return withCookie(await opsInvite(request, opsApplyDeps(env, seen)), seen.cookie);
   if (OPS_APPLICATIONS.test(path)) return withCookie(await opsApplications(request, opsApplyDeps(env, seen)), seen.cookie);
@@ -5086,6 +5114,19 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
       read: (since) => directory.seen({ flow: 'funnel.read', since }),
       records: async (cursor) => directory.listRecords(cursor),
       firsts: (record) => env.RECORD.get(env.RECORD.idFromName(record)).firsts(),
+      now: () => Date.now(),
+    }), seen.cookie);
+  /* THE OPERATOR'S PEOPLE (`people.ts`): who has an account and how their records stand, from the Directory's own tables
+     and each record's count of what it holds of its plan, asked only when the last answer has gone stale. */
+  if (OPS_PEOPLE.test(path))
+    return withCookie(await opsPeople(request, {
+      key: (env.PROVISION_KEY ?? '').trim(),
+      operator: seen.operator,
+      readLimit: (r) => overLimit(env, null, r, 'read'),
+      unauthorized: () => saidUnauthorized('operator', 'This route takes the operator key.'),
+      read: () => directory.peopleRead(),
+      held: (record) => env.RECORD.get(env.RECORD.idFromName(record)).opsHeld(),
+      keep: (rows, at) => directory.peopleKeep(rows, at),
       now: () => Date.now(),
     }), seen.cookie);
   /* THE OPERATOR'S GIFT OF A PLAN (`ops-plan.ts`): a record found by its name or id with who owns it, and the plan set
@@ -5190,6 +5231,9 @@ const OPS_APPLICATIONS = /^\/+account\/+ops\/+applications\/*$/;
 
 /** The operator's funnel (`funnel.ts`), with the same forgiveness. */
 const OPS_FUNNEL = /^\/+account\/+ops\/+funnel\/*$/;
+
+/** The operator's people (`people.ts`), with the same forgiveness. */
+const OPS_PEOPLE = /^\/+account\/+ops\/+people\/*$/;
 
 /**
  * What `/account/ops/invite` and `/account/ops/applications` are handed (`apply.ts`): the provision key, a GET's count by

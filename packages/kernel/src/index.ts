@@ -492,6 +492,7 @@ export {
   ATTACHED_ON_MOST,
   ATTACHED_RECORD_MOST,
   ATTACHED_TEXT_MOST,
+  ATTACHED_WEIGHT,
   attachedKind,
   attachedName,
   attachedSaid,
