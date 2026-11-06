@@ -1884,8 +1884,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     else for (const t of tables) writes.set(t, (writes.get(t) ?? 0) + 1);
     if (tables === null || tables.length > 0) for (const t of signTraces) t.wrote = true;
   };
+  /* WHETHER THE TRANSACTION OPEN NOW HAS WRITTEN (`transaction`): one that has only read reads what is committed, so what it
+     reads may be held (`holdAcross`), as `boot`'s read of its one moment is. */
+  let txWrote = false;
   const sql: Sql = {
     exec: (text, ...params) => {
+      txWrote = true;
       moment?.drop();
       if (/^\s*ROLLBACK\b/iu.test(text)) dropHeld();
       for (const t of traces) t.whole = true;
@@ -1896,6 +1900,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     all: <T = Row>(text: string, ...params: Param[]): T[] => {
       if (traces.length > 0 || signTraces.length > 0 || drawTraces.length > 0) noted(text, params);
       if (reads(text)) return raw.all<T>(text, ...params);
+      txWrote = true;
       moment?.drop();
       const out = raw.all<T>(text, ...params);
       wrote(text, out.length);
@@ -1904,6 +1909,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     one: <T = Row>(text: string, ...params: Param[]): T | undefined => {
       if (traces.length > 0 || signTraces.length > 0 || drawTraces.length > 0) noted(text, params);
       if (reads(text)) return raw.one<T>(text, ...params);
+      txWrote = true;
       moment?.drop();
       const out = raw.one<T>(text, ...params);
       wrote(text, out === undefined ? 0 : 1);
@@ -2101,6 +2107,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (depth > 0) return fn();
     return sql.transactionSync(() => {
       depth++;
+      txWrote = false;
       moment = newMoment();
       try {
         return fn();
@@ -7553,10 +7560,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   const readingsHeld = new HeldReadings<Result<Reading>>();
   const walksHeld = new HeldReadings<Runway | null>();
   const signsHeld = new HeldSigns<SignReading>();
+  /** What `heldFacts` holds. */
+  const factsHeld = new HeldReadings<unknown>();
   dropHeld = () => {
     readingsHeld.clear();
     walksHeld.clear();
     signsHeld.clear();
+    factsHeld.clear();
     listsSeen = null;
   };
   knownList = (word) => registers.has(word);
@@ -7580,10 +7590,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * `make` held in `store` under `key` while the lists it read stand and the day holds (`held-readings.ts`), for at most
    * `most`. What it read is noted by the reads of the kernel's own `Sql`, and a reading inside another is read by the
    * outer one too, held or not, so the outer is held by its lists as well. Never inside a write, whose rows may yet be
-   * taken back. A copy is handed out and a copy kept.
+   * taken back; a transaction that has only read is no write (`txWrote`). A copy is handed out and a copy kept.
    */
   const holdAcross = <T>(store: HeldReadings<T>, key: string, tz: string, now: number, once: Stamps, make: () => T, most?: number): T => {
-    if (depth > 0) return make();
+    if (depth > 0 && txWrote) return make();
     const day = dayAt(tz, now);
     const stampOf = (lists: readonly string[]): string => {
       muted++;
@@ -7610,6 +7620,18 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     for (const t of traces) within(t, trace);
     store.set(key, day, now, trace, structuredClone(value), stampOf, (list) => list === SESSION, most);
     return value;
+  };
+  /**
+   * A FACT WORKED OUT FROM THE ROWS, HELD WHILE THE LISTS IT READ STAND (`holdAcross`), for a read that asks several: which
+   * currencies a list's money is in, how many rows of a list fill a field. The answer has to be a function of `key` and the
+   * lists alone. WHO MAY SEE IT IS NOT IN THE HOLD: `key` names the viewer where the read is held to one, and the caller
+   * decides each time which lists to ask about. What a read names past the lists (the log, a kept line) holds it for at most
+   * `HELD_SHORT_MS`. One `heldFacts()` a read, since each list's version is asked once for all of them.
+   */
+  const heldFacts = (): (<T>(key: string, make: () => T) => T) => {
+    const once: Stamps = { rows: new Map() };
+    let tz: string | undefined;
+    return <T>(key: string, make: () => T): T => holdAcross(factsHeld as HeldReadings<T>, key, (tz ??= readableZone(recordTz())), clock.now(), once, make);
   };
   /**
    * A FIGURE'S READING HELD ACROSS READS WHILE THE LISTS IT READ STAND (`holdAcross`), the day where the record is
@@ -13443,6 +13465,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * and no person's or pack's, so a screen that tells him what he filed leaves them out by this and not by a name.
      */
     kernelLists: (): string[] => [...kernelListsNow()],
+    /** Facts held while the lists they read stand: one for each read that asks several. */
+    heldFacts,
     /**
      * The lists declared `personal: true`, by id: the owner's alone, which no grant, share, link, child key or "See as"
      * reaches. The record's `guard` refuses anybody else on them, and the lens never covers one.
@@ -14480,6 +14504,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     observe: kernel.observe,
     reload,
     depth: () => depth,
+    heldFacts,
     signedBy,
     foreignRun,
     caches: {
