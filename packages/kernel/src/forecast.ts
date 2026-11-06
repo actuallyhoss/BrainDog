@@ -772,7 +772,11 @@ function everydayOf(deps: ForecastDeps, leg: Leg, already: readonly LegRead[], t
   /* WHERE EACH CURRENCY BEGAN, over every dated row of the list and not only the ones the filter keeps: a ledger whose
      first row is a deposit began that day. */
   const began = new Map<string, string>();
-  for (const r of deps.sql.all<{ c: string; m: string }>(`SELECT ${currency} AS c, min(substr(${day}, 1, 7)) AS m FROM entry WHERE ${dated} GROUP BY c`, leg.register))
+  /* ONCE FOR A READ, since it reads every dated row of the list and asks nothing a walk's own filter changes: a page of walks
+     over one ledger scanned all of it for each. */
+  const readBegan = () => deps.sql.all<{ c: string; m: string }>(`SELECT ${currency} AS c, min(substr(${day}, 1, 7)) AS m FROM entry WHERE ${dated} GROUP BY c`, leg.register);
+  const memo = deps.ctx.walks;
+  for (const r of memo === undefined ? readBegan() : memo.once(JSON.stringify(['began', leg.register, leg.on, leg.amount]), readBegan))
     began.set(String(r.c), String(r.m));
   if (began.size === 0) return [{ currency: null, months: [], spent: 0, planned: 0, monthly: 0, why: EVERYDAY_NO_MONTH }];
 

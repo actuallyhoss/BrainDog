@@ -167,3 +167,29 @@ test('A WRITE TAKEN BACK IS NOT SEEN', async () => {
   );
   assert.equal(left().value, 100_000);
 });
+
+test('THE MOVES SINCE A STATED DAY ARE THE SAME BY THE DAY INDEX: on the day, after it, before it, and with the index gone', async () => {
+  const { sql, k, account } = await made();
+  const P2 = P;
+  const cash = () => {
+    const r = k.metric(CASH as never);
+    assert.ok(r.ok, JSON.stringify(r));
+    return r.value.value;
+  };
+  /* Stated on the 19th: 10,000.00. A line on the day is in that statement, and the next day's is not. */
+  assert.equal(cash(), 1_000_000);
+  const spend = (on: string, amount: number) => {
+    const out = k.create('transactions', { what: 'Line', account: account.id, on, amount: money(amount), direction: 'out' }, P2);
+    assert.ok(out.ok, JSON.stringify(out));
+  };
+  spend('2026-09-19', 100);
+  assert.equal(cash(), 1_000_000, 'a line on the stated day was added to the statement');
+  spend('2026-09-20', 200);
+  assert.equal(cash(), 999_800);
+  spend('2026-09-18', 400);
+  assert.equal(cash(), 999_800, 'a line before the stated day moved it');
+  sql.exec('DROP INDEX entry_i_transactions__on');
+  const out = k.create('transactions', { what: 'After', account: account.id, on: '2026-09-20', amount: money(800), direction: 'out' }, P2);
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.equal(cash(), 999_000, 'with no day index it refused or lost the row');
+});

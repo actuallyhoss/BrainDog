@@ -8456,7 +8456,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const zone = readableZone(recordTz());
       const answer = holdAcross(walksHeld, key, zone, clock.now(), once, () => {
         const out = runway(
-          { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: rowIn, ctx: evalContext() },
+          { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: rowIn, ctx: { ...evalContext(), walks } },
           opening,
           legs,
           horizon,
