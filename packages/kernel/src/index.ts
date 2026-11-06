@@ -47,6 +47,7 @@ import {
   REMOVED_WINDOW_DAYS,
   readPackConfig,
   retireDeclarations,
+  indexName,
   sourceKnown,
   writePackConfig,
   stageDeclarations,
@@ -2154,6 +2155,24 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return !includeDeleted && entry.deleted_at ? null : entry;
   }
 
+  /** Indexes `sortIndexOf` named that the record turned out not to hold: not asked for again. */
+  const missingSortIndexes = new Set<string>();
+  /**
+   * The index a sorted list's first page can walk: its first key descending, a field that keeps one (`indexName`) and whose
+   * sort key is the indexed expression itself, so no text (sorted without case), enum (by position) or money (by currency
+   * first). Only under no filter, or the one that leaves out a finished state: a filter that narrows may have a better index,
+   * and naming this one would walk the whole list past it. Ascending keeps empties last by a key no index holds.
+   */
+  const SORT_INDEX_FILTER = /^[( ]*(?:1 = 1|state IS NULL OR NOT \(state = \?\))[) ]*$/u;
+  const SORT_INDEX_TYPES = new Set(['day', 'datetime', 'int', 'number']);
+  function sortIndexOf(register: string, first: { field: string; dir?: string } | undefined, filter: string): string | null {
+    if (first === undefined || first.dir === 'asc' || !SORT_INDEX_FILTER.test(filter)) return null;
+    const field = registers.get(register)?.fields.find((f) => f.id === first.field);
+    if (field === undefined || field.retired || (field as { index?: unknown }).index !== true || !SORT_INDEX_TYPES.has(field.type)) return null;
+    const name = indexName('i', register, field.id);
+    return /^[A-Za-z0-9_]+$/u.test(name) && !missingSortIndexes.has(name) ? name : null;
+  }
+
   /** A live row of one list by its id, the read naming the list, as a walk over that list asks (`ForecastDeps.hydrate`). */
   function rowIn(id: string, register: string): Entry | null {
     const row = sql.one<Record<string, unknown>>(`SELECT ${COLUMNS} FROM entry WHERE register = ? AND id = ?`, register, id);
@@ -2390,7 +2409,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const now =
       (register === undefined
         ? sql.one('SELECT 1 AS y FROM entry_private WHERE person_id <> ? LIMIT 1', viewer)
-        : sql.one('SELECT 1 AS y FROM entry_private p JOIN entry e ON e.id = p.entry_id WHERE p.person_id <> ? AND e.register = ? LIMIT 1', viewer, register)) !== undefined;
+        : /* FROM THE ROWS KEPT PRIVATE, WHICH ARE FEW (`CROSS JOIN` holds the order). Left to choose, SQLite walked the whole
+             list by its index asking each row whether it was kept: 1.5 ms on 20,000 rows, on every read of every list. */
+          sql.one('SELECT 1 AS y FROM entry_private p CROSS JOIN entry e ON e.id = p.entry_id WHERE p.person_id <> ? AND e.register = ? LIMIT 1', viewer, register)) !== undefined;
     moment?.hidden.set(key, now);
     return now;
   };
@@ -4304,8 +4325,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
                 : [expr];
         for (const e of exprs) {
           /* AN EMPTY VALUE GOES LAST, IN EITHER DIRECTION. SQLite puts `NULL` first ascending, so a table sorted by an optional
-             day led with every row that has none; the sample put them last both ways, and last is the one a reader wants. */
-          parts.push(`${e} IS NULL, ${e} ${dir}`);
+             day led with every row that has none; the sample put them last both ways, and last is the one a reader wants.
+             DESCENDING IT ALREADY PUTS THEM LAST, so the first key is left off there: it is the same order, and it is what let
+             the day index answer a ledger's newest page, which sorted 20,000 rows for fifty (9 ms to under 1). */
+          parts.push(dir === 'DESC' ? `${e} DESC` : `${e} IS NULL, ${e} ${dir}`);
           keys.push({ expr: e, asc: dir === 'ASC' });
         }
       }
@@ -4347,6 +4370,22 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        cursor of its own: a client paging on it walked the list twice and could not tell. */
     if (!sortedCursor && cursorText !== '' && !(afterId !== undefined && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(at ?? '') && afterId !== ''))
       return no('VALUE_MALFORMED', 'A cursor is the one the page above answered with. Start from the first page.', { at: 'cursor' });
+    /* THE NEWEST PAGE OF A LONG LIST SORTED BY ITS OWN INDEXED DAY (`sortIndexOf`), from that index and not by sorting every
+       row: SQLite has no counts to know it, and on 20,000 rows it searched by list and sorted, 6 ms for fifty against 0.05. The
+       order is the `ORDER BY`, whichever way the rows are reached. A filter that may be able to use another index is left to
+       choose, and an index that is not there falls back to what was asked. */
+    const indexed = !sortedCursor && !at && deleted !== '' ? sortIndexOf(q.register, q.order?.[0], c.sql) : null;
+    const firstPage = (from: string) =>
+      sql.all<Record<string, unknown>>(`SELECT ${COLUMNS} FROM ${from} WHERE ${on.sql}${deleted} AND (${c.sql}) ${sort} LIMIT ?`, ...on.params, ...c.params, limit + 1);
+    const pageFromIndex = (): Record<string, unknown>[] => {
+      if (indexed === null) return firstPage('entry');
+      try {
+        return firstPage(`entry INDEXED BY ${indexed}`);
+      } catch {
+        missingSortIndexes.add(indexed);
+        return firstPage('entry');
+      }
+    };
     const page = sortedCursor
       ? sql.all<Record<string, unknown>>(
           `SELECT ${COLUMNS} FROM entry WHERE ${on.sql}${deleted} AND (${c.sql})${after} ${sort} LIMIT ?`,
@@ -4365,12 +4404,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           afterId ?? '',
           limit + 1,
         )
-      : sql.all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry WHERE ${on.sql}${deleted} AND (${c.sql}) ${sort} LIMIT ?`,
-          ...on.params,
-          ...c.params,
-          limit + 1,
-        );
+      : pageFromIndex();
 
     /* The MATCHED count is the whole answer, not the page: a reader who cannot see how many rows a
        filter admitted cannot tell a short list from a narrow one. */
@@ -8438,61 +8472,72 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     tz: recordIdentity(sql)?.tz ?? 'UTC',
     /* THE FOUR FIELDS A MEASURE NEEDS AND NOTHING ELSE, by the same expressions an index on them is built from, and the
        newest reading of each measure beside them so a measure that went quiet still says when it last spoke. */
-    readings: (q) => {
-      if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
-      const schema = { ...schemaOf(q.register), ...(anyHiddenFrom(viewer, q.register) ? { except: viewer } : {}) };
-      const c = compile(q.where, schema);
-      if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
-      const at = fieldSqlIn(schema, q.when);
-      /* AND THE PROJECT EACH WAS REPORTED FOR, when the list says: its scope field, else its one field pointing at the
-         projects (the list declaring `scopes:`). Two projects' "Orders" are two measures (`measures.ts`), and the newest
-         reading before the period is each one's, not whichever project reported last. Read by the list's declaration,
-         never by a field's id, so any list of readings that points at its projects is grouped the same way. */
-      const projects = [...registers.values()].find((r) => r.scopes !== undefined)?.id ?? null;
-      const fields = registers.get(q.register)?.fields ?? [];
-      const aims = (f: (typeof fields)[number] | undefined) => f !== undefined && !f.retired && f.type === 'ref' && 'to' in f && f.to === projects;
-      const scoped = scopeFieldOf(fields);
-      const pointing = fields.filter(aims);
-      const thing = projects === null ? undefined : aims(scoped) ? scoped : pointing.length === 1 ? pointing[0] : undefined;
-      /* AND THE READING AS MONEY when the block names a money field: minor units and a code, which `measures.ts`
-         reads in place of `value`, so a reading of USD 48.15 is never drawn as 4815. THE WHOLE VALUE, read as text:
-         `fieldSqlIn` on a money field reads its number alone (the path a sort uses), and a number with no code is the
-         very misreading this stops. */
-      const amount = q.amount ? fieldSqlIn(schema, q.amount, 'text') : 'NULL';
-      /* AND THE GROUP A MEASURE IS LISTED UNDER, the block's sixth column, said as a person reads it below. */
-      const grouped = q.group ? fields.find((f) => f.id === q.group && !f.retired) : undefined;
-      const cols = `${at} AS at, ${fieldSqlIn(schema, q.value)} AS value, ${amount} AS amount, ${q.name ? fieldSqlIn(schema, q.name) : 'NULL'} AS name, ${q.unit ? fieldSqlIn(schema, q.unit) : 'NULL'} AS unit, ${thing ? fieldSqlIn(schema, thing.id) : 'NULL'} AS thing, ${grouped ? fieldSqlIn(schema, grouped.id) : 'NULL'} AS grp`;
-      const from = `FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`;
-      type Read = { at: unknown; value: unknown; amount: unknown; name: unknown; unit: unknown; thing: unknown; grp: unknown };
-      const titles = new Map<string, string | null>();
-      /* THE PROJECT BY ITS NAME, never its id: a reading of a project with no title is of no project a person can name.
-         ITS ID STILL KEEPS IT APART (`project`, never drawn): two untitled projects' "Orders" were one line through both
-         projects' numbers. */
-      /* A GROUP BY A LINK IS ITS ROW'S NAME, by a choice its label, and anything else as it is held. */
-      const labels = grouped && 'labels' in grouped && grouped.labels && typeof grouped.labels === 'object' ? (grouped.labels as Record<string, string>) : null;
-      const groupOf = (v: unknown): string | null => {
-        if (v === null || v === undefined || v === '') return null;
-        if (grouped?.type === 'ref' && typeof v === 'string') {
-          if (!titles.has(v)) titles.set(v, titleOfRow(v));
-          return titles.get(v) ?? null;
-        }
-        const said = String(v);
-        return labels !== null && Object.hasOwn(labels, said) ? labels[said]! : said;
-      };
-      const named = ({ thing: of, grp, ...r }: Read): RawReading => {
-        const under = grouped ? groupOf(grp) : null;
-        const withGroup = under === null ? r : { ...r, group: under };
-        if (typeof of !== 'string' || of === '') return withGroup;
-        if (!titles.has(of)) titles.set(of, titleOfRow(of));
-        const title = titles.get(of);
-        return title ? { ...withGroup, of: title, project: of } : { ...withGroup, project: of };
-      };
-      const readings = sql.all<Read>(`SELECT ${cols} ${from} AND ${at} >= ?`, q.register, ...c.params, q.since).map(named);
-      const latest = sql
-        .all<Read>(`SELECT at, value, amount, name, unit, thing, grp FROM (SELECT ${cols}, max(${at}) AS newest ${from} AND ${at} < ? GROUP BY name, thing, grp)`, q.register, ...c.params, q.since)
-        .map(named);
-      return ok({ readings, latest });
-    },
+    /* HELD WHILE THE LISTS IT READ STAND (`holdAcross`), by who reads: two scans of a long list of readings for one block. */
+    readings: (q) =>
+      holdAcross(factsHeld as HeldReadings<ReturnType<NonNullable<PageDeps['readings']>>>, JSON.stringify(['readings', q, viewer ?? null]), readableZone(recordTz()), clock.now(), once, () => {
+        if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
+        const schema = { ...schemaOf(q.register), ...(anyHiddenFrom(viewer, q.register) ? { except: viewer } : {}) };
+        const c = compile(q.where, schema);
+        if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
+        const at = fieldSqlIn(schema, q.when);
+        /* AND THE PROJECT EACH WAS REPORTED FOR, when the list says: its scope field, else its one field pointing at the
+           projects (the list declaring `scopes:`). Two projects' "Orders" are two measures (`measures.ts`), and the newest
+           reading before the period is each one's, not whichever project reported last. Read by the list's declaration,
+           never by a field's id, so any list of readings that points at its projects is grouped the same way. */
+        const projects = [...registers.values()].find((r) => r.scopes !== undefined)?.id ?? null;
+        const fields = registers.get(q.register)?.fields ?? [];
+        const aims = (f: (typeof fields)[number] | undefined) => f !== undefined && !f.retired && f.type === 'ref' && 'to' in f && f.to === projects;
+        const scoped = scopeFieldOf(fields);
+        const pointing = fields.filter(aims);
+        const thing = projects === null ? undefined : aims(scoped) ? scoped : pointing.length === 1 ? pointing[0] : undefined;
+        /* AND THE READING AS MONEY when the block names a money field: minor units and a code, which `measures.ts`
+           reads in place of `value`, so a reading of USD 48.15 is never drawn as 4815. THE WHOLE VALUE, read as text:
+           `fieldSqlIn` on a money field reads its number alone (the path a sort uses), and a number with no code is the
+           very misreading this stops. */
+        const amount = q.amount ? fieldSqlIn(schema, q.amount, 'text') : 'NULL';
+        /* AND THE GROUP A MEASURE IS LISTED UNDER, the block's sixth column, said as a person reads it below. */
+        const grouped = q.group ? fields.find((f) => f.id === q.group && !f.retired) : undefined;
+        const cols = `${at} AS at, ${fieldSqlIn(schema, q.value)} AS value, ${amount} AS amount, ${q.name ? fieldSqlIn(schema, q.name) : 'NULL'} AS name, ${q.unit ? fieldSqlIn(schema, q.unit) : 'NULL'} AS unit, ${thing ? fieldSqlIn(schema, thing.id) : 'NULL'} AS thing, ${grouped ? fieldSqlIn(schema, grouped.id) : 'NULL'} AS grp`;
+        const from = `FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`;
+        type Read = { at: unknown; value: unknown; amount: unknown; name: unknown; unit: unknown; thing: unknown; grp: unknown };
+        const titles = new Map<string, string | null>();
+        /* A TITLE READ BY THE LIST THE LINK POINTS AT, so this read is held on that list and a project renamed moves it. A row
+           that is not on it is looked for anywhere, which reads past the lists and so is not held. */
+        const titleIn = (to: unknown, id: string): string | null => {
+          const list = typeof to === 'string' ? registers.get(to) : undefined;
+          const row = list === undefined ? undefined : sql.one<{ fields: string }>('SELECT fields FROM entry WHERE register = ? AND id = ?', list.id, id);
+          if (!row) return titleOfRow(id);
+          const said = (JSON.parse(row.fields) as Record<string, Json>)[list!.title];
+          return typeof said === 'string' && said.trim() !== '' ? said.trim() : null;
+        };
+        /* THE PROJECT BY ITS NAME, never its id: a reading of a project with no title is of no project a person can name.
+           ITS ID STILL KEEPS IT APART (`project`, never drawn): two untitled projects' "Orders" were one line through both
+           projects' numbers. */
+        /* A GROUP BY A LINK IS ITS ROW'S NAME, by a choice its label, and anything else as it is held. */
+        const labels = grouped && 'labels' in grouped && grouped.labels && typeof grouped.labels === 'object' ? (grouped.labels as Record<string, string>) : null;
+        const groupOf = (v: unknown): string | null => {
+          if (v === null || v === undefined || v === '') return null;
+          if (grouped?.type === 'ref' && typeof v === 'string') {
+            if (!titles.has(v)) titles.set(v, titleIn(grouped.to, v));
+            return titles.get(v) ?? null;
+          }
+          const said = String(v);
+          return labels !== null && Object.hasOwn(labels, said) ? labels[said]! : said;
+        };
+        const named = ({ thing: of, grp, ...r }: Read): RawReading => {
+          const under = grouped ? groupOf(grp) : null;
+          const withGroup = under === null ? r : { ...r, group: under };
+          if (typeof of !== 'string' || of === '') return withGroup;
+          if (!titles.has(of)) titles.set(of, titleIn(thing?.to, of));
+          const title = titles.get(of);
+          return title ? { ...withGroup, of: title, project: of } : { ...withGroup, project: of };
+        };
+        const readings = sql.all<Read>(`SELECT ${cols} ${from} AND ${at} >= ?`, q.register, ...c.params, q.since).map(named);
+        const latest = sql
+          .all<Read>(`SELECT at, value, amount, name, unit, thing, grp FROM (SELECT ${cols}, max(${at}) AS newest ${from} AND ${at} < ? GROUP BY name, thing, grp)`, q.register, ...c.params, q.since)
+          .map(named);
+        return ok({ readings, latest });
+      }),
     points: (series, from, to) =>
       sql.all<{ at: string; value: number; unit: string | null }>(
         "SELECT at, value, unit FROM metric_point WHERE series = ? AND grain = 'day' AND at >= ? AND at <= ? ORDER BY at",
@@ -8754,24 +8799,26 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     },
     /* HOW MANY ROWS HOLD EACH VALUE OF ONE FIELD, for a page's reader filters, by the expression an index on the field
        is built from and in one query, so a strip of chips over a long list does not read the list. */
-    tally: (q) => {
-      if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
-      const schema = hopSchemaOf(q.register)!;
-      const said = predicateOf(q.where, schema, evalContext());
-      if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
-      const c = compile(said.predicate, schema);
-      if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
-      /* AND NOT THE ROWS KEPT PRIVATE FROM THE PAGE'S READER (leak matrix N2), which the table under the chips leaves out
-         through `list`: a chip counted them, so a strip over Kiln said one more in Review than the block drew. */
-      const kept = admitClause(q.register, undefined, viewer);
-      const rows = sql.all<{ value: Json; n: number }>(
-        `SELECT ${fieldSqlIn(schema, q.field)} AS value, COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})${kept === null ? '' : ` AND (${kept.sql})`} GROUP BY 1`,
-        q.register,
-        ...c.params,
-        ...(kept === null ? [] : kept.params),
-      );
-      return ok(rows);
-    },
+    /* AND HELD WHILE THE LISTS IT READ STAND (`holdAcross`), by who reads: each chip a scan of the list, some twelve on the Ledger. */
+    tally: (q) =>
+      holdAcross(factsHeld as HeldReadings<Result<{ value: Json; n: number }[]>>, JSON.stringify(['tally', q.register, q.field, q.where ?? null, viewer ?? null]), readableZone(recordTz()), clock.now(), once, () => {
+        if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
+        const schema = hopSchemaOf(q.register)!;
+        const said = predicateOf(q.where, schema, evalContext());
+        if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
+        const c = compile(said.predicate, schema);
+        if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
+        /* AND NOT THE ROWS KEPT PRIVATE FROM THE PAGE'S READER (leak matrix N2), which the table under the chips leaves out
+           through `list`: a chip counted them, so a strip over Kiln said one more in Review than the block drew. */
+        const kept = admitClause(q.register, undefined, viewer);
+        const rows = sql.all<{ value: Json; n: number }>(
+          `SELECT ${fieldSqlIn(schema, q.field)} AS value, COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})${kept === null ? '' : ` AND (${kept.sql})`} GROUP BY 1`,
+          q.register,
+          ...c.params,
+          ...(kept === null ? [] : kept.params),
+        );
+        return ok(rows);
+      }),
     /* A LIST ADDED UP IN ONE GROUPED QUERY, for a block that adds up (`wholeRead`): by each label, by the unit
        of what is added, and by the day a money amount is dated, so the page converts a sum a day and never a row. */
     whole: (q) => {
