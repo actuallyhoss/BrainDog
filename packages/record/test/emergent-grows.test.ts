@@ -174,3 +174,50 @@ test('THIRTEEN JOBS MADE YESTERDAY ARE NO OFFER, nor a dismissed one', async () 
   assert.equal(openRowsOffered(deps(18)).length, 1, 'three days on they have stood open long enough');
   assert.deepEqual(openRowsOffered(deps(18, ['page:jobs:open'])), []);
 });
+
+test('THE OPEN COUNT IS HELD ON ITS LIST: thirteen jobs all finished are offered nothing at once', async () => {
+  const { api, jobs, deps } = await record();
+  jobs(OPEN_MOST + 1, 11);
+  const offers = () => openRowsOffered({ ...deps(15), held: api.kernel.heldFacts() });
+  assert.equal(offers().length, 1);
+  const rows = api.kernel.list({ register: 'jobs', limit: 100 });
+  assert.ok(rows.ok);
+  for (const row of rows.value.rows) assert.ok(api.kernel.update('jobs', row.id, { status: 'done' }, { actor: 'p_owner' }).ok);
+  assert.deepEqual(offers(), [], 'finished jobs were still offered as open');
+});
+
+test('THE OPEN COUNT LEAVES OUT WHAT IS FINISHED, WHAT IS NEWER AND AN EXAMPLE, and counts a row with no state as open', async () => {
+  const { api, deps } = await record();
+  value(
+    await api.kernel.install([
+      {
+        id: 'register.orders',
+        kind: 'register',
+        body: {
+          id: 'orders',
+          name: 'Orders',
+          title: 'what',
+          state: 'status',
+          done: ['done'],
+          fields: [
+            { id: 'what', label: 'What', type: 'text', required: true },
+            { id: 'status', label: 'Status', type: 'enum', values: ['open', 'done'] },
+            { id: 'tags', label: 'Tags', type: 'list', of: 'text' },
+          ],
+        },
+      } as unknown as Declaration,
+    ]),
+  );
+  const make = (what: string, fields: Record<string, unknown>) => value(api.kernel.create('orders', { what, ...fields }, { actor: 'p_owner' }));
+  deps(11);
+  for (let i = 0; i < 11; i++) make(`Open ${i}`, { status: 'open', ...(i === 0 ? { tags: ['urgent'] } : {}) });
+  make('No state', {});
+  make('No state, tagged', { tags: ['urgent'] });
+  make('Finished', { status: 'done' });
+  make('An example', { status: 'open', tags: ['example'] });
+  deps(14);
+  make('Made lately', { status: 'open' });
+  const offered = openRowsOffered({ ...deps(15), held: api.kernel.heldFacts() }).filter((o) => o.id === 'page:orders:open');
+  assert.equal(offered.length, 1);
+  assert.equal(offered[0]!.why, `13 orders have stood open for ${OPEN_DAYS} days or more. Want a page of the open ones, by status?`);
+});

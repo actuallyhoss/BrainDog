@@ -9172,6 +9172,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * version"): `record_index` is `boot`, and it counted every list again, with the reader's private rows asked of each.
    */
   const countsHeld = new Map<string, Held<number>>();
+  /** `boot`'s answer, by who asked (`boot`). */
+  const bootHeld = new Map<string, Held<readonly [Omit<Boot, 'theme' | 'looks'>, ReturnType<typeof themeInstalled>, ReturnType<typeof looksOf>]>>();
+  /** The person behind a call, a token's too. */
+  const person = (ctx: CallContext): string | null => (ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : null);
   const countNow = (ctx: CallContext, register: string): number =>
     heldFor(countsHeld, JSON.stringify([readerKey(ctx), register]), () => kernel.count(register, kernel.scope(ctx, register)), 512);
 
@@ -11311,6 +11315,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               pages: every,
               dismissed: new Set(Array.isArray(prefs['pen.dismissed']) ? prefs['pen.dismissed'] : []),
               use: { sql, nowMs: clock.now() },
+              held: kernel.heldFacts(),
               /* THE WORDS THE SPEAKING USE CASE GIVES A LIST, so the week offer says Jobs where the rail does (offer-labels-60). */
               labels: ((v) => labelsOf(v.values, Object.fromEntries(Object.entries(v.labels).map(([k, label]) => [k, { label }]))))(voiceFor(ctx)),
             })).map(penSent)
@@ -13090,7 +13095,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* THE LOOK IS READ IN THE SAME MOMENT AND DRAWN AFTER IT. The row is read inside the transaction with
          everything else, and solved outside it, because the solve loads `@braindog/theme` on demand and a read
          transaction held open across an `await` is a snapshot another connection's writes wait behind. */
-      const [answer, look, looks] = kernel.transaction(() => {
+      /* AND KEPT WHILE NOTHING MOVES (`heldFor`), BY WHO ASKED: the whole answer again on a second open within `HELD_MS`,
+         with the time put back on it. The caller's own preferences and places beside the version, since setting a preference writes no line, and what the pen ranks by (`usedNow`), since a list opened writes no line either. */
+      const { batch: _batch, provedAt: _proved, ...caller } = ctx;
+      const who = person(ctx);
+      const standing = who === null ? null : [kernel.prefsOf(who), sql.all('SELECT register, level, row_where FROM member WHERE person_id = ?', who)];
+      const [answer, look, looks] = heldFor(bootHeld, JSON.stringify([caller, standing, usedNow()]), () => kernel.transaction(() => {
         const out: Boot['registers'] = [];
         /* THE KERNEL'S OWN LISTS SAY SO (`kernel: true`), by their declaration, so no screen leaves them out by a name. */
         const own = new Set(kernel.kernelLists());
@@ -13162,8 +13172,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ...(admin(ctx) === null ? { copies: kernel.copyFacts() } : {}),
         };
         return [answered, themeInstalled(ctx), looksOf(kernel.declarations().filter((d) => d.kind === 'theme'))] as const;
-      });
-      return ok({ ...answer, theme: look === null ? null : await themeDrawn(look), looks });
+      }), 16);
+      return ok({ ...structuredClone(answer), now: new Date(clock.now()).toISOString(), theme: look === null ? null : await themeDrawn(look), looks: structuredClone(looks) });
     },
 
     /**

@@ -920,6 +920,11 @@ function localInstants(where: Predicate | undefined, schema: Schema, tz: string 
 export type ReadMemo = { once<T>(key: string, make: () => T): T };
 
 export type EvalContext = {
+  /**
+   * A read that is about to answer by the clock itself, a walk ahead, says when that answer stops being good: whatever holds it
+   * holds it until then and no longer. Absent where the clock the read uses is fixed for the day (`clockOf`, an as-of read).
+   */
+  movesAt?: ((ms: number) => void) | undefined;
   /** Who is reading, for a `where` that says `someone else`; a figure that says it is held for each reader. */
   reader?: string | undefined;
   nowMs: number;

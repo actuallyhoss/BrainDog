@@ -45,9 +45,15 @@ export function extension(parts: KernelParts) {
      * record in two is answered two and no more, because one currency is the only answer `boot`'s home draws with. A
      * caller that quotes them all (the rates preset, up to `RATES_CURRENCIES_MOST`) asks for one more than it can quote.
      * Every list when `reads` is absent; a list the caller may not open adds nothing, so its money says nothing about it. With a `viewer`, a row kept private to somebody else adds nothing either.
+     *
+     * EACH LIST'S ANSWER IS HELD WHILE THE LIST STANDS (`heldFacts`), by the list, the field, the viewer and how many were
+     * asked: three scans of a whole ledger on every `boot` after any write anywhere, when a currency new to a list only
+     * ever comes with a write to that list. Who may read a list is asked each time, above the hold, so a member's lists
+     * narrowed or a row kept private (which the lists' version moves on) is never answered from before it.
      */
     moneyCurrencies(reads: (register: string) => boolean = () => true, most = 2, viewer?: string): string[] {
       const found = new Set<string>();
+      const held = parts.heldFacts();
       for (const d of parts.declarations()) {
         if (d.kind !== 'register' || !d.id.startsWith('register.')) continue;
         const list = parts.register(d.id.slice('register.'.length));
@@ -55,13 +61,18 @@ export function extension(parts: KernelParts) {
         for (const f of list.fields) {
           if (f.type !== 'money') continue;
           const at = `json_extract(fields, '${jsonPath(f.id)}.currency')`;
-          const held = parts.sql.all<{ c: unknown }>(
-            `SELECT DISTINCT ${at} AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND ${at} IS NOT NULL${viewer === undefined ? '' : ` AND ${unprivate()}`} LIMIT ?`,
-            list.id,
-            ...(viewer === undefined ? [] : [viewer]),
-            most,
+          const here = held(JSON.stringify(['currencies', list.id, f.id, viewer ?? null, most]), () =>
+            parts.sql
+              .all<{ c: unknown }>(
+                `SELECT DISTINCT ${at} AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND ${at} IS NOT NULL${viewer === undefined ? '' : ` AND ${unprivate()}`} LIMIT ?`,
+                list.id,
+                ...(viewer === undefined ? [] : [viewer]),
+                most,
+              )
+              .map((r) => r.c)
+              .filter((c): c is string => typeof c === 'string' && /^[A-Z]{3}$/u.test(c)),
           );
-          for (const r of held) if (typeof r.c === 'string' && /^[A-Z]{3}$/u.test(r.c)) found.add(r.c);
+          for (const c of here) found.add(c);
           if (found.size >= most) return [...found].sort().slice(0, most);
         }
       }

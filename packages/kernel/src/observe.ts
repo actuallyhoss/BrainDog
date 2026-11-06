@@ -87,6 +87,10 @@ const onColumn = (kind: string, subject: string): boolean => {
  * ONE ROW PER KIND PER SUBJECT PER DAY, incremented. The alternative — a row per event — is a table
  * that grows with usage and is never read at that grain, and the detectors below all ask about days.
  */
+/** The two statements that raise a day's counter, named so a host can hold them back (`apps/worker/src/observed-later.ts`). */
+export const OBSERVE_COUNT = 'INSERT INTO observation (kind, subject, day, n) VALUES (?, ?, ?, 1) ON CONFLICT (kind, subject, day) DO UPDATE SET n = n + 1';
+export const OBSERVE_COUNT_WHO = 'INSERT INTO observation_who (kind, subject, day, who, n) VALUES (?, ?, ?, ?, 1) ON CONFLICT (kind, who, subject, day) DO UPDATE SET n = n + 1';
+
 export function observe(sql: Sql, nowMs: number, batch: readonly Observation[]): Result<number> {
   if (batch.length > BATCH)
     return no<number>('OUT_OF_BOUNDS', `A batch is at most ${BATCH} observations, and this one is ${batch.length}.`, {
@@ -109,14 +113,14 @@ export function observe(sql: Sql, nowMs: number, batch: readonly Observation[]):
   for (const row of batch) {
     if (!row.subject || onColumn(row.kind, row.subject)) continue;
     sql.exec(
-      'INSERT INTO observation (kind, subject, day, n) VALUES (?, ?, ?, 1) ON CONFLICT (kind, subject, day) DO UPDATE SET n = n + 1',
+      OBSERVE_COUNT,
       row.kind,
       row.subject,
       day,
     );
     if (typeof row.who === 'string' && row.who !== '')
       sql.exec(
-        'INSERT INTO observation_who (kind, subject, day, who, n) VALUES (?, ?, ?, ?, 1) ON CONFLICT (kind, who, subject, day) DO UPDATE SET n = n + 1',
+        OBSERVE_COUNT_WHO,
         row.kind,
         row.subject,
         day,

@@ -71,6 +71,8 @@ import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/h
 
 import { alarmScheduler } from './alarm.ts';
 import { fileModelSignMoved } from '@braindog/host/sign-model';
+import { ALARM_SLICE_UNITS, ASIDE_MS, breathe, pace, type Pace } from './alarm-pace.ts';
+import { OBSERVED_LATER_MS, observedLater, type ObservedLater } from './observed-later.ts';
 import { slashDue, slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
 import { PLAN_AGENTS, PLAN_FILES, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
 import { fallbackWire, includedCandidates, includedInference, kennelNoteModel } from './slash.ts';
@@ -527,13 +529,10 @@ const ALARM_STEP_PAGES = 10;
  */
 const ALARM_ACT_MS = 10_000;
 
-/** A step slower than this writes an `alarm-step` line with its time. */
-const SLOW_STEP_MS = 5_000;
-
 /**
  * A share of one alarm (`tickBudget`) that also counts what it was spent on, for the `alarm-work` line. THE CLOCK CANNOT
- * SAY WHERE AN ALARM'S CPU WENT: it stands still while a page draws, so a step that drew ten pages in 2 s of CPU measures
- * nothing and writes no `alarm-step` line (on 1 November an alarm spent 19.5 s of CPU and named no step). The pages each
+ * SAY WHERE AN ALARM'S CPU WENT: it stands still while a page draws (on 1 November an alarm spent 19.5 s of CPU and named
+ * no step), and moves only behind a timer, which is why each step's `alarm-step` line is written after one. The pages each
  * step drew are what it cost. AND WHAT IT PASSED OVER BECAUSE NOTHING IT READ MOVED (`kept`): the look's later walks keep
  * what each page read, and draw again only the pages whose reads moved (F35, perf2).
  */
@@ -933,7 +932,14 @@ export class Record$ extends DurableObject<Env> {
        model, its automations' answers and its model jobs. `api` is read when a call fails, by which time it is made. */
     const onFail = (fail: ModelFail) => this.#modelFailed(api, fail);
     const slashModel = workerSlashModel(this.env, () => api, { store: () => sql, onFail });
-    const sql = guardedSql(this.ctx.storage);
+    /* A READ'S COUNTERS WAIT A FEW SECONDS AND GO TOGETHER (`observed-later.ts`): a read was a write, and its answer waited
+       for it. Never once the record is deleted or a restore is armed. */
+    this.#observed = observedLater(
+      guardedSql(this.ctx.storage),
+      (flush) => void setTimeout(flush, OBSERVED_LATER_MS),
+      () => !this.#gone && !this.#armed,
+    );
+    const sql = this.#observed.sql;
     /* WHAT ANSWERS AN AUTOMATION'S QUESTION TO SLASH, off the same endpoint and the same key path as `slashModel`, so
        `answersSlash` below and `/api/version`'s `slash` are one fact. The storage is this object's own, the one the door's
        engine is handed, so the two engines count one `ask_cap`. Before this line a Worker with a model said `slash: true`
@@ -1257,6 +1263,8 @@ export class Record$ extends DurableObject<Env> {
     }
     const owed = this.#wakeOwed;
     this.#wakeOwed = null;
+    /* AN ALARM THAT STOOD ASIDE IS ALREADY SET, and a wake asked meanwhile is what it goes on to do. */
+    if (this.#pace.standing()) return;
     if (owed === 'soon') await this.#soon();
     else if (owed === 'look')
       try {
@@ -1278,11 +1286,19 @@ export class Record$ extends DurableObject<Env> {
   #alarming = false;
   #wakeOwed: 'soon' | 'look' | null = null;
 
+  /** The record's `Sql`, and the counters it holds back from it (`observed-later.ts`). */
+  #observed: ObservedLater | undefined;
+
+  /** Who is calling while the alarm runs, and whether it is standing aside for them (`alarm-pace.ts`). */
+  #pace: Pace = pace();
+
   /** What `fileModelSignMoved` last filed in this object, so an alarm whose reading did not move files nothing. */
   #modelSignLast: string | null = null;
 
   async #alarmPass(): Promise<void> {
+    this.#pace.began();
     const api = await this.#record();
+    this.#observed?.flush();
     /* THE DOORS FIRST, AND ON A LAPSED RECORD TOO: a step that waited behind the lapse would keep asking for the alarm. */
     await this.#doors(api);
     /* A LAPSED RECORD RUNS THE DRAIN AND NOTHING ELSE: its reminders still land, and no
@@ -1304,61 +1320,73 @@ export class Record$ extends DurableObject<Env> {
     /* A STEP THAT THREW WAS NOT CUT (review of 30 October, R4): the step written down is cleared before the throw goes on, so
        the platform's own retry of this alarm does not read it as a reset, count a cut, and after two hold the step for six
        hours with a mail that says it was cut. Only an object reset mid-step leaves it written. */
-    let more: boolean;
-    let asked: boolean;
-    let modelled: boolean;
-    let looked: boolean;
-    let linted: boolean;
+    let more = false;
+    let asked = false;
+    let modelled = false;
+    let looked = false;
+    let linted = false;
+    /* A BREATH BEHIND EVERY STEP (`#step`), and A PASS THAT FINDS SOMEBODY HERE STOPS THERE, set again for a few seconds on
+       (`alarm-pace.ts`). The drain is never skipped: a reminder due is what the alarm is for. Nothing is lost by stopping: a
+       step not reached is reached by the next alarm, and each keeps its own place. */
+    let aside = false;
+    const stopped = (): boolean => this.#gone || this.#armed;
+    const onward = (): boolean => !stopped() && !(aside ||= this.#pace.aside());
     try {
       await this.#step(api, 'drain', () => api.kernel.drain(this.#alarm));
       /* EVERY STEP BUT THE DRAIN MAY BE HELD after two alarms in a row were cut in it (`alarm-cuts.ts`), and then answers
          what a pass with nothing to do answers. */
-      more = await this.#step(api, 'act', () => this.#act(api), false);
-      asked = await this.#step(api, 'ask', () => this.#ask(api), false);
-      modelled = await this.#step(api, 'model', () => this.#model(api), false);
+      if (onward()) more = await this.#step(api, 'act', () => this.#act(api), false);
+      if (onward()) asked = await this.#step(api, 'ask', () => this.#ask(api), false);
+      if (onward()) modelled = await this.#step(api, 'model', () => this.#model(api), false);
       /* THE LOOK AND THE LINT, EACH A SHARE OF THIS ALARM (`ALARM_STEP_MS`, `ALARM_STEP_PAGES`). Each drew every page it
          read in one go, the look up to 49 s and the lint up to 27 s, and the platform reset the object. Now each stops
          when its share is spent, keeps where it stopped, and answers `more`, and the alarm is set for now below, so the
-         rest is the next alarm's and requests are answered in between. */
+         rest is the next alarm's and requests are answered in between. AND WITHIN ITS SHARE EACH GOES A SLICE AT A TIME WITH
+         A BREATH BETWEEN (`#sliced`), so what a request waits behind is a page or two and not ten. */
       const lookShare = countedShare();
       const lintShare = countedShare();
-      looked = await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore, budget: lookShare.budget }), false);
+      if (onward()) looked = await this.#step(api, 'look', () => this.#sliced('look', lookShare, (budget) => slashLook(api, { sql: this.#jobsStore, budget })), false);
       /* AND THE RECORD LINTS ITS OWN PAGES, at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
-      linted = await this.#step(
-        api,
-        'lint',
-        () =>
-          api
-            .lintTick({ budget: lintShare.budget })
-            .then((out) => out.ran === false && out.more === true)
-            .catch((e: unknown) => {
-              console.error('lint:', e instanceof Error ? e.message : String(e));
-              return false;
-            }),
-        false,
-      );
+      if (onward())
+        linted = await this.#step(
+          api,
+          'lint',
+          () =>
+            this.#sliced('lint', lintShare, (budget) =>
+              api
+                .lintTick({ budget })
+                .then((out) => out.ran === false && out.more === true)
+                .catch((e: unknown) => {
+                  console.error('lint:', e instanceof Error ? e.message : String(e));
+                  return false;
+                }),
+            ),
+          false,
+        );
       /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
          replaces the earlier one, so each alarm may file it; the provider's last words ride along from `#modelFailed`. */
       /* ONLY WHEN THE READING MOVED (`fileModelSignMoved`): each filing gave the sign a new `read_at`, which the lint reads as
          a sign that moved, so every alarm read every sign again. */
-      await this.#step(api, 'signs', (): void => {
-        try {
-          this.#modelSignLast = fileModelSignMoved(api.kernel, guardedSql(this.ctx.storage), Date.now(), this.#modelSignLast);
-        } catch (e) {
-          console.error('signs:', e instanceof Error ? e.message : String(e));
-        }
-      });
+      if (onward())
+        await this.#step(api, 'signs', (): void => {
+          try {
+            this.#modelSignLast = fileModelSignMoved(api.kernel, guardedSql(this.ctx.storage), Date.now(), this.#modelSignLast);
+          } catch (e) {
+            console.error('signs:', e instanceof Error ? e.message : String(e));
+          }
+        });
       /* CONNECT GOOGLE, every 15 minutes while a Google account is connected (`google-connect.ts`): its own step, so a
          slow Google holds only itself, and the alarm is kept no later than the next sync below. */
-      await this.#step(
-        api,
-        'google',
-        () =>
-          this.#googleSync(api).catch((e: unknown) => {
-            console.error('google:', e instanceof Error ? e.message : String(e));
-          }),
-        undefined,
-      );
+      if (onward())
+        await this.#step(
+          api,
+          'google',
+          () =>
+            this.#googleSync(api).catch((e: unknown) => {
+              console.error('google:', e instanceof Error ? e.message : String(e));
+            }),
+          undefined,
+        );
       /* WHAT THIS ALARM DREW AND WHAT IT LEFT FOR THE NEXT, when it drew anything: the clock cannot say (`countedShare`). */
       if (lookShare.used() + lintShare.used() + lookShare.kept() > 0)
         op({
@@ -1377,7 +1405,18 @@ export class Record$ extends DurableObject<Env> {
       if (!resetSaid(said)) await this.#stepDone();
       throw e;
     }
+    /* A RESTORE ARMED, OR THE RECORD DELETED, DURING A BREATH: nothing is written from there on. */
+    if (stopped()) return;
     await this.#stepDone();
+    /* STANDING ASIDE SETS THE ALARM A FEW SECONDS ON, LAST, for all of what is left, whatever each step answered. */
+    if (aside) {
+      const at = Date.now() + ASIDE_MS;
+      await this.#alarm.set(at);
+      this.#pace.stoodOff(at);
+      op({ op: 'alarm-aside', rec: recOf(api), until: new Date(at).toISOString() });
+      return;
+    }
+    this.#pace.finished();
     /* WORK LEFT FOR THE NEXT INVOCATION SETS THE ALARM FOR NOW, AND IT IS SET LAST. `kernel.tail` sets the alarm from the
        `schedule` table alone, and both the ask pass and the daily look tail it, so a `set(now)` made inside `#act`
        before either of them could be moved out to the next schedule row, or cleared, by a pass that answered one
@@ -1575,6 +1614,8 @@ export class Record$ extends DurableObject<Env> {
       this.#wakeOwed = 'soon';
       return;
     }
+    /* STANDING ASIDE IT IS ALREADY SET, seconds off (`alarm-pace.ts`), and now would be the alarm back in the person's way. */
+    if (this.#pace.standing()) return;
     try {
       /* SET FOR NOW ONLY WHEN IT IS NOT DUE ALREADY, which the scheduler decides outside the alarm (`AlarmRules`). */
       await this.#alarm.set(Date.now());
@@ -1593,6 +1634,7 @@ export class Record$ extends DurableObject<Env> {
       this.#wakeOwed ??= 'look';
       return;
     }
+    if (this.#pace.standing()) return;
     try {
       /* AN ALARM ALREADY DUE IS NOT ASKED FOR AGAIN, nor is the look asked about: its look asks for itself. So in a burst
          of pulses only the first asks `slashDue`, and the rest read one alarm from memory. */
@@ -1622,14 +1664,48 @@ export class Record$ extends DurableObject<Env> {
       }
     }
     await this.#stepNote(step);
+    /* THE CLOCK IS READ BEHIND A TIMER AT BOTH ENDS (the last step's breath, and this one's), since it stands still while
+       code runs. So `ms` is the step's own CPU and whatever it waited on, and `let` says how many calls came in at the
+       breath behind it, whose own time is in `ms` too. One line a step, so production can say where an alarm's time went. */
     const started = Date.now();
     const out = await run();
-    const ms = Date.now() - started;
-    if (ms >= SLOW_STEP_MS) op({ op: 'alarm-step', rec: recOf(api), step, ms });
+    const calls = this.#pace.calls();
+    /* THE STEP IS CROSSED OFF BEFORE THE BREATH. Requests run in the breath, so one that overran its CPU, or a deploy, would
+       reset the object with a finished step written down, and two of those in a row hold that step for hours and mail the
+       operator (`#cutOff`). */
+    await this.#stepDone();
+    await breathe();
+    op({ op: 'alarm-step', rec: recOf(api), step, ms: Date.now() - started, let: this.#pace.calls() - calls });
     /* A STEP THAT FINISHED CLEARS ITS COUNT: the next cut in it starts again at one. */
     const cuts = await this.#cutsRead();
     if (cuts !== null && cuts.step === step) await this.#cutsKeep(null);
     return out;
+  }
+
+  /**
+   * A page-drawing step's share of this alarm, spent a slice at a time with a breath between (`ALARM_SLICE_UNITS`). The step
+   * keeps its own place, so asking it again goes on from there, and it answers `more` until it is done. It stops when its
+   * share is spent, when it has nothing left, or when somebody has come (`aside`), and answers whether there is more.
+   */
+  async #sliced(step: string, share: ReturnType<typeof countedShare>, run: (budget: TickBudget) => Promise<boolean>): Promise<boolean> {
+    for (let slice = 1; ; slice++) {
+      let used = 0;
+      const more = await run({
+        spend: (n = 1) => {
+          used += n;
+          share.budget.spend(n);
+        },
+        spent: () => used >= ALARM_SLICE_UNITS || share.budget.spent(),
+        kept: (n = 1) => share.budget.kept?.(n),
+      });
+      /* A STEP THAT ANSWERS `more` AND SPENDS NOTHING STILL ENDS: the count of slices is the bound under the share's. */
+      if (!more || share.budget.spent() || slice >= ALARM_STEP_PAGES) return more;
+      /* NOT WRITTEN DOWN ACROSS THE BREATH (`#step`), and written again for the slice that follows it. */
+      await this.#stepDone();
+      await breathe();
+      if (this.#gone || this.#armed || this.#pace.aside()) return more;
+      await this.#stepNote(step);
+    }
   }
 
   /** Write down the step running now, or `act:<script>` while a script runs in `act`, so a cut names it. */
@@ -1664,7 +1740,7 @@ export class Record$ extends DurableObject<Env> {
     }
   }
 
-  /** The alarm finished: no step is left running. */
+  /** No step is running: the alarm finished, or the one that ran is done and the next has not begun. */
   async #stepDone(): Promise<void> {
     try {
       await this.ctx.storage.delete(ALARM_STEP);
@@ -2705,7 +2781,21 @@ export class Record$ extends DurableObject<Env> {
     return drained(request, out);
   }
 
+  /** The call, counted for the alarm while it is answered (`alarm-pace.ts`). */
   async #answer(request: Request): Promise<Response> {
+    this.#pace.called();
+    let person = false;
+    try {
+      return await this.#answered(request, () => {
+        person = true;
+        this.#pace.arrived();
+      });
+    } finally {
+      if (person) this.#pace.left();
+    }
+  }
+
+  async #answered(request: Request, aPerson: () => void): Promise<Response> {
     if (this.#gone) return json({ ok: false, refusal: DELETED }, 503);
     if (this.#armed) return json({ ok: false, refusal: RESTORING }, 503);
     const api = await this.#record();
@@ -2730,6 +2820,8 @@ export class Record$ extends DurableObject<Env> {
     }
     const ctx = JSON.parse(request.headers.get(CTX_HEADER) ?? 'null') as CallContext | null;
     if (!ctx) return saidUnauthorized('record', 'This BrainDog needs a caller.');
+    /* A PERSON IS HERE (`alarm-pace.ts`), and the alarm stands aside at its next breath. Not an open tab's version poll. */
+    if (ctx.principal.kind === 'person' && !pollAsked(request.method, new URL(request.url).pathname)) aPerson();
 
     /* `/mcp` READS ITS BODY HERE. The router checked the bearer from the headers alone, so nothing a stranger
        sent is parsed, and the tools reach this record through the same methods `/api` calls. */

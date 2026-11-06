@@ -113,6 +113,8 @@ export type KernelParts = {
   evalContext: (staged?: readonly Declaration[]) => EvalContext;
   appendEvent: (e: AppendedEvent) => string;
   observe: (batch: readonly Observation[]) => Result<number>;
+  /** Facts held across reads while the lists they read stand (`index.ts`, `heldFacts`): one for each read that asks several. */
+  heldFacts: () => <T>(key: string, make: () => T) => T;
   /** Rebuilds the list cache from the declaration table, which a write of a declaration needs before anything reads it. */
   reload: () => void;
   /**

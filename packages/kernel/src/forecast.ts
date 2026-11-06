@@ -173,7 +173,12 @@ export type ForecastDeps = {
   sql: Sql;
   schemaOf: (register: string) => Schema | null;
   titleOf: (register: string) => string | null;
-  hydrate: (id: string) => Entry | null;
+  /**
+   * A row of a list the walk has already read the ids of, by that list as well as its id, so the read names the list and a
+   * walk over rows is held on the lists it walked (`notice`). Read by the id alone, it read past every list and no walk with
+   * a row in it was held at all.
+   */
+  hydrate: (id: string, register: string) => Entry | null;
   ctx: EvalContext;
   /**
    * The record's rest days, as weekday numbers (0 Sunday to 6 Saturday), which a row's `weekend` rule moves a day off.
@@ -311,6 +316,20 @@ type LegRead = {
  * converted at the rate as of its own day, and a pair with no rate is named in `missing`, exactly as a walk into the
  * home currency is. A walk of one currency (`only` as a string) is never converted, so it ignores `into`.
  */
+/**
+ * The next moment a walk over nothing new answers differently, given the clock it walks by.
+ *
+ * A WALK'S WINDOW MOVES WITHIN A DAY. A step is at noon UTC of its day and the horizon is `nowMs` plus whole days, so a bill due
+ * on the last day of the span comes into it at 12:00 UTC (`until`, `lastOf`), and `days` is rounded from the same noon, so the
+ * count goes down one at 00:00 UTC. Those are the only two: every other comparison is of days. `Math.round` takes the half up, so
+ * the very millisecond of midnight answers as the moment before it, and a walk read on it is good for that millisecond alone.
+ */
+export function walkMovesAt(nowMs: number): number {
+  const half = DAY_MS / 2;
+  const past = ((nowMs % half) + half) % half;
+  return past === 0 ? nowMs + 1 : nowMs + (half - past);
+}
+
 export function runway(
   deps: ForecastDeps,
   opening: number,
@@ -339,6 +358,7 @@ export function runway(
      bill due yesterday in `Africa/Cairo` read as due today until 03:00 local time, and a walk drawn beside a list that
      already called it late. */
   const today = iso(clockOf(deps.ctx));
+  deps.ctx.movesAt?.(walkMovesAt(deps.ctx.nowMs));
   const refusals: Refusal[] = [];
   const movements: { at: number; currency: string; step: Omit<Step, 'balance'> }[] = [];
   const seen = new Set<string>();
@@ -402,7 +422,7 @@ export function runway(
     }
 
     for (const { id } of rows) {
-      const entry = deps.hydrate(id);
+      const entry = deps.hydrate(id, leg.register);
       if (!entry) continue;
       const money = entry.fields[leg.amount];
       /* A LEG WHOSE AMOUNT IS NOT MONEY MUST SAY SO. `amount === null → continue` skipped the row in
@@ -767,7 +787,13 @@ function everydayOf(deps: ForecastDeps, leg: Leg, already: readonly LegRead[], t
   /* WHERE EACH CURRENCY BEGAN, over every dated row of the list and not only the ones the filter keeps: a ledger whose
      first row is a deposit began that day. */
   const began = new Map<string, string>();
-  for (const r of deps.sql.all<{ c: string; m: string }>(`SELECT ${currency} AS c, min(substr(${day}, 1, 7)) AS m FROM entry WHERE ${dated} GROUP BY c`, leg.register))
+  /* ONCE FOR A READ, since it reads every dated row of the list and asks nothing a walk's own filter changes: a page of walks
+     over one ledger scanned all of it for each. */
+  /* NOT THE ROWS KEPT PRIVATE FROM WHO READS (`except` on the schema): a currency only they hold is no line of her walk. */
+  const kept = compile(undefined, schema);
+  const readBegan = () => deps.sql.all<{ c: string; m: string }>(`SELECT ${currency} AS c, min(substr(${day}, 1, 7)) AS m FROM entry WHERE ${dated} AND (${kept.sql}) GROUP BY c`, leg.register, ...kept.params);
+  const memo = deps.ctx.walks;
+  for (const r of memo === undefined ? readBegan() : memo.once(JSON.stringify(['began', leg.register, leg.on, leg.amount, deps.ctx.viewer ?? null]), readBegan))
     began.set(String(r.c), String(r.m));
   if (began.size === 0) return [{ currency: null, months: [], spent: 0, planned: 0, monthly: 0, why: EVERYDAY_NO_MONTH }];
 

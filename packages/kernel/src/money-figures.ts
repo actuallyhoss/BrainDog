@@ -321,16 +321,20 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
         );
 
   const day = (col: string): string => `substr(json_extract(fields, '${jsonPath(col)}'), 1, 10)`;
+  /* THE LIST IN THE STATEMENT'S TEXT WHERE ITS ID ALLOWS, so SQLite can use the partial index on the account: bound, it read
+     every line of the ledger for each account, three times a figure. */
+  const onList = (list: string): { sql: string; params: string[] } => (/^[a-z][a-z0-9_]*$/u.test(list) ? { sql: `register = '${list}'`, params: [] } : { sql: 'register = ?', params: [list] });
 
   /* ONE STATEMENT FROM A CHECK LIST: the newest on or before the day, or the earliest after it. */
   const statedIn = ({ check, schema }: { check: RolledCheck; schema: Schema }, account: string, on: string, after: boolean): { day: string; money: { amount: number; currency: string } } | null => {
     /* THE CHECK LIST'S OWN SCHEMA CARRIES THE VIEWER (`except`), so `compile` leaves out a statement somebody kept private. */
     const kept = compile(undefined, schema);
+    const list = onList(check.register);
     const row = sql.one<{ fields: string }>(
-      `SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL AND (${kept.sql}) AND json_extract(fields, '${jsonPath(check.by)}') = ?
+      `SELECT fields FROM entry WHERE ${list.sql} AND deleted_at IS NULL AND (${kept.sql}) AND json_extract(fields, '${jsonPath(check.by)}') = ?
          AND json_extract(fields, '${jsonPath(check.balance)}.amount') IS NOT NULL AND ${day(check.on)} ${after ? '>' : '<='} ?
        ORDER BY ${day(check.on)} ${after ? 'ASC' : 'DESC'}, rowid ${after ? 'ASC' : 'DESC'} LIMIT 1`,
-      check.register,
+      ...list.params,
       ...kept.params,
       account,
       on,
@@ -344,25 +348,42 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
 
   /* AN ACCOUNT'S MOVES AFTER ONE DAY AND ON OR BEFORE ANOTHER, signed and added per currency in SQL, with the first
      day among them for an account that starts before its first move. */
-  const movesBetween = (account: string, from: string, to: string): { currency: string; amount: number; first: string | null }[] =>
-    sql
-      .all<{ c: string; v: number | null; first: string | null }>(
+  const movesOn = onList(rolled.moves.register);
+  /* FROM A STATED DAY, BY THE LIST'S DAY INDEX AND NOT THE ACCOUNT'S: one account holds most of a ledger, so its index reads
+     nearly every line (8.6 ms) to add up the few since its last statement (0.7). The extra bound is implied by the day test
+     beside it, a day's text being a prefix, so it leaves out no row, and only a field that holds days is read this way. An
+     account with no stated day reads all its lines either way, and an index that is not there falls back. */
+  const movesDayType = ctx.schemaOf?.(rolled.moves.register)?.fields[rolled.moves.on]?.type;
+  const movesDayIndex = movesOn.params.length === 0 && (movesDayType === 'day' || movesDayType === 'instant') ? `entry_i_${rolled.moves.register}__${rolled.moves.on}` : null;
+  const movesBetween = (account: string, from: string, to: string): { currency: string; amount: number; first: string | null }[] => {
+    const read = (index: string | null) =>
+      sql.all<{ c: string; v: number | null; first: string | null }>(
         `SELECT json_extract(fields, '${jsonPath(rolled.moves.amount)}.currency') AS c,
                 sum(CASE WHEN json_extract(fields, '${jsonPath(rolled.moves.direction)}') = ? THEN -json_extract(fields, '${jsonPath(rolled.moves.amount)}.amount')
                          ELSE json_extract(fields, '${jsonPath(rolled.moves.amount)}.amount') END) AS v,
                 min(${day(rolled.moves.on)}) AS first
-           FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(rolled.moves.by)}') = ?
+           FROM entry${index === null ? '' : ` INDEXED BY ${index}`} WHERE ${movesOn.sql} AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(rolled.moves.by)}') = ?
             AND json_extract(fields, '${jsonPath(rolled.moves.amount)}.amount') IS NOT NULL AND json_extract(fields, '${jsonPath(rolled.moves.amount)}.currency') IS NOT NULL
-            AND ${day(rolled.moves.on)} > ? AND ${day(rolled.moves.on)} <= ? AND (${m.sql})
+            AND ${day(rolled.moves.on)} > ? AND ${day(rolled.moves.on)} <= ? AND (${m.sql})${index === null ? '' : ` AND json_extract(fields, '${jsonPath(rolled.moves.on)}') > ?`}
           GROUP BY c`,
         rolled.moves.out,
-        rolled.moves.register,
+        ...movesOn.params,
         account,
         from,
         to,
         ...m.params,
-      )
-      .map((r) => ({ currency: String(r.c), amount: Number(r.v ?? 0), first: r.first }));
+        ...(index === null ? [] : [from]),
+      );
+    const useIndex = movesDayIndex !== null && /^\d{4}-\d{2}-\d{2}$/u.test(from);
+    let rows: { c: string; v: number | null; first: string | null }[];
+    try {
+      rows = read(useIndex ? movesDayIndex : null);
+    } catch (e) {
+      if (!useIndex) throw e;
+      rows = read(null);
+    }
+    return rows.map((r) => ({ currency: String(r.c), amount: Number(r.v ?? 0), first: r.first }));
+  };
 
   /* ONE ACCOUNT ON ONE DAY: its amounts per currency, the day its statement is from, and the day it was last confirmed.
      `confirmed` IS A STATEMENT THAT SAYS BOTH A BALANCE AND A DAY, the account's own or a check's. An account with
@@ -721,8 +742,8 @@ export function beyondOf(reading: Reading): Beyond | null {
 export const isWalked = (decl: Pick<MetricDecl, 'source'>): boolean => decl.source === WALK_SOURCE;
 
 /** A row as the walk reads one. The same columns the kernel's own `byId` reads, with a deleted row read as none. */
-function rowOf(sql: Sql, id: string): Entry | null {
-  const row = sql.one<Record<string, unknown>>('SELECT id, register, seq, fields, state, version, created_at, updated_at, deleted_at FROM entry WHERE id = ?', id);
+function rowOf(sql: Sql, id: string, register: string): Entry | null {
+  const row = sql.one<Record<string, unknown>>('SELECT id, register, seq, fields, state, version, created_at, updated_at, deleted_at FROM entry WHERE register = ? AND id = ?', register, id);
   if (!row || (row.deleted_at !== null && row.deleted_at !== undefined)) return null;
   return {
     id: String(row.id),
@@ -789,11 +810,13 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
      in a zone would be named from its local date a second time: noon UTC is already the next day in a zone twelve or
      more hours east of UTC (New Zealand in summer), so every leg's `where` would be read from tomorrow. */
   const at = clockOf(ctx);
-  const walkCtx: EvalContext = { ...ctx, nowMs: at, asOfMs: at };
-  const deps = { sql, schemaOf: ctx.schemaOf, titleOf: ctx.titleOf ?? (() => null), hydrate: (id: string) => {
+  /* NOON OF THE LOCAL DATE, OR THE DAY ASKED ABOUT, STANDS STILL FOR THE DAY, and the day holds what is held. Only a walk by the
+     running clock, a record with no zone, moves within one (`walkMovesAt`). */
+  const walkCtx: EvalContext = { ...ctx, nowMs: at, asOfMs: at, ...(at === ctx.nowMs ? {} : { movesAt: undefined }) };
+  const deps = { sql, schemaOf: ctx.schemaOf, titleOf: ctx.titleOf ?? (() => null), hydrate: (id: string, register: string) => {
       /* A ROW IS HYDRATED ONCE FOR A READ, since every walk over the same legs asks for the same ones. */
       const memo = ctx.walks;
-      return memo === undefined ? rowOf(sql, id) : memo.once(`row:${id}`, () => rowOf(sql, id));
+      return memo === undefined ? rowOf(sql, id, register) : memo.once(`row:${id}`, () => rowOf(sql, id, register));
     },
     ctx: walkCtx,
   };
