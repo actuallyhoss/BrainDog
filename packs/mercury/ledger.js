@@ -11,11 +11,19 @@
  * an account again by its name only, and wrote one beside every account a person had typed under another name, so the
  * company's cash counted twice. The pull is gone: one key path, one order, balances then transactions.
  *
+ * AN ACCOUNT MERCURY HAS ARCHIVED IS NOT NEW MONEY, SINCE 1.3.2. Mercury goes on listing an account it archived, and a real
+ * organisation holds several, listed before the live ones. Each was written as a $0 row of its own, and each spent one of
+ * the run's fetches, so a live account listed past them never had its transactions read. One no row holds is passed over;
+ * one a row holds still has its balance kept. Neither has its transactions asked for.
+ *
  * AN ACCOUNT IS FOUND BY MERCURY'S OWN ID, in `mercury_account`, a field this pack lays on Accounts, and never by its
  * name. A person may rename the row and it is still Mercury's. Every read and write of an account goes by it. A held
  * account's balance and day move each hour; its name, whether it counts as cash and its book (once filed) are a
  * person's and are left alone. An account Mercury stops listing keeps its last balance, since an answer that left one
  * out is not one that closed it.
+ *
+ * A ROW WHOSE TAGS HOLD MERCURY'S ID IS THAT ACCOUNT, SINCE 1.3.2, whatever its name: a record brought from elsewhere keeps
+ * the bank's id in a tag, and an id is proof where a name is a guess. It is taken first, like a row typed under Mercury's name.
  *
  * FIRST CONTACT, FOR A MERCURY ACCOUNT NO ROW HOLDS THE ID OF. The candidates are the live bank accounts that no feed
  * keeps (no `mercury_account`, no `stripe_kind`), in the same currency, whose name, case folded, is Mercury's name or
@@ -97,6 +105,9 @@ const STATES = { pending: 'pending', sent: 'cleared', cancelled: 'void', failed:
 export const NOT_MATCHED = 'Not yet matched to an account you typed';
 /* THE FIELDS A FEED MARKS ITS OWN ACCOUNTS BY. An account carrying one is that feed's, never a candidate here. */
 const FEED_MARKS = ['mercury_account', 'stripe_kind'];
+/* WHAT MERCURY CALLS AN ACCOUNT THAT IS SHUT. It keeps listing them. */
+const SHUT = new Set(['archived', 'deleted']);
+const shut = (a) => SHUT.has(a?.status);
 /**
  * THE CURRENCIES WHOSE MINOR UNIT IS NOT A HUNDREDTH, with the decimals the record keeps (`EXPONENT` in
  * `packages/kernel/src/ingest.ts`). Mercury sends whole units with decimals, so an amount is multiplied by ten to these
@@ -249,8 +260,9 @@ async function keepAccounts(ctx, accounts, inBook, bookFor) {
 
   /* THE BANK ACCOUNTS NO FEED KEEPS, read once and only when an account is met for the first time. A full answer may
      leave one out, which is said; a row written then does not count as cash, so it is never counted twice. */
+  const met = accounts.filter((a) => held.has(a.id) || !shut(a));
   const loose = [];
-  if (accounts.some((a) => !held.has(a.id))) {
+  if (met.some((a) => !held.has(a.id))) {
     const rows = await ctx.record.list('accounts', { all: [{ field: 'kind', is: 'bank' }, { field: 'mercury_account', empty: true }] });
     if (rows.length >= PAGE) ctx.log(`The record holds ${PAGE} bank accounts or more, so a Mercury account may have been compared with only some of them.`);
     for (const r of rows.sort((x, y) => x.seq - y.seq)) if (unmarked(r)) loose.push(r);
@@ -259,7 +271,7 @@ async function keepAccounts(ctx, accounts, inBook, bookFor) {
   /* A TYPED ACCOUNT TWO NEW MERCURY ACCOUNTS BOTH NAME COULD BE EITHER ONE'S MONEY, so neither takes it: taking it for
      the first one listed would be a guess at which, the pairing the scope warns joins the wrong two. */
   const namesFor = (a) => new Set([fold(a.name), fold(a.nickname)].filter((n) => n !== ''));
-  const fresh = accounts.filter((a) => !held.has(a.id));
+  const fresh = met.filter((a) => !held.has(a.id));
   const shared = new Set(
     loose.filter((r) => fresh.filter((a) => currencyOf(a) === r.fields.balance?.currency && namesFor(a).has(fold(r.fields.name))).length > 1).map((r) => r.id),
   );
@@ -267,9 +279,17 @@ async function keepAccounts(ctx, accounts, inBook, bookFor) {
 
   const rowOf = new Map();
   const claimed = new Set();
+  /* THE TAGGED ROWS ARE CLAIMED BEFORE ANY NAME IS COMPARED, so an account listed earlier cannot take one by its name. */
+  const tagged = new Map();
+  for (const a of fresh) {
+    const row = loose.find((r) => !claimed.has(r.id) && r.fields.balance?.currency === currencyOf(a) && Array.isArray(r.fields.tags) && r.fields.tags.some((t) => typeof t === 'string' && t.includes(a.id)));
+    if (row === undefined) continue;
+    claimed.add(row.id);
+    tagged.set(a.id, row);
+  }
   let writes = 0;
   let unmatched = 0;
-  for (const a of accounts) {
+  for (const a of met) {
     const currency = currencyOf(a);
     const balance = { amount: minorOf(a.currentBalance, currency), currency };
     const row = held.get(a.id);
@@ -283,6 +303,14 @@ async function keepAccounts(ctx, accounts, inBook, bookFor) {
       if (Object.keys(patch).length === 0) continue;
       ctx.update(`accounts#${row.seq}`, patch, row.version);
       writes += 1;
+      continue;
+    }
+    const byTag = tagged.get(a.id);
+    if (byTag !== undefined) {
+      rowOf.set(a.id, byTag.id);
+      ctx.update(`accounts#${byTag.seq}`, { mercury_account: a.id, balance, as_of: today, no_feed: false, ...bookFor(byTag) }, byTag.version);
+      writes += 1;
+      ctx.log(`Took over "${byTag.fields.name}": its tag names "${a.name}" at Mercury, kept from Mercury every hour from now on, so the money counts once.`);
       continue;
     }
     const names = namesFor(a);
@@ -346,6 +374,7 @@ export default async function run(ctx) {
   const seen = [];
   let fetched = 1;
   for (const a of accounts) {
+    if (shut(a)) continue;
     const account = kept.rowOf.get(a.id);
     if (account === undefined) {
       ctx.log(`"${a.name}" is new to the record this hour, so its transactions arrive next hour, once its account is written.`);

@@ -438,7 +438,7 @@ test('THE PACK CARRIES ledger.js AS ITS SOURCE, byte for byte, on its host, key 
   ]);
   const cards = JSON.parse(readFileSync(new URL('../card-alerts/card-alerts.pack.json', import.meta.url), 'utf8')) as { extends?: unknown };
   assert.equal(cards.extends, undefined, 'another bank door lays the payee field again');
-  assert.deepEqual([doc.version, typeof doc.changes], ['1.3.1', 'string']);
+  assert.deepEqual([doc.version, typeof doc.changes], ['1.3.2', 'string']);
   /* THE CHANGES LINE IS READ BY A PERSON ON THE ADD-ON'S PAGE: plain words, no dash for a comma, no id. */
   assert.equal(/[—–]|mercury_|#\d/.test(String(doc.changes)), false, String(doc.changes));
 });
@@ -1049,4 +1049,30 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, a
     await running.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('AN ARCHIVED ACCOUNT ADDS NO ROW AND SPENDS NO READ, and one a row already holds still has its balance kept', async () => {
+  const shutNew = account('Mercury Checking ••1111', 0, { id: 'acc_shut', status: 'archived' }) as Fixture;
+  const shutHeld = account('Mercury Checking ••2222', 0, { id: 'acc_held', status: 'archived' }) as Fixture;
+  const held = keptRow(shutHeld, { balance: { amount: 500, currency: 'USD' } });
+  const h = mercuryHost({ accounts: [opsHeld(), held], transactions: [], categories: [], mercury: [shutNew, shutHeld, OPS] });
+  const a = await runInQuickJs(ledgerDecl(), h);
+  assert.deepEqual(writesOf(a).filter((w) => w.op === 'create' && w.register === 'accounts'), []);
+  const moved = writesOf(a).filter((w) => w.op === 'update');
+  assert.equal(moved.length, 1);
+  assert.deepEqual((moved[0] as unknown as { patch: Record<string, Json> }).patch.balance, { amount: 0, currency: 'USD' });
+  assert.deepEqual(h.asked.map((r) => new URL(r.url).pathname), ['/api/v1/accounts', '/api/v1/account/acc_ops/transactions']);
+});
+
+test('A ROW WHOSE TAG HOLDS MERCURY’S ID IS THAT ACCOUNT, under any name, before a name is compared', async () => {
+  const tagged = account('Mercury Checking ••7001', 1_000.5, { id: 'acc_tag', nickname: 'Payroll' }) as Fixture;
+  const row = typedRow('Old checking', 80_000, 'USD', { tags: ['import:company:mercury:acc_tag:checking'] });
+  const h = mercuryHost({ accounts: [row], transactions: [], categories: [], mercury: [tagged] });
+  const a = await runInQuickJs(ledgerDecl(), h);
+  const w = writesOf(a);
+  const patch = (w[0] as unknown as { patch: Record<string, Json> }).patch;
+  assert.deepEqual(w.map((x) => x.op), ['update']);
+  assert.equal(patch.mercury_account, 'acc_tag');
+  assert.deepEqual(patch.balance, { amount: 100_050, currency: 'USD' });
+  assert.match(a.log, /Took over "Old checking"/);
 });

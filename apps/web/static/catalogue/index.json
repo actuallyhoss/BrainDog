@@ -5457,8 +5457,47 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.3.1",
+      "latest": "1.3.2",
       "versions": [
+        {
+          "version": "1.3.2",
+          "checksum": "85cc890a3fa798bcf398e4d9deff1c3cad5f6bca4f4660c0e31d0631dac64549",
+          "bytes": 31850,
+          "published_at": "2026-11-06T19:27:34.223Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
+                "key": "Mercury (read only)"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "An account Mercury has archived is passed over, so it adds no empty row and no longer uses up the run's reads before a live account's transactions. A row tagged with Mercury's id for an account is taken as that account."
+        },
         {
           "version": "1.3.1",
           "checksum": "d9e44350dcf633c199dd11b078dc292982f3937256c69ddafd3a8378086c2ea0",
