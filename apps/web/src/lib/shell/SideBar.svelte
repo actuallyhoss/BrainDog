@@ -311,7 +311,8 @@
   /* THE ROWS HOLD STILL UNDER A PRESS. A place's own rows open as you get there, and the rows under them move: at once, a
      second press a moment later landed on whichever row had moved under the pointer, and flicking down the rail ended
      somewhere nobody pressed. So after a press the rail opens and closes what it should once the hand has stopped for
-     `RAIL_REST_MS`; the row pressed is lit from the press (`motion/press.ts`), and anything else that moves it goes at once. */
+     `RAIL_REST_MS`, however long the screens take to land: on a slow machine a press that came after the move began still
+     counts; the row pressed is lit from the press (`motion/press.ts`), and anything else that moves it goes at once. */
   const RAIL_REST_MS = 180;
   const PRESS_NEAR_MS = 1000;
   let openOn = $state.raw(untrack(() => ({ lit, project: projectLit })));
@@ -321,7 +322,11 @@
       openOn = now;
       return;
     }
-    const wait = setTimeout(() => (openOn = now), RAIL_REST_MS);
+    const rest = (): void => {
+      if (pressedWithin(RAIL_REST_MS)) wait = setTimeout(rest, RAIL_REST_MS);
+      else openOn = now;
+    };
+    let wait = setTimeout(rest, RAIL_REST_MS);
     return () => clearTimeout(wait);
   });
   const opensFor = (href: string): boolean => (openOn.project !== undefined ? href === openOn.project : href === openOn.lit);
