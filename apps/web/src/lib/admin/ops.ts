@@ -166,3 +166,116 @@ export function useSaid(u: { id?: string; writes?: boolean }): { label: string; 
 
 /** "2 lists", "1 page". */
 export const plural = (n: number, one: string, many: string): string => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
+
+/* ── people ───────────────────────────────────────────────────────────────── */
+
+/** What a BrainDog has reached of its plan this month, as the door names it. */
+export type Limit = 'runs' | 'requests' | 'bytes' | 'ms' | 'held' | 'asks' | 'agents' | 'files';
+export type Meters = { runs: number; requests: number; bytes: number; ms: number };
+
+/** A BrainDog as `/account/ops/people` answers it: counts, a plan's name, and the one name its owner gave it. */
+export type PersonRecord = {
+  slug: string | null;
+  name: string | null;
+  role: 'owner' | 'member';
+  members: number;
+  plan: string;
+  pay: string | null;
+  since: number;
+  agents: number | null;
+  agents_most: number | null;
+  files: number | null;
+  files_most: number | null;
+  runs_7: number;
+  runs_30: number;
+  actions_30: number;
+  month: Meters & { failures: number; held: number };
+  allowance: Meters | null;
+  asks: number;
+  credits: number | null;
+  limits: Limit[];
+};
+export type Person = { email: string; name: string | null; signed_up: number; seen: number | null; suspended: boolean; passkeys: number; came: 'code' | 'invited' | 'open'; records: PersonRecord[] };
+export type People = { people: Person[]; total?: number; records?: number; more?: boolean; asked?: number; missed?: number; waiting?: number };
+
+export const readPeople = async (): Promise<Answer<People>> => {
+  const out = await door<Partial<People>>('/account/ops/people');
+  return out.ok ? { ok: true, value: { ...out.value, people: Array.isArray(out.value.people) ? out.value.people : [] } } : out;
+};
+
+const DAY_MS = 86_400_000;
+
+/** How many agents a person's BrainDogs hold, or `null` while none of them has been asked. */
+export function agentsOf(p: Person): number | null {
+  const known = p.records.flatMap((r) => (r.agents === null ? [] : [r.agents]));
+  return known.length === 0 ? null : known.reduce((n, a) => n + a, 0);
+}
+
+/** Every limit any of a person's BrainDogs has reached. */
+export const limitsOf = (p: Person): Limit[] => [...new Set(p.records.flatMap((r) => r.limits))];
+
+/** Everything counted against a person's BrainDogs lately: Slash's month and thirty days of runs. */
+export const activityOf = (p: Person): number => p.records.reduce((n, r) => n + r.asks + r.runs_30, 0);
+
+/**
+ * Whether somebody signed up and never came back: three days on, seen no later than the day they arrived, and nothing
+ * counted against them since.
+ *
+ * NOT ONLY THE SESSION, because a session is rotated once a day and signing out removes it, so its date alone would call
+ * somebody gone who signed out last week. An agent connected or a question asked is coming back too.
+ */
+export function neverBack(p: Person, now: number): boolean {
+  if (now - p.signed_up < 3 * DAY_MS) return false;
+  if (p.seen !== null && p.seen - p.signed_up >= DAY_MS) return false;
+  return activityOf(p) === 0 && (agentsOf(p) ?? 0) === 0;
+}
+
+export const seenThisWeek = (p: Person, now: number): boolean => p.seen !== null && now - p.seen < 7 * DAY_MS;
+
+export type PeopleSort = 'seen' | 'new' | 'active';
+export type PeopleSlice = 'all' | 'week' | 'gone' | 'agentless' | 'limit';
+
+/** Whether a person is in a slice. Nobody is agentless while their BrainDogs have not been asked: that is not known. */
+export function inSlice(p: Person, slice: PeopleSlice, now: number): boolean {
+  if (slice === 'week') return seenThisWeek(p, now);
+  if (slice === 'gone') return neverBack(p, now);
+  if (slice === 'agentless') return agentsOf(p) === 0;
+  if (slice === 'limit') return limitsOf(p).length > 0;
+  return true;
+}
+
+/** A sort, the newest sign-up breaking every tie. Somebody with no session left to say goes last on Last active. */
+export function sortPeople(list: readonly Person[], by: PeopleSort): Person[] {
+  const rank = (p: Person): number => (by === 'new' ? p.signed_up : by === 'active' ? activityOf(p) : (p.seen ?? 0));
+  return list.slice().sort((a, b) => rank(b) - rank(a) || b.signed_up - a.signed_up);
+}
+
+/** Whether a search finds a person: their name, address, or a BrainDog's name or address. */
+export function peopleFound(p: Person, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (q === '') return true;
+  return [p.name, p.email, ...p.records.flatMap((r) => [r.name, r.slug])].some((s) => (s ?? '').toLowerCase().includes(q));
+}
+
+/** When, as the row says it: "Today", "Yesterday", "3 days ago", then the day. */
+export function agoSaid(ms: number, now: number): string {
+  const days = Math.floor((now - ms) / DAY_MS);
+  if (days < 1) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 14) return `${String(days)} days ago`;
+  return day(ms);
+}
+
+/** A mail link for an address, encoded so nothing in it can add a subject or a body. */
+export const mailTo = (email: string): string => `mailto:${encodeURIComponent(email).replace(/%40/g, '@')}`;
+
+/** A size as a person reads it: "12 MB", "1.5 GB". */
+export function bytesSaid(n: number): string {
+  if (n >= 1e9) return `${String(Math.round(n / 1e8) / 10)} GB`;
+  if (n >= 1e6) return `${String(Math.round(n / 1e6))} MB`;
+  if (n >= 1e3) return `${String(Math.round(n / 1e3))} KB`;
+  return n === 0 ? '0 MB' : `${String(n)} bytes`;
+}
+
+/** Run time as a person reads it: "40 min", "5 h". */
+export const timeSaid = (ms: number): string => (ms >= 3_600_000 ? `${String(Math.round(ms / 360_000) / 10)} h` : `${String(Math.round(ms / 60_000))} min`);

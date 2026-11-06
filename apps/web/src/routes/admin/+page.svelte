@@ -2,9 +2,10 @@
   Admin: `/admin`, the operator's page, which was admin.brain.dog. Shown only to the operator (`+page.ts`, and the
   Worker's `operator.ts` behind every door it calls), with no key and no second sign-in.
 
-  THE FIRST SCREEN IS HOW THINGS STAND. The way in across the top; under it what needs the owner, applications and plugins
-  side by side as short rows; then one line to invite someone and the codes already out. The head has no count line
-  (the owner, 3 Nov: no briefs); each tile says its own count.
+  THE FIRST SCREEN IS HOW THINGS STAND. The way in across the top; under it who signed up and whether they use it
+  (`People.svelte`); then what needs the owner, applications and plugins side by side as short rows; then one line to
+  invite someone and the codes already out. The head has no count line (the owner, 3 Nov: no briefs); each tile says its
+  own count.
 
   A ROW IS ONE LINE UNTIL IT IS PRESSED. An application opens where it stands. A plugin opens in the sheet, with every
   fact and warning it has and Approve and Decline, and pressing Decline is what asks for the reason. Red is one press at
@@ -36,6 +37,7 @@
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
   import type { IconName } from '$lib/ui/icons.ts';
   import WayIn from './WayIn.svelte';
+  import People from './People.svelte';
   import {
     REVIEW,
     counted,
@@ -46,6 +48,7 @@
     readApplications,
     readCodes,
     readFunnel,
+    readPeople,
     readReview,
     useSaid,
     webLink,
@@ -53,6 +56,7 @@
     type Application,
     type Code,
     type Funnel,
+    type People as PeopleAnswer,
     type Report,
     type Review,
     type Waiting,
@@ -142,13 +146,14 @@
     ended: { label: 'Ended', tone: undefined },
   };
 
-  /* ── the four reads, each its own tile's ──────────────────────────────────── */
+  /* ── the five reads, each its own tile's ──────────────────────────────────── */
 
   type Card<T> = { at: 'waiting' } | { at: 'done'; value: T } | { at: 'failed'; fix: string };
   let applications = $state<Card<Application[]>>({ at: 'waiting' });
   let codes = $state<Card<Code[]>>({ at: 'waiting' });
   let review = $state<Card<Review>>({ at: 'waiting' });
   let funnel = $state<Card<Funnel>>({ at: 'waiting' });
+  let people = $state<Card<PeopleAnswer>>({ at: 'waiting' });
 
   const landed = <T,>(out: Answer<T>): Card<T> => (out.ok ? { at: 'done', value: out.value } : { at: 'failed', fix: out.fix });
   const newest = <T extends { made_at?: number }>(items: T[]): T[] => items.slice().sort((a, b) => (b.made_at ?? 0) - (a.made_at ?? 0));
@@ -167,11 +172,15 @@
   async function loadFunnel(): Promise<void> {
     funnel = landed(await readFunnel());
   }
+  async function loadPeople(): Promise<void> {
+    people = landed(await readPeople());
+  }
   onMount(() => {
     void loadApplications();
     void loadCodes();
     void loadReview();
     void loadFunnel();
+    void loadPeople();
   });
 
   /* ── what waits ───────────────────────────────────────────────────────────── */
@@ -374,6 +383,10 @@
   </div>
 {/snippet}
 
+{#snippet peopleFailed(fix: string)}
+  {@render failed(fix, () => void loadPeople())}
+{/snippet}
+
 {#snippet sendYourself(link: string)}
   <div class="a-unsent" role="status">
     <p class="a-unsent-said">{words.noMail}</p>
@@ -478,6 +491,8 @@
       <WayIn funnel={funnel.at === 'done' ? funnel.value : null} weeksOpen={showWeeks} />
     {/if}
   </Tile>
+
+  <People answer={people} failed={peopleFailed} />
 
   <div class="a-need">
     <!-- APPLICATIONS, WAITING FIRST. A row says who and why in two short lines; pressing it opens the rest where it stands. -->

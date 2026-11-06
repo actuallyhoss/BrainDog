@@ -70,6 +70,7 @@ const RENDERED_HREF = new Map([
   ['routes/addons/[id]/Origin.svelte r.href', 'the add-on\'s repository, always an https address `sourceOf` builds'],
   ['lib/kpis/KpisBlock.svelte href(k.input as KpiAnswered)', 'its one caller, `BlockSlot.svelte`, hands it `inApp(to)`'],
   ['routes/admin/+page.svelte link', 'what `webLink` lets through of a stranger\'s typed link: only http(s)'],
+  ['routes/admin/People.svelte mailTo(p.email)', 'a `mailto:` for that person\'s address, which `mailTo` builds and is no address in the app'],
   ['routes/inbox/+page.svelte UNSIGNED_HELP', 'the docs on brain.dog, a whole address'],
   ['routes/settings/[area]/areas/Ingest.svelte UNSIGNED_HELP', 'the docs on brain.dog, a whole address'],
   ['routes/settings/[area]/areas/Billing.svelte i.url', 'the payment provider\'s hosted invoice, a whole address the host sends'],
