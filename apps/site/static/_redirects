@@ -2,6 +2,8 @@
 # A typed /privacy or /terms lands on the text at its real address.
 /privacy /legal/privacy 301
 /terms /legal/terms 301
+# The short address the launch film and anywhere else public names; 302 so the repo can move without old links sticking.
+/github https://github.com/actuallyhoss/BrainDog 302
 # The Mac app's download and update feed live in the R2 bucket `braindog-desktop`, at its own name; these addresses are
 # the ones the app (its update feed) and /download name, so they never change when the files move
 # (tools/desktop/release.mjs --publish uploads them).
