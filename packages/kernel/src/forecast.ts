@@ -789,9 +789,11 @@ function everydayOf(deps: ForecastDeps, leg: Leg, already: readonly LegRead[], t
   const began = new Map<string, string>();
   /* ONCE FOR A READ, since it reads every dated row of the list and asks nothing a walk's own filter changes: a page of walks
      over one ledger scanned all of it for each. */
-  const readBegan = () => deps.sql.all<{ c: string; m: string }>(`SELECT ${currency} AS c, min(substr(${day}, 1, 7)) AS m FROM entry WHERE ${dated} GROUP BY c`, leg.register);
+  /* NOT THE ROWS KEPT PRIVATE FROM WHO READS (`except` on the schema): a currency only they hold is no line of her walk. */
+  const kept = compile(undefined, schema);
+  const readBegan = () => deps.sql.all<{ c: string; m: string }>(`SELECT ${currency} AS c, min(substr(${day}, 1, 7)) AS m FROM entry WHERE ${dated} AND (${kept.sql}) GROUP BY c`, leg.register, ...kept.params);
   const memo = deps.ctx.walks;
-  for (const r of memo === undefined ? readBegan() : memo.once(JSON.stringify(['began', leg.register, leg.on, leg.amount]), readBegan))
+  for (const r of memo === undefined ? readBegan() : memo.once(JSON.stringify(['began', leg.register, leg.on, leg.amount, deps.ctx.viewer ?? null]), readBegan))
     began.set(String(r.c), String(r.m));
   if (began.size === 0) return [{ currency: null, months: [], spent: 0, planned: 0, monthly: 0, why: EVERYDAY_NO_MONTH }];
 

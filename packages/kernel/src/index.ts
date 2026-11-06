@@ -8454,13 +8454,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* `into` GOES THROUGH, so a walk opened from one book walks in the book's own currency. Dropped here, the page asked
        for the book's currency and this host walked the home one, drawn once per currency instead. */
     runway: (opening, legs, horizon, only, into) => {
-      const key = JSON.stringify([opening, legs, horizon, only, into]);
+      /* BY WHO READS, since a row kept private from them is not in their walk. */
+      const key = JSON.stringify([opening, legs, horizon, only, into, viewer ?? null]);
       if (walked.has(key)) return structuredClone(walked.get(key)!);
       /* AND HELD ACROSS READS WHILE THE LISTS IT WALKED STAND (`holdAcross`), the day holding. */
       const zone = readableZone(recordTz());
       const answer = holdAcross(walksHeld, key, zone, clock.now(), once, () => {
         const out = runway(
-          { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: rowIn, ctx: { ...evalContext(), walks } },
+          /* AS THE PAGE'S READER (`here`), so a bill kept private from a member is not a step on her forecast, as it is no row in her list. */
+          { sql, schemaOf: here.schemaOf, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: rowIn, ctx: here },
           opening,
           legs,
           horizon,
