@@ -173,7 +173,12 @@ export type ForecastDeps = {
   sql: Sql;
   schemaOf: (register: string) => Schema | null;
   titleOf: (register: string) => string | null;
-  hydrate: (id: string) => Entry | null;
+  /**
+   * A row of a list the walk has already read the ids of, by that list as well as its id, so the read names the list and a
+   * walk over rows is held on the lists it walked (`notice`). Read by the id alone, it read past every list and no walk with
+   * a row in it was held at all.
+   */
+  hydrate: (id: string, register: string) => Entry | null;
   ctx: EvalContext;
   /**
    * The record's rest days, as weekday numbers (0 Sunday to 6 Saturday), which a row's `weekend` rule moves a day off.
@@ -402,7 +407,7 @@ export function runway(
     }
 
     for (const { id } of rows) {
-      const entry = deps.hydrate(id);
+      const entry = deps.hydrate(id, leg.register);
       if (!entry) continue;
       const money = entry.fields[leg.amount];
       /* A LEG WHOSE AMOUNT IS NOT MONEY MUST SAY SO. `amount === null → continue` skipped the row in

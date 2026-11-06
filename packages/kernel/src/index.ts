@@ -2154,6 +2154,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return !includeDeleted && entry.deleted_at ? null : entry;
   }
 
+  /** A live row of one list by its id, the read naming the list, as a walk over that list asks (`ForecastDeps.hydrate`). */
+  function rowIn(id: string, register: string): Entry | null {
+    const row = sql.one<Record<string, unknown>>(`SELECT ${COLUMNS} FROM entry WHERE register = ? AND id = ?`, register, id);
+    if (!row) return null;
+    const entry = hydrate(row);
+    return entry.deleted_at ? null : entry;
+  }
+
   function bySeq(register: string, seq: number, includeDeleted = false): Entry | null {
     const row = sql.one<Record<string, unknown>>(
       `SELECT ${COLUMNS} FROM entry WHERE register = ? AND seq = ?`,
@@ -8414,7 +8422,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const zone = readableZone(recordTz());
       const answer = holdAcross(walksHeld, key, zone, clock.now(), once, () => {
         const out = runway(
-          { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
+          { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: rowIn, ctx: evalContext() },
           opening,
           legs,
           horizon,
@@ -11274,7 +11282,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     runway: (opening: number, legs: readonly Leg[], horizon?: Horizon, into?: string): Result<Runway> =>
       runway(
-        { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
+        { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: rowIn, ctx: evalContext() },
         opening,
         legs,
         horizon,

@@ -721,8 +721,8 @@ export function beyondOf(reading: Reading): Beyond | null {
 export const isWalked = (decl: Pick<MetricDecl, 'source'>): boolean => decl.source === WALK_SOURCE;
 
 /** A row as the walk reads one. The same columns the kernel's own `byId` reads, with a deleted row read as none. */
-function rowOf(sql: Sql, id: string): Entry | null {
-  const row = sql.one<Record<string, unknown>>('SELECT id, register, seq, fields, state, version, created_at, updated_at, deleted_at FROM entry WHERE id = ?', id);
+function rowOf(sql: Sql, id: string, register: string): Entry | null {
+  const row = sql.one<Record<string, unknown>>('SELECT id, register, seq, fields, state, version, created_at, updated_at, deleted_at FROM entry WHERE register = ? AND id = ?', register, id);
   if (!row || (row.deleted_at !== null && row.deleted_at !== undefined)) return null;
   return {
     id: String(row.id),
@@ -790,10 +790,10 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
      more hours east of UTC (New Zealand in summer), so every leg's `where` would be read from tomorrow. */
   const at = clockOf(ctx);
   const walkCtx: EvalContext = { ...ctx, nowMs: at, asOfMs: at };
-  const deps = { sql, schemaOf: ctx.schemaOf, titleOf: ctx.titleOf ?? (() => null), hydrate: (id: string) => {
+  const deps = { sql, schemaOf: ctx.schemaOf, titleOf: ctx.titleOf ?? (() => null), hydrate: (id: string, register: string) => {
       /* A ROW IS HYDRATED ONCE FOR A READ, since every walk over the same legs asks for the same ones. */
       const memo = ctx.walks;
-      return memo === undefined ? rowOf(sql, id) : memo.once(`row:${id}`, () => rowOf(sql, id));
+      return memo === undefined ? rowOf(sql, id, register) : memo.once(`row:${id}`, () => rowOf(sql, id, register));
     },
     ctx: walkCtx,
   };
