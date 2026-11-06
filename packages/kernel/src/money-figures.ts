@@ -810,7 +810,9 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
      in a zone would be named from its local date a second time: noon UTC is already the next day in a zone twelve or
      more hours east of UTC (New Zealand in summer), so every leg's `where` would be read from tomorrow. */
   const at = clockOf(ctx);
-  const walkCtx: EvalContext = { ...ctx, nowMs: at, asOfMs: at };
+  /* NOON OF THE LOCAL DATE, OR THE DAY ASKED ABOUT, STANDS STILL FOR THE DAY, and the day holds what is held. Only a walk by the
+     running clock, a record with no zone, moves within one (`walkMovesAt`). */
+  const walkCtx: EvalContext = { ...ctx, nowMs: at, asOfMs: at, ...(at === ctx.nowMs ? {} : { movesAt: undefined }) };
   const deps = { sql, schemaOf: ctx.schemaOf, titleOf: ctx.titleOf ?? (() => null), hydrate: (id: string, register: string) => {
       /* A ROW IS HYDRATED ONCE FOR A READ, since every walk over the same legs asks for the same ones. */
       const memo = ctx.walks;

@@ -7794,6 +7794,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   const evalContext = (staged: readonly Declaration[] = [], viewer?: string, reader: string | undefined = viewer): EvalContext => withViewer(viewer, {
     nowMs: clock.now(),
+    movesAt: (ms) => {
+      for (const t of traces) within(t, { lists: [], instant: false, until: ms });
+      for (const t of drawTraces) within(t, { lists: [], instant: false, until: ms });
+    },
     ...(reader === undefined ? {} : { reader }),
     /* THE RECORD'S ZONE, SO A LIVE READ NAMES THE DAY THE NIGHT POINT WILL BE STORED UNDER. Without it
        `metric`, `list` and every page block dated `today` by UTC while `snapshot` dated it locally: in
@@ -11225,7 +11229,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         drawTraces.pop();
       }
       for (const t of drawTraces) withinDraw(t, trace);
-      return { value, seen: trace.whole || trace.instant ? null : { lists: [...trace.lists].sort(), reads: [...trace.reads.values()], at: clock.now() } };
+      return { value, seen: trace.whole || trace.instant ? null : { lists: [...trace.lists].sort(), reads: [...trace.reads.values()], at: clock.now(), ...(trace.until === undefined ? {} : { until: trace.until }) } };
     },
 
     /**
@@ -11255,7 +11259,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             length += said.length;
           }
           /* FNV-1a over every answer, with how long they ran: a page's reads past the lists are a few dozen small answers. */
-          return JSON.stringify([lists, seen.reads.length, length, hash]);
+          /* AND WHETHER THE CLOCK ALONE HAS MOVED WHAT IT DREW (a walk ahead, `DrawSeen.until`). */
+          return JSON.stringify([lists, seen.reads.length, length, hash, seen.until !== undefined && clock.now() >= seen.until]);
         } finally {
           muted--;
         }

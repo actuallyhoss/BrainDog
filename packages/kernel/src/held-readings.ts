@@ -29,6 +29,8 @@ export type ReadTrace = {
   whole: boolean;
   /** It bound an instant, so its window moves with the clock and not only with the day. */
   instant: boolean;
+  /** The moment what it read answers differently with nothing written (a walk ahead, `movesAt`). Good until then, and not after. */
+  until?: number;
 };
 
 /** A fresh trace. */
@@ -89,7 +91,7 @@ export type DrawRead = { text: string; params: readonly Param[]; shift: readonly
 export type DrawTrace = ReadTrace & { reads: Map<string, DrawRead> };
 
 /** A draw as `drawsOf` hands it back to be stamped later: its lists, its reads to ask again, and when it was drawn. */
-export type DrawSeen = { lists: string[]; reads: DrawRead[]; at: number };
+export type DrawSeen = { lists: string[]; reads: DrawRead[]; at: number; until?: number };
 
 /** A fresh draw's trace. */
 export const drawTraceOf = (): DrawTrace => ({ ...traceOf(), reads: new Map() });
@@ -160,10 +162,11 @@ export function withinDraw(outer: DrawTrace, inner: DrawTrace): void {
 }
 
 /** What `inner` read, read by `outer` too: a reading inside another is one of the things the outer one read. */
-export function within(outer: ReadTrace, inner: { lists: Iterable<string>; instant: boolean; whole?: boolean }): void {
+export function within(outer: ReadTrace, inner: { lists: Iterable<string>; instant: boolean; whole?: boolean; until?: number | undefined }): void {
   for (const list of inner.lists) outer.lists.add(list);
   if (inner.instant) outer.instant = true;
   if (inner.whole === true) outer.whole = true;
+  if (inner.until !== undefined) outer.until = Math.min(outer.until ?? inner.until, inner.until);
 }
 
 /** How long a reading that bound an instant, or read past any list, is held at most. */
@@ -174,7 +177,7 @@ export const HELD_LONG_MS = 3_600_000;
 export const HELD_MOST = 600;
 
 /** A reading held: what it was read against, when, for how long, whether its window moves with the clock, and the reading. */
-export type Held<T> = { day: string; lists: readonly string[]; instant: boolean; stamp: string; at: number; ms: number; value: T };
+export type Held<T> = { day: string; lists: readonly string[]; instant: boolean; until?: number; stamp: string; at: number; ms: number; value: T };
 
 /** The readings held, by key, the oldest first. */
 export class HeldReadings<T> {
@@ -184,7 +187,7 @@ export class HeldReadings<T> {
   get(key: string, day: string, now: number, stampOf: (lists: readonly string[]) => string): Held<T> | undefined {
     const was = this.#held.get(key);
     if (was === undefined) return undefined;
-    if (was.day !== day || was.at > now || now - was.at >= was.ms || stampOf(was.lists) !== was.stamp) {
+    if (was.day !== day || was.at > now || now - was.at >= was.ms || (was.until !== undefined && now >= was.until) || stampOf(was.lists) !== was.stamp) {
       this.#held.delete(key);
       return undefined;
     }
@@ -201,7 +204,7 @@ export class HeldReadings<T> {
        this, and it would stand for its whole time through every write to the rows it read. */
     if (trace.whole || trace.lists.size === 0 || [...trace.lists].some(loud)) return;
     const lists = [...trace.lists].sort();
-    this.#held.set(key, { day, lists, instant: trace.instant, stamp: stampOf(lists), at: now, ms: Math.min(most, trace.instant ? HELD_SHORT_MS : HELD_LONG_MS), value });
+    this.#held.set(key, { day, lists, instant: trace.instant, ...(trace.until === undefined ? {} : { until: trace.until }), stamp: stampOf(lists), at: now, ms: Math.min(most, trace.instant ? HELD_SHORT_MS : HELD_LONG_MS), value });
     if (this.#held.size > HELD_MOST) this.#held.delete(this.#held.keys().next().value as string);
   }
 
