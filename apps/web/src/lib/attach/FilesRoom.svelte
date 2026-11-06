@@ -5,8 +5,14 @@
   ITS OWN READ, AND NOTHING WHEN IT FAILS: the page's own read above already says when the record cannot be reached, and a
   build with no attachments has no room to show.
 -->
+<script lang="ts" module>
+  /* A BUILD WITH NO ROOM TO SHOW SAYS SO ONCE, and its tile does not stand again in this tab. */
+  let noRoom = false;
+</script>
+
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/state';
   import { apiBase } from '$lib/at.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import { cardShape, shapeKey } from '$lib/ui/shape.ts';
@@ -16,11 +22,13 @@
 
   let room = $state<Room | null>(null);
   /* THE TILE IT DREW LAST TIME STANDS WHILE ITS READ IS OUT (`Tile`'s `ready`, kept in `ui/shape.ts`): it came a beat after the
-     page, and pushed every tile under it down on a phone and halved the one beside it on a desk. */
-  let asking = $state(cardShape(shapeKey(), 'files-room') !== null);
+     page, and pushed every tile under it down on a phone and halved the one beside it on a desk. The first time here too,
+     on a live record, since nothing is kept yet to say it has one. */
+  let asking = $state(cardShape(shapeKey(), 'files-room') !== null || (Boolean(page.data.live) && !noRoom));
   onMount(() => {
     void readRoom(apiBase()).then((r) => {
       room = r;
+      noRoom = r === null;
       asking = false;
     });
   });
