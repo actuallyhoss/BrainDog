@@ -158,15 +158,6 @@ export const trust = {
       body: 'Write to the support address with the steps that show the weakness. Test only against a BrainDog that is yours.',
       /* The empty-address twin, as on /support. */
       pending: 'The address for reporting a weakness will be listed here.',
-      /* THE REPOSITORY'S OWN PROMISE, `SECURITY.md` at the root, its table of what happens after a report, word for word
-         in its figures. It is drawn only beside the address, because it is a promise about mail somebody reads. */
-      after: 'What happens after you write',
-      steps: [
-        { what: 'A person reads it', when: 'within 3 working days' },
-        { what: 'A first assessment', when: 'within 10 working days' },
-        { what: 'A fix, or a dated plan', when: 'within 90 days' },
-        { what: 'An advisory, with credit', when: 'at the fix, or at 90 days' },
-      ],
     },
   },
 } as const;

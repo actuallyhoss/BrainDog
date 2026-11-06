@@ -11,8 +11,8 @@
   (the pricing table's own "last 30 kept"), the sign-in with no password field, and the export. What a token may do is the agents page's (plan F21), linked.
 
   THE REPORTING ADDRESS IS THE SUPPORT ADDRESS, `SUPPORT_EMAIL`. While it is empty the last tile says when it arrives,
-  and neither the address nor the repository's promise about mail is drawn, because nobody would be reading it. The
-  address is a plain outlined button and never red: the one solid red a page carries is "Start free".
+  and the address is not drawn, because nobody would be reading it. What happens after a report is `SECURITY.md`'s to
+  say, not this page's (6 Nov, his word). The address is a plain outlined button and never red: the one solid red a page carries is "Start free".
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
@@ -137,7 +137,7 @@
       </section>
     {/if}
 
-    <section class="fact span-12 split report" aria-labelledby="report-title">
+    <section class="fact span-12 report" aria-labelledby="report-title">
       <div class="say-it">
         {@render head('report-title', 'shield', s.report.title)}
         {#if address === ''}
@@ -147,20 +147,6 @@
           <p class="go"><a class="btn line" href="mailto:{address}"><Icon name="mail" size="m" />{address}</a></p>
         {/if}
       </div>
-      {#if address !== ''}
-        <div class="after">
-          <h3 class="after-title" id="after-title">{s.report.after}</h3>
-          <ol class="steps" aria-labelledby="after-title">
-            {#each s.report.steps as step, i}
-              <li class="step">
-                <span class="step-n" aria-hidden="true">{i + 1}</span>
-                <span class="step-what">{step.what}</span>
-                <span class="step-when">{step.when}</span>
-              </li>
-            {/each}
-          </ol>
-        </div>
-      {/if}
     </section>
   </div>
 </section>
@@ -489,95 +475,7 @@
     overflow-wrap: anywhere;
   }
 
-  .after {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    min-inline-size: 0;
-  }
-
-  .after-title {
-    color: var(--muted);
-    font-family: var(--ui);
-    font-size: var(--t-label);
-    font-weight: 500;
-  }
-
-  /* THE FOUR STEPS IN ORDER, a numbered square each, with the time it is promised in under it. */
-  .steps {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px 16px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .step {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-inline-size: 0;
-  }
-
-  .step-n {
-    display: grid;
-    place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
-    margin-block-end: 4px;
-    background: var(--board);
-    border-radius: 8px;
-    color: var(--ink2);
-    font-size: var(--t-meta);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .step-what {
-    color: var(--ink);
-    font-size: var(--t-label);
-    font-weight: 600;
-  }
-
-  .step-when {
-    color: var(--muted);
-    font-size: var(--t-label);
-  }
-
-  @media (width >= 1100px) {
-    .steps {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-  }
-
-  /* ON A PHONE EACH STEP IS ONE LINE (plan F22): its number, what happens, and when, where four stacked squares made the
-     report the page's tallest tile. */
   @media (width < 640px) {
-    .steps {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 8px;
-    }
-
-    .step {
-      display: grid;
-      grid-template-columns: 24px minmax(0, 1fr) auto;
-      column-gap: 10px;
-      align-items: center;
-    }
-
-    .step-n {
-      inline-size: 24px;
-      block-size: 24px;
-      margin: 0;
-      font-size: var(--t-meta);
-    }
-
-    .step-when {
-      font-size: var(--t-meta);
-      text-align: end;
-    }
-
     .night-row {
       gap: 2px;
     }
