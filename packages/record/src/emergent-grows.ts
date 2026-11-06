@@ -221,19 +221,11 @@ function endsOf(decl: RegisterDecl, state: Field): string[] {
  * `before`, leaving out the example entries a pack seeds, which nobody added and nobody has to finish.
  */
 function openSince(deps: PenDeps, list: string, state: string, ends: readonly string[], before: string): number {
-  const read = (): number =>
-    Number(
-      deps.use!.sql.one<{ n: number }>(
-        `SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND created_at <= ?
-      AND coalesce(json_extract(fields, '$.tags'), '') NOT LIKE '%"example"%'
-      AND (json_extract(fields, ?) IS NULL OR json_extract(fields, ?) NOT IN (${ends.map(() => '?').join(', ')}))`,
-        list,
-        before,
-        `$.${state}`,
-        `$.${state}`,
-        ...ends,
-      )?.n ?? 0,
-    );
+  /* THROUGH `kernel.count`, as `pen.filled` and `pen.week` are, so the read names its list and the hold moves with it. Read on
+     the raw `Sql` it was held on no list at all, and thirteen jobs all finished were still offered for up to an hour. */
+  const tagged = deps.kernel.registers().get(list)?.fields.some((f) => f.id === 'tags' && f.type === 'list' && !f.retired) === true;
+  const where = { all: [{ field: 'created_at', before }, { field: state, not_in: [...ends] }, ...(tagged ? [{ field: 'tags', lacks: 'example' }] : [])] };
+  const read = (): number => deps.kernel.count(list, where as never);
   return deps.held === undefined ? read() : deps.held(JSON.stringify(['pen.open', list, state, ends, before]), read);
 }
 

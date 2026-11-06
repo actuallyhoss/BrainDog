@@ -153,3 +153,20 @@ test('A LIST INSTALLED AFTER THE ANSWER IS ASKED ABOUT, and one retired is not',
   add('loans', 'owed', 100, 'JPY');
   assert.deepEqual(k.moneyCurrencies(() => true, 5), ['GBP', 'JPY']);
 });
+
+test('A FACT THAT NAMED NO LIST IS NOT HELD: nothing could ever move it', async () => {
+  const { k, add } = await made();
+  add('spends', 'amount', 100, 'GBP');
+  const held = k.heldFacts();
+  let made_ = 0;
+  const nothing = () => held('no list at all', () => ((made_ += 1), 7));
+  assert.equal(nothing(), 7);
+  assert.equal(nothing(), 7);
+  assert.equal(made_, 2, 'a reading that names no list stood through everything');
+  /* And a fact that named one is still held. */
+  let counted = 0;
+  const one = () => held('spends', () => ((counted += 1), k.count('spends')));
+  one();
+  one();
+  assert.equal(counted, 1, 'a fact over a list was not held');
+});

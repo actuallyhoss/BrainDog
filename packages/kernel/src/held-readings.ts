@@ -192,12 +192,14 @@ export class HeldReadings<T> {
   }
 
   /**
-   * Hold a reading read with `trace`, stamped by `stampOf` its lists as they stand now. One that read past the lists, or
-   * read one that is `loud` (the runs, whose rows move with no line), is not held: it is read again each time, as before.
+   * Hold a reading read with `trace`, stamped by `stampOf` its lists as they stand now. One that read past the lists, named
+   * none, or read one that is `loud` (the runs, whose rows move with no line), is not held: it is read again each time.
    */
   set(key: string, day: string, now: number, trace: ReadTrace, value: T, stampOf: (lists: readonly string[]) => string, loud: (list: string) => boolean, most = HELD_LONG_MS): void {
     this.#held.delete(key);
-    if (trace.whole || [...trace.lists].some(loud)) return;
+    /* AND NOT ONE THAT NAMED NO LIST: nothing could ever move it. A reading made on a `Sql` the kernel does not watch looks like
+       this, and it would stand for its whole time through every write to the rows it read. */
+    if (trace.whole || trace.lists.size === 0 || [...trace.lists].some(loud)) return;
     const lists = [...trace.lists].sort();
     this.#held.set(key, { day, lists, instant: trace.instant, stamp: stampOf(lists), at: now, ms: Math.min(most, trace.instant ? HELD_SHORT_MS : HELD_LONG_MS), value });
     if (this.#held.size > HELD_MOST) this.#held.delete(this.#held.keys().next().value as string);
