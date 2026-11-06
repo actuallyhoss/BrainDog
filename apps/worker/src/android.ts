@@ -10,6 +10,7 @@ export const ANDROID_APP = 'dog.brain.app';
 /** The upload key's certificate, and Play's app signing key from the Play Console once the app is there. */
 export const ANDROID_FINGERPRINTS: readonly string[] = [
   '9F:B7:69:CD:8B:16:A7:F7:07:B7:A7:D1:FF:07:32:6C:81:96:BF:E1:6B:E2:79:8C:B5:67:45:38:86:9A:93:F4',
+  '84:B1:19:88:A4:65:2C:0F:0C:9B:44:64:6B:16:ED:93:09:FB:97:96:48:03:5E:D5:7D:40:50:B3:60:81:CC:E1',
 ];
 
 export const assetLinks = (): object[] => [
