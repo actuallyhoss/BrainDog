@@ -18,7 +18,7 @@ import type { createClient } from '@braindog/client';
 import { dev } from '$app/environment';
 import { tick } from 'svelte';
 
-import { endedBy, newerBuild, poller, regranted, Wait, type LiveState, type Visibility } from './live.ts';
+import { endedBy, newerBuild, paced, poller, regranted, Wait, type LiveState, type Visibility } from './live.ts';
 /* THE LOCAL COPY IS ASKED FOR WHEN THE POLL HAS SOMETHING TO TELL IT, never with the shell: its reader carries the
    predicate engine, and the first paint draws nothing from it. Each of the three is fire-and-forget already. */
 const localTab = () => import('./local-tab.ts');
@@ -97,8 +97,8 @@ function end(said: string): void {
 
 /* ── a newer build ── */
 
-/** The build this tab runs, the deploy's tuple (`vite.config.ts`), or `''` in a build without one. */
-const OWN_BUILD = typeof __BRAINDOG_BUILD__ === 'string' ? __BRAINDOG_BUILD__ : '';
+/** The build this tab runs, the deploy's tuple in the shell (`app.html`, `vite.config.ts`), or `''` in a build without one. */
+const OWN_BUILD = typeof document === 'undefined' ? '' : (document.querySelector('meta[name="braindog-build"]')?.getAttribute('content') ?? '');
 /** Where the tab keeps the last build change it reloaded for, so each one is tried once (`newerBuild`). */
 const TRIED = 'braindog.build-tried';
 const tried = (): string | null => {
@@ -129,6 +129,24 @@ function newer(key: string, drop: boolean): void {
   });
 }
 
+/* A CHUNK THAT WILL NOT LOAD IS A TAB OLDER THAN THE DEPLOY (its file has gone): it reloads onto the new build, once. Twice in a
+   minute is something else, and the error goes on to the page that says so. A file keeps its name when it has not changed
+   (`svelte.config.js`), so nothing else here would notice. */
+const RELOADED = 'braindog.chunk-reload';
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (e) => {
+    try {
+      const at = Number(sessionStorage.getItem(RELOADED));
+      if (Date.now() - at < 60_000) return;
+      sessionStorage.setItem(RELOADED, String(Date.now()));
+    } catch {
+      return;
+    }
+    e.preventDefault();
+    globalThis.location.reload();
+  });
+}
+
 /* HEARD FROM THE FIRST MOMENT THE SHELL'S SCRIPT RUNS, not once the record is followed: the worker tells the page the
    shell moved once the network has answered behind the copy, and a message that arrives before anybody listens is lost. */
 if (typeof window !== 'undefined') {
@@ -140,6 +158,9 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pointerdown', touch, { once: true, capture: true, passive: true });
   window.addEventListener('keydown', touch, { once: true, capture: true, passive: true });
 }
+
+/** How often the screens may hear the record moved. */
+const SCREENS_EVERY_MS = 5_000;
 
 const timers = {
   after(fn: () => void, ms: number): () => void {
@@ -248,16 +269,18 @@ export function follow(base: string | null): void {
     hearing = true;
     hear((at) => (live.from = live.from === null ? at : Math.min(live.from, at)));
   }
-  following = {
-    base,
-    stop: poller({
+  /* A RECORD ITS AGENTS ARE WRITING TO MOVES SEVERAL TIMES A SECOND, and every move asked the shell, every read on screen and
+     the board again. So the screens hear of it at most once in `SCREENS_EVERY_MS`: the first move at once, what follows
+     after the wait (`paced`, `live.ts`). */
+  const told = paced((version: number) => (live.version = version), SCREENS_EVERY_MS, timers);
+  const stopPoll = poller({
       ask: asker(base),
       timers,
       visible: tab,
       onChange: (version) => {
         /* THE LOCAL COPY ASKS THE LOG WHAT CHANGED, beside the screens asking their own questions again. */
         void localTab().then((m) => m.heardLocal(version));
-        live.version = version;
+        told.hear(version);
       },
       onState: (state) => {
         live.state = state;
@@ -268,7 +291,13 @@ export function follow(base: string | null): void {
           void reread();
         }
       },
-    }),
+  });
+  following = {
+    base,
+    stop: () => {
+      told.stop();
+      stopPoll();
+    },
   };
 }
 

@@ -24,6 +24,7 @@
   import ItemMenu from '$lib/ui/ItemMenu.svelte';
   import { ownMenu } from '$lib/ui/context-menu.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { copy } from '$lib/copy.ts';
   import { writeAmount } from 'braindog-render';
   import type { HomeLine } from './home-rows.ts';
   import { asideToday, isBill, lateWords, putAside, verbOf } from './late-verb.ts';
@@ -59,8 +60,7 @@
   } as const;
 
   let open = $state(false);
-  /** The lines pressed and on their way, by key: their button waits, and a finished one fades until Today reads again. */
-  let busy = $state.raw<ReadonlySet<string>>(new Set());
+  /** The lines pressed, by key: each fades on the press, as every other press answers, and until Today reads again. */
   let done = $state.raw<ReadonlySet<string>>(new Set());
   /* A BILL ANSWERED "NOT YET" IS OUT OF LATE UNTIL TOMORROW, in this browser: nothing is written to the record. */
   let aside = $state.raw<ReadonlySet<string>>(asideToday());
@@ -89,21 +89,31 @@
     return m !== undefined && d !== undefined && m >= 1 && m <= 12 && d >= 1 ? `${String(d)} ${MONTHS[m - 1]!}` : day;
   }
 
+  const notDone = (key: string): void => {
+    done = new Set([...done].filter((k) => k !== key));
+  };
+
+  /**
+   * PAID ANSWERS ON THE PRESS, AS EVERY OTHER PRESS DOES. It waited for two reads and a write with the button greyed, 430ms
+   * here and more on a phone, and it was the one decision on Today that did. The line goes at once, the write goes
+   * behind it, and a refusal puts the line back and says why; the Undo arrives with the record's word that it has it.
+   */
   async function finish(line: HomeLine): Promise<void> {
-    if (busy.has(line.key) || done.has(line.key)) return;
-    busy = new Set([...busy, line.key]);
+    if (done.has(line.key)) return;
+    done = new Set([...done, line.key]);
+    void focusOnward(line.key);
+    let out: Awaited<ReturnType<typeof import('./late-finish.ts').finishLate>>;
     try {
       const m = await import('./late-finish.ts');
-      const out = await m.finishLate(apiBase(), line.key, onfinished);
-      if (out.ok) {
-        done = new Set([...done, line.key]);
-        void focusOnward(line.key);
-      } else if ('open' in out) {
-        if (line.href) await goto(at(line.href));
-      } else toasts.push(out.fix, { intent: 'warn' });
-    } finally {
-      busy = new Set([...busy].filter((k) => k !== line.key));
+      out = await m.finishLate(apiBase(), line.key, onfinished, () => notDone(line.key));
+    } catch {
+      out = { ok: false, fix: copy.writeNotReached };
     }
+    if (out.ok) return;
+    notDone(line.key);
+    if ('open' in out) {
+      if (line.href) await goto(at(line.href));
+    } else toasts.push(out.fix, { intent: 'warn' });
   }
 
   let list = $state<HTMLUListElement | null>(null);
@@ -156,7 +166,7 @@
         {#if !bill && verb}
           <!-- A TASK IS A QUIET TICK at the line's start: the row's own verb is its name for a screen reader. A box, as
                Today's other ticks are, so `x` presses it from the keyboard (`PageBody.svelte`). -->
-          <button type="button" class="ln-tick tap" role="checkbox" aria-checked={done.has(line.key)} aria-label={`${verb}: ${line.title}`} title={verb} disabled={busy.has(line.key) || done.has(line.key)} aria-busy={busy.has(line.key)} onclick={() => void finish(line)}
+          <button type="button" class="ln-tick tap" role="checkbox" aria-checked={done.has(line.key)} aria-label={`${verb}: ${line.title}`} title={verb} disabled={done.has(line.key)} onclick={() => void finish(line)}
             ><Icon name="check" size="s" /></button
           >
         {/if}
@@ -169,8 +179,8 @@
           <span class="ln-acts">
             {#if verb}
               <!-- A BILL IS ANSWERED PAID OR NOT YET: Paid is the strong one, in ink (the screen keeps its one red), Not yet puts it aside until tomorrow. -->
-              <Button weight="ink" size="sm" aria-label={verb} disabled={busy.has(line.key) || done.has(line.key)} aria-busy={busy.has(line.key)} onclick={() => void finish(line)}>{lateWords.paid}</Button>
-              <Button size="sm" disabled={busy.has(line.key) || done.has(line.key)} onclick={() => notYet(line)}>{lateWords.notYet}</Button>
+              <Button weight="ink" size="sm" aria-label={verb} disabled={done.has(line.key)} onclick={() => void finish(line)}>{lateWords.paid}</Button>
+              <Button size="sm" disabled={done.has(line.key)} onclick={() => notYet(line)}>{lateWords.notYet}</Button>
             {:else if line.href}
               <Button size="sm" href={line.href}>{words.open}</Button>
             {/if}

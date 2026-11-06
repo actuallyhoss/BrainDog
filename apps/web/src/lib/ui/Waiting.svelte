@@ -79,7 +79,7 @@
     margin-block-end: var(--sp-4);
     background: color-mix(in oklab, var(--ink) 8%, transparent);
     border-radius: var(--r-pill);
-    animation: waiting-in var(--d-state) var(--ease-out) 300ms backwards;
+    animation: waiting-in 200ms var(--ease-out) 300ms backwards;
   }
 
   @keyframes waiting-in {

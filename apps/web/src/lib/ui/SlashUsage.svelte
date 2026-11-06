@@ -60,9 +60,12 @@
 
   let status = $state<SlashStatus | null>(null);
   let rows = $state<SlashAsked[] | null>(null);
+  /* ITS TILE STANDS WHILE ITS READS ARE OUT: it came a beat after the page and halved the allowance beside it. */
+  const offered = Boolean(page.data.live) && page.data.slash === true;
+  let asking = $state(offered);
 
   onMount(() => {
-    if (!page.data.live || page.data.slash !== true) return;
+    if (!offered) return;
     const client = createClient({ base: apiBase() });
     void Promise.all([client.slashStatus(), client.slashAsks(LEDGER_FETCHED)])
       .then(([s, a]) => {
@@ -72,6 +75,9 @@
       })
       .catch(() => {
         /* Nothing to draw; the page's own read says when the record cannot be reached. */
+      })
+      .finally(() => {
+        asking = false;
       });
   });
 
@@ -139,7 +145,13 @@
   </li>
 {/snippet}
 
-{#if status && spent}
+{#if !(status && spent)}
+  {#if asking}
+    <Tile class="section" data-surface="tile" icon="slash" title={words.title} ready={false} skeleton="lines" rows={2} shape="slash-usage" data-standing="">
+      <div></div>
+    </Tile>
+  {/if}
+{:else}
   <Tile class="section" data-surface="tile" icon="slash" title={words.title} data-open={open ? '' : undefined}>
     {#snippet actions()}
       {#if !quiet}

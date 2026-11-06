@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { delayOf, endedBy, newerBuild, poller, regranted, Wait, type LiveState, type Timers, type Visibility } from './live.ts';
+import { delayOf, endedBy, newerBuild, paced, poller, regranted, Wait, type LiveState, type Timers, type Visibility } from './live.ts';
 import { accessEnded } from './offline.ts';
 
 /**
@@ -390,4 +390,45 @@ test('A NEWER BUILD IS ONE BOTH SIDES NAME AND DISAGREE ON, tried once a pair (s
   const poll = readFileSync(new URL('./live.svelte.ts', import.meta.url), 'utf8');
   assert.match(poll, /newerBuild\(OWN_BUILD, out\.value\.app, tried\(\)\)/, 'the poll compares what version answers');
   assert.match(poll, /hearShell\(/, 'and hears the worker say the shell moved');
+});
+
+test('the screens hear the record moved at most once a wait: the first at once, then the newest when it ends', () => {
+  const due: { fn: () => void; at: number; gone: boolean }[] = [];
+  let now = 0;
+  const timers: Timers = {
+    after(fn, ms) {
+      const t = { fn, at: now + ms, gone: false };
+      due.push(t);
+      return () => void (t.gone = true);
+    },
+  } as Timers;
+  const move = (ms: number) => {
+    now += ms;
+    for (const t of due.splice(0)) {
+      if (t.gone) continue;
+      if (t.at <= now) t.fn();
+      else due.push(t);
+    }
+  };
+  const heard: number[] = [];
+  const told = paced((v: number) => heard.push(v), 5_000, timers);
+  told.hear(1);
+  assert.deepEqual(heard, [1], 'the first of a quiet spell goes at once');
+  told.hear(2);
+  told.hear(3);
+  move(4_999);
+  assert.deepEqual(heard, [1], 'nothing more inside the wait');
+  move(1);
+  assert.deepEqual(heard, [1, 3], 'the newest when it ends, and 2 never');
+  told.hear(4);
+  assert.deepEqual(heard, [1, 3], 'the wait starts again after what it let go');
+  move(5_000);
+  assert.deepEqual(heard, [1, 3, 4]);
+  move(5_000);
+  told.hear(5);
+  assert.deepEqual(heard, [1, 3, 4, 5], 'a quiet spell goes at once again');
+  told.hear(6);
+  told.stop();
+  move(10_000);
+  assert.deepEqual(heard, [1, 3, 4, 5], 'stopped, what was held is let go');
 });

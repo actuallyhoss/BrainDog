@@ -147,7 +147,8 @@
     border-radius: var(--r-pill);
   }
 
-  .tab[aria-current='page'] .badge-slot {
+  .tab[aria-current='page'] .badge-slot,
+  .tab:active .badge-slot {
     background: var(--chosen);
     color: var(--ink);
   }

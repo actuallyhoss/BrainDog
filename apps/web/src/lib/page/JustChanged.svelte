@@ -50,7 +50,7 @@
 {/if}
 
 <style>
-  /* THE PAGE'S FIRST ROW, full width, so it reads as what you just did before what the page holds. */
+  /* A ROW OF ITS OWN AT THE FOOT OF THE BOARD, full width: nothing the reader is aiming at moves when it lands. */
   .just {
     grid-column: 1 / -1;
     min-inline-size: 0;

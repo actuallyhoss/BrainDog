@@ -317,13 +317,18 @@
   /* THE SENTENCE AS WORDS, cut into its figures and the phrase that needs him (`shell/headline.ts`). */
   const parts = $derived(typeof sentence === 'string' ? partsOf(stopped(sentence), needs) : null);
 
-  /* A SENTENCE ON ITS WAY HOLDS ITS ROOM, and only while the screen is still reading: a page that settles with nothing
-     to say gives the line back. */
-  const held = $derived(!silent && sentence === undefined && settled() === undefined);
+  /* A SENTENCE ON ITS WAY HOLDS ITS ROOM, and only while the screen is reading for the first time: a page that settles
+     with nothing to say gives the line back, and it never comes back. `settled()` goes the moment a press moves away and
+     on any read of the same screen (a filter), and the line coming back on the press dropped the whole page about 60px. */
+  let drewOnce = $state(false);
+  $effect.pre(() => {
+    if (settled() !== undefined) drewOnce = true;
+  });
+  const held = $derived(!silent && sentence === undefined && !drewOnce);
 
   /* ON A DESK, A TITLED HEAD WITH NO SENTENCE PUTS ITS BUTTONS IN THE TOP BAR, beside the name the bar already says
      (space pass, 4 Nov): with the sentence gone, Share and the "⋯" stood alone on a row of their own under the bar. */
-  const inBar = $derived(titled && !narrow.current && !inIosApp && Boolean(actions) && !sentence && !held);
+  const inBar = $derived(titled && !narrow.current && !inIosApp && Boolean(actions) && !sentence);
   $effect(() => {
     if (!inBar) return;
     const s = barActions;
@@ -397,7 +402,7 @@
       <h1 class="name-unseen" tabindex="-1">{title}</h1>
       {#if sentence}
         <p class="page-said head-said">{@render said()}</p>
-      {:else if held}
+      {:else if held && !inBar}
         <p class="page-said head-said" data-held aria-hidden="true" style:--held-lines={heldLines}>{#if heldText}<span class="held-words">{heldText}</span>{/if}</p>
       {/if}
     {:else}

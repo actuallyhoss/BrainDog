@@ -39,7 +39,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
-  import { areaOf, areasWithFlow, boxesOf, flowAfterRail, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, railDrawn, slotOf, snapped, splitAreas, sticks, widened, type Measured, type Run } from './layout.ts';
+  import { areaOf, areasWithFlow, boxesOf, flowAfterRail, keptFlow, keptWidth, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, railDrawn, slotOf, snapped, splitAreas, sticks, widened, type Measured, type Run } from './layout.ts';
   import { FOLD_LINES, foldOf, foldWords, linesOf, mayFold } from './fold.ts';
   import { arranged, emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
@@ -65,6 +65,7 @@
     mode,
     page,
     blocks: given,
+    answerTurn = 0,
     held = null,
     now,
     writes,
@@ -101,6 +102,8 @@
     page: LivePageDecl;
     /** Every block the page draws, declared then added, each at the index its slot keeps. */
     blocks: readonly LiveBlock[];
+    /** Goes up as the answer to a new filter lands: that draw is the reader's choice, drawn at once with no plan (`PageView`). */
+    answerTurn?: number;
     /**
      * The scheduled actions the page's panel would draw, counted by the page before it is judged (`panels.ts`,
      * `PageView.svelte`): a list, of none where the project has none, or `null` where nobody counted.
@@ -299,7 +302,7 @@
    * written, and not in a preview.
    */
   /** The work column's width, measured below (`twoUp`); declared here, as the questions' place reads it. */
-  let workWidth = $state<number | null>(null);
+  let workWidth = $state<number | null>(untrack(() => (mode === 'page' && typeof innerWidth === 'number' && keptWidth.window === innerWidth ? keptWidth.px : null)));
   const asks = $derived.by(() => {
     if (placed) return { order: blocks.map((_, i) => i), rail: new Set<number>(), compact: new Set<number>(), spans: new Map<number, number>() };
     if (mode !== 'page' || arranging) return { order: looked, rail: new Set<number>(), compact: new Set<number>(), spans: new Map<number, number>() };
@@ -542,6 +545,10 @@
     const take = (w: number) => {
       const px = Math.round(w);
       if (px !== workWidth) workWidth = px;
+      if (mode === 'page') {
+        keptWidth.window = innerWidth;
+        keptWidth.px = px;
+      }
     };
     /* THE FIRST WIDTH IS THE RESIZEOBSERVER'S FIRST ANSWER, TAKEN AT ONCE (speed5): it comes after the browser's own
        layout of the frame and before its paint, so the page is still measured before it is first seen, and nothing makes
@@ -579,9 +586,8 @@
    */
   let flowAt = $state<{ on: string; at: number } | null>(null);
   const mayFlow = $derived(mode === 'page' && !arranging && layout !== null && railShown && wide.current && !narrow && workWidth !== null);
-  const flowSplit = $derived(
-    mayFlow && flowAt !== null && flowAt.on === page.page ? areasWithFlow(mainRest, flowAt.at) : { beside: mainRest, after: [] as Laid[] },
-  );
+  const flowCut = $derived(flowAt !== null && flowAt.on === page.page ? flowAt.at : (keptFlow.get(`${page.page} ${workWidth}`) ?? 0));
+  const flowSplit = $derived(mayFlow && flowCut > 0 && flowCut < mainRest.length ? areasWithFlow(mainRest, flowCut) : { beside: mainRest, after: [] as Laid[] });
 
   /**
    * THE WIDTHS A ROW IS DRAWN AT ONCE ITS HIDDEN BLOCKS ARE GONE, by declared index, for the blocks whose width changes
@@ -648,6 +654,8 @@
   const sized = $derived(workWidth !== null);
   /** What each drawn headline said when the page was last drawn, by key. */
   let saidWas = new Map<string, string>();
+  /** The filter answer the page was last drawn with. */
+  let turnWas = 0;
   $effect.pre(() => {
     void spans;
     void narrow;
@@ -660,12 +668,13 @@
     const cut = flowSplit.after.length;
     untrack(() => {
       const el = pageEl;
-      const same = drewFor === on && wasArranging === moving && wasSized === isSized && wasCut === cut;
+      const same = drewFor === on && wasArranging === moving && wasSized === isSized && wasCut === cut && turnWas === answerTurn;
       const swap = same ? rewritten(saidWas, said) : new Set<string>();
       drewFor = on;
       wasArranging = moving;
       wasSized = isSized;
       wasCut = cut;
+      turnWas = answerTurn;
       saidWas = said;
       if (mode === 'preview' || !el || !same) return motion.stop();
       const play = motion.before(el, shown, swap);
@@ -742,14 +751,26 @@
       /* A HIDDEN BLOCK JUST BEFORE THE CUT GOES UNDER WITH WHAT FOLLOWS IT, so a boxed run keeps its section. */
       while (at > 0 && !list[at - 1]!.block.drawn) at--;
       const was = untrack(() => flowAt);
-      const next = at > 0 ? { on, at } : null;
-      if (next?.at !== was?.at || next?.on !== was?.on) flowAt = next;
+      const next = { on, at: Math.max(at, 0) };
+      untrack(() => keptFlow.set(`${on} ${workWidth}`, next.at));
+      if (next.at !== was?.at || next.on !== was?.on) flowAt = next;
     };
     const watch = frameResizeObserver(measure);
-    watch.observe(main);
-    watch.observe(rail);
-    if (under) watch.observe(under);
-    return () => watch.disconnect();
+    /* THE FIRST MEASURE IS TAKEN BEFORE THE FRAME IS PAINTED, as the width's is above: a frame later the page had been seen
+       with the column running to its foot, and then fell 700px shorter. One round and let go, so no second round is asked
+       of the observer in that frame. */
+    const first = new ResizeObserver(() => {
+      first.disconnect();
+      measure();
+      watch.observe(main);
+      watch.observe(rail);
+      if (under) watch.observe(under);
+    });
+    first.observe(main);
+    return () => {
+      first.disconnect();
+      watch.disconnect();
+    };
   });
 
   /* ── a long note, folded ───────────────────────────────────────────────────
@@ -1409,10 +1430,9 @@
     {#if opens && opensAt === at}<div class="page-strip" data-opens>{@render opens()}</div>{/if}
     {#if lifted?.at === at}
       <!-- THEN the line the page opens on, on a phone, under its sentence and never between the name and the sentence;
-           then what narrows the page, as part of its header, then what was just done on it, before what it holds. -->
+           then what narrows the page, as part of its header. -->
       {#if under && !leadTile}<div class="page-strip">{@render under()}</div>{/if}
       {#if strip && !leadTile}<div class="page-strip">{@render strip()}</div>{/if}
-      {#if host && mode === 'page'}<JustChanged {host} />{/if}
     {/if}
   {/if}
 {/snippet}
@@ -1521,7 +1541,6 @@
   {/if}
   {#if under && !lifted}<div class="page-strip">{@render under()}</div>{/if}
   {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
-  {#if host && mode === 'page' && !arranging && !lifted && !bare}<JustChanged {host} />{/if}
   <!-- THE RESERVED SLOT (`slot.ts`): BrainDog's one suggestion, at the head of a page or a home being read by someone who
        may answer it. It arrives after the page has drawn and draws nothing when there is nothing to suggest, and never
        on a page that is no place to decide (`slotPlace`). ON A HOME EVERY QUESTION ITS QUEUE HOLDS COUNTS AS DRAWN, the
@@ -1548,6 +1567,9 @@
   {:else}
     {@render column(rest)}
   {/if}
+  <!-- WHAT WAS JUST DONE ON IT, UNDER WHAT IT HOLDS: over the blocks, its tile landed a quarter second after a tick and pushed
+       the whole list 132px down under the pointer, and the next press landed on another row. -->
+  {#if host && mode === 'page' && !arranging && !bare}<JustChanged {host} />{/if}
   <!-- WHAT WAS CHANGED FOR THE READER THIS WEEK, one line at the foot of the board; the list opens in the panel. -->
   {#if host && mode === 'page' && !arranging && !bare}<Changed {host} />{/if}
 </div>

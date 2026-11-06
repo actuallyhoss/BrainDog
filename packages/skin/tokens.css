@@ -394,10 +394,12 @@
     --d-menu: 120ms;
     --d-swap: 160ms;
     --d-rows: 180ms;
-    --d-page: 200ms;
+    --d-page: 100ms;
     --d-recompose: 220ms;
     --d-panel: 240ms;
     --d-state: var(--d-exit);
+    /* The old picture of a cross-fade leaving, the first part of `--d-page`. */
+    --d-page-out: 40ms;
     /* The panel, a sheet and an action sheet going back the way they came: a step quicker than they arrived (180). */
     --d-panel-out: var(--d-rows);
     /* TILES ARRIVING ON A PLACE'S FIRST DRAW, one after another: this far apart, six at most, so the last is

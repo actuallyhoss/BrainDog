@@ -131,5 +131,13 @@ test('A PRESS TURNED AWAY IS SAID, AND NOT MORE THAN ONCE IN A FEW SECONDS', () 
   assert.match(held, /toasts\.push\(copy\.stillOpening\)/u);
   assert.match(held, /if \(at - toldAt < 4_000\) return;/u);
   assert.match(held, /turn\(e\);\n\s+told\(\);/u, 'a click and a key are both said');
-  assert.equal([...held.matchAll(/\btold\(\);/gu)].length, 2);
+  assert.match(held, /return told\(\);/u, 'a press with nothing to keep it on is said');
+  assert.match(held, /else told\(\);/u, 'and so is a kept press the answer has made stale');
+  assert.equal([...held.matchAll(/\btold\(\);/gu)].length, 3);
+});
+
+test('A PRESS IN THE FIRST MOMENT IS KEPT, MARKED AT ONCE, AND GOES ONLY IF IT STILL MEANS THE SAME', () => {
+  const held = src('./held.svelte.ts');
+  assert.match(held, /control\.setAttribute\(KEPT_MARK, ''\)/u, 'it answers on the press');
+  assert.match(held, /readsAs\(was\.el\) === was\.reads && performance\.now\(\) - was\.at < KEPT_MS/u, 'never on what has since changed, nor after he has moved on');
 });

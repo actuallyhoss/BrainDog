@@ -1,5 +1,5 @@
 /**
- * EVERY VIEW TRANSITION'S RULES, out of `app.css` (speed4, 2 Nov): the work's cross-fade on a page change, the tab bar,
+ * EVERY VIEW TRANSITION'S RULES, out of `app.css` (speed4, 2 Nov): the work's cross-fade on a change of its own, the tab bar,
  * the toasts and a docked panel held still through it, the top bar's words handing over, and a theme change as one
  * picture. Nothing here draws a still screen, so the sheet every screen waits on does not carry it: the root layout asks
  * for it once the first screen has drawn (`+layout.svelte`), long before anyone presses anything. `page-out` and
@@ -7,8 +7,8 @@
  */
 
 @layer components {
-  /* A NEW SCREEN CROSS-FADES IN THE WORK'S PLACE AND NOWHERE ELSE. The shell names the work `page` (`+layout.svelte`)
-     and wraps a navigation in a view transition where the browser has one; the rest of the window is the root, which
+  /* A CHANGE A SCREEN CROSS-FADES ITSELF (`motion/transition.ts`) DOES SO IN THE WORK'S PLACE AND NOWHERE ELSE: a move between
+     screens is a cut (`AppFrame.svelte`). The work is named `page` and the rest of the window is the root, which
      is told not to animate, so the rail and the docked panel stay where they are. `normal`, because the browser blends
      the two halves of a pair by adding their light, and a root that does not fade would flash white. */
   ::view-transition-old(root),
@@ -19,19 +19,18 @@
 
   /* ONE MOTION PER PAGE CHANGE (motion F6, section 3): the old picture leaves fast and THEN the new one arrives with a 4px
      rise, so two layouts are never on screen at once (fluid F3). Leaving is shorter than arriving, and the two together
-     last `--d-page`. The group itself does not move; the shell waits a moment for the new screen to say it has drawn
-     before the new picture is taken (`+layout.svelte`). */
+     last `--d-page`. The group itself does not move. */
   ::view-transition-group(page) {
     animation-duration: var(--d-page);
     animation-timing-function: var(--ease-out);
   }
 
   ::view-transition-old(page) {
-    animation: page-out var(--d-exit) var(--ease-in) both;
+    animation: page-out var(--d-page-out) var(--ease-in) both;
   }
 
   ::view-transition-new(page) {
-    animation: page-in calc(var(--d-page) - var(--d-exit)) var(--ease-out) var(--d-exit) both;
+    animation: page-in calc(var(--d-page) - var(--d-page-out)) var(--ease-out) var(--d-page-out) both;
   }
 
   @keyframes page-out {
@@ -75,12 +74,22 @@
     animation-duration: var(--d-page);
   }
 
+  /* EACH PICTURE AT ITS OWN SIZE. The crumb's box takes most of the bar on a page with no buttons and only the word's
+     width beside them, and by default a picture stretches to the box as it travels: "Work" drew at twice its size. */
+  ::view-transition-old(bar-crumb),
+  ::view-transition-new(bar-crumb) {
+    inline-size: auto;
+    block-size: auto;
+    object-fit: none;
+    object-position: left center;
+  }
+
   ::view-transition-old(bar-crumb) {
-    animation: page-out var(--d-exit) var(--ease-in) both;
+    animation: page-out var(--d-page-out) var(--ease-in) both;
   }
 
   ::view-transition-new(bar-crumb) {
-    animation: crumb-in calc(var(--d-page) - var(--d-exit)) var(--ease-out) var(--d-exit) both;
+    animation: crumb-in calc(var(--d-page) - var(--d-page-out)) var(--ease-out) var(--d-page-out) both;
   }
 
   @keyframes crumb-in {

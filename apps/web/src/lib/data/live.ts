@@ -83,6 +83,40 @@ export function delayOf(base: number, failures: number, most: number, wait: numb
   return wait === null ? backed : Math.max(backed, wait * 1000);
 }
 
+/**
+ * AT MOST ONE IN `every` MS: the first of a quiet spell goes at once, and what comes during the wait is held, the newest only,
+ * and goes when it ends. `stop` lets go of what is held.
+ */
+export function paced<T>(apply: (value: T) => void, every: number, timers: Timers): { hear: (value: T) => void; stop: () => void } {
+  let waiting: (() => void) | null = null;
+  let held: { value: T } | null = null;
+  const wait = (): void => {
+    waiting = timers.after(() => {
+      waiting = null;
+      if (held === null) return;
+      const { value } = held;
+      held = null;
+      apply(value);
+      wait();
+    }, every);
+  };
+  return {
+    hear(value) {
+      if (waiting !== null) {
+        held = { value };
+        return;
+      }
+      apply(value);
+      wait();
+    },
+    stop() {
+      waiting?.();
+      waiting = null;
+      held = null;
+    },
+  };
+}
+
 /** Start polling. The function it returns stops it, and an answer landing after that is dropped. */
 export function poller({ ask, fast = 1_500, every = 15_000, most = 60_000, idle = 6_000, timers, visible, onChange, onState }: Poll): () => void {
   let stopped = false;

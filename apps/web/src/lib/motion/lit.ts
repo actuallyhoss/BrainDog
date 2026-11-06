@@ -10,6 +10,10 @@
  * rectangle only, nothing laid out. Nothing when either end is out of sight (a closed group, another scroller), on a
  * jump longer than the box (a Menu sheet opening), or under reduced motion. NOT HELD BY A SCREEN'S FIRST SECOND
  * (`calm`), since the move is the navigation itself.
+ *
+ * NOR WHEN THE ROWS MOVED IN THE SAME BREATH (a group's sub-rows opening or closing): A's place is read after the change,
+ * so the highlight set off from where A no longer stood and crossed rows that were not those. Nor on a row a press has
+ * already lit (`press.ts`), which has nowhere to go.
  */
 
 import { ms, still } from './index.ts';
@@ -23,11 +27,12 @@ export const litSlide =
     let was: HTMLElement | null = box.querySelector<HTMLElement>(match);
     let ghost: HTMLElement | null = null;
 
-    const seen = new MutationObserver(() => {
+    const seen = new MutationObserver((changes) => {
       const now = box.querySelector<HTMLElement>(match);
       const from = was;
       was = now;
       if (!now || !from || now === from || !from.isConnected) return;
+      if (now.hasAttribute('data-going') || changes.some((c) => c.type === 'childList')) return;
       slide(from, now);
     });
     seen.observe(box, { subtree: true, attributes: true, attributeFilter: ['aria-current'], childList: true });

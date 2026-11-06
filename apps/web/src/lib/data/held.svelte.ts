@@ -49,6 +49,14 @@ function told(): void {
   toasts.push(copy.stillOpening);
 }
 
+/** How long a press waits for the screen to be live: past this, what it was pressed on is not what he is looking at. */
+const KEPT_MS = 4_000;
+/** What the waiting press wears, so it answers at once (`motion.css`). */
+const KEPT_MARK = 'data-press-kept';
+
+/** What a press was made on as it read then: pressed once the record has answered, only if it still reads so. */
+const readsAs = (el: Element): string => `${el.getAttribute('aria-checked') ?? ''} ${el.getAttribute('aria-pressed') ?? ''} ${el.textContent ?? ''}`;
+
 /** Every element a press can act through, for the sweep; `heldControl` decides which of them is held. */
 const CONTROLS = 'button, select, input, [role]';
 
@@ -83,10 +91,18 @@ export function holdIn(on: () => boolean): Attachment<HTMLElement> {
       e.preventDefault();
       e.stopImmediatePropagation();
     };
+    /* A PRESS IN THE FIRST MOMENT IS KEPT, NOT REFUSED (fluid F5): it wears its mark at once and goes when the record has
+       answered, the way a decision's card has always kept one. Only the last press is kept. */
+    let kept: { el: HTMLElement; reads: string; at: number } | null = null;
     const press = (e: Event) => {
-      if (heldControl(e.target instanceof Element ? e.target : null, root) === null) return;
+      const control = heldControl(e.target instanceof Element ? e.target : null, root);
+      if (control === null) return;
       turn(e);
-      told();
+      kept?.el.removeAttribute(KEPT_MARK);
+      kept = null;
+      if (!(control instanceof HTMLElement)) return told();
+      control.setAttribute(KEPT_MARK, '');
+      kept = { el: control, reads: readsAs(control), at: performance.now() };
     };
     /* A SELECT OPENS ON THE POINTER GOING DOWN, before any click. */
     const down = (e: Event) => {
@@ -112,6 +128,16 @@ export function holdIn(on: () => boolean): Attachment<HTMLElement> {
         el.removeAttribute(HELD_MARK);
         if (el.getAttribute('aria-disabled') === 'true') el.removeAttribute('aria-disabled');
       }
+      const was = kept;
+      kept = null;
+      if (was === null) return;
+      /* A FRAME ON, so what the answer changes has been drawn before it is compared. A screen that has gone takes it along. */
+      requestAnimationFrame(() => {
+        was.el.removeAttribute(KEPT_MARK);
+        if (!root.isConnected) return;
+        if (was.el.isConnected && readsAs(was.el) === was.reads && performance.now() - was.at < KEPT_MS && !was.el.hasAttribute('disabled')) was.el.click();
+        else told();
+      });
     };
   };
 }

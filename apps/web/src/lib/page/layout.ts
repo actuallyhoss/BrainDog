@@ -451,3 +451,15 @@ export function areasWithFlow<T>(main: readonly T[], at: number): { beside: T[];
   if (at <= 0 || at >= main.length) return { beside: [...main], after: [] };
   return { beside: main.slice(0, at), after: main.slice(at) };
 }
+
+/**
+ * WHERE EACH PAGE'S SIDE COLUMN LAST CLOSED, by page and width, for the tab: a page opened again is laid out with its column
+ * closed from its first layout, and is not laid out tall and then again short (Money, 2098 then 1394 tall).
+ */
+export const keptFlow = new Map<string, number>();
+
+/**
+ * THE WORK COLUMN'S WIDTH AS LAST MEASURED, for the width of the window it was measured in: a page opened again in the same
+ * window draws its first layout at the right width, and is not laid out once at no width and again a moment later.
+ */
+export const keptWidth: { window: number; px: number | null } = { window: 0, px: null };

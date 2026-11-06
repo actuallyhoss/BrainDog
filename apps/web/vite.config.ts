@@ -400,12 +400,15 @@ const preloadOncePlugin: Plugin = {
   },
 };
 
+/* THE DEPLOY'S BUILD TUPLE GOES IN THE SHELL, as a `<meta>` (`app.html`), the one the Worker answers `/api/version` with as
+   `app`, so a tab can tell it is running an older build than the one live (`newerBuild` in `lib/data/live.ts`). Empty in a
+   build without one, which compares nothing. NOT A `define`: a value in a chunk's bytes renames that chunk and every chunk
+   above it on every deploy. A meta tag leaves the one inline script's hash in the policy as it is. */
+process.env.PUBLIC_BRAINDOG_BUILD = process.env.BRAINDOG_BUILD ?? '';
+
 export default defineConfig({
   plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin, routeRuntimePlugin, routeMarksPlugin, hoistPlugin, preloadOncePlugin],
-  /* `__BRAINDOG_BUILD__` IS THE DEPLOY'S BUILD TUPLE, the one the Worker answers `/api/version` with as `app`, so a tab can
-     tell it is running an older build than the one live (`newerBuild` in `lib/data/live.ts`). Empty in a build without one,
-     which compares nothing. */
-  define: { __BRAINDOG_ENV__: JSON.stringify(ENV), __BRAINDOG_BUILD__: JSON.stringify(process.env.BRAINDOG_BUILD ?? '') },
+  define: { __BRAINDOG_ENV__: JSON.stringify(ENV) },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
   /* `/catalogue` AT THE ROOT, beside the pages: the app is served at the root (`svelte.config.js`) and asks for the
      catalogue there (`routes/packs/browse/catalogue.ts`). It was `/app/catalogue` while the app was under `/app`. The

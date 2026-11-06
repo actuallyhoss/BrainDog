@@ -12,8 +12,6 @@
  */
 declare const __BRAINDOG_ENV__: string;
 declare const __BRAINDOG_FLAGS__: string;
-/** The deploy's build tuple (`BRAINDOG_BUILD`), the one `/api/version` answers as `app`; `''` in a build without one. */
-declare const __BRAINDOG_BUILD__: string;
 /** Kit's build name, which it `define`s for `$app/environment`'s `version`; read directly by `lib/data/local-tab.ts`. */
 declare const __SVELTEKIT_APP_VERSION__: string;
 
