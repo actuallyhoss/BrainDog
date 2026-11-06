@@ -211,8 +211,8 @@ for (const [what, answer, fix] of [
 test("any other refusal is the record's own sentence, on the list and on a page", async () => {
   const fix = 'This record declares no pages. Install a pack to make some.';
   const { io } = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix } }));
-  assert.deepEqual(await pagesReader(BASE, io).read(), { from: 'refused', fix });
-  assert.deepEqual(await pagesReader(BASE, io).readOne('money'), { from: 'refused', fix });
+  assert.deepEqual(await pagesReader(BASE, io).read(), { from: 'refused', fix, code: 'FORBIDDEN' });
+  assert.deepEqual(await pagesReader(BASE, io).readOne('money'), { from: 'refused', fix, code: 'FORBIDDEN' });
 });
 
 test("a page's refusal stops the read rather than shortening the list", async () => {
@@ -226,7 +226,7 @@ test("a page's refusal stops the read rather than shortening the list", async ()
   );
   /* A LIST THAT QUIETLY CAME UP SHORT reads as pages that do not exist, to a caller about to write
      one of them back. */
-  assert.deepEqual(await pagesReader(BASE, io).read(), { from: 'refused', fix });
+  assert.deepEqual(await pagesReader(BASE, io).read(), { from: 'refused', fix, code: 'PAGE_UNKNOWN' });
 });
 
 test('a slug is read once, however it is asked for', async () => {
