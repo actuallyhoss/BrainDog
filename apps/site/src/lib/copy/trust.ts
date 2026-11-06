@@ -80,7 +80,7 @@ export const trust = {
 
   security: {
     meta: {
-      title: 'Security · BrainDog',
+      title: 'Security: how BrainDog protects your data and keys',
       description: 'How BrainDog keeps your projects, money and keys safe: a database of your own, sealed keys, sealed nightly copies, no password, and agents that ask first.',
     },
     title: 'Security',

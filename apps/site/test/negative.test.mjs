@@ -34,7 +34,7 @@ const SEEDS = join(HERE, 'negative');
  * The pages `content.test.ts` and `slash.test.ts` require. Each is the clean stand-in page but the home page. No
  * packs: they are held with the changelog until the site is public (batch 103).
  */
-const PAGES = ['slash', 'agents', 'pricing', 'docs', 'changelog', 'support', 'security', 'legal', '404'];
+const PAGES = ['slash', 'agents', 'pricing', 'download', 'docs', 'changelog', 'support', 'security', 'legal', '404'];
 
 /** The home page's shape, as `content.test.ts` holds it from 20 October: the hero with the desk, six bands, no picture. */
 const HOME = 'the home page opens on the hero with the desk, then its six bands in order, and holds no picture';

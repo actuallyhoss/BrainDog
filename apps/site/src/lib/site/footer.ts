@@ -32,15 +32,15 @@ export const footerGroups = (launch: Flags = LAUNCH): FootGroup[] => {
   return [
     {
       title: f.groups.product,
-      links: [...page('/slash'), ...page('/agents'), ...page('/pricing'), ...page(SECURITY)],
+      links: [...page('/slash'), ...page('/agents'), ...page('/pricing'), ...page(SECURITY), ...page('/download'), ...page('/plugins'), ...page('/changelog')],
     },
     {
       title: f.groups.who,
       links: [
         ...page(forWho.founder.href, f.small),
         ...page(forWho.team.href, f.teams),
-        /* No "Personal use" here since the 3 November story: the site speaks to founders and teams, and personal money
-           stays in the FAQ and the docs. */
+        /* Personal came back on 6 November, on the owner's word. */
+        ...page(forWho.personal.href, f.personal),
         ...(live.has(DOCS) ? [{ href: DEVELOPERS, label: f.developers }] : []),
       ],
     },

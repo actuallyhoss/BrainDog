@@ -9,6 +9,7 @@
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
+  import { crumbsOf } from '$lib/site/seo.ts';
   import { parse } from 'braindog-render';
   import Icon from '$lib/Icon.svelte';
   import Page from '$lib/app/Page.svelte';
@@ -42,7 +43,7 @@
   }
 </script>
 
-<Seo title={person.title} description={person.description} path={here} />
+<Seo title={person.title} description={person.description} path={here} ld={[crumbsOf([{ name: 'BrainDog', path: '/' }, { name: person.tag, path: here }])]} />
 <PageHead title={person.tag} lead={person.said}>
   <p class="sub">{person.sub}</p>
   <div class="actions">

@@ -74,10 +74,30 @@ export function shellKind(): ShellKind {
 export const inIosApp: boolean = shellKind() === 'ios';
 
 /**
- * An app Apple's store sells, the iPhone's or the Mac's, where a plan is never bought or managed inside the app and no
- * press leads out to a payment page (App Review 3.1.1 and 3.1.3). Windows and the web take the card as usual.
+ * The Android app, which is this page in Chrome with no bar and no shell on the window. It starts at `/?shell=android`,
+ * or says so through its referrer, and that is remembered for the pages after it, since neither lasts past the first load.
  */
-export const inStoreApp: boolean = shellKind() === 'ios' || shellKind() === 'mac';
+const ANDROID_MARK = 'braindog.shell.android';
+function readAndroid(): boolean {
+  try {
+    const here = globalThis.location;
+    const said =
+      new URLSearchParams(here?.search ?? '').get('shell') === 'android' ||
+      (globalThis.document?.referrer ?? '').startsWith('android-app://dog.brain.app');
+    if (said) globalThis.localStorage?.setItem(ANDROID_MARK, '1');
+    return said || globalThis.localStorage?.getItem(ANDROID_MARK) === '1';
+  } catch {
+    return false;
+  }
+}
+export const inAndroidApp: boolean = readAndroid();
+
+/**
+ * An app a store sells that takes no card of ours: the iPhone's, the Mac's or Android's, where a plan is never bought or
+ * managed inside the app and no press leads out to a payment page (App Review 3.1.1 and 3.1.3, Google Play's payments
+ * policy). Windows and the web take the card as usual.
+ */
+export const inStoreApp: boolean = shellKind() === 'ios' || shellKind() === 'mac' || inAndroidApp;
 
 /** In the native Mac app, which keeps the web's own frame under its title bar. */
 export const inMacApp: boolean = shellKind() === 'mac';

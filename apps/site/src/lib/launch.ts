@@ -1,11 +1,10 @@
 import { cases } from './copy/cases.ts';
-import { DESKTOP_NOTARIZED } from './desktop.ts';
 
 /**
  * The pages written for one kind of person that a visitor reaches; the rest are in `HELD`. /for/teams IS BACK (1 Nov):
  * it was held from 23 October while brain.dog held invitations, and a team is on Cloud Plus.
  */
-export const FOR_SHOWN: readonly string[] = ['/for/founders', '/for/teams'];
+export const FOR_SHOWN: readonly string[] = ['/for/founders', '/for/teams', '/for/personal'];
 
 /**
  * What is true on launch day and not before, one flag per fact.
@@ -26,15 +25,18 @@ export const LAUNCH = {
   cli: true, // the CLI is on npm under the name the docs print
   render: true, // braindog-render is on npm
   legal: true, // the owner's Terms, Privacy and processing texts are in force (approved 22 October)
-  public: false, // the site is public: the changelog and its feed are shown
+  public: true, // the site is public: the changelog, its feed and the plugin store are shown (6 November, on the owner's word)
 } as const;
 
 export type LaunchFlag = keyof typeof LAUNCH;
 
+/** Pages that stay off whatever the flags say: on 6 November the store and the changelog went public, and these did not. */
+export const NEVER_SHOWN: readonly string[] = ['/for/students', '/for/new-projects'];
+
 /**
  * The addresses held until the site is public. The changelog and its feed since W.170, because the site was not
  * deployed publicly yet, and the packs with the site's design ("Packs and the
- * changelog stay held"), the Mac download until a signed build exists, and the pages for personal records, students
+ * changelog stay held"), and the pages for personal records, students
  * and new projects (20 October: the slogan is about a business, and those pull the other way), and the page for
  * teams while inviting people is held (22 October). The pricing page
  * came back on 20 October as the one-plan early access page with no prices. The sources stay (`routes/changelog/entries.ts`, the catalogue `routes/plugins/` reads); only
@@ -49,8 +51,6 @@ export const HELD: readonly string[] = [
   '/changelog',
   '/changelog.xml',
   '/plugins',
-  /* THE MAC DOWNLOAD UNTIL A NOTARISED DMG IS PUBLISHED (`desktop.ts`, set by `tools/desktop/release.mjs --publish`). */
-  ...(DESKTOP_NOTARIZED ? [] : ['/download']),
   ...Object.values(cases.drawn.moreFor)
     .map((more) => more.href)
     .filter((href) => !FOR_SHOWN.includes(href)),

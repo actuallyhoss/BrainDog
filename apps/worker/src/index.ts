@@ -33,6 +33,7 @@ import {
   CONNECT_ROUTES, SYNC_EVERY_MS, type ConnectSaid, type Connection, type Status as GoogleStatus, type Writer as GoogleWriter,
 } from './google-connect.ts';
 import { DESKTOP_ROUTES, serveDesktop } from './desktop-signin.ts';
+import { androidAssociation } from './android.ts';
 import { appleAssociation } from './apple.ts';
 /* CLOSING AN ACCOUNT: the door is the host package's, and `account()` hands it this Worker's halves. */
 import { CLOSE_RECORDS_MOST, closeDoor, type Mirrored } from '@braindog/host/auth';
@@ -4229,6 +4230,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     if (servesBuild(url.pathname)) return buildId(env);
     /* WHICH APPLE APP MAY USE THIS NAME'S PASSKEYS (`apple.ts`): asks nothing of anybody, like the build id. */
     if (servesAppleAssociation(url.pathname)) return appleAssociation(env.APPLE_TEAM_ID);
+    /* AND WHICH ANDROID APP MAY OPEN THIS NAME WITH NO BROWSER BAR (`android.ts`). */
+    if (url.pathname === '/.well-known/assetlinks.json' && request.method === 'GET') return androidAssociation();
     /* SIGN-IN FIRST, AND IT IS THE DIRECTORY'S: nothing under `/auth/` reaches a record. LIMITED BY ADDRESS BEFORE THE
        DIRECTORY IS ASKED, on top of its own lockouts, because nobody at this door has proved who they are yet: the
        address is the one thing a caller cannot choose here (`cf-connecting-ip`). */

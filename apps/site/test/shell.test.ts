@@ -109,16 +109,15 @@ test('PageHead draws one h1 and its lead', async () => {
   assert.ok(head.includes('Every plan has the whole app.'));
 });
 
-test('the header row is Agents, Pricing, Security and Docs', () => {
+test('the header row is Agents, Pricing and Docs', () => {
   const row = reachable({ public: false }).filter((p) => p.header);
-  assert.deepEqual(row.map((p) => p.label), ['Agents', 'Pricing', 'Security', 'Docs']);
-  assert.deepEqual(row.map((p) => p.path), ['/agents', '/pricing', '/security', '/docs']);
+  assert.deepEqual(row.map((p) => p.label), ['Agents', 'Pricing', 'Docs']);
+  assert.deepEqual(row.map((p) => p.path), ['/agents', '/pricing', '/docs']);
 });
 
-test('/plugins is held, so the sitemap and the 404 do not name it', () => {
-  assert.equal(LAUNCH.public, false);
-  assert.ok((HELD as readonly string[]).includes('/plugins'));
-  assert.ok(!PAGES.some((p) => p.path === '/plugins' || p.path === '/changelog'), 'PAGES names a held page');
+test('/plugins and the changelog are public, so the sitemap and the 404 name them', () => {
+  assert.equal(LAUNCH.public, true);
+  assert.ok(PAGES.some((p) => p.path === '/plugins') && PAGES.some((p) => p.path === '/changelog'), 'PAGES leaves out a public page');
 });
 
 const links = (launch: { legal: boolean; repo: boolean; public: boolean }) =>
@@ -142,12 +141,12 @@ test("the footer is Product, Who it's for and Help, plain links and no blurb", (
   assert.deepEqual(
     groups.map((g) => [g.title, g.links.map((l) => l.label)]),
     [
-      ['Product', ['Slash', 'Agents', 'Pricing', 'Security']],
+      ['Product', ['Slash', 'Agents', 'Pricing', 'Security', 'Download', 'Plugins', 'Changelog']],
       /* TEAMS IS BACK (1 November, `FOR_SHOWN` in `launch.ts`): inviting people is open, and its page answers. */
-      ["Who it's for", ['Founders', 'Teams and agencies', 'Developers']],
+      ["Who it's for", ['Founders', 'Teams and agencies', 'Personal', 'Developers']],
       ['Help', ['Docs', 'Support', 'Legal']],
     ],
   );
-  assert.deepEqual(groups[1]?.links.map((l) => l.href), ['/for/founders', '/for/teams', '/docs/agents/connect']);
+  assert.deepEqual(groups[1]?.links.map((l) => l.href), ['/for/founders', '/for/teams', '/for/personal', '/docs/agents/connect']);
   assert.ok(!('tagline' in shell.footer), 'the footer carries no blurb');
 });

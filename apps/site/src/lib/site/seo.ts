@@ -74,7 +74,7 @@ export const application = {
   name: 'BrainDog',
   url: `${ORIGIN}/`,
   applicationCategory: 'BusinessApplication',
-  operatingSystem: 'Web',
+  operatingSystem: 'Web, Windows',
   description:
     'One place for your projects, decisions and money that every agent you use reads before it starts and writes to when it stops, with one list of what needs you and every change signed and undoable.',
   publisher: { '@id': ORG_ID },

@@ -10,7 +10,7 @@ export const shell = {
   /** The search result and the shared card, about 150 characters each. */
   meta: {
     home: {
-      title: 'BrainDog · Your agents keep track. You make the calls.',
+      title: 'BrainDog: shared memory for you and your AI agents',
       description: 'One place for your projects, decisions and money. Every agent reads it before it starts and writes down what it did. Money and keys wait for your yes.',
     },
     slash: {
@@ -26,7 +26,7 @@ export const shell = {
           'month. Paid plans come later.',
     },
     agents: {
-      title: 'Connect your agents · BrainDog',
+      title: 'One memory for Claude Code, ChatGPT and Cursor · BrainDog',
       description:
         'One address and one approval per agent. Then each one starts with where things stand and writes down what it did.',
     },
@@ -39,8 +39,8 @@ export const shell = {
       description: 'The licence BrainDog is published under, and its Terms of Service and Privacy Policy.',
     },
     download: {
-      title: 'BrainDog for iPhone and Mac',
-      description: 'The iPhone and Mac apps are coming. Until then BrainDog works in any browser, on your phone too.',
+      title: 'Download BrainDog for Windows and the web',
+      description: 'Get BrainDog for Windows from the Microsoft Store, use it in any browser on any device, or install the command line for your agents.',
     },
     changelog: {
       title: 'Changelog · BrainDog',
@@ -90,6 +90,7 @@ export const shell = {
     /* The links that are not a page's own label: who it is for, then the texts. */
     small: 'Founders',
     teams: 'Teams and agencies',
+    personal: 'Personal',
     developers: 'Developers',
     terms: 'Terms',
     privacy: 'Privacy',

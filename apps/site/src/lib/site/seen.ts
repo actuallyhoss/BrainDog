@@ -34,6 +34,7 @@ export const PAGES: readonly string[] = [
   '/',
   '/agents',
   '/docs',
+  '/download',
   ...Object.values(cases.drawn.moreFor)
     .map((more) => more.href)
     .filter((href) => !(HELD as readonly string[]).includes(href)),

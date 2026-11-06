@@ -34,7 +34,7 @@ export const forPages = {
     who: {
       personal: {
         nav: 'For personal records',
-        title: 'For personal records · BrainDog',
+        title: 'BrainDog for personal money: bills, budgets and savings',
         description:
           'Bills, budgets, subscriptions, splits, savings and net worth in one record. What arrives is filed ' +
           'for you, and nothing that moves money happens until you say yes.',
@@ -102,7 +102,7 @@ export const forPages = {
 
       founder: {
         nav: 'For founders',
-        title: 'For founders · BrainDog',
+        title: 'BrainDog for founders: run every project with AI agents',
         description:
           'For founders running several projects with agents: the agents keep each project current, one list holds ' +
           'what needs you, and the money sits beside the work.',
@@ -137,7 +137,7 @@ export const forPages = {
 
       team: {
         nav: 'For teams and agencies',
-        title: 'For teams and agencies · BrainDog',
+        title: 'BrainDog for teams: one record for people and agents',
         description:
           'Invite your team by email, each with a role. Their agents get the same access, and every change says who made it.',
         tag: 'For teams and agencies',

@@ -17,7 +17,7 @@ import { existsSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { isHttpError } from '@sveltejs/kit';
 
-import { HELD, LAUNCH, held } from '../src/lib/launch.ts';
+import { HELD, LAUNCH, NEVER_SHOWN, held } from '../src/lib/launch.ts';
 import { reachable, LIVE, PAGES, PLACES } from '../src/lib/nav.ts';
 import { _load } from '../src/routes/changelog/+page.ts';
 import { _feed } from '../src/routes/changelog.xml/+server.ts';
@@ -49,12 +49,12 @@ const pageStatus = (launch: { public: boolean }): number => {
   }
 };
 
-test('the flag is off until the owner flips it, and it holds the page and its feed', () => {
-  assert.equal(LAUNCH.public, false, "LAUNCH.public is on: that is the owner's choice, not a build");
-  assert.equal(held(), true);
+test('the owner flipped the flag on 6 November, and what it held is listed still', () => {
+  assert.equal(LAUNCH.public, true, "LAUNCH.public is off: that is the owner's choice, not a build");
+  assert.equal(held(), false);
   /* The pricing page came back on 20 October as the early access page, three of the pages for one kind of person
      went, and the teams page went while inviting people is held (22 October). */
-  assert.deepEqual([...HELD], ['/changelog', '/changelog.xml', '/plugins', '/download', '/for/personal', '/for/students', '/for/new-projects']);
+  assert.deepEqual([...HELD], ['/changelog', '/changelog.xml', '/plugins', '/for/students', '/for/new-projects']);
 });
 
 test('with the flag off the header, the footer, the 404 and the sitemap hold no changelog place', () => {
@@ -62,18 +62,18 @@ test('with the flag off the header, the footer, the 404 and the sitemap hold no 
   assert.ok(!off.includes('/changelog'), 'the changelog is still a place with the flag off');
   assert.ok(!reachable(OFF).some((p) => p.header && p.path === '/changelog'), 'the header still names the changelog');
   /* What the shell and the sitemap read today, under the flag as it stands. */
-  assert.ok(!LIVE.some((p) => p.path === '/changelog'), 'LIVE names the changelog while it is held');
-  assert.ok(!PAGES.some((p) => p.path === '/changelog'), 'PAGES, which the 404 and the sitemap read, names the changelog');
+  assert.ok(LIVE.some((p) => p.path === '/changelog'), 'LIVE does not name the changelog');
+  assert.ok(PAGES.some((p) => p.path === '/changelog'), 'PAGES, which the 404 and the sitemap read, does not name the changelog');
   /* Nothing else is held: every other place stays. */
-  assert.deepEqual(off, PLACES.map((p) => p.path).filter((path) => !(HELD as readonly string[]).includes(path)));
+  assert.deepEqual(off, PLACES.map((p) => p.path).filter((path) => !(HELD as readonly string[]).includes(path) && !NEVER_SHOWN.includes(path)));
 });
 
-test('with a copy of the flag on the changelog is back in the header, in its old place', () => {
+test('with the flag on the changelog is a place, in the footer and not the header row', () => {
   const on = reachable(ON);
   const place = on.find((p) => p.path === '/changelog');
   assert.ok(place, 'the changelog is not a place with the flag on');
-  assert.equal(place.header, true, 'the changelog is not in the header with the flag on');
-  assert.deepEqual(on.map((p) => p.path), PLACES.map((p) => p.path));
+  assert.equal(place.header, false, 'the changelog is in the header row: the owner keeps it to Agents, Pricing and Docs');
+  assert.deepEqual(on.map((p) => p.path), PLACES.map((p) => p.path).filter((path) => !NEVER_SHOWN.includes(path)));
 });
 
 test('with the flag off the page answers not found, and with it on the page answers', () => {
@@ -96,24 +96,14 @@ test('with the flag off the feed answers not found, and with it on the feed is t
 
 test('with the flag off the packs are no place: not in the header, the footer, the 404 or the sitemap', () => {
   assert.ok(!reachable(OFF).some((p) => p.path === '/plugins'), 'the packs are still a place with the flag off');
-  assert.ok(!LIVE.some((p) => p.path === '/plugins'), 'LIVE names the packs while they are held');
-  assert.ok(!PAGES.some((p) => p.path === '/plugins'), 'PAGES, which the 404 and the sitemap read, names the packs');
+  assert.ok(LIVE.some((p) => p.path === '/plugins'), 'LIVE does not name the packs');
+  assert.ok(PAGES.some((p) => p.path === '/plugins'), 'PAGES, which the 404 and the sitemap read, does not name the packs');
 });
 
 test('with a copy of the flag on the packs are back as a place, and never in the header row', () => {
   const place = reachable(ON).find((p) => p.path === '/plugins');
   assert.ok(place, 'the packs are not a place with the flag on');
   assert.equal(place.header, false, 'the packs left the header row with the site design');
-});
-
-test('while held, /packs answers not found and no page is made for any one pack', async () => {
-  assert.equal(held(), true);
-  await assert.rejects(
-    async () => packsPage.load({} as never),
-    (e: unknown) => isHttpError(e) && e.status === 404,
-    '/packs still answers while it is held',
-  );
-  assert.deepEqual(await packPage.entries(), [], 'a page for one pack is still prerendered while /packs is held');
 });
 
 test('the source is kept while the page is held', () => {

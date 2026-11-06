@@ -11,6 +11,7 @@
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
+  import { crumbsOf } from '$lib/site/seo.ts';
   import { LAUNCH } from '$lib/launch.ts';
   import { SOURCE, SUPPORT_EMAIL } from '$lib/links.ts';
   import { trust } from '$lib/copy/trust.ts';
@@ -44,7 +45,7 @@
   ];
 </script>
 
-<Seo title={s.meta.title} description={s.meta.description} path="/support" />
+<Seo title={s.meta.title} description={s.meta.description} path="/support" ld={[crumbsOf([{ name: 'BrainDog', path: '/' }, { name: 'Support', path: '/support' }])]} />
 {#snippet head()}
   {#if address !== ''}<p class="write"><a class="btn ghost" href="mailto:{address}"><Icon name="mail" size="m" />{address}</a></p>{/if}
 {/snippet}

@@ -16,6 +16,7 @@
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
+  import { crumbsOf } from '$lib/site/seo.ts';
   import Icon from '$lib/Icon.svelte';
   import type { IconName } from '$lib/icons.ts';
   import { SUPPORT_EMAIL } from '$lib/links.ts';
@@ -33,7 +34,7 @@
   const NIGHTS = Array.from({ length: 30 }, (_, i) => i);
 </script>
 
-<Seo title={s.meta.title} description={s.meta.description} path="/security" />
+<Seo title={s.meta.title} description={s.meta.description} path="/security" ld={[crumbsOf([{ name: 'BrainDog', path: '/' }, { name: 'Security', path: '/security' }])]} />
 {#snippet head(id: string, name: string, title: string)}
   <h2 class="fact-head">
     <span class="glyph"><Icon name={glyph(name)} /></span>

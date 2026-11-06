@@ -10,7 +10,7 @@ import { shell } from './copy/shell.ts';
 import { cases } from './copy/cases.ts';
 import { forPages } from './copy/for.ts';
 import { PLUGINS, DOCS, SECURITY, SUPPORT } from './links.ts';
-import { HELD, LAUNCH, held } from './launch.ts';
+import { HELD, LAUNCH, NEVER_SHOWN, held } from './launch.ts';
 
 export type Place = {
   path: string;
@@ -48,14 +48,14 @@ export const PLACES: readonly Place[] = [
   place('/agents', 'agents', true),
   place(PLUGINS, 'packs', false),
   place('/pricing', 'pricing', true),
-  place(SECURITY, 'security', true),
+  place(SECURITY, 'security', false),
   person('founder'),
   person('team'),
   person('personal'),
   person('student'),
   person('project'),
   place(DOCS, 'docs', true),
-  place('/changelog', 'changelog', true),
+  place('/changelog', 'changelog', false),
   place(SUPPORT, 'support', false),
   place('/download', 'download', false),
   place('/legal', 'legal', false),
@@ -88,7 +88,7 @@ export const exists = (path: string): boolean => found === null || found.has(pat
  * again and edits nothing here. Takes the flags so a test can pass a copy with one turned on.
  */
 export const reachable = (launch: { public: boolean } = LAUNCH): readonly Place[] =>
-  PLACES.filter((p) => exists(p.path) && !(held(launch) && (HELD as readonly string[]).includes(p.path)));
+  PLACES.filter((p) => exists(p.path) && !NEVER_SHOWN.includes(p.path) && !(held(launch) && (HELD as readonly string[]).includes(p.path)));
 
 /** The places that exist today, in order. */
 export const LIVE: readonly Place[] = reachable();
