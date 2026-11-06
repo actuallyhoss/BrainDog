@@ -171,3 +171,36 @@ test('A WAKE ASKED WHILE THE ALARM STANDS ASIDE DOES NOT BRING IT BACK AT ONCE',
 test('THE SLICE IS SMALLER THAN THE SHARE, or a slice would be the whole of it', () => {
   assert.ok(ALARM_SLICE_UNITS >= 1 && ALARM_SLICE_UNITS < 10);
 });
+
+test('NO STEP IS WRITTEN DOWN ACROSS A BREATH: a cut while requests run names nothing that had finished', async () => {
+  const { c, object: obj } = await made();
+  await c.settle();
+  const storage = c.storages.get(REC)! as unknown as { get(key: string): unknown; put(key: string, value: unknown): unknown; delete(key: string): unknown };
+  /* WHAT IS WRITTEN DOWN, as the object's storage holds it, read at the moment each breath begins. */
+  let written: unknown = undefined;
+  const put = storage.put.bind(storage);
+  const del = storage.delete.bind(storage);
+  storage.put = (key: string, value: unknown) => {
+    if (key === 'braindog.alarm-step') written = value;
+    return put(key, value);
+  };
+  storage.delete = (key: string) => {
+    if (key === 'braindog.alarm-step') written = undefined;
+    return del(key);
+  };
+  const heldAtBreath: unknown[] = [];
+  const timer = globalThis.setTimeout;
+  globalThis.setTimeout = ((fn: () => void, ms?: number, ...rest: never[]) => {
+    if (ms === 1) heldAtBreath.push(written);
+    return timer(fn, ms, ...rest);
+  }) as typeof setTimeout;
+  try {
+    await lines(() => obj.alarm());
+  } finally {
+    globalThis.setTimeout = timer;
+    storage.put = put;
+    storage.delete = del;
+  }
+  assert.ok(heldAtBreath.length > 3, `only ${heldAtBreath.length} breaths seen, so this test proves nothing`);
+  assert.deepEqual(heldAtBreath.filter((step) => step !== undefined), [], 'a finished step was written down across a breath');
+});

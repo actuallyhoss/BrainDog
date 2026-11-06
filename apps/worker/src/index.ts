@@ -1345,14 +1345,14 @@ export class Record$ extends DurableObject<Env> {
          A BREATH BETWEEN (`#sliced`), so what a request waits behind is a page or two and not ten. */
       const lookShare = countedShare();
       const lintShare = countedShare();
-      if (onward()) looked = await this.#step(api, 'look', () => this.#sliced(lookShare, (budget) => slashLook(api, { sql: this.#jobsStore, budget })), false);
+      if (onward()) looked = await this.#step(api, 'look', () => this.#sliced('look', lookShare, (budget) => slashLook(api, { sql: this.#jobsStore, budget })), false);
       /* AND THE RECORD LINTS ITS OWN PAGES, at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
       if (onward())
         linted = await this.#step(
           api,
           'lint',
           () =>
-            this.#sliced(lintShare, (budget) =>
+            this.#sliced('lint', lintShare, (budget) =>
               api
                 .lintTick({ budget })
                 .then((out) => out.ran === false && out.more === true)
@@ -1670,6 +1670,10 @@ export class Record$ extends DurableObject<Env> {
     const started = Date.now();
     const out = await run();
     const calls = this.#pace.calls();
+    /* THE STEP IS CROSSED OFF BEFORE THE BREATH. Requests run in the breath, so one that overran its CPU, or a deploy, would
+       reset the object with a finished step written down, and two of those in a row hold that step for hours and mail the
+       operator (`#cutOff`). */
+    await this.#stepDone();
     await breathe();
     op({ op: 'alarm-step', rec: recOf(api), step, ms: Date.now() - started, let: this.#pace.calls() - calls });
     /* A STEP THAT FINISHED CLEARS ITS COUNT: the next cut in it starts again at one. */
@@ -1683,7 +1687,7 @@ export class Record$ extends DurableObject<Env> {
    * keeps its own place, so asking it again goes on from there, and it answers `more` until it is done. It stops when its
    * share is spent, when it has nothing left, or when somebody has come (`aside`), and answers whether there is more.
    */
-  async #sliced(share: ReturnType<typeof countedShare>, run: (budget: TickBudget) => Promise<boolean>): Promise<boolean> {
+  async #sliced(step: string, share: ReturnType<typeof countedShare>, run: (budget: TickBudget) => Promise<boolean>): Promise<boolean> {
     for (let slice = 1; ; slice++) {
       let used = 0;
       const more = await run({
@@ -1696,8 +1700,11 @@ export class Record$ extends DurableObject<Env> {
       });
       /* A STEP THAT ANSWERS `more` AND SPENDS NOTHING STILL ENDS: the count of slices is the bound under the share's. */
       if (!more || share.budget.spent() || slice >= ALARM_STEP_PAGES) return more;
+      /* NOT WRITTEN DOWN ACROSS THE BREATH (`#step`), and written again for the slice that follows it. */
+      await this.#stepDone();
       await breathe();
       if (this.#gone || this.#armed || this.#pace.aside()) return more;
+      await this.#stepNote(step);
     }
   }
 
@@ -1733,7 +1740,7 @@ export class Record$ extends DurableObject<Env> {
     }
   }
 
-  /** The alarm finished: no step is left running. */
+  /** No step is running: the alarm finished, or the one that ran is done and the next has not begun. */
   async #stepDone(): Promise<void> {
     try {
       await this.ctx.storage.delete(ALARM_STEP);
