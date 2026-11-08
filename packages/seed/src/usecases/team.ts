@@ -272,8 +272,10 @@ export const TEAM = {
      2.30.5 (audit 31 Oct o, AO14): Sprints draws its own glyph, where it drew Menu's three lines on the phone bar. The
      look only, so a patch step; 2.30.4 is published.
      2.31.0 (no briefs, 3 Nov): Team, Sprints and Agent work no longer open on a line counting tickets, which the lists and
-     boards under them show. Three blocks taken away and none added, so a minor step; 2.30.5 is published. */
-  version: '2.31.0',
+     boards under them show. Three blocks taken away and none added, so a minor step; 2.30.5 is published.
+     2.31.1 (the page-print check, 8 Nov): a project page's Keys calls each key by what it opens, its label only where
+     nothing says, where it printed the name a key is kept under. Words only, so a patch step; 2.31.0 is published. */
+  version: '2.31.1',
   title: 'Team board',
   summary: 'Tickets, sprints and the agents on them.',
   author: 'BrainDog',

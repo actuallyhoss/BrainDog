@@ -1729,10 +1729,12 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is key, scope is project',
+        /* A KEY IS CALLED BY WHAT IT OPENS, SINCE founder 3.10.1 and team 2.31.1, and by its label only where nothing
+           says: a label is the name a key is kept under, `bluff-golf`, a name from the code where the card should say
+           what the key is for, and the line under it said the same thing again in words. */
         columns: [
-          { field: 'name', as: 'title' },
+          { field: 'detail', or: 'name', as: 'title' },
           { field: 'scope', label: 'Applies to', as: 'scope' },
-          { field: 'detail', label: 'Opens', as: 'fact' },
           { field: 'used_agents', label: 'Used by', as: 'who' },
           { field: 'used_at', label: 'Last used', as: 'when' },
         ],

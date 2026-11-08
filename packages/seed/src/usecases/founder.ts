@@ -520,8 +520,10 @@ export const FOUNDER = {
      step; 3.9.1 is published.
      3.10.0 (no briefs, 3 Nov): the Dashboard no longer opens on how many numbers came in thirty days, which its charts draw, and
      Home no longer counts the agents at work over Agents at work. The lines for an empty Dashboard and Home's line
-     about cash and how long it lasts stay. Two blocks taken away and none added, so a minor step; 3.9.3 is published. */
-  version: '3.10.0',
+     about cash and how long it lasts stay. Two blocks taken away and none added, so a minor step; 3.9.3 is published.
+     3.10.1 (the page-print check, 8 Nov): a project page's Keys calls each key by what it opens, its label only where
+     nothing says, where it printed the name a key is kept under. Words only, so a patch step; 3.10.0 is published. */
+  version: '3.10.1',
   title: 'Solo founder',
   summary: 'Your companies, their revenue and metrics.',
   author: 'BrainDog',
