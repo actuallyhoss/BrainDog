@@ -16,6 +16,10 @@
  *      word ("AMAZON PRIME" beside Amazon, "SWIFTCAB RIDE" beside Swiftcab) is that payee too (`baseOf`). A payee the
  *      record does not know yet is made an organisation only when it says it is a business (`soundsLikeBusiness`): a
  *      company suffix, a card processor's prefix or a web address, or a word only a shop or a supplier is called by.
+ *      A payee the bank said as one that cannot be a person (`cannotBePerson`: one word that is no given name, a word
+ *      mixing letters and digits, "The" or "&" inside it, a merchant everybody knows) is made too, with Undo, and never
+ *      asked about. A bank's own charge ("Intl. Transaction Fee", `isFee`) and a stray word ("We", "Subscription") name
+ *      nobody, and only a ledger's rows, where every row says an amount, are read as payments.
  *      Anything else, a plain "Layla Ahmed" above all, is a question and never an organisation. A payee on one line
  *      alone is left as it is unless the record already knows it; a payee that is a person, or shaped like one, is never
  *      an organisation, nor is the payee of a line that says it is a transfer, nor a word like "Unknown" that names
@@ -277,6 +281,10 @@ function ledgersOf(lists: Lists, orgs: string, people: string | undefined): Ledg
        link to an organisation, and "Daily active players, Bake.gg" on 276 lines was asked about as a company. Missing a
        payee on such a list costs a suggestion; reading a metric as a payee costs the person's trust. */
     if (fields.some((f) => f.type === 'decimal')) continue;
+    /* ONLY A LEDGER'S ROWS ARE PAYMENTS: a list whose every row must say an amount, or that keeps the bank's words. A
+       list where an amount is only one thing a row may hold (key numbers, a list of servers with a cost) is read for
+       nobody, so "Servers, Bake" on 279 rows is never asked about as a company. */
+    if (!fields.some((f) => (f.type === 'money' && f.required === true) || f.id === COUNTERPARTY)) continue;
     const party = refs.find((f) => f.id === 'party') ?? refs[0]!;
     const text = (id: string | undefined): string | undefined =>
       id !== undefined && fields.some((f) => f.id === id && (f.type === 'text' || f.type === 'document')) ? id : undefined;
@@ -385,7 +393,92 @@ const NAME_WORDS = 4;
  * too, and is learnt from the ledger rather than written here (`railsOf`).
  */
 const NAMES_NOBODY =
-  /^(?:unknown|unnamed|initial|opening|balance|misc|miscellaneous|sundry|other|none|na|adjustment|correction|internet|phone|mobile|online|banking|bank|ipn|tt|pos|purchase|inward|outward|incoming|outgoing|credit|debit|cash|card|payment|transfer)$/iu;
+  /^(?:unknown|unnamed|initial|opening|balance|misc|miscellaneous|sundry|other|none|na|adjustment|correction|internet|phone|mobile|online|banking|bank|ipn|tt|pos|purchase|purchases|inward|outward|incoming|outgoing|credit|debit|cash|card|payment|payments|transfer|transfers|subscription|subscriptions|renewal|order|refund|deposit|withdrawal|i|me|my|we|us|our|you|your|he|him|his|she|her|it|its|they|them|their|this|that|these|those|the|a|an|and)$/iu;
+
+/**
+ * WORDS A BANK NAMES A CHARGE BY, and the words it puts round one: "Intl. Transaction Fee", "Foreign transaction fee",
+ * "ATM fee", "Service charge", "VAT". A payee made only of them is the bank's charge and names no company: it is never
+ * made an organisation and never asked about, and its lines are left with no organisation. One with a name in it,
+ * "HARBOUR BANK FEES" or "Stripe fee", is still that name's.
+ */
+const FEE_WORDS = /^(?:fee|fees|charge|charges|chrg|chg|interest|tax|taxes|vat|gst|commission|commissions|surcharge|levy|duty|penalty|markup|fx|forex)$/u;
+const FEE_AROUND =
+  /^(?:intl|international|foreign|overseas|cross|border|crossborder|transaction|transactions|txn|atm|service|services|monthly|annual|yearly|late|card|bank|banking|account|currency|conversion|exchange|overdraft|maintenance|processing|withdrawal|cash|wire|swift|sms|statement|admin|administration|handling|local|outward|inward|incoming|outgoing|govt|government|sales|income|withholding|stamp|debit|credit|purchase|network|pos|payment|transfer|of|on|the|and|for|a|an)$/u;
+
+/** Whether a payee is only a bank's charge, by the words above. */
+export function isFee(said: string): boolean {
+  const words = said.toLowerCase().split(/[\s,/]+/u).map((w) => w.replace(/[^\p{L}]/gu, '')).filter((w) => w !== '');
+  return words.some((w) => FEE_WORDS.test(w)) && words.every((w) => FEE_WORDS.test(w) || FEE_AROUND.test(w));
+}
+
+/**
+ * A WORD THAT SAYS WHAT WAS BOUGHT AND NOT FROM WHOM, after a merchant's name: "Apify* Subscription", "UBER *TRIP",
+ * "NORTHWIND RENEWAL". A payee that is a held organisation's name and only such words is that organisation, and the
+ * name a person reads is the merchant's and never "Subscription".
+ */
+const BOUGHT_WORDS = new Set([
+  'trip', 'trips', 'ride', 'rides', 'order', 'orders', 'renewal', 'renewals', 'subscription', 'subscriptions', 'premium', 'plan', 'plans', 'membership',
+  'bill', 'billing', 'invoice', 'purchase', 'purchases', 'recharge', 'topup', 'payment', 'payments', 'service', 'services', 'usage', 'charge', 'monthly',
+  'annual', 'yearly', 'online', 'store', 'app', 'apps', 'web', 'help', 'pmts', 'pymt', 'pmt', 'eats',
+]);
+const boughtOnly = (words: readonly string[]): boolean =>
+  words.length > 0 &&
+  words.every((w) => {
+    const bare = w.replace(/[^\p{L}]/gu, '').toLowerCase();
+    return bare === '' || BOUGHT_WORDS.has(bare) || NAMES_NOBODY.test(bare) || ABOUT_A_PAYMENT.test(bare) || FEE_WORDS.test(bare);
+  });
+
+/** The words of a payee after the ones that fold to `base`, or `null` when no first words of it do. */
+function wordsAfter(said: string, base: string): string[] | null {
+  const words = said.trim().split(/\s+/u);
+  for (let n = words.length - 1; n >= 1; n--) if (keyOf('bank', words.slice(0, n).join(' ')) === base) return words.slice(n);
+  return null;
+}
+
+/**
+ * A PAYEE THAT CANNOT BE A PERSON, said as one by the bank, is made an organisation when it is on enough lines, and is
+ * never a question: "Steam" on 9 lines, "PayPal" on 7, "Cult The Drive" on 5. A name a person could have, "Layla Ahmed"
+ * or "Rhea Albany", is still asked about. It cannot be a person when it is one word that is not a given name, when a
+ * word of it mixes letters and digits, when it joins words as only a business does ("the", "&", "and", "+"), or when
+ * it starts with a merchant or a payment service everybody knows. Given names and merchants are general words, never
+ * one record's.
+ */
+const GIVEN_NAMES = new Set(
+  (
+    'aaron adam adel adrian ahmad ahmed aisha alaa albert alex alexander alexandra ali alice alicia alison amal amanda amani amina amir amira amr amy ' +
+    'ana andre andrea andreas andrew andy angela ann anna anne anthony antonio arjun ashley asma aya ayman aziz barbara basma ben benjamin bilal bob ' +
+    'brian bruno carl carla carlos carmen caroline catherine charles charlie charlotte chris christian christina christine christopher claire clara ' +
+    'daniel daniela dalia dana david deborah dina diana diego dimitri dina doaa donald dorothy ehab eman emily emma eric esraa eva evan farah ' +
+    'farida fatima fatma francesca francesco frank gamal george georgia hadi hamza hana hani hanna hannah hassan heba helen henry hesham hoda ' +
+    'hossam hussein ibrahim ines isabel islam ivan jack jacob james jamie jane jason jean jennifer jessica jim joe john jonathan jorge jose joseph ' +
+    'josh joshua juan julia julie justin karen karim kate katherine kevin khaled khalid laila lara laura layla leila lena leo linda lisa lucas ' +
+    'lucy luis luke magdy mahmoud mai maria mariam marie mark marta martin mary maryam matt matthew max maya mena mia michael michelle mike ' +
+    'mina mohamed mohammad mohammed mona mostafa mustafa nada nadia nancy nader nasser natalie nathan nicholas nick nicole nina noha nour noura ' +
+    'olga olivia omar omnia osama pablo patricia patrick paul paula pedro peter philip pierre priya rachel rahul rami rana rania rasha ravi ' +
+    'rebecca reem richard rita robert rodrigo ruth ryan saad sabrina sahar said salah salma sam samantha samar samir samuel sara sarah sean ' +
+    'sergio shady sherif simon sofia sophia sophie stephanie stephen steve steven susan tamer tarek tariq thomas tim timothy tom tony usman ' +
+    'victor victoria walid william yara yasmin yasmine yasser yehia yousef youssef yusuf zain zeinab zoe'
+  ).split(' '),
+);
+const KNOWN_MERCHANTS = new Set(
+  (
+    'paypal stripe steam apple google amazon meta facebook instagram whatsapp netflix spotify uber careem talabat cloudflare github gitlab openai ' +
+    'anthropic vercel netlify heroku microsoft adobe dropbox slack notion figma zoom airbnb shopify squarespace godaddy namecheap hetzner ' +
+    'digitalocean linode twilio sendgrid mailgun atlassian jetbrains canva paddle gumroad patreon discord twitch youtube tiktok linkedin twitter ' +
+    'wise revolut payoneer klarna ebay aliexpress temu ikea starbucks mcdonalds kfc deliveroo glovo bolt lyft grab expedia agoda ryanair ' +
+    'emirates lufthansa'
+  ).split(' '),
+);
+export function cannotBePerson(said: string): boolean {
+  const raw = said.trim().split(/\s+/u).filter((w) => w !== '');
+  if (raw.some((w) => /\p{L}/u.test(w) && /\p{N}/u.test(w))) return true;
+  const words = tidy(said).toLowerCase().split(/\s+/u).filter((w) => w !== '');
+  const bare = words.map((w) => w.replace(/[^\p{L}\p{N}]/gu, ''));
+  if (bare.length === 0 || bare[0] === '') return false;
+  if (KNOWN_MERCHANTS.has(bare[0]!)) return true;
+  if (words.some((w, i) => i > 0 && (bare[i] === 'the' || w === '&' || w === '+' || bare[i] === 'and'))) return true;
+  return bare.length === 1 && bare[0]!.length >= 3 && /^\p{L}+$/u.test(bare[0]!) && !GIVEN_NAMES.has(bare[0]!);
+}
 
 /**
  * An account on a payment network, as a bank prints who a transfer came from: `quill.harbour@<network>`, the network's
@@ -438,10 +531,11 @@ function payeeOf(ledger: Ledger, fields: Record<string, Json>, reading: Reading)
   const what = ledger.title === undefined ? undefined : textOf(fields[ledger.title]);
   const moved = what !== undefined && SAYS_TRANSFER.test(what);
   const keyed = (said: string, sure: boolean): Payee | null => {
-    if (railsOf([said]).size > 0) return null;
+    if (railsOf([said]).size > 0 || isFee(said)) return null;
+    /* A WORD OF ONE OR TWO LETTERS NAMES NOBODY ALONE: "We" cut from a description was asked about as a company. */
     const nobody = (w: string): boolean => {
       const bare = w.replace(/[^\p{L}\p{N}]/gu, '');
-      return bare === '' || NAMES_NOBODY.test(bare) || reading.rails.has(bare.toLowerCase()) || reading.about.has(bare.toLowerCase());
+      return bare.length <= 2 || NAMES_NOBODY.test(bare) || reading.rails.has(bare.toLowerCase()) || reading.about.has(bare.toLowerCase());
     };
     if (said.split(/\s+/u).every(nobody)) return null;
     const key = keyOf('bank', said);
@@ -456,6 +550,9 @@ function payeeOf(ledger: Ledger, fields: Record<string, Json>, reading: Reading)
   return keyed(said, !cut);
 }
 
+/** The card processors a bank text writes before a star and the merchant's name, which are never the merchant. */
+const STAR_PROCESSORS = /^(?:geidea|paymob|fawry|kashier|paytabs|sumup|paypal|pp|zettle_?|izettle|sq|tst|sp)$/iu;
+
 /**
  * A NAME SHAPED LIKE A PERSON'S, an initial and a surname as a bank prints a transfer to one: `J OKONKWO`, `S. Marchetti`.
  * Money paid to a person is not paid to an organisation, and the walk never makes a person, so it is left as it is.
@@ -469,7 +566,11 @@ const PERSON_SHAPED = /^\p{L}\.?\s+\p{L}[\p{L}'-]+$/u;
  */
 export function tidy(said: string): string {
   const key = keyOf('bank', said);
-  const words = said
+  /* A MERCHANT BEFORE ITS STAR, AND ONLY WHAT WAS BOUGHT AFTER IT, IS THE MERCHANT: "Apify* Subscription" is Apify and
+     "UBER *TRIP" is Uber, never "Subscription" or "Trip". A processor before the star (`GEIDEA*BREEZEWAY`) is not. */
+  const star = /^([\p{L}\p{N} ]{1,12})\*\s*(.*)$/su.exec(said.normalize('NFKC').trim());
+  const merchant = star !== null && !STAR_PROCESSORS.test(star[1]!.trim()) && boughtOnly(star[2]!.split(/\s+/u)) ? star[1]!.trim() : null;
+  const words = (merchant ?? said)
     .normalize('NFKC')
     .trim()
     .replace(/^[\p{L}\p{N} ]{1,12}\*\s*/u, '')
@@ -730,7 +831,10 @@ function ledgerSlice(
       let org: string | null | undefined;
       if (found !== null && found !== undefined) {
         if (madeFromWords(found.id)) give(found.id, [...(found.named ? [key] : []), ...(extended ? [p.key] : [])]);
-        else if (extended) {
+        else if (extended && boughtOnly(wordsAfter(p.said, key) ?? [])) {
+          /* A HELD ORGANISATION'S NAME AND ONLY WHAT WAS BOUGHT ("Apify* Subscription" beside Apify) IS THAT
+             ORGANISATION, linked as a line naming it exactly is, and the key left off. Never a question. */
+        } else if (extended) {
           /* A HELD ORGANISATION A PAYEE ONLY EXTENDS IS ASKED ABOUT, AND THE LINE LEFT AS IT IS. */
           const held = sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', found.id);
           const organisation = { id: found.id, name: (held && textOf((JSON.parse(held.fields) as Record<string, Json>)[orgs.at.name])) ?? 'an organisation' };
@@ -753,10 +857,12 @@ function ledgerSlice(
            field's end named "Orbt Speciali" and "Marke" as shops. The lines keep the bank's words, and are linked once
            the record holds the shop by its key. */
         else if (count !== undefined && count.lines >= PAYEE_SEEN && count.whole) {
-          /* A PAYEE SAID AS ONE ON ANY OF ITS LINES, THAT SAYS IT IS A BUSINESS ON ANY OF THEM, IS MADE. One only ever
-             cut out of a description, or one that could be a person's name, is a question, named the way the walk
-             would have named it. */
-          if (count.sure && count.business) org = make(keys, tidy(count.said), false);
+          /* A PAYEE SAID AS ONE ON ANY OF ITS LINES, THAT SAYS IT IS A BUSINESS OR CANNOT BE A PERSON, IS MADE, with
+             Undo: "Steam", "PayPal", "Cult The Drive" were each asked about and were never anything but a company. A
+             merchant everybody knows is made even cut out of a description. One that could be a person's name, or one
+             only ever cut out of a description, is a question, named the way the walk would have named it. */
+          const merchant = KNOWN_MERCHANTS.has(tidy(count.said).toLowerCase().split(/\s+/u)[0]!.replace(/[^\p{L}\p{N}]/gu, ''));
+          if ((count.sure && (count.business || cannotBePerson(count.said))) || merchant) org = make(keys, tidy(count.said), false);
           else if (tidy(count.said) !== '') {
             const name = tidy(count.said);
             suggest({ kind: 'organisation', key: `organisation:${key}`, name, payments: count.lines, question: `Is ${name} a company you pay or are paid by? ${count.lines} payments name it.` });

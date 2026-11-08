@@ -455,6 +455,32 @@ test('A PAYEE THAT COULD BE A PERSON IS A QUESTION AND NEVER AN ORGANISATION, un
   sql.close();
 });
 
+test('A PAYEE THAT CANNOT BE A PERSON IS MADE AND NEVER ASKED ABOUT; A BANK CHARGE OR A STRAY WORD NAMES NOBODY; A HELD NAME WITH WHAT WAS BOUGHT IS THAT ORGANISATION', async () => {
+  const { k, sql, deps } = await record();
+  const line = (what: string, more: Record<string, unknown> = {}) => value<Entry>(k.create('transactions', { what, amount: gbp(-4_000), ...more }, OWNER)).id;
+  for (let i = 0; i < 3; i++) {
+    line('Games', { counterparty_text: 'DRIFTWELL' });
+    line('Payment', { counterparty_text: 'PayPal' });
+    line('Ticket', { counterparty_text: 'QUILL THE DRIVE' });
+    line('Charge', { counterparty_text: 'Intl. Transaction Fee' });
+    line('Cash', { counterparty_text: 'ATM fee' });
+    line('WE PAID THE DEPOSIT');
+  }
+  const orefield = value<Entry>(k.create('organisations', { name: 'Orefield' }, OWNER)).id;
+  const plan = line('Plan', { counterparty_text: 'Orefield* Subscription' });
+  const done = understandBackfill(deps);
+
+  for (const name of ['Driftwell', 'PayPal', 'Quill The Drive']) assert.ok(orgNamed(k, name), `${name} is made, with Undo, and not asked about`);
+  for (const name of ['Intl. Transaction Fee', 'Atm Fee', 'We']) assert.equal(orgNamed(k, name), null, `${name} names nobody`);
+  const asked = kinds(done.suggestions, 'organisation').map((s) => s.kind === 'organisation' && s.name);
+  assert.deepEqual(asked, ['Lowry St Studios'], 'only a payee cut out of a description is still a question');
+  assert.equal(partyOf(k, plan), orefield, '"Orefield* Subscription" is Orefield');
+  assert.deepEqual(done.held.filter((h) => h.kind === 'organisation-key'), [], 'and is never asked about as "Subscription"');
+  assert.equal(tidy('Orefield* Subscription'), 'Orefield');
+  assert.equal(tidy('RIDEWELL *TRIP'), 'Ridewell');
+  sql.close();
+});
+
 test('A BROAD FOLDER, OR A FOLDER THE RUN’S OWN REPOSITORY CONTRADICTS, IS A QUESTION; A FOLDER OF ONE PROJECT PLACES', async () => {
   const { k, sql, deps, clock, ids } = await record();
   /* A project listing the whole code folder, as one listing `~/Developer` does, beside one listing a checkout in it. */
