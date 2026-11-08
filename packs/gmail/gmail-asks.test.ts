@@ -199,20 +199,23 @@ test('ONE QUESTION A THREAD: the newest mail that asks carries it, a later one j
   assert.equal(row(l, four).who, l.people![1]!.id);
 });
 
-test('ONE QUESTION AN ORDER: Order Received and Order Finished, and a PayPal receipt and the invoice it pays, are one each, amount first', async () => {
+test('ONE ORDER IS ONE, AND A RECEIPT IS NEVER ASKED ABOUT: Order Received and Order Finished, and a PayPal receipt and the invoice it pays, are one each, kept with your money, amount first', async () => {
   const received = mail({ subject: 'Order #1042 received', name: 'Corner Shop', address: 'orders@corner-shop.example', snippet: 'Thanks for your order. Total: EGP 450.00', person: false, needs_reply: false });
   const finished = mail({ subject: 'Order #1042 finished', name: 'Corner Shop', address: 'orders@corner-shop.example', snippet: 'Your order is complete. Total: EGP 450.00', person: false, needs_reply: false });
   const invoice = mail({ subject: 'Invoice INV-2026-07 for October hosting', name: 'Northwind Hosting', address: 'billing@northwind.example', snippet: 'Amount due: $49.00 by 15 November.', person: false, needs_reply: false, day: '2026-11-01', at: '2026-11-01T07:00:00.000Z' });
   const paid = mail({ subject: 'Receipt for your payment to Northwind Hosting', name: 'PayPal', address: 'service@paypal.com', snippet: 'You sent a payment of $49.00 USD to Northwind Hosting.', person: false, needs_reply: false });
   const l = lists([received, finished, invoice, paid]);
   await hour(l);
-  assert.deepEqual([row(l, received).ask, row(l, finished).ask], ['receipt', 'joined'], 'one order asked twice');
+  /* A RECEIPT IS KEPT WITH YOUR MONEY AND NOT ASKED ABOUT (1.3.2): it waits to be added, once an order. */
+  assert.deepEqual([row(l, received).ask, row(l, finished).ask], ['none', 'joined'], 'one order kept twice');
+  assert.deepEqual([row(l, received).add, row(l, finished).add], [true, undefined]);
   assert.equal(row(l, received).says, 'EGP 450.00 receipt from Corner Shop');
   assert.equal(row(l, received).ref, '1042');
-  /* PAID ALREADY: the invoice joins the receipt, and the one question is whether to add it to Money (1.3.0). */
-  assert.deepEqual([row(l, invoice).ask, row(l, paid).ask], ['joined', 'receipt'], 'a receipt and the invoice it pays asked twice');
+  /* PAID ALREADY: the invoice joins the receipt, and the receipt is kept with your money, with nothing asked. */
+  assert.deepEqual([row(l, invoice).ask, row(l, paid).ask], ['joined', 'none'], 'a receipt and the invoice it pays asked about');
+  assert.equal(row(l, paid).add, true);
   assert.equal(row(l, paid).says, '$49.00 receipt from PayPal');
-  assert.equal(asked(l).length, 2);
+  assert.equal(asked(l).length, 0);
 
   /* AN HOUR LATER THE SAME ORDER'S NEXT MAIL STILL JOINS, read from what was kept. */
   const shipped = mail({ subject: 'Order #1042 has shipped', name: 'Corner Shop', address: 'orders@corner-shop.example', snippet: 'Your order receipt: EGP 450.00', person: false, needs_reply: false });
