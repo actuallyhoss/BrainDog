@@ -18,7 +18,7 @@ braindog page check invoicing.dog
 ```
 ~~~
 
-A word straight after the kind, as in `code ts`, is refused with a sentence saying the heading goes after a bar. On a phone a code block scrolls inside itself, and it can be reached with the keyboard.
+A word straight after the kind, as in `code ts`, is the language, and a fence that names a language rather than one of the kinds (` ```ts `, ` ```bash `) or names nothing at all is drawn as code too. On a phone a code block scrolls inside itself, and it can be reached with the keyboard.
 
 ## `tree`
 

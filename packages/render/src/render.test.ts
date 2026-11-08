@@ -283,6 +283,16 @@ test('too many cells degrades to a visible fence, and the write is still accepte
   assert.match(toHTML([seg]), /block-degraded/);
 });
 
+test('A FENCE TAGGED WITH A LANGUAGE, OR WITH NOTHING, IS ORDINARY CODE AND IS DRAWN', () => {
+  for (const src of ['```ts\nconst a = 1;\n  b();\n```', '```bash\nls -la\n```', '```Dockerfile\nFROM node\n```', '```\nplain\n```', '```c++\nint x;\n```']) {
+    const [seg] = parse(src);
+    assert.equal(seg?.type === 'block' && seg.kind, 'code', src);
+  }
+  const [ts] = parse('```ts\nconst a = 1;\n  b();\n```');
+  assert.equal(ts?.type === 'block' && ts.heading, 'ts');
+  assert.match(toHTML(parse('```ts\nconst a = 1;\n  b();\n```')), /<pre class="media" data-lang="ts"[^>]*><code>const a = 1;\n  b\(\);<\/code><\/pre>/u);
+});
+
 test('a kind outside the eighteen degrades rather than disappearing', () => {
   const [seg] = parse('```reactor_core | H\nA\n```');
   assert.equal(seg?.type === 'degraded' && seg.code, 'DIALECT_KIND_UNKNOWN');
@@ -307,7 +317,7 @@ test('A CAPITALISED KIND IS TOLD ABOUT ITS CAPITAL, NOT TOLD IT WROTE NO KIND', 
   // And the three sentences that were already right stay right: a word that is not a kind in any
   // case, a fence with no kind at all, and a kind that is spelled correctly and page-bound.
   assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the (thirty-nine|forty|forty-one|forty-two|forty-three) kinds/u);
-  assert.equal(fixFor('```\nA\n```'), 'A fence with no kind is shown as you wrote it.');
+  assert.equal(fixFor('```stat big extra\nA\n```'), 'A fence with no kind is shown as you wrote it.');
   assert.match(fixFor('```table | Open\n```'), /draws a register on a page/u);
 });
 
@@ -1670,7 +1680,8 @@ test('THE LEAD FORM IS A WORD AFTER THE KIND, carried on the figure, and any oth
   assert.equal(big?.type === 'degraded' && big.code, 'DIALECT_KIND_UNKNOWN');
   assert.match(big?.type === 'degraded' ? big.fix : '', /Write "stat" or "stat lead"/u);
   const code = parse('```code ts\nx\n```')[0];
-  assert.match(code?.type === 'degraded' ? code.fix : '', /takes no word after it/u);
+  assert.equal(code?.type === 'block' && code.kind, 'code', 'the word after code is its language');
+  assert.equal(code?.type === 'block' && code.heading, 'ts');
 });
 
 test('A SPARKLINE ROW IS A LABEL, A LINE AND ITS FIGURE, and under two points it is the figure only', () => {

@@ -297,6 +297,29 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     const kind = written.toLowerCase();
 
     const spec = kindSpec(kind, opts.kinds);
+
+    /* A FENCE THAT NAMES NO KIND OF OURS IS ORDINARY CODE: ` ```ts `, ` ```bash `, ` ```dockerfile `, or no word at all.
+       A skill or a project note carries code the way every README does, and telling its author that "ts" is not one of
+       the forty-three kinds sent them to fix a fence that was right, and counted it as a fault on the page. It is drawn
+       as a `code` block, the word kept as its language. What still degrades is a fence that reads as a block of ours
+       gone wrong: a pack's kind not installed, a word with a `|` heading after it, or a kind word with more after it. */
+    if (!spec && !isPackKind(kind) && !info.includes('|')) {
+      const first = (info.split(/\s+/)[0] ?? '').toLowerCase();
+      if (!kindSpec(first, opts.kinds) && !isPackKind(first)) {
+        out.push({
+          type: 'block',
+          kind: 'code' as BlockKind,
+          ...(info ? { heading: info.split(/\s+/)[0]! } : {}),
+          rows: body.map((line) => ({ cells: [line] })),
+          raw,
+          start,
+          end,
+        });
+        i = close;
+        continue;
+      }
+    }
+
     if (!spec) {
       out.push({
         type: 'degraded',
@@ -380,11 +403,13 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     }
 
     /* A FORM IS A WORD THE KIND NAMES, and any other word degrades with the forms there are. Before
-       forms existed a second word matched nothing and was told the fence had no kind; `code ts`
-       still degrades, now saying where the heading goes. */
+       forms existed a second word matched nothing and was told the fence had no kind. */
     const form = parsed?.groups?.form;
     const forms = spec.forms ?? [];
-    if (form !== undefined && !forms.includes(form)) {
+    /* `code ts` IS CODE IN TYPESCRIPT, and it is drawn now that ` ```ts ` is: the word is the language, the same label a
+       bare language fence carries, and a heading after a `|` still wins it. */
+    const lang = kind === 'code' && form !== undefined ? form : undefined;
+    if (form !== undefined && lang === undefined && !forms.includes(form)) {
       out.push({
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
@@ -403,7 +428,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     // The heading half is row-split like a row, so a trailing tone word there is the BLOCK's tone.
     const headingCells = splitRow(parsed?.groups?.heading ?? '');
     const headTone = takeTone(headingCells, { cells: 1, tone: true });
-    const heading = headTone.cells.filter((c) => c !== '').join(' | ') || undefined;
+    const heading = headTone.cells.filter((c) => c !== '').join(' | ') || lang;
 
     const { rows, over } = readRows(kind, spec, body);
     if (over) {
@@ -494,7 +519,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
       type: 'block',
       /* `kindSpec` answered, so the name is one of the forty-three or an installed `block.<id>`. */
       kind: kind as BlockKind,
-      ...(form ? { form } : {}),
+      ...(form && lang === undefined ? { form } : {}),
       ...(heading ? { heading } : {}),
       ...(headTone.tone ? { tone: headTone.tone } : {}),
       rows: ordered,
