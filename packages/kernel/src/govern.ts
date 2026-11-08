@@ -3713,6 +3713,9 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
 
   if (row.body_kind === 'options') {
     const ids = ((body.options ?? []) as { id?: string }[]).map((o) => o.id).filter((x): x is string => typeof x === 'string');
+    /* "NOT MINE" ON A QUESTION ABOUT DIGITS ASKED BEFORE IT WAS OFFERED (`NOT_MINE` in `ingest.ts`): the owner saying
+       a card is somebody else's is an answer to every such question, whatever options it was asked with. */
+    if (typeof body.cause === 'string' && body.cause.startsWith('tail:') && !ids.includes('not_mine')) ids.push('not_mine');
     if (!ids.includes(option))
       return no<Decided>('ENUM_VALUE_UNKNOWN', `${option} is not one of the options on ${id}.`, {
         at: 'option',

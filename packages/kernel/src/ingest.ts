@@ -2144,6 +2144,12 @@ function readFields(deps: IngestDeps, matched: IngestDecl, body: string, text: s
 /** The answer that says none of the accounts offered is the one. */
 export const NONE = 'none';
 
+/**
+ * The answer that says the digits are somebody else's: a card or account the owner does not hold. It stands for good,
+ * whatever is added later, and every text for those digits is set aside without a question (`notMineTail`).
+ */
+export const NOT_MINE = 'not_mine';
+
 /** The most accounts a tail question offers, the ones with no digits first. */
 const TAIL_OPTIONS_MOST = 12;
 
@@ -2228,12 +2234,32 @@ function tailOptions(deps: Pick<IngestDeps, 'sql' | 'schemaOf' | 'nowMs'>, tail:
       ...(r.id === suggested ? { recommended: true as const } : {}),
     })),
     {
+      id: NOT_MINE,
+      label: 'Not mine',
+      because: `The ${tail.says} ending ${tail.digits} is someone else's. Its texts are set aside from now on, nothing is filed and nothing is asked.`,
+    },
+    {
       id: NONE,
       label: 'None of these',
       because: `They keep waiting, and the ${tail.says} ending ${tail.digits} is not asked about again until a new ${one} is added.`,
     },
   ];
 }
+
+/**
+ * Whether the owner said the digits are not theirs: the latest answered question about this list, field and digits was
+ * answered "Not mine". The latest only, so a later answer naming an account is the one that stands.
+ */
+function notMineTail(sql: Sql, key: TailKey): boolean {
+  const last = sql.one<{ id: string }>(
+    `SELECT id FROM suggestion WHERE status = 'resolved' AND resolved_as = 'addressed' AND ${SAME_TAIL} ORDER BY rowid DESC LIMIT 1`,
+    ...keyOf(key),
+  );
+  return last !== undefined && settledAnswer(sql, last.id) === NOT_MINE;
+}
+
+/** What a text for digits that are not the owner's is set aside with, in his words. */
+const notMineSaid = (says: string, digits: string): string => `You said the ${says} ending ${digits} is not yours, so this was set aside and nothing was filed.`;
 
 /** What a held arrival brings to its tail question. */
 type Holding = {
@@ -2275,6 +2301,14 @@ function holdTail(deps: IngestDeps, h: Holding): Arrived {
   const cause = tailCause(asked.register, asked.by, asked.digits);
   const named = h.suggested === null ? null : rowTitle(deps.sql, asked.register, h.suggested);
   const held = { raw: h.raw, ingest: h.matched.ingest, state: 'review' as const, wrote: [], confidence: 'needs-review' as const };
+
+  /* NOT HIS, FOR GOOD: set aside with no question and nothing waiting, whatever accounts were added since. */
+  if (notMineTail(deps.sql, asked)) {
+    const reason = notMineSaid(asked.says, asked.digits);
+    h.store('skipped', reason);
+    h.note('match', `ingest:${h.matched.ingest}`, `inbox_raw:${h.raw}`, 'inbox_raw', 'skipped');
+    return { raw: h.raw, ingest: h.matched.ingest, state: 'skipped', wrote: [], reason };
+  }
 
   const declined = declinedTail(deps.sql, asked);
   if (declined !== null) {
@@ -2575,6 +2609,21 @@ function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown
 
   if (a.option === NONE) {
     keep({ applied: { none: true, at, resolve } });
+    return ok(null);
+  }
+  /* "NOT MINE": what waited under the question is set aside, never filed, and later texts are too (`notMineTail`). */
+  if (a.option === NOT_MINE) {
+    const raws = Array.isArray(body.raws) ? (body.raws as unknown[]).filter((r): r is string => typeof r === 'string') : [];
+    if (raws.length)
+      deps.sql.exec(
+        "UPDATE inbox_raw SET state = 'skipped', reason = ? WHERE id IN (SELECT value FROM json_each(?)) AND state IN ('review', 'proposed', 'untriaged')",
+        notMineSaid(tail.says, tail.digits),
+        JSON.stringify(raws),
+      );
+    /* A QUESTION ASKED BEFORE "NOT MINE" WAS OFFERED gets the option written on it, so the answer reads in words. */
+    const offered = Array.isArray(body.options) ? (body.options as { id?: unknown }[]) : [];
+    const options = offered.some((o) => o?.id === NOT_MINE) ? offered : [...offered, { id: NOT_MINE, label: 'Not mine', because: `The ${tail.says} ending ${tail.digits} is someone else's.` }];
+    keep({ options, applied: { not_mine: true, at, resolve }, said: `The ${tail.says} ending ${tail.digits} is someone else's. Its texts are set aside from now on.` });
     return ok(null);
   }
   const rows = liveRows(deps.sql, tail.register);
