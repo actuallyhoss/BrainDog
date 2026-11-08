@@ -3,6 +3,7 @@
  * carries the slogan) and the 404. Which pages the header, the footer and the 404 list is `nav.ts`'s.
  */
 import { LAUNCH } from '../launch.ts';
+import { TABLE } from '../plans.ts';
 
 export const shell = {
   product: 'BrainDog',
@@ -19,7 +20,7 @@ export const shell = {
         'Press ⌘J and ask in plain words. Slash answers from your own numbers and makes the changes you ask for, with an undo.',
     },
     pricing: {
-      title: 'Pricing: free to start · BrainDog',
+      title: LAUNCH.billing ? `BrainDog pricing: free to start, Cloud from ${TABLE.hosted.price.month} a month` : 'Pricing: free to start · BrainDog',
       description: LAUNCH.billing
         ? 'Free to start with 3 connected agents. Cloud and Cloud Plus add more agents, more questions and, on Cloud Plus, your team.'
         : 'BrainDog is free to start: every feature, 3 connected agents and 20 questions to the built-in assistant a ' +
@@ -35,17 +36,23 @@ export const shell = {
       description: 'There is no page at this address on brain.dog.',
     },
     legal: {
-      title: 'Legal · BrainDog',
-      description: 'The licence BrainDog is published under, and its Terms of Service and Privacy Policy.',
+      title: 'Legal: licence, terms and privacy · BrainDog',
+      description: 'The licence BrainDog is published under, its Terms of Service, its Privacy Policy and the Data Processing Addendum for a business.',
     },
     download: {
-      title: 'Download BrainDog for Windows and the web',
-      description: 'Get BrainDog for Windows from the Microsoft Store, use it in any browser on any device, or install the command line for your agents.',
+      title: 'Download BrainDog for Windows, iPhone and the web',
+      description: 'BrainDog for Windows from the Microsoft Store and for iPhone from the App Store, in any browser on any device, and the command line for your agents.',
     },
     changelog: {
-      title: 'Changelog · BrainDog',
-      description: 'Everything that shipped in BrainDog, day by day.',
+      title: 'BrainDog changelog: what shipped, day by day',
+      description: 'Everything that shipped in BrainDog, day by day: the app, the tools your agents use, plugins and fixes. Also as a feed you can follow.',
     },
+  },
+
+  /** The download page's head: its name and the line under it, which its shared card prints too. */
+  downloadHead: {
+    title: 'Download BrainDog',
+    lead: "The same record on every device, so your work and your agents' work come with you.",
   },
 
   /* One label per page `nav.ts` knows, by the same key, plus the header's own words. */

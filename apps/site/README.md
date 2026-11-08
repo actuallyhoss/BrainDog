@@ -8,6 +8,7 @@ present tense and ships with that product.
 pnpm dev              # http://localhost:5184
 pnpm build            # -> build/, one directory of static files
 node scripts/shot.mjs # screenshots of the built site, both schemes
+node scripts/product.mjs  # the shared cards, static/shots/og-*.png, from seo.ts
 ```
 
 ## How it is built
@@ -26,9 +27,9 @@ node scripts/shot.mjs # screenshots of the built site, both schemes
 - **One list of pages.** `src/lib/nav.ts` names every page in order, and a page shows only once its
   route folder exists. The header, the footer, the 404 and `/sitemap.xml` all read it.
 - **No photographs.** The product is drawn in HTML and CSS from the seed each starter installs, and
-  `test/content.test.ts` fails if a `<picture>` or an `<img>` reaches the home page. The one capture
-  is the shared card, `static/shots/home-light.png`, which `scripts/product.mjs` draws out of the
-  built home page.
+  `test/content.test.ts` fails if a `<picture>` or an `<img>` reaches the home page. The only pictures
+  are the shared cards, `static/shots/og-*.png`, one per key page, which `scripts/product.mjs` draws in the
+  hero's style from each page's headline (`CARDS` in `src/lib/site/seo.ts`).
 
 ## The flags
 

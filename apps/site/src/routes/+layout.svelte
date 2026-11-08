@@ -14,7 +14,7 @@
   it; without scripting it is a native disclosure that opens and closes on its own 44px button, and a link inside it
   loads the next page anyway.
 
-  `header .brand` is read by `scripts/product.mjs`, which draws the shared card from the built home page.
+  The shared cards (`scripts/product.mjs`) draw the same mark and name, from the same mark data.
 -->
 <script lang="ts">
   import '@braindog/skin/tokens.css';

@@ -6,7 +6,7 @@
  * ONE FILE AND ONE READER. `static/shots/` held 33 captures on 22 September and the built site named
  * 9; the next day the screenshots on the home page were ruled out because they looked terrible,
  * and the home page stopped drawing any. What is left is the link preview,
- * `home-light.png`, which `app.html` names as the `og:image`. Deleting the files by hand fixes that
+ * the cards `lib/site/seo.ts` names as each page's `og:image`, `og-home.png` first. Deleting the files by hand fixes that
  * once; the next run of a capture script puts them straight back, which is why the scripts are held
  * to the page here too.
  *
@@ -75,19 +75,17 @@ test('every capture the site names is in static/shots', () => {
 test('product.mjs writes nothing the site does not name', async () => {
   const names = referenced();
   const writes = await productWrites();
-  assert.ok(writes.includes('home-light.png'), 'product.mjs does not write each card `CARD_PATHS` names under `cardOf`, the home card first');
+  assert.ok(writes.includes('og-home.png'), 'product.mjs does not write each card `CARD_PATHS` names under `cardOf`, the home card first');
   assert.deepEqual(writes.filter((f) => !names.has(f)), []);
 });
 
-test('product.mjs draws the card from the site build and not from the record app', () => {
-  /* ON 23 SEPTEMBER IT COULD NOT RUN AT ALL. It looked for `apps/web/build/index.html`, and the
-     record app now builds under `apps/web/build/app/`, so the run printed "no record-app build" and
-     exited 1 with the app freshly built beside it. The card is made of the site's own mark, face and
-     palette, so the site's build is the one it reads, and it starts no record and forwards no
-     `/api` because nothing on the card is a read of one. */
+test('product.mjs draws each card from the site\'s words and not from a capture', () => {
+  /* ON 23 SEPTEMBER IT COULD NOT RUN AT ALL: it looked for the record app's build. On 8 November the cards stopped
+     being the built page's head shrunk to fit and became a drawing in the hero's style, from `seo.ts`'s words, the
+     mark and `static/fonts`, so it reads no build, starts no record and photographs no page. */
   const text = readFileSync(join(import.meta.dirname, 'product.mjs'), 'utf8');
-  assert.match(text, /const ROOT = join\(import\.meta\.dirname, '\.\.', 'build'\);/, 'product.mjs does not read apps/site/build');
-  assert.doesNotMatch(text, /'web',\s*'build'/, 'product.mjs reads the record app build again');
+  assert.match(text, /cardFor\(path\)/, 'product.mjs does not draw from `cardFor` in seo.ts');
+  assert.doesNotMatch(text, /'build'/, 'product.mjs reads a build again');
   assert.doesNotMatch(text, /tools\/gates\/record\.mjs|startRecord/, 'product.mjs starts a record again');
 });
 
@@ -96,7 +94,7 @@ test('the link preview is a 1200 by 630 card and not a capture of the app', () =
      288 KB, which is a screenshot of the app under another name. 1200 by 630 is the size the Open
      Graph card is drawn at, and a drawing made to that size is the only thing that is. The width
      and height are the IHDR chunk's, bytes 16 to 24 of any PNG. */
-  const png = readFileSync(join(SHOTS, 'home-light.png'));
+  const png = readFileSync(join(SHOTS, 'og-home.png'));
   assert.equal(png.subarray(1, 4).toString('latin1'), 'PNG');
   assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630]);
 });

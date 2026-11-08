@@ -24,8 +24,8 @@
    * No close after them: the free tile is the last ask.
    *
    * EVERY PAGE READS WITH SCRIPTING OFF. Every band's content is in the prerendered HTML, and a control that only a
-   * script can work is drawn once it runs. `scripts/product.mjs` reads `section.hero`, `#hero-title` and `.sub` here
-   * for the social picture, so those three stay.
+   * script can work is drawn once it runs. The shared card (`scripts/product.mjs`) prints the hero's title and sub from
+   * `home.hero`, as this page does.
    *
    * EVERY WORD IS IN `lib/copy/home.ts`; the names and figures in the drawings are `lib/demo/maya.ts`. The title and
    * description are `copy/shell.ts`.

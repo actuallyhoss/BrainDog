@@ -15,7 +15,7 @@
   import { application, crumbsOf } from '$lib/site/seo.ts';
 
   const ld = [
-    { ...application, operatingSystem: 'Web, Windows', downloadUrl: WINDOWS_STORE, installUrl: WINDOWS_STORE },
+    { ...application, downloadUrl: WINDOWS_STORE, installUrl: WINDOWS_STORE },
     crumbsOf([
       { name: 'BrainDog', path: '/' },
       { name: 'Download', path: '/download' },
@@ -45,7 +45,7 @@
   {/if}
 {/snippet}
 
-<PageHead title="Download BrainDog" lead="The same record on every device, so your work and your agents' work come with you.">
+<PageHead title={site.downloadHead.title} lead={site.downloadHead.lead}>
   <div class="here">
     <p class="said">
       {#if device && mine?.href}

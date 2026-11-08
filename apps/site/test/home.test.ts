@@ -109,7 +109,7 @@ test('the built home page has one h1, the headline', when(NO_BUILD), () => {
   const h1s = [...page().matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)];
   assert.equal(h1s.length, 1, 'one h1');
   assert.equal(text(h1s[0]![1]!).trim(), 'Your agents keep track. You make the calls.');
-  assert.match(h1s[0]![0], /\bid="hero-title"/, 'the h1 is #hero-title, which scripts/product.mjs reads');
+  assert.match(h1s[0]![0], /\bid="hero-title"/, 'the h1 is #hero-title');
 });
 
 test('the hero is section.hero with the headline and the .sub sentence', when(NO_BUILD), () => {

@@ -25,8 +25,8 @@
 /_app/immutable/*
   Cache-Control: public, max-age=31536000, immutable
 
-# The one file here is the link-preview card, which `scripts/product.mjs` redraws under the same
-# name, so a browser keeps it for a day and refreshes it in the background for a week after.
+# The files here are the link-preview cards, which `scripts/product.mjs` redraws under the same
+# names, so a browser keeps one for a day and refreshes it in the background for a week after.
 /shots/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 
