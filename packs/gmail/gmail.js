@@ -30,9 +30,9 @@
  *     its update, and that asks you something: a question or a request. A forward with nothing asked by whoever
  *     forwarded it is for your information. ONE QUESTION A THREAD: a newer mail in a thread whose question still waits
  *     joins it, and a thread asks again only after you replied or answered.
- *   - A BILL OR A RECEIPT once for each order or invoice, with the amount first. Two mails with the same order or
- *     invoice number, or the same amount within ten days from one sender or a payment service (a PayPal receipt and the
- *     invoice it pays), are one.
+ *   - A BILL once for each order or invoice, with the amount first. Two mails with the same order or invoice number,
+ *     or the same amount within ten days from one sender or a payment service (a PayPal receipt and the invoice it
+ *     pays), are one. A RECEIPT IS NEVER ASKED ABOUT (1.3.2): it is kept with your money, as below.
  *   - A DATE only for a person's mail that names a day, never for an invitation or a mail about an event already on
  *     your calendar (the Calendar add-on asks about those), and once a thread.
  *   - MANY AT ONCE: the first look at your mail, or any hour that would ask more than five questions, asks one question
@@ -50,6 +50,9 @@
  *   - "ADD IT TO MONEY" ADDS THE LINE, with the amount and the seller the mail names, on the account that paid that
  *     seller last or the one account kept in that currency; "Not a receipt" or "Not a bill" is remembered for that
  *     account (an ad account's number) or that sender, and never asked again.
+ *   - A RECEIPT NOT ON YOUR LEDGER IS ADDED AS "ADD IT TO MONEY" ADDS IT (1.3.2), with no question, once three days have
+ *     passed for your bank's own line to arrive; if that line comes first, the receipt is kept with it instead. Undo
+ *     takes the added line back.
  *
  * IT NEVER TOUCHES GMAIL, and it never answers, files or deletes a mail. Only you act on what it asks.
  */
@@ -215,6 +218,9 @@ const MOST = 200;
 /* WHAT "LATELY" IS: the two weeks the door keeps, for being of use and for one order's two mails. */
 const WINDOW_DAYS = 14;
 const SAME_ORDER_DAYS = 10;
+/* HOW LONG A RECEIPT WAITS FOR YOUR BANK'S OWN LINE before it is added to Money itself (1.3.2): a card charge reaches
+   the Ledger a day or two after its receipt, and the receipt is then kept with that line rather than added twice. */
+const RECEIPT_WAITS_DAYS = 3;
 /* MORE QUESTIONS THAN THIS IN ONE HOUR ARE ASKED AS ONE. */
 const FLOOD = 5;
 
@@ -499,6 +505,8 @@ export default async function run(ctx) {
     const money = moneyOf(amountOf(`${f.amount ?? ''} ${f.subject ?? ''} ${f.snippet ?? ''}`));
     if (money === null) continue;
     const already = lineFor(f, ledgerNow);
+    /* A RECEIPT NOBODY PRESSED ADD ON waits for the bank's line its first days, and is kept with it if it comes. */
+    if (already === null && f.answered !== true && daysApart(dayOf(f), today) < RECEIPT_WAITS_DAYS) continue;
     if (already !== null) {
       ctx.update(spoken('gmail_mail', row), { add: false, line: spoken('transactions', already) });
       continue;
@@ -798,7 +806,15 @@ export default async function run(ctx) {
     }
     const who = nameIn(f.name) ?? (registrable(f.address) ? orgName(registrable(f.address)) : lower(f.address));
     const word = kind === 'bill' ? 'bill' : 'receipt';
-    set(row, kind, { says: amount ? `${amount.said} ${word} from ${who}` : `A ${word} from ${who}` });
+    const says = amount ? `${amount.said} ${word} from ${who}` : `A ${word} from ${who}`;
+    /* A RECEIPT IS ALWAYS KEPT WITH YOUR MONEY, AND NEVER ASKED ABOUT (1.3.2): "Keep it with your money?" had one
+       answer. It is added to Money as "Add it to Money" adds it, once your bank's line has had its days to come, and
+       the line it adds is undone like any other. A bill is still asked about: it is money you have not paid yet. */
+    if (kind === 'receipt') {
+      set(row, 'none', { says, add: true });
+      continue;
+    }
+    set(row, kind, { says });
     asks.set(row.id, kind);
   }
 

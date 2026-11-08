@@ -1,10 +1,10 @@
 /**
  * Paydays in Money: a repeating line's days of the month and its rule for a rest day, Money's rest
- * days, the leg that hands both to the walk, and the one question about lines on a month's last day.
+ * days, the leg that hands both to the walk, and the lines on a month's last day decided without a question.
  *
  * RED FIRST: with `day_of_month` and `weekend` out of `lists/recurring.ts`, the first test fails on the fields and the
  * create is refused; with `days` and `weekend` off the leg in `legs.ts`, the walk tests read the 1st and the 15th and
- * the Friday; with the 31st or the cadence check out of `scripts/last-day.js`, the question counts four lines.
+ * the Friday; with the 31st or the cadence check out of `scripts/last-day.js`, the script decides four lines.
  */
 
 import { test } from 'node:test';
@@ -22,9 +22,8 @@ import { readCashAhead } from './money-walk-page.ts';
 /* THE SCRIPT IS PLAIN JAVASCRIPT, run in a sandbox as written, so it is imported by its URL and typed here by hand. */
 type Row = { id: string; seq: number; version: number; fields: Record<string, unknown> };
 type Ctx = { input: Record<string, unknown> | null; record: { list: (register: string, where: unknown) => Promise<Row[]> }; update: (id: string, fields: Record<string, unknown>, version: number) => void; log: (line: string) => void };
-type Asked = { ask: { cause: string; question: string; about: string; options: { label: string; patches: { id: string; version: number; fields: Record<string, unknown> }[] }[] } };
 const script = (await import(new URL('../src/modules/money/scripts/last-day.js', import.meta.url).href)) as {
-  default: (ctx: Ctx) => Promise<Asked | { filled: number } | null>;
+  default: (ctx: Ctx) => Promise<{ filled: number; last?: number; date?: number } | null>;
   LAST_DAY_SCRIPT: Record<string, unknown> & { source: string };
 };
 
@@ -151,20 +150,25 @@ const HIS = (): Row[] =>
     line('Hosting', '2026-09-15'),
   ].map((fields, i) => ({ id: `r${i + 1}`, seq: i + 1, version: 1, fields }));
 
-test('a record with three lines on a month end is asked once, in one question, and a record with none is asked nothing', async () => {
-  const out = (await script.default(ctxOver(HIS()).ctx)) as Asked;
-  assert.equal(out.ask.question, '3 repeating lines fall on the last day of their month. Is each the last day, or that date?');
-  assert.equal(out.ask.cause, 'money.last-day');
-  assert.equal(out.ask.about, 'Salary, 30 September; Consulting, 28 February; Rent from the flat, 30 June');
-  assert.deepEqual(out.ask.options.map((o) => o.label), ['The last day', 'That date']);
-
-  const one = HIS().filter((r) => r.fields.what !== 'Consulting' && r.fields.what !== 'Rent from the flat');
-  assert.equal(((await script.default(ctxOver(one).ctx)) as Asked).ask.question, '1 repeating line falls on the last day of its month. Is it the last day, or that date?');
+test('lines on a month end are decided and never asked about: a yearly line or one with no history keeps its date, one paid on two month ends moves with them', async () => {
+  const rows = [
+    ...HIS(),
+    { id: 'r9', seq: 9, version: 1, fields: line('Retainer', '2026-11-30', { started: '2026-04-30', last_paid: '2026-10-31' }) },
+    { id: 'r10', seq: 10, version: 1, fields: line('Domain', '2027-02-28', { every: 'yearly', started: '2025-02-28', last_paid: '2026-02-28' }) },
+    { id: 'r11', seq: 11, version: 1, fields: line('Metered bill', '2026-11-30', { last_paid: '2026-10-30' }) },
+  ];
+  const { ctx, writes } = ctxOver(rows);
+  assert.deepEqual(await script.default(ctx), { filled: 6, last: 1, date: 5 });
+  assert.deepEqual(
+    writes.map((w) => [w[0], w[1].day_of_month]),
+    [['recurring#1', '30'], ['recurring#2', '28'], ['recurring#3', '30'], ['recurring#9', 'last'], ['recurring#10', '28'], ['recurring#11', '30']],
+  );
+  assert.equal(await script.default(ctxOver(rows).ctx), null, 'a line that holds its days is decided again');
   const none = HIS().filter((r) => !['Salary', 'Consulting', 'Rent from the flat'].includes(String(r.fields.what)));
   assert.equal(await script.default(ctxOver(none).ctx), null);
 });
 
-test('the answer fills each line, the last day or that date, and the next run asks nothing', async () => {
+test('an answer to a question asked before fills each line still open, the last day or that date', async () => {
   for (const [answer, filled] of [
     ['The last day', ['last', 'last', 'last']],
     ['That date', ['30', '28', '30']],
@@ -173,7 +177,7 @@ test('the answer fills each line, the last day or that date, and the next run as
     const { ctx, writes } = ctxOver(rows, { answer });
     assert.deepEqual(await script.default(ctx), { filled: 3 });
     assert.deepEqual(writes.map((w) => [w[0], w[1].day_of_month]), [['recurring#1', filled[0]], ['recurring#2', filled[1]], ['recurring#3', filled[2]]]);
-    assert.equal(await script.default(ctxOver(rows).ctx), null, `${answer}: asked again after the answer`);
+    assert.equal(await script.default(ctxOver(rows).ctx), null, `${answer}: decided again after the answer`);
   }
   const { ctx, writes } = ctxOver(HIS(), { answer: 'Both' });
   assert.equal(await script.default(ctx), null);
@@ -184,15 +188,17 @@ test('the declaration carries the script as a sandbox runs it, Repeating its onl
   const d = script.LAST_DAY_SCRIPT;
   assert.deepEqual([d.script, d.pack, d.runs, d.reads, d.writes, d.egress, d.keys], ['last_day', 'money-core', { every: '1d', rule: true }, ['recurring'], ['recurring'], [], []]);
   const alone = (await import(`data:text/javascript,${encodeURIComponent(d.source)}`)) as typeof script;
-  assert.equal(((await alone.default(ctxOver(HIS()).ctx)) as Asked).ask.options[1]?.patches.length, 3);
+  assert.deepEqual(await alone.default(ctxOver(HIS()).ctx), { filled: 3, last: 0, date: 3 });
 });
 
 test('the script asks a real record what it asks the one held here: its filter reads, and only live lines monthly or longer come back', async () => {
   const k = await moneyCore();
   for (const r of HIS()) value(k.create('recurring', r.fields, OWNER));
   const rows = value<{ rows: Row[] }>(k.list({ register: 'recurring', where: LISTED as never })).rows;
-  const ctx: Ctx = { input: null, record: { list: async () => rows }, update: () => {}, log: () => {} };
-  assert.deepEqual(((await script.default(ctx)) as Asked).ask.about.split('; ').toSorted(), ['Consulting, 28 February', 'Rent from the flat, 30 June', 'Salary, 30 September']);
+  const decided: string[] = [];
+  const ctx: Ctx = { input: null, record: { list: async () => rows }, update: (id) => void decided.push(String(rows.find((r) => `recurring#${r.seq}` === id)?.fields.what)), log: () => {} };
+  await script.default(ctx);
+  assert.deepEqual(decided.toSorted(), ['Consulting', 'Rent from the flat', 'Salary']);
   assert.ok(!rows.some((r) => r.fields.every === 'weekly' || r.fields.state !== 'live'), 'the filter let a weekly or paused line through');
 });
 

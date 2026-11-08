@@ -2571,8 +2571,66 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.3.1",
+      "latest": "1.3.2",
       "versions": [
+        {
+          "version": "1.3.2",
+          "checksum": "0f7c2ee99177392407842b4ce1206b2d750a3722cff4c8d372f0dee08640b35a",
+          "bytes": 94016,
+          "published_at": "2026-11-08T16:04:11.991Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Mail"
+            ],
+            "pages": [
+              "Mail"
+            ],
+            "rules": [
+              "Ask about a mail a person is waiting on your reply to",
+              "Ask about a mail that looks like a bill",
+              "Ask about a mail that looks like a receipt",
+              "Ask about a mail from a person with a date in it",
+              "Ask once about many mails at a time",
+              "Take a mail you replied to off Waiting on your reply",
+              "Take a mail that needs no reply off Waiting on your reply",
+              "Clear a mail you said is not a bill",
+              "Clear a mail you said is not a receipt",
+              "Add a receipt you said to add to Money",
+              "Leave the mails you said to leave"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Mail",
+              "Waiting on your reply"
+            ],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": true
+              },
+              {
+                "id": "register.organisations",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "A receipt is no longer a question: one already on your Ledger is kept with that line, and one that is not is added to Money after three days for your bank's own line to arrive, with Undo. Bills, replies and dates are asked about as before.",
+          "preview": true
+        },
         {
           "version": "1.3.1",
           "checksum": "bd0615fad0139c8d0390f7610bbc356eaeac81861384895d0d2d72a17cfbe94d",

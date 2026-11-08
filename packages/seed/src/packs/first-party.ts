@@ -1006,6 +1006,10 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   not spending". A comma ends a clause, so the record could not read a sentence about the name it prints.
  * - money-core 3.38.7 (5 Nov, going public): a script's comments and notes say an invented bill and an invented plan where
  *   they named real ones. Nothing a record does changes.
+ * - money-core 3.38.8 (8 Nov, the owner: obvious questions are not questions): `script.learn_category` makes the filing
+ *   rule at once, with Undo, for a payee he filed under one category by hand three times and never another, and asks
+ *   only otherwise; `script.last_day` decides each month-end line itself, a yearly one or one with no history on its
+ *   date and one paid on two different month ends on the last day, and asks nothing. Only the scripts' source moved.
  * - people 4.7.0 (fin-people1104, 3 Nov, the owner: "instead of just long text, i want them to be parsed as fields ... his
  *   name should be a field, discord username a field"): `register.people` gains a field for each fact a note used to
  *   say (`legal_name`, `goes_by`, `relation`, `titles`, `about`, `nationality`, `country`, `city`, `timezone`, `birthday`,
@@ -1032,7 +1036,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.31.2',
   people: '4.7.2',
-  'money-core': '3.38.7',
+  'money-core': '3.38.8',
   estate: '2.8.1',
   work: '1.26.2',
 };

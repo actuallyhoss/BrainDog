@@ -131,15 +131,16 @@ test('A FIRST LOOK WITH SEVEN QUESTIONS, TWO INVITATIONS, AN FYI AND A NEWSLETTE
   close();
 });
 
-test('ONE ORDER IS ONE QUESTION, WITH THE AMOUNT FIRST', async () => {
+test('A RECEIPT IS NEVER A QUESTION: ONE ORDER IS KEPT WITH YOUR MONEY ONCE, AMOUNT FIRST', async () => {
   const { api, sql, clock, close } = await fresh();
   await arrive(api, body({ subject: 'Order #1042 received', name: 'Corner Shop', address: 'orders@corner-shop.example', snippet: 'Thanks for your order. Total: EGP 450.00', person: false, reply: false }));
   await arrive(api, body({ subject: 'Order #1042 finished', name: 'Corner Shop', address: 'orders@corner-shop.example', snippet: 'Your order is complete. Total: EGP 450.00', person: false, reply: false }));
   await hour(api, clock);
   const asked = cards(api, sql);
-  assert.equal(asked.length, 1, asked.join(' | '));
-  assert.match(asked[0]!, /^EGP 450\.00 receipt from Corner Shop: Order #1042 received\. Keep it with your money\? https:\/\/mail\.google\.com\//u);
-  /* AND THE MAIL PAGE COUNTS ONE ORDER ONCE. */
+  assert.deepEqual(asked, [], asked.join(' | '));
+  /* THE ONE ORDER WAITS TO BE ADDED, and the Mail page counts it once. */
+  const adding = sql.all<{ says: string }>("SELECT json_extract(fields, '$.says') AS says FROM entry WHERE register = 'gmail_mail' AND json_extract(fields, '$.add') = 1");
+  assert.deepEqual(adding.map((r) => r.says), ['EGP 450.00 receipt from Corner Shop']);
   assert.equal(await figure(api, 'gmail-to-look'), 1);
   close();
 });
@@ -158,7 +159,7 @@ test('THE UPDATE FROM 1.1.1 LOSES NOTHING AND REACHES NOTHING NEW, so the night 
   assert.deepEqual(reachesNew(diff as never), [], 'the update would run something new');
   assert.deepEqual((diff as unknown as { conflicts: unknown[] }).conflicts, []);
   await put(api, SHIPPED());
-  assert.equal(sql.one<{ version: string }>("SELECT version FROM pack WHERE id = 'gmail'")?.version, '1.3.1');
+  assert.equal(sql.one<{ version: string }>("SELECT version FROM pack WHERE id = 'gmail'")?.version, '1.3.2');
   /* A BILL KEPT BEFORE 1.2.0 SAID WHAT IT ASKS IS STILL COUNTED: it holds no ask at all. */
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.kind', 'bill') WHERE register = 'gmail_mail'");
   assert.equal(await figure(api, 'gmail-to-look'), 1);
