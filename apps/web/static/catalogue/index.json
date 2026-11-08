@@ -12942,8 +12942,37 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "founder",
-      "latest": "3.10.0",
+      "latest": "3.10.1",
       "versions": [
+        {
+          "version": "3.10.1",
+          "checksum": "484f0426251eba5a3b5b8a3cdaa6b0e136ff956dfcd14adc9f732e6fd51acd0b",
+          "bytes": 45391,
+          "published_at": "2026-11-08T16:13:07.842Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core",
+              "estate",
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Founder overview",
+              "Dashboard",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "datapoint-reporter",
+              "poll-setup"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "3.10.0",
           "checksum": "1b3cbe23b2de7cecb7d764adea7b1e71895c953e619aaef8c02869805e52dde3",
@@ -14967,8 +14996,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "2.31.0",
+      "latest": "2.31.1",
       "versions": [
+        {
+          "version": "2.31.1",
+          "checksum": "f8133528c1c3e2d3712b68ad8680254b350f4e1215e8525adbc1572f70b87ad2",
+          "bytes": 37011,
+          "published_at": "2026-11-08T16:13:07.842Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Sprints",
+              "Sprint plan",
+              "Sprint days"
+            ],
+            "pages": [
+              "Team",
+              "Sprints",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [
+              "ticket_done_ticks_plan",
+              "ticket_reopened_unticks_plan",
+              "cycle_day_each_morning"
+            ],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.31.0",
           "checksum": "690eb492cd350de24dd4971dc04be8c935da7606b5f49920c43031c90469110e",

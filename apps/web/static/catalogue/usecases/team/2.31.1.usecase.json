@@ -1,0 +1,1388 @@
+{
+  "usecase": "team",
+  "version": "2.31.1",
+  "title": "Team board",
+  "summary": "Tickets, sprints and the agents on them.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "team",
+  "tone": "brisk and shared",
+  "signals": [
+    "team",
+    "teams",
+    "my team",
+    "our team",
+    "product team",
+    "engineering team",
+    "product manager",
+    "product managers",
+    "project manager",
+    "pm",
+    "squad",
+    "squads",
+    "enterprise",
+    "department",
+    "colleagues",
+    "teammates",
+    "staff",
+    "sprint",
+    "sprints",
+    "cycle",
+    "cycles",
+    "backlog",
+    "ticket",
+    "tickets",
+    "issues",
+    "jira",
+    "linear",
+    "kanban",
+    "scrum",
+    "standup",
+    "standups",
+    "roadmap",
+    "task list",
+    "assignees",
+    "agents",
+    "our agents",
+    "agentic"
+  ],
+  "modules": [
+    "portfolio",
+    "people",
+    "work"
+  ],
+  "voice": {
+    "home": "Team",
+    "right_now": "In flight",
+    "needs_you": "Waiting on a call",
+    "nothing_needs_you": "No call is waiting on you",
+    "since_away": "What the team and its agents did",
+    "lists": "Our things",
+    "working_now": "On it now",
+    "coming_up": "Due soon",
+    "overdue": "Slipping",
+    "nothing_now": "No call is waiting on you right now.",
+    "nothing_waiting": "No call is waiting on you.",
+    "fills_with": "Tickets in flight, calls waiting on you and what the team and its agents did show up here as work moves.",
+    "no_questions": "No call waiting",
+    "inbox_clear": "Triage is clear",
+    "add_first": "File the first one",
+    "pen_waits": "When there is a way to fit this to how the team works, it waits here until you keep it or say no."
+  },
+  "labels": {
+    "tasks": "Tickets",
+    "tasks:one": "ticket",
+    "tasks:holds": "every piece of work the team has, who owns it, how urgent it is and whether an agent took it",
+    "tasks.state.backlog": "Backlog",
+    "tasks.state.open": "To do",
+    "tasks.state.doing": "In progress",
+    "tasks.state.review": "In review",
+    "cycles": "Sprints",
+    "cycle_plan": "Sprint plan",
+    "people": "People",
+    "people:holds": "everyone on the team and everyone it works with, the part each one plays and how to reach them",
+    "people.role.collaborator": "Teammate",
+    "cycle_days": "Sprint days"
+  },
+  "pack": {
+    "pack": "usecase-team",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "register": "cycles",
+        "name": "Sprints",
+        "one": "sprint",
+        "icon": "rows",
+        "holds": "the sprints the team works in, with the dates each runs and what it is for",
+        "title": "name",
+        "mobile": [
+          "name",
+          "state",
+          "ends"
+        ],
+        "state": "state",
+        "done": [
+          "done"
+        ],
+        "fields": [
+          {
+            "id": "name",
+            "label": "Sprint",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "state",
+            "label": "Status",
+            "type": "enum",
+            "values": [
+              "planned",
+              "active",
+              "done"
+            ],
+            "labels": {
+              "planned": "Planned",
+              "active": "Active",
+              "done": "Done"
+            },
+            "default": "planned",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "starts",
+            "label": "Starts",
+            "type": "day",
+            "index": true
+          },
+          {
+            "id": "ends",
+            "label": "Ends",
+            "type": "day",
+            "index": true
+          },
+          {
+            "id": "goal",
+            "label": "Goal",
+            "type": "text"
+          },
+          {
+            "id": "retro",
+            "label": "How it went",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "cycle_plan",
+        "name": "Sprint plan",
+        "one": "planned ticket",
+        "icon": "rows",
+        "holds": "which tickets each sprint takes on, and how many points each one is worth",
+        "title": "what",
+        "steps": {
+          "of": "cycle",
+          "done": "done"
+        },
+        "mobile": [
+          "what",
+          "cycle",
+          "done"
+        ],
+        "fields": [
+          {
+            "id": "what",
+            "label": "Planned",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "task",
+            "label": "Ticket",
+            "type": "ref",
+            "to": "tasks",
+            "index": true
+          },
+          {
+            "id": "cycle",
+            "label": "Sprint",
+            "type": "ref",
+            "to": "cycles",
+            "index": true
+          },
+          {
+            "id": "points",
+            "label": "Points",
+            "type": "int",
+            "min": 0
+          },
+          {
+            "id": "done",
+            "label": "Done",
+            "type": "bool",
+            "default": false,
+            "index": true
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "cycle_days",
+        "name": "Sprint days",
+        "one": "morning count",
+        "icon": "rows",
+        "holds": "how many tickets were still open on each day of a sprint, one row a morning",
+        "title": "day",
+        "mobile": [
+          "day",
+          "open",
+          "cycle"
+        ],
+        "fields": [
+          {
+            "id": "day",
+            "label": "Day",
+            "type": "day",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "open",
+            "label": "Open tickets",
+            "type": "int",
+            "min": 0,
+            "required": true
+          },
+          {
+            "id": "cycle",
+            "label": "Sprint",
+            "type": "ref",
+            "to": "cycles",
+            "index": true
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "metric": "tickets-in-flight",
+        "name": "In flight",
+        "source": "register.tasks",
+        "where": "state is doing or review",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "tickets-blocked",
+        "name": "Blocked",
+        "source": "register.tasks",
+        "where": "state is blocked",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "tickets-due-else",
+        "name": "Else due this week",
+        "source": "register.tasks",
+        "where": "state is not done or dropped, state is not doing or review or blocked, by before +8d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "tickets-planned",
+        "name": "Planned into a sprint",
+        "source": "register.cycle_plan",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "tickets-taken",
+        "name": "Taken by agents",
+        "source": "register.tasks",
+        "where": "agent is set, state is not done or dropped",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "tickets-done-by-agents",
+        "name": "Finished by agents",
+        "source": "register.tasks",
+        "where": "agent is set, state is done",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "rule": "ticket_done_ticks_plan",
+        "pack": "usecase-team",
+        "on": {
+          "written": {
+            "register": "tasks",
+            "op": [
+              "update"
+            ],
+            "fields": [
+              "state"
+            ]
+          }
+        },
+        "when": "state is done",
+        "steps": [
+          {
+            "script": {
+              "id": "plan_follows_ticket",
+              "as": "ticking"
+            }
+          }
+        ]
+      },
+      {
+        "rule": "ticket_reopened_unticks_plan",
+        "pack": "usecase-team",
+        "on": {
+          "written": {
+            "register": "tasks",
+            "op": [
+              "update"
+            ],
+            "fields": [
+              "state"
+            ]
+          }
+        },
+        "when": "state is not done",
+        "steps": [
+          {
+            "script": {
+              "id": "plan_follows_ticket",
+              "as": "unticking"
+            }
+          }
+        ]
+      },
+      {
+        "rule": "cycle_day_each_morning",
+        "pack": "usecase-team",
+        "on": {
+          "every": "1d",
+          "at": "06:00"
+        },
+        "steps": [
+          {
+            "script": {
+              "id": "cycle_day",
+              "as": "counting"
+            }
+          }
+        ]
+      },
+      {
+        "script": "plan_follows_ticket",
+        "title": "Tick a planned ticket when its ticket is done",
+        "pack": "usecase-team",
+        "runs": {
+          "rule": true
+        },
+        "egress": [],
+        "keys": [],
+        "reads": [
+          "tasks",
+          "cycle_plan"
+        ],
+        "writes": [
+          "cycle_plan"
+        ],
+        "source": "export default async function run(ctx) {\n  const ticket = await ctx.record.get(ctx.input.id);\n  if (!ticket) return;\n  const done = ticket.fields.state === 'done';\n  const lines = await ctx.record.list('cycle_plan', { all: [{ field: 'task', is: ticket.id }] });\n  for (const line of lines)\n    if ((line.fields.done === true) !== done) ctx.update('cycle_plan#' + line.seq, { done }, line.version);\n}"
+      },
+      {
+        "script": "cycle_day",
+        "title": "Count the sprint's open tickets each morning",
+        "pack": "usecase-team",
+        "runs": {
+          "rule": true
+        },
+        "egress": [],
+        "keys": [],
+        "reads": [
+          "cycles",
+          "cycle_plan",
+          "cycle_days",
+          "tasks"
+        ],
+        "writes": [
+          "cycle_plan",
+          "cycle_days"
+        ],
+        "source": "export default async function run(ctx) {\n  const today = ctx.today();\n  const cycles = await ctx.record.list('cycles', { all: [{ field: 'state', is: 'active' }] });\n  if (cycles.length === 0) return;\n  const written = await ctx.record.list('cycle_days', { all: [{ field: 'day', is: today }] });\n  if (written.some((d) => !d.fields.cycle)) return;\n  for (const cycle of cycles) {\n    if (written.some((d) => d.fields.cycle === cycle.id)) continue;\n    const lines = await ctx.record.list('cycle_plan', { all: [{ field: 'cycle', is: cycle.id }, { field: 'done', is: false }] });\n    let open = 0;\n    for (const line of lines) {\n      const ticket = line.fields.task ? await ctx.record.get(line.fields.task) : null;\n      if (ticket && ticket.fields.state === 'done') ctx.update('cycle_plan#' + line.seq, { done: true }, line.version);\n      else open++;\n    }\n    ctx.write('cycle_days', { day: today, open, cycle: cycle.id });\n  }\n}"
+      },
+      {
+        "page": "home-team",
+        "title": "Team",
+        "icon": "home",
+        "requires": [
+          "register.tasks",
+          "register.cycle_plan",
+          "register.cycle_days"
+        ],
+        "blocks": [
+          {
+            "kind": "table",
+            "heading": "Gone quiet",
+            "icon": "history",
+            "span": 12,
+            "source": "exceptions",
+            "columns": [
+              {
+                "field": "subject",
+                "label": "What"
+              },
+              {
+                "field": "since",
+                "label": "Last seen"
+              },
+              {
+                "field": "was",
+                "label": "Before"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "queue",
+            "heading": "Agents suggest",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "where": "list is tasks",
+            "limit": 3,
+            "when": {
+              "metric": "questions-open",
+              "gt": 0
+            },
+            "empty": "No agent is suggesting anything right now."
+          },
+          {
+            "kind": "cards",
+            "heading": "{{config:voice_right_now}}",
+            "icon": "activity",
+            "span": 12,
+            "source": "register.tasks",
+            "where": "state is doing or review",
+            "when": {
+              "metric": "tickets-in-flight",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "what",
+                "as": "title"
+              },
+              {
+                "field": "owner",
+                "label": "Owner",
+                "as": "who"
+              },
+              {
+                "field": "agent",
+                "label": "Agent",
+                "as": "fact"
+              },
+              {
+                "field": "state",
+                "label": "Status",
+                "as": "fact"
+              },
+              {
+                "field": "by",
+                "label": "Due",
+                "as": "when"
+              }
+            ],
+            "working": true,
+            "limit": 8,
+            "empty": "Nothing is in flight."
+          },
+          {
+            "kind": "table",
+            "heading": "Blocked",
+            "icon": "octagon-alert",
+            "span": 12,
+            "source": "register.tasks",
+            "where": "state is blocked",
+            "when": {
+              "metric": "tickets-blocked",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "what",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "owner",
+                "label": "Owner",
+                "width": "minmax(10ch,16ch)"
+              },
+              {
+                "field": "by",
+                "label": "Due",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "limit": 8,
+            "empty": "Nobody is blocked."
+          },
+          {
+            "kind": "table",
+            "heading": "Due this week",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "register.tasks",
+            "where": "state is not done or dropped, state is not doing or review or blocked, by before +8d",
+            "when": {
+              "metric": "tickets-due-else",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "what",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "priority",
+                "label": "Priority",
+                "width": "10ch"
+              },
+              {
+                "field": "state",
+                "label": "Status",
+                "width": "12ch"
+              },
+              {
+                "field": "by",
+                "label": "Due",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "by",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "Nothing else is due this week."
+          },
+          {
+            "kind": "link",
+            "heading": "Bring the team in",
+            "icon": "user-plus",
+            "span": 12,
+            "authored": [
+              {
+                "cells": [
+                  "Connect an agent",
+                  "/settings/agents",
+                  "A team of agents works on any record."
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "section",
+            "heading": "How the sprint is going",
+            "icon": "gauge",
+            "span": 12,
+            "fold": true
+          },
+          {
+            "kind": "progress",
+            "heading": "This sprint",
+            "icon": "goal",
+            "span": 6,
+            "source": "register.cycle_plan",
+            "columns": [
+              {
+                "field": "cycle"
+              },
+              {
+                "field": "done"
+              }
+            ],
+            "order": [
+              {
+                "field": "cycle",
+                "dir": "desc"
+              }
+            ],
+            "limit": 3,
+            "empty": "Plan tickets into a sprint and how far it has come shows here."
+          },
+          {
+            "kind": "lines",
+            "heading": "Open tickets, each morning",
+            "icon": "chart-line",
+            "span": 6,
+            "source": "register.cycle_days",
+            "columns": [
+              {
+                "field": "day"
+              },
+              {
+                "field": "open"
+              }
+            ],
+            "back": 14,
+            "bucket": "day",
+            "empty": "Nothing counted yet. Once a sprint is active, the open tickets are counted each morning."
+          }
+        ]
+      },
+      {
+        "page": "cycles",
+        "title": "Sprints",
+        "nav": {
+          "section": "Sprints",
+          "order": 10,
+          "place": 20
+        },
+        "icon": "refresh",
+        "requires": [
+          "register.tasks",
+          "register.cycles",
+          "register.cycle_plan"
+        ],
+        "blocks": [
+          {
+            "kind": "capture",
+            "heading": "Add a sprint",
+            "icon": "plus",
+            "span": 12,
+            "register": "cycles"
+          },
+          {
+            "kind": "table",
+            "heading": "Sprints",
+            "icon": "repeat",
+            "span": 12,
+            "source": "register.cycles",
+            "columns": [
+              {
+                "field": "name",
+                "label": "Sprint",
+                "width": "minmax(16ch,1fr)"
+              },
+              {
+                "field": "state",
+                "label": "Status",
+                "width": "12ch"
+              },
+              {
+                "field": "starts",
+                "label": "Starts",
+                "width": "15ch"
+              },
+              {
+                "field": "ends",
+                "label": "Ends",
+                "width": "15ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "starts",
+                "dir": "desc"
+              }
+            ],
+            "empty": "No sprints yet."
+          },
+          {
+            "kind": "table",
+            "heading": "Sprint plan",
+            "icon": "list-checks",
+            "span": 12,
+            "when": {
+              "metric": "tickets-planned",
+              "gt": 0
+            },
+            "source": "register.cycle_plan",
+            "columns": [
+              {
+                "field": "task",
+                "label": "Ticket",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "cycle",
+                "label": "Sprint",
+                "width": "minmax(10ch,16ch)"
+              },
+              {
+                "field": "points",
+                "label": "Points",
+                "width": "8ch",
+                "align": "end"
+              }
+            ],
+            "limit": 30,
+            "empty": "No ticket is planned into a sprint yet."
+          },
+          {
+            "kind": "table",
+            "heading": "Blocked",
+            "icon": "octagon-alert",
+            "span": 12,
+            "source": "register.tasks",
+            "where": "state is blocked",
+            "when": {
+              "metric": "tickets-blocked",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "what",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "owner",
+                "label": "Owner",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "agent",
+                "label": "Agent",
+                "width": "12ch"
+              },
+              {
+                "field": "by",
+                "label": "Due",
+                "width": "15ch",
+                "align": "end"
+              }
+            ],
+            "limit": 20,
+            "empty": "Nobody is blocked."
+          }
+        ]
+      },
+      {
+        "page": "project",
+        "title": "{{name}}",
+        "for": {
+          "register": "things"
+        },
+        "nav": {
+          "section": "Projects",
+          "order": 10
+        },
+        "icon": "thing",
+        "layout": {
+          "rail": 4
+        },
+        "requires": [
+          "register.things",
+          "register.stages",
+          "register.tasks",
+          "register.session"
+        ],
+        "blocks": [
+          {
+            "kind": "project",
+            "parts": [
+              "hero",
+              "side"
+            ],
+            "heading": "Overview",
+            "icon": "eye",
+            "span": 12
+          },
+          {
+            "kind": "project",
+            "parts": [
+              "numbers",
+              "what-is-open"
+            ],
+            "heading": "Numbers and work",
+            "icon": "chart-line",
+            "span": 12
+          },
+          {
+            "kind": "project",
+            "parts": [
+              "dates",
+              "who-is-on-it",
+              "runs-on",
+              "agents-here",
+              "decisions",
+              "happened"
+            ],
+            "heading": "Dates, people, agents and what happened",
+            "icon": "calendar",
+            "span": 12
+          },
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "says": [
+              {
+                "when": {
+                  "metric": "project-in-review:{{name}}",
+                  "gt": 0
+                },
+                "body": "Work on {{name}} has been handed back, and it waits for you to check it."
+              },
+              {
+                "body": "{{next}}"
+              }
+            ]
+          },
+          {
+            "kind": "queue",
+            "heading": "Waiting on you",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "where": "about is {{spoken}}",
+            "limit": 3,
+            "when": {
+              "metric": "questions-open:{{spoken}}",
+              "gt": 0
+            },
+            "tiles": true
+          },
+          {
+            "kind": "stat",
+            "heading": "At a glance",
+            "icon": "gauge",
+            "span": 12,
+            "area": "rail",
+            "cells": [
+              {
+                "metric": "project-open:{{name}}",
+                "label": "Open"
+              },
+              {
+                "metric": "project-due-soon:{{name}}",
+                "label": "Due soon"
+              },
+              {
+                "metric": "project-in-review:{{name}}",
+                "label": "In review"
+              },
+              {
+                "metric": "project-done-7d:{{name}}",
+                "label": "Done this week",
+                "trend": "4w"
+              }
+            ]
+          },
+          {
+            "kind": "cards",
+            "heading": "Where it stands",
+            "icon": "target",
+            "span": 12,
+            "area": "rail",
+            "source": "register.things",
+            "where": "name is {{name}}",
+            "columns": [
+              {
+                "field": "health",
+                "as": "title"
+              },
+              {
+                "field": "progress",
+                "label": "",
+                "as": "ring"
+              },
+              {
+                "field": "aim",
+                "label": "Aiming for",
+                "as": "fact"
+              },
+              {
+                "field": "agent",
+                "label": "Agent",
+                "as": "who"
+              }
+            ],
+            "tones": {
+              "at_risk": "warn",
+              "off_track": "bad"
+            },
+            "limit": 1,
+            "empty": "Nobody has said where {{name}} stands yet.",
+            "when": {
+              "metric": "project-said:{{name}}",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "stat",
+            "heading": "Where it stands",
+            "icon": "target",
+            "span": 12,
+            "area": "rail",
+            "key": "stands-figures",
+            "cells": [
+              {
+                "metric": "project-moved-7d:{{name}}",
+                "label": "Changed this week"
+              },
+              {
+                "metric": "project-worked:{{name}}",
+                "label": "Last worked"
+              }
+            ],
+            "when": {
+              "metric": "project-said:{{name}}",
+              "is": 0
+            }
+          },
+          {
+            "kind": "steps",
+            "heading": "The road",
+            "icon": "flag",
+            "span": 12,
+            "area": "rail",
+            "source": "register.stages",
+            "where": "thing is {{name}}",
+            "columns": [
+              {
+                "field": "name",
+                "label": "Stage"
+              },
+              {
+                "field": "done_when",
+                "label": "Done when"
+              }
+            ],
+            "order": [
+              {
+                "field": "order",
+                "dir": "asc"
+              }
+            ],
+            "limit": 20,
+            "when": {
+              "all": [
+                {
+                  "metric": "project-staged:{{name}}",
+                  "gt": 0
+                },
+                {
+                  "metric": "project-plan-roadmap:{{name}}",
+                  "is": 0
+                }
+              ]
+            },
+            "empty": "{{name}} has no stages yet."
+          },
+          {
+            "kind": "section",
+            "heading": "More about {{name}}",
+            "icon": "notebook-pen",
+            "span": 12,
+            "box": true,
+            "panel": "actions",
+            "fold": true
+          },
+          {
+            "kind": "roadmap",
+            "heading": "The plan",
+            "icon": "milestone",
+            "span": 12,
+            "source": "register.tasks",
+            "where": "thing is {{name}}, by is set, state is not done or dropped",
+            "columns": [
+              {
+                "field": "what",
+                "label": "What"
+              },
+              {
+                "field": "by",
+                "label": "Due"
+              },
+              {
+                "field": "effort",
+                "label": "Effort"
+              }
+            ],
+            "order": [
+              {
+                "field": "by",
+                "dir": "asc"
+              }
+            ],
+            "limit": 50,
+            "when": {
+              "all": [
+                {
+                  "metric": "project-dated:{{name}}",
+                  "gt": 0
+                },
+                {
+                  "metric": "project-plan-path:{{name}}",
+                  "is": 0
+                }
+              ]
+            },
+            "empty": "No task on {{name}} has a day yet."
+          },
+          {
+            "kind": "kpis",
+            "heading": "Key numbers",
+            "icon": "chart-line",
+            "span": 12,
+            "key": "kpis",
+            "source": "kpis",
+            "for": "project"
+          },
+          {
+            "kind": "cards",
+            "heading": "Agents",
+            "icon": "bot",
+            "span": 12,
+            "columns": [
+              {
+                "field": "agent",
+                "as": "title"
+              },
+              {
+                "field": "doing_said",
+                "as": "reply"
+              },
+              {
+                "field": "last_seen",
+                "as": "when"
+              }
+            ],
+            "source": "register.session",
+            "where": "project is {{spoken}}, parent is empty, wrote is not 0",
+            "order": [
+              {
+                "field": "last_seen",
+                "dir": "desc"
+              }
+            ],
+            "limit": 3
+          },
+          {
+            "kind": "note",
+            "document": true,
+            "heading": "Notes",
+            "icon": "notebook-pen",
+            "span": 12,
+            "body": "{{note}}",
+            "empty": "Nothing is written about {{name}} yet. Its note is on the project."
+          },
+          {
+            "kind": "section",
+            "heading": "Runs on",
+            "icon": "plug",
+            "span": 12,
+            "box": true
+          },
+          {
+            "kind": "cards",
+            "heading": "Keys",
+            "icon": "key",
+            "span": 4,
+            "source": "runs_on",
+            "about": "{{spoken}}",
+            "where": "kind is key, scope is project",
+            "columns": [
+              {
+                "field": "detail",
+                "or": "name",
+                "as": "title"
+              },
+              {
+                "field": "scope",
+                "label": "Applies to",
+                "as": "scope"
+              },
+              {
+                "field": "used_agents",
+                "label": "Used by",
+                "as": "who"
+              },
+              {
+                "field": "used_at",
+                "label": "Last used",
+                "as": "when"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "cards",
+            "heading": "Tools and servers",
+            "icon": "plug",
+            "span": 4,
+            "source": "runs_on",
+            "about": "{{spoken}}",
+            "where": "kind is tool, scope is project",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "scope",
+                "label": "Applies to",
+                "as": "scope"
+              },
+              {
+                "field": "detail",
+                "label": "Reached by",
+                "as": "fact"
+              },
+              {
+                "field": "used_agents",
+                "label": "Used by",
+                "as": "who"
+              },
+              {
+                "field": "used_at",
+                "label": "Last used",
+                "as": "when"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "cards",
+            "heading": "Skills",
+            "icon": "skill",
+            "span": 4,
+            "source": "runs_on",
+            "about": "{{spoken}}",
+            "where": "kind is skill, scope is project",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "scope",
+                "label": "Applies to",
+                "as": "scope"
+              },
+              {
+                "field": "detail",
+                "label": "Version",
+                "as": "fact"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "cards",
+            "heading": "And from everywhere",
+            "icon": "globe",
+            "span": 12,
+            "source": "runs_on",
+            "about": "{{spoken}}",
+            "where": "kind is not action, scope is global",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "kind",
+                "label": "What it is",
+                "as": "fact"
+              },
+              {
+                "field": "used_agents",
+                "label": "Used by",
+                "as": "who"
+              },
+              {
+                "field": "used_at",
+                "label": "Last used",
+                "as": "when"
+              }
+            ],
+            "limit": 5
+          }
+        ]
+      },
+      {
+        "page": "agent-work",
+        "title": "Agent work",
+        "nav": {
+          "section": "Agents",
+          "order": 20
+        },
+        "icon": "session",
+        "requires": [
+          "register.tasks"
+        ],
+        "blocks": [
+          {
+            "kind": "cards",
+            "heading": "Working now",
+            "icon": "session",
+            "span": 12,
+            "source": "sessions.working",
+            "columns": [
+              {
+                "field": "doing",
+                "as": "title"
+              },
+              {
+                "field": "agent",
+                "as": "who"
+              },
+              {
+                "field": "last_seen",
+                "as": "when"
+              }
+            ],
+            "limit": 12,
+            "empty": "No agent is working here right now. Agents you connect in Settings show here while they work."
+          },
+          {
+            "kind": "table",
+            "heading": "Taken by agents",
+            "icon": "bot",
+            "span": 12,
+            "when": {
+              "metric": "tickets-taken",
+              "gt": 0
+            },
+            "source": "register.tasks",
+            "where": "agent is set, state is not done or dropped",
+            "columns": [
+              {
+                "field": "what",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "agent",
+                "label": "Agent",
+                "width": "12ch"
+              },
+              {
+                "field": "state",
+                "label": "Status",
+                "width": "14ch"
+              },
+              {
+                "field": "owner",
+                "label": "Owner",
+                "width": "minmax(10ch,18ch)"
+              }
+            ],
+            "limit": 30,
+            "empty": "No agent holds a ticket."
+          },
+          {
+            "kind": "agents",
+            "heading": "What agents did",
+            "icon": "activity",
+            "span": 12,
+            "source": "activity",
+            "first": 5,
+            "empty": "No agent has changed anything here yet."
+          },
+          {
+            "kind": "table",
+            "heading": "Finished by agents",
+            "icon": "circle-check",
+            "span": 12,
+            "when": {
+              "metric": "tickets-done-by-agents",
+              "gt": 0
+            },
+            "source": "register.tasks",
+            "where": "agent is set, state is done",
+            "columns": [
+              {
+                "field": "what",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "agent",
+                "label": "Agent",
+                "width": "12ch"
+              },
+              {
+                "field": "done_on",
+                "label": "Done on",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "done_on",
+                "dir": "desc"
+              }
+            ],
+            "limit": 30,
+            "empty": "No agent has finished a ticket yet."
+          }
+        ]
+      }
+    ]
+  },
+  "skills": [
+    {
+      "name": "task-triage",
+      "trigger": "when a ticket is opened, to set its priority, suggest an owner and say whether an agent can take it"
+    },
+    {
+      "name": "standup-digest",
+      "trigger": "each morning, to say what moved yesterday, what is blocked and what agents finished"
+    }
+  ],
+  "nav": [],
+  "links": [],
+  "over": {}
+}

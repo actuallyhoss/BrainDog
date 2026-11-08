@@ -45,6 +45,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.5.1', notes: NAMED('Courses') },
   ],
   founder: [
+    { version: '3.10.1', notes: "A project's Keys calls each key by what it opens, and by its name only where that is not written." },
     { version: '3.10.0', notes: 'The Dashboard no longer opens on how many numbers came in, and Home no longer counts the agents at work over the list of them. Nothing you hold changes.' },
     { version: '3.9.3', notes: 'Bring your numbers in says plugins, as the app now calls them. Nothing you hold changes.' },
     { version: '3.9.2', notes: 'The Dashboard says where a project sends its numbers in a plain sentence: to its own address, shown on its page.' },
@@ -97,6 +98,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.31.1', notes: "A project's Keys calls each key by what it opens, and by its name only where that is not written." },
     { version: '2.31.0', notes: 'Team, Sprints and Agent work no longer open on a line counting tickets, since the lists under them show them. Nothing you hold changes.' },
     { version: '2.30.5', notes: 'Sprints has its own icon, so it no longer looks like Menu on a phone. Nothing you hold changes.' },
     { version: '2.30.4', notes: 'Teammates is called People, as your sidebar and Today say it. Nothing you hold changes.' },

@@ -224,11 +224,10 @@ const PROSE_KEY = /(?<![\w.@])(?:[a-z]\w*\.)*(?:[a-z]{2,}(?:[A-Z][a-z0-9]+)+|[a-
 /* A run's handle (`S731`): the one id a part may print on purpose, beside the run's name (`ids`). */
 const HANDLE = /\bS\d{2,6}\b/g;
 /* Where a name goes: a row's number in its register (`tools#8`), a ULID, a UUID. Never printed on purpose. */
-const NAMED_IDS = [
-  /\b[a-z][a-z0-9_-]*#\d+\b/g,
-  /\b(?=[0-9A-HJKMNP-TV-Z]*\d)[0-9A-HJKMNP-TV-Z]{26}\b/g,
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
-];
+const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+const NAMED_IDS = [/\b[a-z][a-z0-9_-]*#\d+\b/g, /\b(?=[0-9A-HJKMNP-TV-Z]*\d)[0-9A-HJKMNP-TV-Z]{26}\b/g, UUID];
+/** A line that is one UUID and nothing else: an id typed where text goes, whoever typed it. */
+const wholeUuid = (line: string): boolean => new RegExp(`^\\s*#?${UUID.source}\\s*$`, 'iu').test(line);
 /* Random ids: a long hex run, or a long token mixing both cases and digits. Not in his own words, where a hash is a commit. */
 const RANDOM_IDS = [
   /\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{12,}\b/g,
@@ -467,7 +466,15 @@ const RULES: readonly RuleSpec[] = [
     rule: 'raw-id',
     copy: false,
     says: 'An id where a name goes: a row number such as tools#8, a run handle, a ULID or a random id.',
-    find: (v) => taken(v.lines, [...(v.part.ids ? [] : [HANDLE]), ...NAMED_IDS, ...(v.part.theirs ? [] : RANDOM_IDS)]),
+    /* A CELL OF SOMEBODY'S WORDS QUOTES THEM, ID AND ALL, as it quotes a time (`quotedCell`): "Spaceship order summary
+       #e5c0d7e5-..." is the subject the sender wrote, and Mail's Recent mail printed it as it should. A UUID is never
+       one of the record's own ids, so inside a quoted line it is theirs; a cell that holds nothing but one still is not. */
+    find: (v) =>
+      taken(quotedCell(v) ? v.lines.map((l) => (wholeUuid(l) ? l : l.replace(UUID, ' '))) : v.lines, [
+        ...(v.part.ids ? [] : [HANDLE]),
+        ...NAMED_IDS,
+        ...(v.part.theirs ? [] : RANDOM_IDS),
+      ]),
     said: (n) => many(n, 'Prints an id where a name goes.', 'Prints # ids where names go.'),
   },
   {

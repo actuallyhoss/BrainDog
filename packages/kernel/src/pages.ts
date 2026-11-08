@@ -137,7 +137,11 @@ export type PageBlock = {
    * (`walkFrom`), so a page that knows only what is held draws its future without naming whose figure walks it.
    */
   /* `sign`: the way the money in a figure goes, said in front of it, "+£11,490" for `in` and "−£43,047" for `out` (AM1). */
-  cells?: { metric: string; label?: string; trend?: string; note?: string; ahead?: string; sign?: 'in' | 'out' }[];
+  /**
+   * `when:` on a cell is the block's `when:` for that one figure: a cell whose condition does not hold is left out of
+   * the row, and the figures beside it are kept (a book's Runs out, which has no answer over two currencies).
+   */
+  cells?: { metric: string; label?: string; trend?: string; note?: string; ahead?: string; sign?: 'in' | 'out'; when?: unknown }[];
   /**
    * A `stat`'s: its first figure is the screen's one hero figure. A `cards` block's: its first card is drawn two tracks
    * wide. A `note`'s: its body is the page's opening sentence, said with the plural and nought rules a figure's note has.
@@ -3079,9 +3083,13 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      measure from them: the numbers a project reported are rows, and a figure per measure would be a declaration per
      measure nobody can write ahead of the project sending it. */
   if (block.cells || (block.kind === 'stat' && !block.source?.startsWith('register.'))) {
+    /* A CELL WHOSE OWN `when:` DOES NOT HOLD IS LEFT OUT OF BOTH, so a host reading a cell's trend by its place among
+       `cells` still finds it beside its own reading. */
+    const kept = (block.cells ?? []).filter((c) => c.when === undefined || whenHolds(deps, c.when));
     return {
       ...base,
-      readings: (block.cells ?? []).map(({ trend: window, ahead: walkOf, ...cell }) => {
+      ...(block.cells && kept.length !== block.cells.length ? { cells: kept } : {}),
+      readings: kept.map(({ trend: window, ahead: walkOf, when: _when, ...cell }) => {
         const decl = deps.metric(cell.metric.split(':')[0] ?? '');
 
         if (!decl)

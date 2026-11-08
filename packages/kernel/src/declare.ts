@@ -2216,6 +2216,15 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       const fault = whenFault(block.when, `${id}.${at}'s when`);
       if (fault) return bad('DECLARATION_INVALID', fault, at);
     }
+    /* A CELL'S OWN `when:` IS THE BLOCK'S, READ FOR ONE FIGURE: a row of three whose third has no answer keeps the two. */
+    if (Array.isArray(block.cells)) {
+      for (const [n, cell] of (block.cells as unknown[]).entries()) {
+        const w = cell !== null && typeof cell === 'object' ? (cell as { when?: unknown }).when : undefined;
+        if (w === undefined) continue;
+        const fault = whenFault(w, `${id}.${at}'s cell ${n + 1}'s when`);
+        if (fault) return bad('DECLARATION_INVALID', fault, at);
+      }
+    }
 
     if (block.columns !== undefined) {
       const columns = block.columns;

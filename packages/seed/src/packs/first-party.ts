@@ -1031,12 +1031,15 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   install of the add-on was handed as source. They are invented now. Only the script's source moved.
  *   portfolio 1.31.2 (4 Nov, Projects page): `page.portfolio` drops How they are going, the bar of health over the projects;
  *   each project's card says it. No id added or taken away.
+ * - money-core 3.38.9 (8 Nov, the page-print check): a book's What is due draws Runs out only while it has an answer, a
+ *   day or "Lasts past" one, by a cell's own `when:` (`page.money-book`). Over two currencies it drew a dash. No id
+ *   added or taken away.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.31.2',
   people: '4.7.2',
-  'money-core': '3.38.8',
+  'money-core': '3.38.9',
   estate: '2.8.1',
   work: '1.26.2',
 };

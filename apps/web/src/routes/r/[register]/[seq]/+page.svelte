@@ -26,6 +26,8 @@
 <script lang="ts">
   /* A FACT IS DRAWN ON THE BAR PRIMITIVE'S `.prop` ROW (`kinds/proportional.css`): its label, its value and their type. */
   import '@braindog/skin/kinds/proportional.css';
+  /* A ROW'S TEXT CARRIES CODE (a skill's commands, a note's sample), drawn on the media primitive (`kinds/media.css`). */
+  import '@braindog/skin/kinds/media.css';
   import { apiBase, at, at as inApp } from '$lib/at.ts';
   import { tick, untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
