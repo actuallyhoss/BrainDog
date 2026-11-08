@@ -216,6 +216,15 @@ const OWED_CELLS: [figure: string, label: string][] = [
   ['book-lasts-until', 'Runs out'],
 ];
 
+const LASTS_UNTIL = 'book-lasts-until';
+
+/**
+ * RUNS OUT ONLY WHILE IT HAS AN ANSWER, SINCE money-core 3.38.8: a day it runs out, or the walk's "Lasts past" one. A
+ * book whose cash and bills are in two currencies has no walk, and the cell drew a dash and "figure unavailable" beside
+ * the two figures that did answer (the owner's Quartz book). Left out, as Money's own line steps aside on `beyond`.
+ */
+const LASTS_ANSWERED = { any: [{ metric: `${LASTS_UNTIL}:{{name}}`, empty: false }, { metric: `${LASTS_UNTIL}:{{name}}`, beyond: true }] };
+
 /**
  * WHAT THIS BOOK IS OWED AND OWES, AND HOW LONG ITS MONEY LASTS, IN ONE ROW under its month: the rest of the figures
  * read once a book. A ROW OF ITS OWN AND NOT THREE MORE CELLS OF THIS MONTH, because that row is drawn
@@ -226,7 +235,11 @@ const OWED_CELLS: [figure: string, label: string][] = [
  * out a row whose every figure is empty, so a book with nothing due draws no row of noughts.
  */
 function owedRow(declared: (figure: string) => boolean): Record<string, unknown>[] {
-  const cells = OWED_CELLS.filter(([figure]) => declared(figure)).map(([figure, label]) => ({ metric: `${figure}:{{name}}`, label }));
+  const cells = OWED_CELLS.filter(([figure]) => declared(figure)).map(([figure, label]) => ({
+    metric: `${figure}:{{name}}`,
+    label,
+    ...(figure === LASTS_UNTIL ? { when: LASTS_ANSWERED } : {}),
+  }));
   if (cells.length === 0) return [];
   return [{ kind: 'stat', heading: 'What is due', icon: 'scale', span: 12, cells }];
 }
