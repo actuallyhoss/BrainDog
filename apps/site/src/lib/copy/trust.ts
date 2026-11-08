@@ -38,8 +38,17 @@ export const trust = {
     /* One entry per text in `apps/site/legal/`, by its file name, which is also its address under
        `/legal/`. Fair use and refunds are sections of the Terms, not texts of their own. */
     texts: {
-      terms: { title: 'Terms of Service', description: 'The terms of a hosted BrainDog record.' },
-      privacy: { title: 'Privacy Policy', description: 'What BrainDog keeps about you, why, and for how long.' },
+      terms: {
+        title: 'Terms of Service',
+        description: 'The terms of a hosted BrainDog record.',
+        /* The search result's longer line, from the text's own headings. */
+        meta: 'The terms of a hosted BrainDog record: your account, agents and keys, your content, plans, payment and refunds, and export and leaving.',
+      },
+      privacy: {
+        title: 'Privacy Policy',
+        description: 'What BrainDog keeps about you, why, and for how long.',
+        meta: 'What BrainDog keeps about you, why, and for how long: what we collect, who we share it with, where it goes, and your rights.',
+      },
       processing: { title: 'Data Processing Addendum', description: 'How BrainDog handles personal data for a business, and the companies that help run it.' },
     },
     /* The one sentence an unpublished text's page says. The page exists so a strict prerender passes
@@ -49,7 +58,7 @@ export const trust = {
 
   support: {
     meta: {
-      title: 'Support · BrainDog',
+      title: 'BrainDog support: write to us and a person answers',
       description: 'Where to get help with BrainDog, and what to put in a report so it can be answered the first time.',
     },
     title: 'Support',

@@ -41,7 +41,7 @@
   const idAt = (at: number): string | undefined => sections.find((s) => s.at === at)?.id;
 </script>
 
-<Seo title="{text.title} · BrainDog" description={text.description} path="/legal/{data.name}" noindex={data.text === null} />
+<Seo title="{text.title} · BrainDog" description={'meta' in text ? text.meta : text.description} path="/legal/{data.name}" noindex={data.text === null} />
 <PageHead title={text.title} lead={text.description} />
 
 <section class="sheet-board">

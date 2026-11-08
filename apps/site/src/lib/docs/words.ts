@@ -7,12 +7,13 @@
  */
 import { APPS_OR } from '../agents.ts';
 import { LAUNCH } from '../launch.ts';
+import { TABLE } from '../plans.ts';
 import type { IconName } from '../icons.ts';
 import type { Section } from './pages.ts';
 
 export const docsWords = {
   meta: {
-    title: 'Docs · BrainDog',
+    title: 'BrainDog docs: use it, connect your agents, build on it',
     description:
       'How to use BrainDog, connect your AI tools, and build on it. Every page is also plain text an AI tool can read.',
     /** A page's own title in the tab. */
@@ -95,14 +96,30 @@ export const docsWords = {
       'Projects, Work, People, Agents and Money are built in. Money: cash ahead, accounts, ledger, budgets, forecast, coming up, payees, reports. Stripe and Mercury connect read only; bank statements import as CSV.',
       'Slash: the built-in assistant. Press ⌘J to ask in plain words or ask for a change, with an undo.',
       'Free is $0, with every feature, 3 connected agents and 20 Slash questions a month; no card to start. ' +
-        (LAUNCH.billing ? 'Cloud and Cloud Plus are paid monthly; see https://brain.dog/pricing.' : 'Cloud and Cloud Plus, paid monthly, are coming soon, priced at launch.'),
-      'The app is at https://app.brain.dog. BrainDog is made by Quartz Apps LLC. Support: support@brain.dog.',
+        (LAUNCH.billing
+          ? `Cloud is ${TABLE.hosted.price.month} a month (${TABLE.hosted.agents} agents) and Cloud Plus ${TABLE.plus.price.month} a month (${TABLE.plus.agents} agents, with your team); see https://brain.dog/pricing.`
+          : 'Cloud and Cloud Plus, paid monthly, are coming soon, priced at launch.'),
+      'The app is at https://app.brain.dog, in any browser, and on Windows and iPhone (https://brain.dog/download). BrainDog is made by Quartz Apps LLC. Support: support@brain.dog.',
     ],
     about:
       'Each docs page below is the page as dialect text: Markdown with fenced blocks such as stat, steps and comparison that a BrainDog page draws. The address of each is the page address with .md on the end.',
     /* THE SITE'S OWN PAGES, before the docs: each line is the page's name and its search result (`meta` in `lib/copy/shell.ts`). */
     site: 'Site',
-    pages: { home: 'Home', slash: 'Slash', agents: 'Connect your agents', pricing: 'Pricing', security: 'Security', support: 'Support', docs: 'Docs' },
+    pages: {
+      home: 'Home',
+      slash: 'Slash',
+      agents: 'Connect your agents',
+      pricing: 'Pricing',
+      download: 'Download',
+      plugins: 'Plugins',
+      founders: 'For founders',
+      teams: 'For teams and agencies',
+      personal: 'For personal records',
+      security: 'Security',
+      support: 'Support',
+      docs: 'Docs',
+      changelog: 'Changelog',
+    },
     connect: 'Connecting',
     /* `MCP` in `lib/links.ts`, `servesMcp` in `apps/worker/src/route.ts`. The address is code; the words around it are not. */
     address: 'The address agents connect to',

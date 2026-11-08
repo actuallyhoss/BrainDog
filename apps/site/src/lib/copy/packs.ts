@@ -11,7 +11,7 @@ const many = (n: number, one: string, more: string): string => `${n} ${n === 1 ?
 export const packs = {
   packs: {
     meta: {
-      title: 'Plugins · BrainDog',
+      title: 'BrainDog plugins: Stripe, Mercury, Sentry and more',
       description:
         'Plugins bring new pages and rules into BrainDog: Stripe, Mercury, Sentry, Calendar and more. Each one shows ' +
         'what it adds before anything changes.',
@@ -104,6 +104,10 @@ export const packs = {
 
     detail: {
       title: (name: string) => `${name} · BrainDog plugin`,
+      /* A SEARCH RESULT'S LINE: the plugin's own summary, and when that is a few words only, the one sentence every
+         plugin page can say after it. `Seo` trims a long summary to what a result shows. */
+      description: (summary: string) =>
+        summary.length < 90 ? `${summary.replace(/\.?$/, '.')} A BrainDog plugin that shows what it adds before you add it.` : summary,
       back: 'All plugins',
       install: 'Add to BrainDog',
       /* The app shows its plan before a write: `apps/web/src/lib/market/PlanSheet.svelte`. */

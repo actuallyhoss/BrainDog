@@ -14,6 +14,8 @@ import { SECTIONS, plainOf } from '$lib/docs/pages.ts';
 import { docsWords } from '$lib/docs/words.ts';
 import { shell } from '$lib/copy/shell.ts';
 import { trust } from '$lib/copy/trust.ts';
+import { packs } from '$lib/copy/packs.ts';
+import { forPages } from '$lib/copy/for.ts';
 import { MCP } from '$lib/links.ts';
 import { PAGES } from '$lib/nav.ts';
 
@@ -31,9 +33,15 @@ export const GET = (): Response => {
     { path: '/slash', name: w.pages.slash, says: shell.meta.slash.description },
     { path: '/agents', name: w.pages.agents, says: shell.meta.agents.description },
     { path: '/pricing', name: w.pages.pricing, says: shell.meta.pricing.description },
+    { path: '/download', name: w.pages.download, says: shell.meta.download.description },
+    { path: '/plugins', name: w.pages.plugins, says: packs.packs.meta.description },
+    { path: '/for/founders', name: w.pages.founders, says: forPages.person.who.founder.description },
+    { path: '/for/teams', name: w.pages.teams, says: forPages.person.who.team.description },
+    { path: '/for/personal', name: w.pages.personal, says: forPages.person.who.personal.description },
     { path: '/security', name: w.pages.security, says: trust.security.meta.description },
     { path: '/support', name: w.pages.support, says: trust.support.meta.description },
     { path: '/docs', name: w.pages.docs, says: docsWords.meta.description },
+    { path: '/changelog', name: w.pages.changelog, says: shell.meta.changelog.description },
   ].filter((p) => PAGES.some((q) => q.path === p.path));
   if (site.length > 0) {
     lines.push(`## ${w.site}`, '');

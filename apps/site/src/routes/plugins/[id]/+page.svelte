@@ -17,6 +17,7 @@
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
+  import { snippetOf } from '$lib/site/seo.ts';
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
   import { parse } from 'braindog-render';
@@ -47,7 +48,7 @@
   const wide = (src: string): Span[] => parse(src, { page: true }).map((_, at) => ({ at, cols: 12 }));
 </script>
 
-<Seo title={d.title(card.title)} description={card.summary} path="{PLUGINS}/{card.slug}" />
+<Seo title={d.title(card.title)} description={snippetOf(d.description(card.summary))} path="{PLUGINS}/{card.slug}" />
 {#snippet back()}
   <a class="back" href={PLUGINS}><Icon name="back" size="m" />{d.back}</a>
 {/snippet}

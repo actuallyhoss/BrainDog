@@ -37,7 +37,7 @@ export const forPages = {
         title: 'BrainDog for personal money: bills, budgets and savings',
         description:
           'Bills, budgets, subscriptions, splits, savings and net worth in one record. What arrives is filed ' +
-          'for you, and nothing that moves money happens until you say yes.',
+          'for you, and money moves only when you say yes.',
         tag: 'For personal records',
         said: 'What is due, what is left to spend, and am I still on track?',
         /* Inbox is docs/07 §4; Needs you (once Decide, `apps/web/src/routes/decide/`) is where every proposal waits. */
