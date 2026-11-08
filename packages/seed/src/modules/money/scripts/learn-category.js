@@ -12,8 +12,9 @@
  * question a cause: one still waiting is joined, and one answered is not asked again, whichever answer it was. The cause
  * is the memory, so nothing else is kept.
  *
- * NEVER DECIDED FOR HIM. Nothing is written until Yes is pressed, and the question is raised only by the write of a
- * category: never on a clock and never at night. It is signed by the script (`script:learn_category`), as every
+ * DECIDED ONLY WHEN HE ALREADY DID. A payee he filed under one category by hand three times or more, and never under
+ * another, gets its rule at once, with Undo, and no question. Otherwise nothing is written until Yes is pressed, and
+ * the question is raised only by the write of a category: never on a clock and never at night. It is signed by the script (`script:learn_category`), as every
  * script's question is, and never by `system`.
  *
  * ONLY A PERSON'S HAND STARTS IT, AS FAR AS THE RECORD CAN TELL. A rule's own write starts no other rule, and every
@@ -126,6 +127,20 @@ export default async function run(ctx) {
     ctx.write('filing_rules', rule.fields);
     ctx.log(`A filing rule now files every ${whom} under ${under}. What it matches with no category is filed next, as one change.`);
     return { made: text };
+  }
+
+  /* FILED THE SAME WAY BY HAND AT LEAST `SURE` TIMES, AND NEVER ANOTHER WAY, IS ALREADY HIS ANSWER: the rule is made
+     at once, said in the log and the feed, and undone like any write. "File every Stripe under Game sales from now on?"
+     after the fourth Stripe line he filed there was a question with one answer. One page of his lines is read; a
+     payee with more lines than a page holds, or one ever filed elsewhere, is asked about as before. */
+  const SURE = 3;
+  const same = await ctx.record.list('transactions', { all: [{ field: 'counterparty_text', is: text }, { field: 'direction', is: f.direction }] });
+  const filed = same.filter((e) => typeof e.fields.category === 'string' && e.fields.category !== '');
+  const here = filed.filter((e) => e.fields.category === category.id).length + (filed.some((e) => e.id === entry.id) ? 0 : 1);
+  if (same.length < 50 && filed.every((e) => e.fields.category === category.id) && here >= SURE) {
+    ctx.write('filing_rules', rule.fields);
+    ctx.log(`You filed ${whom} under ${under} ${here} times and never anywhere else, so a filing rule now files every ${whom} there. Undo takes it back.`);
+    return { made: text, said: `Every ${whom} is filed under ${under} from now on, as you filed it ${here} times.` };
   }
 
   /* ASKED. The payee's key is the host's fold where it hands one, else the text's own letters and digits. */

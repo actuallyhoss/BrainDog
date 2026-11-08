@@ -4062,6 +4062,67 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'money-core@3.38.8': {
+    holds: `
+      metric.account-ages metric.account-gap metric.account-in-by-month metric.account-lines metric.account-now
+      metric.account-out-by-month metric.accounts-open metric.arriving-30d metric.balance-by-account metric.balances-stale
+      metric.bills-held metric.bills-in-no-book metric.bills-open metric.book-accounts metric.book-cash metric.book-in-by-month
+      metric.book-in-month metric.book-lasts-until metric.book-net-by-month metric.book-net-month metric.book-out-by-month
+      metric.book-out-month metric.book-owed-by metric.book-owed-to metric.book-spent-month metric.books-held metric.budget-passed-on
+      metric.budgets-monthly-total metric.budgets-set metric.budgets-total metric.budgets-unset metric.budgets-weekly
+      metric.budgets-weekly-total metric.budgets-yearly metric.budgets-yearly-total metric.card-to-pay metric.card-to-pay-on
+      metric.cash-accounts metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-cross-check
+      metric.cash-foreign-share metric.cash-now metric.categories-against-direction metric.chasing metric.currencies-held
+      metric.days-late-in metric.due-30d metric.due-items-30d metric.every-month-by-category metric.every-month-in
+      metric.every-month-net metric.every-month-out metric.filed-by-rule-30d metric.filed-for-you-30d metric.filed-today
+      metric.filing-rule-filed metric.filing-rules metric.held-beyond-cash metric.in-30d metric.in-ahead-by-month metric.in-by-month
+      metric.in-due-by-month metric.installments-a-month metric.installments-after-next-by-plan metric.installments-due-30d
+      metric.installments-late metric.installments-left metric.installments-left-by-plan metric.installments-next-due-by-plan
+      metric.installments-paid-by-plan metric.installments-total-by-plan metric.instalments-in-no-book metric.kept-share-90d
+      metric.lasts-no-income metric.late-in metric.leaving-30d metric.ledger-in-no-book metric.ledger-newest-days
+      metric.ledger-rows-7d metric.left-all metric.left-last metric.left-month metric.left-three metric.left-year
+      metric.lines-by-account metric.moved-since metric.net-by-month metric.net-worth metric.net-worth-nights metric.nights-missed-30d
+      metric.out-30d metric.out-ahead-by-month metric.out-by-month metric.out-due-by-month metric.over-all metric.over-last
+      metric.over-month metric.over-three metric.over-year metric.overdue metric.owed-by-you metric.owed-over-time metric.owed-to-you
+      metric.paid-last-by-payee metric.paid-times-by-payee-90d metric.paid-to-by-week metric.payees-paid-90d metric.pending-lines
+      metric.pending-out-month metric.pending-out-month-count metric.plan-after-next-by-plan metric.plan-last-due metric.plan-late
+      metric.plan-left metric.plan-left-by-plan metric.plan-next-due metric.plan-next-due-by-plan metric.plan-paid
+      metric.plan-paid-by-quarter metric.plan-parts metric.plan-parts-by-plan metric.plan-parts-cancelled metric.plan-parts-open
+      metric.plan-parts-paid metric.plan-parts-paid-by-plan metric.plans-paying metric.project-in-by-month metric.project-in-month
+      metric.project-kept-month metric.project-out-by-month metric.project-out-month metric.project-owed metric.received-30d
+      metric.received-7d metric.received-a-month metric.received-all metric.received-last metric.received-month metric.received-three
+      metric.received-three-months-back metric.received-year metric.repeating-held metric.repeating-in-no-book
+      metric.repeating-overdue metric.rule-filed metric.rules-filing metric.rules-filing-30d metric.runs-out-on metric.runway-days
+      metric.settled-in-7d metric.settled-out-7d metric.spent-30d metric.spent-all metric.spent-by-category-last-month
+      metric.spent-by-category-month metric.spent-by-category-to-date-last-month metric.spent-by-category-week
+      metric.spent-by-category-year metric.spent-in-category-by-week metric.spent-last metric.spent-last-month metric.spent-three
+      metric.spent-vs-last-month metric.spent-year metric.spoken-for-month metric.spoken-for-share metric.statement-oldest-days
+      metric.stripe-below-zero-count metric.txn-uncategorised metric.uncategorised-share-30d metric.unfiled-month
+      metric.unfiled-spent-month metric.unnamed-paid-90d
+      page.money page.money-account page.money-accounts page.money-bill page.money-book page.money-budgets page.money-coming
+      page.money-forecast page.money-ledger page.money-payees page.money-plan page.money-reports page.money-rules
+      register.accounts register.balances register.books register.categories register.filing_rules register.fx register.installments
+      register.obligations register.payee_names register.plans register.recurring register.snapshots register.transactions
+      rule.account-files-book rule.bill-moves-line rule.bill-takes-book rule.budget-near rule.budget-over rule.card-limit-owes
+      rule.card-text-owes rule.category-correction-asks rule.category-correction-yes rule.category-stays-asks rule.category-stays-yes
+      rule.category-taught rule.category-teaches rule.entry-takes-book rule.installment-due-soon rule.instalment-settles
+      rule.invoice-chased rule.invoice-late rule.part-counts-plan rule.part-takes-book rule.payee-named-back rule.payment-files-paid
+      rule.payment-matches rule.payment-matches-again rule.payment-settles rule.payment-unsettles rule.plan-links-parts
+      rule.plan-made-one rule.posted-replaced rule.recurring-ended rule.recurring-missed rule.recurring-stopped
+      rule.recurring-went-through rule.repeat-takes-book rule.rule-files-back rule.txn-categorise
+      script.book_from_account script.budget_watch script.card_owed script.category_correction script.category_stays script.file_back
+      script.file_paid script.last_day script.learn_category script.ledger_twice script.match_payment script.move_line
+      script.name_payees script.offer_budgets script.plans_from_names script.post_due script.replace_posted script.settle
+      script.settle_matched_line script.unsettle
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
+    `,
+    declares: 'a8941d0098073977',
+    history: [
+      'money-core 3.38.8 of 8 November (obvious questions): `script.learn_category` makes the rule for a payee filed one way three times, and `script.last_day` decides each month-end line instead of asking, and nothing else moved -> a8941d0098073977',
+    ],
+  },
   'money-core@3.38.7': {
     holds: `
       metric.account-ages metric.account-gap metric.account-in-by-month metric.account-lines metric.account-now

@@ -273,6 +273,22 @@ test('an entry with no other like it asks without a count; a bank\'s new entry w
   assert.equal(m.said(open[0]!.id).includes('more like it'), false);
 });
 
+test('A PAYEE HE FILED THE SAME WAY THREE TIMES, AND NEVER ANOTHER, GETS ITS RULE WITHOUT A QUESTION, and Undo takes it back', async () => {
+  const m = await money();
+  for (let i = 0; i < 2; i++) m.paid('ZOOBA', 2 + i * 7, { payee: 'Zooba', category: m.outing.id });
+  const mine = m.paid('ZOOBA', 20, { payee: 'Zooba' });
+  const later = m.paid('ZOOBA', 30, { payee: 'Zooba' });
+  await m.turn();
+  value(m.k.update('transactions', mine.id, { category: m.outing.id }, OWNER));
+  await m.turn(6);
+  assert.deepEqual(m.asked(), [], 'a payee already filed the same way three times is not asked about');
+  const made = m.rules();
+  assert.equal(made.length, 1, m.log.join(' | '));
+  assert.deepEqual([made[0]!.fields.match, made[0]!.fields.category], ['ZOOBA', m.outing.id]);
+  assert.equal(m.k.get(later.id)!.fields.filed_by, made[0]!.id, 'and the rest are filed by it');
+  assert.ok(m.log.some((l) => l.includes('3 times and never anywhere else')), m.log.join(' | '));
+});
+
 test('a Ledger read a page of fifty at a time still files every one of 130 entries', async () => {
   const m = await money();
   const many = Array.from({ length: 130 }, (_, i) => m.paid('TALABAT', 1 + Math.floor(i / 3)));

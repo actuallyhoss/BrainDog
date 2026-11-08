@@ -226,6 +226,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.38.8', notes: 'Fewer questions: a payee you filed the same way three times gets its filing rule without asking, and a repeating line on a month end is put on the last day or kept on its date by its own payments. Both can be undone.' },
     { version: '3.38.7', notes: 'Words only: a note on filing a payment says an example bill. Nothing a record does changes.' },
     { version: '3.38.6', notes: 'A category or line marked as a correction reads "A correction and not spending", so a filter on it can be typed back.' },
     { version: '3.38.5', notes: 'Filing rules no longer opens on a count of what the rules filed in 30 days. Each rule still says it.' },
