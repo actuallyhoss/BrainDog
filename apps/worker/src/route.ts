@@ -399,8 +399,9 @@ export function appPath(pathname: string): AppPath | null {
  *
  * AND HSTS, COOP AND PERMISSIONS-POLICY (`PAGE_HARDENING`). HSTS was left to a zone setting nobody turned on: measured on
  * 5 Nov, neither `app.brain.dog` nor `brain.dog` sent it, so a first visit typed without `https://` went out in the clear.
- * It names this host alone and carries no `includeSubDomains`, since a name somebody once pointed elsewhere must not stop
- * answering for it. `same-origin` on the opener means a page this one opens, or that opened it, holds no handle to it.
+ * It carries `includeSubDomains` since the security pass of 8 Nov (L8), so a name under this host is never first reached in
+ * the clear either, and every such name must answer on https. No `preload`: browsers ship that list, and a host is not
+ * taken off it for months. `same-origin` on the opener means a page this one opens, or that opened it, holds no handle to it.
  * The app asks for no camera, microphone or place, so a frame or a script that got in cannot either.
  *
  * THE POLICY IS THE ONE THE PAGE ALREADY CARRIES (`pagePolicy`), so it names the very hashes of the build it rides on
@@ -433,7 +434,7 @@ export async function asPage(out: Response, path?: string): Promise<Response> {
 
 /** What every page says of how it is reached and what it may ask for. The self-host keeps the last two in `shell.ts`. */
 export const PAGE_HARDENING = [
-  ['strict-transport-security', 'max-age=31536000'],
+  ['strict-transport-security', 'max-age=31536000; includeSubDomains'],
   ['cross-origin-opener-policy', 'same-origin'],
   ['permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), bluetooth=(), midi=()'],
 ] as const;
