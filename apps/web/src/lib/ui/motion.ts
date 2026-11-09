@@ -101,6 +101,36 @@ export function gapOf(node: Element): { px: number; side: 'margin-block-end' | '
 /** The margin that takes back `part` (0 to 1) of the gap, as CSS, or nothing where there is no gap. */
 const gapCss = (gap: ReturnType<typeof gapOf>, part: number): string => (gap ? `;${gap.side}:${(-gap.px * part).toFixed(1)}px` : '');
 
+/** Whether `a` is a glide Svelte's `animate:flip` laid on a row that carries it straight down. */
+function glidesDown(a: Animation): boolean {
+  if (a.id !== '' || !(a.effect instanceof KeyframeEffect)) return false;
+  const first = a.effect.getKeyframes()[0]?.['transform'];
+  const m = typeof first === 'string' ? /translate\((-?[\d.]+(?:e-?\d+)?)px, (-?[\d.]+(?:e-?\d+)?)px\)/u.exec(first) : null;
+  return m !== null && Math.abs(Number(m[1])) < 1 && Number(m[2]) <= -1;
+}
+
+/**
+ * THE ROWS UNDER AN ARRIVING ROW MOVE ONCE, AS ITS ROOM OPENS (9 Nov). A list that also glides its rows (`animate:flip`)
+ * measures where they went before Svelte lays the new row's first frame on it (a microtask later, Svelte 5.57), so it
+ * measured them a whole row lower and glided them down to there while the room opening under them carried them down
+ * as well: they jumped up over the new row and fell two rows. Their glides straight down are let go as soon as they are
+ * laid on, so they ride the room alone, as in a list with no glide. A glide sideways or up, a row trading places, stays.
+ * One read of the list's animations, so the page's style is worked out once and not once a row.
+ */
+function unglideBelow(row: Element): void {
+  const drop = (): void => {
+    const list = row.parentElement;
+    if (!list || !row.isConnected) return;
+    for (const a of list.getAnimations({ subtree: true })) {
+      const at = a.effect instanceof KeyframeEffect ? a.effect.target : null;
+      if (at?.parentElement === list && row.compareDocumentPosition(at) & Node.DOCUMENT_POSITION_FOLLOWING && glidesDown(a)) a.cancel();
+    }
+  };
+  /* Svelte lays a glide on in the microtask after the one that measured it, which is after this one: so one more. */
+  queueMicrotask(() => queueMicrotask(drop));
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(drop);
+}
+
 /**
  * A ROW ARRIVING (the record forming of 1 November): its height opens on the even curve, so the rows under it glide down
  * to make room, while it rises 8px into place on the spring (`--ease-spring`) and fades in, over `--form-in`. One the
@@ -112,6 +142,7 @@ export function rowIn(node: Element): TransitionConfig {
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
   const gap = gapOf(node);
+  unglideBelow(node);
   return {
     duration: ms('--form-in', 320),
     css: (p) => {
