@@ -25,6 +25,7 @@ import { askPage } from './page-verbs.ts';
 import { thingOf } from './thing.ts';
 import { thingWords } from './verbs.ts';
 import { dbl } from '../ui/dbl.ts';
+import { appAddress } from '../ui/context-menu.ts';
 
 /** The row a page is about, by its slug: a project's page, a person's, an account's. */
 export function aboutOf(slug: string): { list: string; seq: number } | null {
@@ -76,6 +77,33 @@ export function renameAt(address: string, field?: string): void {
  * not rename, so the press is the browser's.
  */
 export const renames = (href: string, field?: string) => dbl(() => renameAt(href, field), { can: () => renamable(href) });
+
+/** The link a press landed in, where it stands for a row or a page about one: what a double click on it renames. */
+export function rowLinkOf(from: Element): string | null {
+  const link = from.closest('a[href]');
+  const address = link ? appAddress(link) : null;
+  if (!address) return null;
+  const t = thingOf(address);
+  return t.kind === 'row' || (t.kind === 'page' && aboutOf(t.slug) !== null) ? address : null;
+}
+
+/**
+ * `{@attach renamesLinks}`: A SCREEN WHOSE LINES ARE LINKS TO ROWS (a row's page, with the rows it is tied to), each
+ * renamed by a double click on its link, as `renames` renames one. A link to anything else keeps its own double click.
+ */
+export const renamesLinks = dbl(
+  (from) => {
+    const to = rowLinkOf(from);
+    if (to) renameAt(to);
+  },
+  {
+    can: (from) => {
+      const to = rowLinkOf(from);
+      return to !== null && renamable(to);
+    },
+    through: 'a[href]',
+  },
+);
 
 /** The sheet a row's menu opens for Rename, over the row as it was read, written through the list's own writer. */
 export function renameSheetOf(list: string, seq: number, decl: RegisterDecl, row: Entry, write: RowWriter = rowWriter(apiBase())): SheetAsk {

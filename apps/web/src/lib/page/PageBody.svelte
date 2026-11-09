@@ -48,11 +48,10 @@
   import { rowOfKey } from './row-verbs.ts';
   import type { RowAt } from './row-verbs.ts';
   import { dbl } from '$lib/ui/dbl.ts';
-  import { appAddress, MENU_AT } from '$lib/ui/context-menu.ts';
-  import { renamable, renameAt, askRename, aboutOf } from '$lib/things/rename.ts';
+  import { MENU_AT } from '$lib/ui/context-menu.ts';
+  import { renamable, renameAt, askRename, rowLinkOf } from '$lib/things/rename.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { dayFieldOf } from '$lib/board/sentence.ts';
-  import { thingOf } from '$lib/things/thing.ts';
   import JustChanged from './JustChanged.svelte';
   import Changed from './Changed.svelte';
   import { leadIndex } from './lead.ts';
@@ -1297,14 +1296,6 @@
   let asEdit: string | true | null = null;
   const panels = $derived(host !== null && host !== undefined && mode === 'page' && writes !== null);
 
-  /** A link the press followed, where it stands for a row or a page about one. */
-  const rowLink = (from: Element): string | null => {
-    const link = from.closest('a[href]');
-    const address = link ? appAddress(link) : null;
-    if (!address) return null;
-    const t = thingOf(address);
-    return t.kind === 'row' || (t.kind === 'page' && aboutOf(t.slug) !== null) ? address : null;
-  };
   /** The row pressed: by the key it draws, or the one its title's press just opened (a card says no key). */
   const pressedRow = (from: Element): RowAt | null => {
     const said = rowOfKey(from.closest<HTMLElement>('[data-row]')?.dataset.row);
@@ -1342,7 +1333,7 @@
   function canChange(from: Element): boolean {
     if (arranging || mode === 'preview') return false;
     if (from.closest('a[href]')) {
-      const to = rowLink(from);
+      const to = rowLinkOf(from);
       return to !== null && renamable(to);
     }
     if (tableRow(from)) return panels;
@@ -1352,7 +1343,7 @@
   }
 
   function change(from: Element): void {
-    const to = rowLink(from);
+    const to = rowLinkOf(from);
     if (to) return renameAt(to);
     const tr = tableRow(from);
     if (tr && panels) return tableEdit(tr, from);

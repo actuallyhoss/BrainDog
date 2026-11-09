@@ -78,6 +78,7 @@
   import { draftOf, editable, isFile, isJson, isQuantity, patchOf, unitOf, unitsOf, wrongValue } from '$lib/record/field-draft.ts';
   import { dbl } from '$lib/ui/dbl.ts';
   import { answerVerbs } from '$lib/things/page-verbs.ts';
+  import { renamesLinks } from '$lib/things/rename.ts';
   import FileField from '$lib/ui/FileField.svelte';
   import DayBox from '$lib/ui/DayBox.svelte';
   import QuantityBox from '$lib/ui/QuantityBox.svelte';
@@ -1656,7 +1657,7 @@
   <!-- A PERSON'S PAGE WEARS THEIR FACE, as every list draws them: a who is round, and the list's group glyph beside one
        person's name read as a crowd. -->
   {#snippet personWell()}<Face name={String(row?.fields[decl?.title ?? ''] ?? '')} kind="person" you={self && owner} size="l" />{/snippet}
-  <div class="row-head">
+  <div class="row-head" {@attach renamesLinks}>
   <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : (lineHead ?? rowNameSaid(id, String(row.fields[decl.title] ?? '')))} sentence={headLine} well={meets ? personWell : undefined}>
     {#snippet actions()}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER. A row's page led with a developer verb: the first control a
@@ -1739,7 +1740,9 @@
   {#if mergeable && row}<MergeSheet bind:open={mergeOpen} register={id} seq={row.seq} name={String(row.fields[decl.title] ?? '')} title={decl.title} mergedInto={decl.meets?.merged_into} />{/if}
   {#if live && proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={() => (got = got && { ...got })} />{/if}
 
-  <div class="page">
+  <!-- A LINK HERE TO ANOTHER ROW (its project, its invoices, the people at it) renames that row on a double click, as
+       one in the head does (its projects, who it is with). -->
+  <div class="page" {@attach renamesLinks}>
     <!-- SAID ON THE ROW, because every list leaves an archived row out and nothing else on this
          screen would say why it has gone from them. -->
     {#if archived}
