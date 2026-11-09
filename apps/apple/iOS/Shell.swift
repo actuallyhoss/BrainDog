@@ -307,7 +307,7 @@ struct RootTools: ToolbarContent {
             Button {
                 app.accountOpen = true
             } label: {
-                Face(app.boot?.me?.name ?? app.boot?.record?.name ?? "B", side: 30)
+                Face(app.boot?.me?.name ?? app.boot?.record?.name ?? "B", side: 30, picture: app.boot?.me?.picture)
             }
             .accessibilityLabel(Words.account)
         }

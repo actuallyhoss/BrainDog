@@ -127,6 +127,8 @@ nonisolated public struct Boot: Codable, Sendable, Equatable {
     public struct Me: Codable, Sendable, Equatable {
         public let person: String?
         public let name: String?
+        /// The hash of the owner's own photo, at `/api/files/<sha256>`, while his row in People holds one (`Face` draws it).
+        public let picture: String?
         public let level: String?
         public let levels: [String: String]?
     }
