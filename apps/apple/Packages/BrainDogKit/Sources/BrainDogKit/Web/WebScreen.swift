@@ -60,6 +60,9 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     /// The pull's spinner while its read is out: it stops when the page says the read has landed (`settled`).
     @ObservationIgnored private weak var pulling: UIRefreshControl?
     @ObservationIgnored private var pulledAt = Date.distantPast
+    /// The page says when a pull's reads land (it says `settled` once as it first draws): until then the spinner keeps
+    /// the old short wait, so a page from before this never holds it for the whole six seconds.
+    @ObservationIgnored private var tellsSettled = false
     #endif
     /// A file the page handed over (an export, a backup, an attachment's Download), saved where the app can share it.
     @ObservationIgnored public var onFile: ((URL) -> Void)?
@@ -276,6 +279,7 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
             withAnimation(.easeOut(duration: 0.2)) { modal = open }
         case .settled:
             #if os(iOS)
+            tellsSettled = true
             endPull()
             #endif
             onAsk?(ask)
@@ -325,8 +329,9 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         pulling = control
         pulledAt = Date()
         if offline { reload() } else { emit("refresh") }
+        let most: Duration = tellsSettled ? .seconds(6) : .milliseconds(700)
         Task { @MainActor [weak self, weak control] in
-            try? await Task.sleep(for: .seconds(6))
+            try? await Task.sleep(for: most)
             if self?.pulling === control { self?.endPull() }
         }
     }

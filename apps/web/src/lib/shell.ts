@@ -210,6 +210,8 @@ export function shellReady(): void {
   if (readySaid) return;
   readySaid = true;
   shell()?.ready?.();
+  /* AND THAT THIS PAGE SAYS WHEN A PULL'S READS LAND (`shellSettled`), so the iPhone waits for it rather than a timer. */
+  shell()?.settled?.();
 }
 
 /** The pull's reads have landed (`settled`): said once per pull, so native can end its spinner. */
