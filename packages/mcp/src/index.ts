@@ -3311,7 +3311,24 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         },
         ctx,
       );
-      return wrote(made, 'Added', ctx, turn);
+      const out = await wrote(made, 'Added', ctx, turn);
+      /* A DAY IN THE TITLE AND NONE IN THE DUE FIELD (6 Nov: "by Friday" went into a task's name and no date was set, so
+         it was due nowhere and reminded nobody): the answer says so, with the update that sets it. Read as `context`
+         reads days, in the record's own zone; a list with no due field, or a title naming no day, is told nothing. */
+      if (!made.ok || !isEntry(made.value) || out.say === undefined) return out;
+      const row = made.value;
+      if (!decls.has(row.register)) await learnPrefix(row.register, ctx);
+      const decl = decls.get(row.register);
+      const due = decl === undefined ? undefined : roleField(decl, 'due');
+      const title = decl?.title === undefined ? undefined : row.fields[decl.title];
+      if (due === undefined || (row.fields[due.id] !== undefined && row.fields[due.id] !== null) || typeof title !== 'string' || row.seq === null) return out;
+      if (!/\b(?:by|due|before|until|till|on)\s/iu.test(title)) return out;
+      const place = await peopleOf(ctx, turn);
+      const said = dueIn(title, (words) => dayInWords(words, place.now, { ...(place.zone === undefined ? {} : { zone: place.zone }), ...(place.locale === undefined ? {} : { locale: place.locale }) }));
+      if (said === null) return out;
+      const hint = `${due.label ?? due.id} is empty, though the ${decl?.one ?? 'title'} says "${said.words}". Set it: ${callOf('update', { spoken: spokenOf(row.register, row.seq), patch: { [due.id]: said.day } })}`;
+      const say = out.say;
+      return { ...out, say: (look) => `${say(look)}\n${hint}` };
     },
 
     update: async (args, ctx, turn) => {
@@ -5128,6 +5145,25 @@ export function mendFields(
     out[key] = Array.isArray(value) && f.type === 'list' ? value.map((v) => one(f, key, v, key)) : one(f, key, value, key);
   }
   return { fields: out, mends, left };
+}
+
+/**
+ * The day a title says a thing is due, "by Friday", "due 14 Nov", "before next Tuesday", as its words and the day
+ * `read` takes them for (`dayInWords` on the record's clock), or `null` where it names none. Up to three words after the
+ * word that says when are read, the longest reading first, so "by next Friday" is next Friday and not Friday; "now" is
+ * no day anything is due by.
+ */
+export function dueIn(text: string, read: (words: string) => string | null): { words: string; day: string } | null {
+  for (const m of text.matchAll(/\b(by|due|before|until|till|on)\s+([^\s,;:()]+(?:\s+[^\s,;:()]+){0,2})/giu)) {
+    const after = m[2]!.split(/\s+/u);
+    for (let n = after.length; n >= 1; n--) {
+      const words = after.slice(0, n).join(' ').replace(/[.!?]+$/u, '');
+      if (words === '' || words.toLowerCase() === 'now') continue;
+      const day = read(words);
+      if (day !== null) return { words: `${m[1]!} ${words}`, day };
+    }
+  }
+  return null;
 }
 
 /** Mends said as a person reads them, "what for title and high for High", joined with "and". */
