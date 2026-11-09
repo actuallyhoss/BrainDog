@@ -31,7 +31,7 @@ export type ListPageShape = {
   state?: string | undefined;
   finished?: string | undefined;
   order?: { field: string; dir?: 'asc' | 'desc' | undefined } | undefined;
-  identity?: { mark?: string | undefined; accent?: string | undefined } | undefined;
+  identity?: { mark?: string | undefined; accent?: string | undefined; picture?: string | undefined } | undefined;
 };
 
 /** What the caller has read of the list, when it has: how many it holds. */
@@ -116,7 +116,8 @@ export function listPage(decl: ListPageShape, said: ListPageSaid = {}): ListPage
   const state = by(decl.state);
   const mark = by(decl.identity?.mark);
   const accent = by(decl.identity?.accent);
-  const picture = live.find((f) => f.type === 'file');
+  /* THE PICTURE A ROW IS DRAWN BY, where the list names one (`identity.picture`), else its first file. */
+  const picture = (decl.identity?.picture === undefined ? undefined : by(decl.identity.picture)) ?? live.find((f) => f.type === 'file');
   const { order, newest, day: ownDay } = orderOf(decl, live);
   const days = live.filter((f) => f.type === 'day');
   const due = days.find((f) => f.deadline === true);

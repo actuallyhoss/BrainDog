@@ -5171,9 +5171,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         /* A MARK IS A PICTURE, NEVER A CONTROL: a project drawn as the close cross reads as a button. */
         if ((decl as { identity?: { mark?: unknown } }).identity?.mark === key && isControlMark(value))
           return no<Entry>(MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, { at: key });
-        /* AND A PICTURE STAYS ONCE IT IS CHOSEN (`markFrozen`): a mark that names a glyph takes no change, and
-           before the `null` branch on purpose, so it is not cleared either. One that names no glyph takes the write. */
-        if (current && (decl as { identity?: { mark?: unknown } }).identity?.mark === key) {
+        /* AND A PICTURE STAYS ONCE IT IS CHOSEN (`markFrozen`), FROM AN AGENT: a mark that names a glyph takes no change
+           by a key, and before the `null` branch on purpose, so it is not cleared either. One that names no glyph takes
+           the write. A PERSON CHANGES IT (his word of 4 November: "make it so i can change icon of the project by hovering
+           on the profile picture"): a write that is no key's is his, made where the mark is drawn. */
+        if (current && w.principal?.kind === 'token' && (decl as { identity?: { mark?: unknown } }).identity?.mark === key) {
           const frozen = markFrozen(current.fields[key], value);
           if (frozen) return no<Entry>(frozen.code, frozen.fix, { at: key });
         }
@@ -8715,13 +8717,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        `runs_on` counts the runs among them and answers no grant. */
     keyUses: (grant, since) =>
       sql.all<{ actor: string; ts: string }>("SELECT actor, ts FROM event WHERE target = ? AND kind = 'grant.read' AND ts >= ? ORDER BY rowid DESC LIMIT 5000", `grant:${grant}`, since),
-    /* THE FIELDS A LIST MARKS ITS ROWS BY, its `identity:`, which the chip beside a row's scope is drawn from (`scope_marks`). */
+    /* THE FIELDS A LIST MARKS ITS ROWS BY, its `identity:`, which the chip beside a row's scope is drawn from (`scope_marks`):
+       its mark, its hue, and the picture drawn in place of the mark where a row holds one. */
     identityOf: (register) => {
       const decl: Readonly<Record<string, unknown>> | undefined = registers.get(register);
       const said = decl?.identity;
       if (said === null || typeof said !== 'object' || Array.isArray(said)) return null;
-      const { mark, accent } = said as { mark?: unknown; accent?: unknown };
-      return { ...(typeof mark === 'string' ? { mark } : {}), ...(typeof accent === 'string' ? { accent } : {}) };
+      const { mark, accent, picture } = said as { mark?: unknown; accent?: unknown; picture?: unknown };
+      return { ...(typeof mark === 'string' ? { mark } : {}), ...(typeof accent === 'string' ? { accent } : {}), ...(typeof picture === 'string' ? { picture } : {}) };
     },
     /*
      * THE OPEN QUESTIONS, for a `queue` block: what is waiting on a person, dearest first.
