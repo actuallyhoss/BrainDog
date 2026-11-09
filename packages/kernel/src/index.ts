@@ -2514,17 +2514,40 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     LIST_ID.test(register) ? { sql: `register = '${register}'`, params: [] } : { sql: 'register = ?', params: [register] };
 
   const RULES_KEPT = 512;
-  const rulesKept = new Map<string, Compiled>();
+  /* AND WHAT COMPILING IT READ (`read`), handed to every reading being read when the rule is handed out again (`within`),
+     as a held value's reads are (`readMemo`): a name looked up in `things` holds the reading on `things` too. */
+  const rulesKept = new Map<string, { c: Compiled; read: ReadTrace }>();
   const ruleCompiled = (register: string, rule: Json): Compiled => {
-    const key = [revision, version(), Math.floor(clock.now() / 60_000), register, JSON.stringify(rule)].join('\u0000');
+    /* THE VERSION IN THE KEY IS NO READ OF THE READINGS BEING READ (`traces`): it reads the log, which no held reading may,
+       so every count by a rule (how many rows fill a field, how many are open) was read again on every ask, and the pen
+       counted a 20,000 row ledger's dated rows again on every `boot`. What compiling reads is theirs, as it was. A sign or
+       a draw still sees it. */
+    const watching = traces.splice(0);
+    let at: number;
+    try {
+      at = version();
+    } finally {
+      traces.push(...watching);
+    }
+    const key = [revision, at, Math.floor(clock.now() / 60_000), register, JSON.stringify(rule)].join('\u0000');
     const hit = rulesKept.get(key);
     if (hit !== undefined) {
       rulesKept.delete(key);
       rulesKept.set(key, hit);
-      return hit;
+      for (const t of traces) within(t, hit.read);
+      return hit.c;
     }
-    const c = ruleOf(rule, readerSchemaOf()(register) ?? schemaOf(register), evalContext());
-    rulesKept.set(key, c);
+    const read = traceOf();
+    traces.push(read);
+    let c: Compiled;
+    try {
+      c = ruleOf(rule, readerSchemaOf()(register) ?? schemaOf(register), evalContext());
+    } finally {
+      traces.pop();
+    }
+    /* KEPT ONLY WHERE WHAT IT READ WAS SEEN: compiled while reads are not noted (`muted`), it would be handed out reading nothing. */
+    if (muted > 0) return c;
+    rulesKept.set(key, { c, read });
     while (rulesKept.size > RULES_KEPT) rulesKept.delete(rulesKept.keys().next().value as string);
     return c;
   };
@@ -4618,8 +4641,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * record) and an arrival filed or read (`inbox_raw`). Each moved every list, so every figure, walk and fact held over
    * the ledger was read again after a script read its key: a book's page went from 0.2 s to 1.8 s of the record's time.
    * A row such a write changes still moves its own list, by its line or by what its rows add up to (`listsStamp`).
+   * NOR AN ANSWER (`decision`): every question answered on the phone wrote one, and Money's page was read again whole
+   * after each, 0.9 s of the record's time on a ledger of 20,000 rows. What an answer changes is written with lines of
+   * its own: a row by its line, a declaration or an add-on by `whole`, the record's settings by a line about the record.
    */
-  const QUIET_TARGETS: ReadonlySet<string> = new Set(['suggestion', 'grant', 'inbox_raw']);
+  const QUIET_TARGETS: ReadonlySet<string> = new Set(['suggestion', 'grant', 'inbox_raw', 'decision']);
   type ListsSeen = { head: string; whole: string; top: number; id: string; base: number; other: number; tops: Map<string, number> };
   let listsSeen: ListsSeen | null = null;
   const listsNow = (): ListsSeen => {
@@ -14058,11 +14084,26 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if (parseSpoken(ref) ?? prefixed(ref)) out.set(ref, readOut(get(ref, opts)));
         else ids.push(ref);
       }
-      for (let i = 0; i < ids.length; i += 500)
-        for (const row of sql.all<Record<string, unknown>>(`SELECT ${COLUMNS} FROM entry WHERE id IN (SELECT value FROM json_each(?))`, JSON.stringify(ids.slice(i, i + 500)))) {
-          const entry = hydrate(row);
-          out.set(entry.id, !opts.includeDeleted && entry.deleted_at ? null : readOut(entry));
+      for (let i = 0; i < ids.length; i += 500) {
+        const entries = sql.all<Record<string, unknown>>(`SELECT ${COLUMNS} FROM entry WHERE id IN (SELECT value FROM json_each(?))`, JSON.stringify(ids.slice(i, i + 500))).map(hydrate);
+        /* EACH LIST'S ROWS READ OUT TOGETHER (`withDerived`), so a field worked out through a link is one lookup for the
+           batch and not one a row: the news on `boot` read each payment's linked row alone, a third of a `boot` after a
+           write on a ledger of 20,000 rows. Each row is worked out from its own link as `readOut` works it out. */
+        const by = new Map<string, Entry[]>();
+        for (const entry of entries) {
+          if (!opts.includeDeleted && entry.deleted_at) continue;
+          const rows = by.get(entry.register);
+          if (rows) rows.push(entry);
+          else by.set(entry.register, [entry]);
         }
+        const read = new Map<string, Entry>();
+        for (const [register, rows] of by) {
+          const decl = registers.get(register);
+          const made = decl !== undefined && decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf()) : rows;
+          for (const entry of made) read.set(entry.id, entry);
+        }
+        for (const entry of entries) out.set(entry.id, read.get(entry.id) ?? null);
+      }
       for (const id of ids) if (!out.has(id)) out.set(id, null);
       return out;
     },

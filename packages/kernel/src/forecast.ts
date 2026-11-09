@@ -804,14 +804,12 @@ function everydayOf(deps: ForecastDeps, leg: Leg, already: readonly LegRead[], t
   for (let back = want; back >= 1; back--) months.push(iso(Date.UTC(year, month - 1 - back, 1, 12)).slice(0, 7));
   const out = leg.incoming ? ` AND ${`json_extract(fields, '${jsonPath(leg.incoming.field)}')`} IS NOT ?` : '';
   const spent = new Map<string, number>();
-  for (const r of deps.sql.all<{ c: string; m: string; total: number }>(
-    `SELECT ${currency} AS c, substr(${day}, 1, 7) AS m, sum(${amount}) AS total FROM entry WHERE ${dated} AND (${w.sql}) AND ${day} >= ? AND ${day} < ?${out} GROUP BY c, m`,
-    leg.register,
-    ...w.params,
-    `${months[0]!}-01`,
-    `${today.slice(0, 7)}-01`,
-    ...(leg.incoming ? [leg.incoming.is] : []),
-  ))
+  const text = `SELECT ${currency} AS c, substr(${day}, 1, 7) AS m, sum(${amount}) AS total FROM entry WHERE ${dated} AND (${w.sql}) AND ${day} >= ? AND ${day} < ?${out} GROUP BY c, m`;
+  const params = [leg.register, ...w.params, `${months[0]!}-01`, `${today.slice(0, 7)}-01`, ...(leg.incoming ? [leg.incoming.is] : [])];
+  /* ONCE FOR A READ TOO, by the statement as it is asked: each walk over the same everyday leg added up the same months
+     of the ledger again, three times on Money's page. */
+  const readSpent = () => deps.sql.all<{ c: string; m: string; total: number }>(text, ...params);
+  for (const r of memo === undefined ? readSpent() : memo.once(JSON.stringify(['spent', text, params]), readSpent))
     spent.set(`${String(r.c)} ${String(r.m)}`, Number(r.total));
 
   return [...began.keys()].sort().map((c): Everyday => {

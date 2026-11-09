@@ -899,12 +899,14 @@ export function youngOf(used: Used, nowMs: number): 'none' | 'weeks' | 'days' | 
 
 /** The different weeks since `since` that `list` was read on, by itself or through a page that draws it. */
 function weeksRead(sql: Sql, list: string, slugs: readonly string[], since: string): number {
-  const rendered = slugs.length === 0 ? '' : ` OR (kind = 'page.render' AND subject IN (${slugs.map(() => '?').join(', ')}))`;
+  /* THE SLUGS GO AS ONE JSON VALUE (`json_each`), as the pen's other reads pass lists: one parameter a slug was 180 on a
+     record whose 178 pages draw its tasks, and the store refuses past 100, so `boot` failed whole. */
+  const rendered = slugs.length === 0 ? '' : " OR (kind = 'page.render' AND subject IN (SELECT value FROM json_each(?)))";
   const days = sql.all<{ day: string }>(
     `SELECT DISTINCT day FROM observation WHERE day >= ? AND ((kind = 'register.read' AND subject = ?)${rendered})`,
     since,
     list,
-    ...slugs,
+    ...(slugs.length === 0 ? [] : [JSON.stringify(slugs)]),
   );
   return new Set(days.map((d) => mondayOf(d.day))).size;
 }
