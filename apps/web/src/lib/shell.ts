@@ -42,6 +42,8 @@ interface Shell {
   on?(event: ShellEvent, fn: (arg?: string) => void): () => void;
   /** The first screen has drawn, so the launch picture can go. */
   ready?(): void;
+  /** The native pull's reads have landed, so its spinner can end. */
+  settled?(): void;
   haptic?(kind: Haptic): void;
   share?(what: { url: string; title?: string }): void;
   tell?(prefill?: string): void;
@@ -208,6 +210,11 @@ export function shellReady(): void {
   if (readySaid) return;
   readySaid = true;
   shell()?.ready?.();
+}
+
+/** The pull's reads have landed (`settled`): said once per pull, so native can end its spinner. */
+export function shellSettled(): void {
+  shell()?.settled?.();
 }
 
 /** A press the hand should feel and a refusal it should notice; one felt within `FELT_MS` of the last is the same one. */

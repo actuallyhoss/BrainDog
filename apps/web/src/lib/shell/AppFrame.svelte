@@ -35,7 +35,7 @@
 <script lang="ts">
   import { BASE, apiBase, at, here, slugOf } from '$lib/at.ts';
   import { nameAskDue } from '$lib/sharing/name-ask.ts';
-  import { appPath, inIosApp, isApp, macNotifications, notify, onShell, setBadge, shellPlaces, shellTitle, shellVisit, windowFocused } from '$lib/shell.ts';
+  import { appPath, inIosApp, isApp, macNotifications, notify, onShell, setBadge, shellPlaces, shellSettled, shellTitle, shellVisit, windowFocused } from '$lib/shell.ts';
   import { handoffAlert, instructionAlert, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
   /* THE STYLESHEETS AND `applyInset()` ARE THE ROOT LAYOUT'S (`routes/+layout.svelte`), in the order they always had,
      so the light frame and this one draw on the same skin. */
@@ -115,6 +115,13 @@
     const path = appPath(to);
     if (path !== null) void goto(at(path));
   }));
+  /* THE PULL'S READS ARE OUT FROM `reread`'S RETURN (`Pull.svelte`): wait for the screen to settle, 8 s at most, so native ends its spinner when they land. */
+  async function waitSettled(): Promise<void> {
+    await tick();
+    const until = Date.now() + 8_000;
+    while (settled() === undefined && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
+  }
+
   /* ⌥SPACE AND THE MENU'S "ASK SLASH" (⌘J) OPEN ASK, and its "Search" (⌘K) opens the search: the same surfaces the keys
      open in the page. Only the Mac app sends these; a browser never does. */
   $effect(() => {
@@ -126,7 +133,7 @@
       onShell('saved', (name) => toasts.push(copy.savedToDownloads(name ?? ''))),
       onShell('unsaved', (name) => toasts.push(copy.notSaved(name ?? ''), { intent: 'warn' })),
       /* THE NATIVE PULL TO REFRESH: every screen reads again, through the same mark a pull in the page moves. */
-      onShell('refresh', () => void reread()),
+      onShell('refresh', () => void reread().then(waitSettled).then(shellSettled)),
     ];
     return () => stops.forEach((stop) => stop());
   });
@@ -764,7 +771,8 @@
   /* THE NATIVE TAB BAR IS THE WEB'S FOUR (`shellPlaces`), said as the shell opens and again only when they change, so
      "his five win" holds in the app as on the phone's web bar. Nothing in a browser. */
   $effect(() => {
-    if (isApp) shellPlaces(phoneTabs);
+    /* ONLY FROM A LIVE RECORD'S PAGE: a not-found or refused page would say Today alone and the tab bar would lose its places. */
+    if (isApp && !bare && !stray && page.error === null && data.live === true && !data.refused && data.index.slug !== '') shellPlaces(phoneTabs);
   });
   /* THE ONE LIT ROW, and the crumb the bar says it in. */
   /* AN ADDRESS WHOSE FIRST WORD NAMES NO RECORD THAT ANSWERED is a page that is not here (`routes/+page.svelte`), not this
@@ -1353,7 +1361,8 @@
 
   /* A SCREEN'S FIRST READ IS ASKED WHILE ITS LINK IS HOVERED, FOCUSED OR TOUCHED (`preload.ts`), on a live record
      whose access has not ended, and loaded once the first screen has rested, so the entry carries none of it. */
-  const readsAhead = $derived(data.live === true && !data.refused && live.ended === null);
+  /* NOT IN THE APP: a tap opens in another web view, so the answer is never used, and the record serves one request at a time. */
+  const readsAhead = $derived(!inIosApp && data.live === true && !data.refused && live.ended === null);
   $effect(() => {
     if (!readsAhead) return;
     let stop: (() => void) | null = null;

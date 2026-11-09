@@ -25,6 +25,7 @@ import { MARK_KEY, dropMark, memoryKey, readMark, writeMark, type MarkDeps } fro
 import { localCopy, memoryStore, railOf, scopeOf, type LocalCopy, type Log, type Near, type Rail, type Spot } from './local.ts';
 import { forget as forgetOffline, markGuest } from './offline.ts';
 import { seeingAs } from '../sharing/see-as.svelte.ts';
+import { inIosApp } from '../shell.ts';
 
 /* THE BUILD, READ OFF KIT'S OWN `define` RATHER THAN `$app/environment`. That module lives in the entry, and naming its
    `version` from this lazy file made the build stamp a chunk the entry has to import on every visit (`bundle` gate).
@@ -33,6 +34,8 @@ const build = typeof __SVELTEKIT_APP_VERSION__ === 'string' ? __SVELTEKIT_APP_VE
 
 /** How long a screen waits for the copy before it asks the record without it. */
 const NEAR_MS = 60;
+/* IN THE APP native covers a pushed screen for longer than that, so the copy is waited for more. */
+const NEAR_APP_MS = 200;
 /* OFFLINE THE RECORD ANSWERS NOTHING, so a slow copy is still the first thing drawn: it is waited for this long. */
 const OFFLINE_MS = 1_500;
 let patient = false;
@@ -228,7 +231,7 @@ export async function nearLocal<T>(name: string, key: string, base: string, late
     timer = setTimeout(() => {
       waited = true;
       resolve(null);
-    }, patient ? OFFLINE_MS : NEAR_MS);
+    }, patient ? OFFLINE_MS : inIosApp ? NEAR_APP_MS : NEAR_MS);
   });
   const asked = lastReader(base).then((person) => tab().answer<T>(name, key, base, person)).catch(() => null);
   const near = await Promise.race([asked, wait]);
