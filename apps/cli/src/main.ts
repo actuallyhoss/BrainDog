@@ -417,7 +417,7 @@ const fullUsage = () =>
     'braindog import <file.brainl> [--key <pubkey|url>] [--host <host>]',
     "  Check the file here, then put your BrainDog back from it, in place of everything it holds now. It takes only its own copy.",
     "  The owner approves the one import in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
-    'braindog import <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder|address>] [--host <host>] [--dry-run] [--strict] [--yes] | --draft-setup | --since <day|last>',
+    'braindog import <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder|address>] [--host <host>] [--dry-run] [--strict] [--yes] [--here] | --draft-setup | --since <day|last>',
     "  Move another tool's export into this BrainDog through its adapter: a pack id such as one in packs/, or the path of a module. Running it again updates what it added, and no key value is ever read.",
     'braindog import --map <map.json> <export.json> [--host <host>] [--dry-run] [--strict]',
     "  The same with no adapter: the map file says which list each part of the export goes to. --strict refuses the whole file when any part of it would not be read.",

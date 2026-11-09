@@ -18,7 +18,7 @@
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { looksLikeCredential } from '@braindog/declare';
@@ -377,10 +377,14 @@ const PACK_ID = /^[a-z0-9][a-z0-9-]{0,62}$/u;
 
 /**
  * The file an adapter named on the command line is: a path to a module or to a folder holding `adapter.ts`, or a pack
- * id, which is looked for as `packs/<id>/adapter.ts` under the folder the command runs in and then under the checkout
- * this command runs from. The id is never imported by name, so the command knows no pack: it knows where packs sit.
+ * id, which is looked for as `packs/<id>/adapter.ts` under the checkout this command runs from. The id is never imported
+ * by name, so the command knows no pack: it knows where packs sit.
+ *
+ * THE FOLDER THE COMMAND RUNS IN ONLY WHEN `here` ASKS (`--here`), and then before the checkout (security pass, 8 Nov).
+ * It was looked in first and nothing was asked, so `braindog import <id>` typed in a folder somebody else filled ran their
+ * `packs/<id>/adapter.ts` as this person. `here` in the answer says the file is that folder's.
  */
-export function adapterFile(spec: string, cwd: string): string | null {
+export function adapterFile(spec: string, cwd: string, here = false): { file: string; here: boolean } | null {
   const asFile = (path: string): string | null => {
     try {
       if (statSync(path).isDirectory()) return existsSync(join(path, 'adapter.ts')) ? join(path, 'adapter.ts') : null;
@@ -390,14 +394,15 @@ export function adapterFile(spec: string, cwd: string): string | null {
     }
   };
   const pathLike = isAbsolute(spec) || /[\\/]/u.test(spec) || /\.(?:ts|mts|js|mjs)$/u.test(spec);
-  if (pathLike) return asFile(resolve(cwd, spec));
-  if (!PACK_ID.test(spec)) return null;
-  const checkout = fileURLToPath(new URL('../../../', import.meta.url));
-  for (const root of [cwd, checkout]) {
-    const found = asFile(join(root, 'packs', spec));
-    if (found) return found;
+  if (pathLike) {
+    const file = asFile(resolve(cwd, spec));
+    return file === null ? null : { file, here: false };
   }
-  return null;
+  if (!PACK_ID.test(spec)) return null;
+  const local = here ? asFile(join(cwd, 'packs', spec)) : null;
+  if (local) return { file: local, here: true };
+  const own = asFile(join(fileURLToPath(new URL('../../../', import.meta.url)), 'packs', spec));
+  return own ? { file: own, here: false } : null;
 }
 
 const isAdapter = (v: unknown): v is Adapter =>
@@ -408,28 +413,37 @@ export type AdapterFetch = (id: string) => Promise<{ ok: true; file: string } | 
 
 /**
  * The file an adapter named on the line is, as `adapterFile` finds it, and then, for an id no `packs/` folder holds,
- * the copy `fetch` keeps of the add-on's adapter from the catalogue (`adapter-fetch.ts`). `fetched` says which.
+ * the copy `fetch` keeps of the add-on's adapter from the catalogue (`adapter-fetch.ts`). `fetched` says which, and
+ * `here` whether it is the working folder's own.
  */
-export async function adapterFileOr(spec: string, cwd: string, fetch?: AdapterFetch): Promise<{ ok: true; file: string; fetched: boolean } | { ok: false; fix: string }> {
-  const file = adapterFile(spec, cwd);
-  if (file !== null) return { ok: true, file, fetched: false };
+export async function adapterFileOr(
+  spec: string,
+  cwd: string,
+  fetch?: AdapterFetch,
+  here = false,
+): Promise<{ ok: true; file: string; fetched: boolean; here: boolean } | { ok: false; fix: string }> {
+  const found = adapterFile(spec, cwd, here);
+  if (found !== null) return { ok: true, ...found, fetched: false };
   if (fetch === undefined || !PACK_ID.test(spec)) return { ok: false, fix: `${spec} is neither a file nor a pack in packs/ with an adapter.ts in it.` };
   const got = await fetch(spec);
-  return got.ok ? { ok: true, file: got.file, fetched: true } : got;
+  return got.ok ? { ok: true, file: got.file, fetched: true, here: false } : got;
 }
 
 /**
  * The adapter and its mapping, loaded, or the sentence saying why not. `map` is `--map`'s file; without it the
  * `map.json` beside the adapter is read, which is where a pack keeps it. An adapter from the catalogue is one file, so
  * its mapping travels inside it as its `map` export, and the folder it is kept in is never read for one.
+ *
+ * A PACK FROM THE WORKING FOLDER IS SAID BEFORE IT RUNS (`say`), since nothing but `--here` vouches for it.
  */
 export async function loadAdapter(
   spec: string,
-  o: { cwd: string; map?: string | undefined; fetch?: AdapterFetch | undefined },
+  o: { cwd: string; map?: string | undefined; fetch?: AdapterFetch | undefined; here?: boolean | undefined; say?: ((line: string) => void) | undefined },
 ): Promise<{ ok: true; adapter: Adapter; map: ImportMap; file: string } | { ok: false; fix: string }> {
-  const found = await adapterFileOr(spec, o.cwd, o.fetch);
+  const found = await adapterFileOr(spec, o.cwd, o.fetch, o.here === true);
   if (!found.ok) return found;
   const { file } = found;
+  if (found.here) o.say?.(`Running ${relative(o.cwd, file)} from this folder, as --here asked.`);
   let mod: unknown;
   try {
     mod = await import(pathToFileURL(file).href);

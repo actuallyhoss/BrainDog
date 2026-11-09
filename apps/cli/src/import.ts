@@ -57,10 +57,10 @@ import { createClient } from '@braindog/client';
 import { saidDay } from './said-day.ts';
 
 const USAGE =
-  'braindog import takes <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder or address>] [--host <host>] [--dry-run] [--strict] [--yes], or --map <map.json> <export.json> when the map has sections, or <adapter> <export.json> --draft-setup, or <adapter> --since <day or last>. The adapter is the path of an adapter module, or a plugin by its id: from packs/ here, or else from the catalogue, asked about once. --yes is for a script: it says yes to running a plugin\'s adapter without asking.';
+  'braindog import takes <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder or address>] [--host <host>] [--dry-run] [--strict] [--yes] [--here], or --map <map.json> <export.json> when the map has sections, or <adapter> <export.json> --draft-setup, or <adapter> --since <day or last>. The adapter is the path of an adapter module, or a plugin by its id: from this command\'s own packs/, or else from the catalogue, asked about once; one in packs/ of this folder runs only with --here. --yes is for a script: it says yes to running a plugin\'s adapter without asking.';
 
 /** The options only an adapter import takes, which is how `main.ts` tells one from putting a .brainl file back. */
-export const ADAPTER_OPTIONS = ['setup', 'map', 'catalogue', 'dry-run', 'draft-setup', 'since', 'bin-emptied', 'strict'] as const;
+export const ADAPTER_OPTIONS = ['setup', 'map', 'catalogue', 'dry-run', 'draft-setup', 'since', 'bin-emptied', 'strict', 'here'] as const;
 
 /**
  * Whether a line after `braindog import` is an adapter import rather than a .brainl put back: two words before any
@@ -2406,6 +2406,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
     'bin-emptied'?: boolean | undefined;
     strict?: boolean | undefined;
     yes?: boolean | undefined;
+    here?: boolean | undefined;
   };
   let positionals: string[];
   try {
@@ -2424,6 +2425,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
         'bin-emptied': { type: 'boolean' },
         strict: { type: 'boolean' },
         yes: { type: 'boolean' },
+        here: { type: 'boolean' },
       },
     }));
   } catch {
@@ -2440,7 +2442,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
   }
   /** How the line named what reads the export, for a sentence that tells him what to type next. */
   const line = mapOnly ? `--map ${String(values.map)}` : String(spec);
-  const loaded = mapOnly ? loadMap(String(values.map), io.cwd) : await loadAdapter(String(spec), { cwd: io.cwd, map: values.map, fetch: fromCatalogue(io, values) });
+  const loaded = mapOnly ? loadMap(String(values.map), io.cwd) : await loadAdapter(String(spec), { cwd: io.cwd, map: values.map, fetch: fromCatalogue(io, values), here: values.here, say: io.say });
   if (!loaded.ok) {
     io.say(loaded.fix);
     return 1;
