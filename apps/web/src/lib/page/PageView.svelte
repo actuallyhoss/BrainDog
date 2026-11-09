@@ -35,6 +35,7 @@
 
 <script lang="ts">
   import { PAGE_MENU } from '$lib/ui/context-menu.ts';
+  import { answerVerbs, renamesPage } from '$lib/things/page-verbs.ts';
   import { handOver } from '$lib/shell/head-actions.ts';
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
   import type { ComponentProps, Snippet } from 'svelte';
@@ -373,6 +374,14 @@
   /* THE ROW'S OWN FIELDS UNDER A PAGE ABOUT IT (things, not rows): the page speaks first, and "Show the data" opens the
      row's screen, which stays where it is because the address asks for its fields. A project's shape has its own. */
   const dataHref = $derived(about !== null ? rowScreen(about.register, about.seq) : null);
+  /* RENAMING THE PAGE IS RENAMING WHAT IT IS ABOUT (a double click on its name, or on a card that opens it): the row's
+     Rename sheet, its menu's (`things/rename.ts`), for a reader who may change the row. A page about no row answers none. */
+  $effect(() => {
+    const shellNow = route.data as unknown as Partial<Shell>;
+    const of = about !== null && shellNow.me && may(shellNow as Shell, 'write', about.register) ? about : null;
+    if (!of) return;
+    return answerVerbs({ rename: () => void import('$lib/things/rename.ts').then((m) => m.askRename(of.register, of.seq)) });
+  });
   /* AND ITS ONE PRESS, the list's own finishing word ("Mark paid" on a bill), read for the row once (`row-finish.ts`). */
   let finish = $state.raw<{ key: string; said: string } | null>(null);
   $effect(() => {
@@ -1269,7 +1278,7 @@
     <!-- WHERE A BAR SAYS THE NAME (`barTitled`), its glyph, name, count and parent are the bar's, and the `h1` is unseen. -->
     <div class="lead-head" data-barred={barTitled() ? '' : undefined} data-handed={leadHanded ? '' : undefined}>
       <span class="lead-glyph" aria-hidden="true"><Icon name={iconFor(live.page.page.icon, 'doc')} size="m" /></span>
-      <h1 class="lead-name" tabindex="-1" dir="auto" data-thing={route.url.pathname + route.url.search} data-menu-host={PAGE_MENU}>{live.page.page.title}</h1>
+      <h1 class="lead-name" tabindex="-1" dir="auto" data-thing={route.url.pathname + route.url.search} data-menu-host={PAGE_MENU} {@attach renamesPage}>{live.page.page.title}</h1>
       {#if declared?.count?.value}<span class="lead-count num">{declared.count.value.toLocaleString('en')}</span>{/if}
       {#if crumb}
         {#if backTo}<a class="lead-crumb" href={at(backTo)}>{crumb}</a>{:else}<span class="lead-crumb">{crumb}</span>{/if}

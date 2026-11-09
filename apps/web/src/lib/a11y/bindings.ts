@@ -99,6 +99,8 @@ export const BINDINGS: Binding[] = [
   { id: 'close', scope: 'document', key: 'Esc', label: 'Close what is on top', bare: false },
   { id: 'help', scope: 'document', key: '?', label: 'These keys', bare: true },
   { id: 'menu', scope: 'document', key: '⇧F10', label: 'The menu of what has focus', bare: false },
+  /* `F2` CHANGES WHAT HAS FOCUS AS A DOUBLE CLICK ON IT DOES (`lib/ui/dbl.ts`): a name renamed, a value's box opened. */
+  { id: 'change', scope: 'document', key: 'F2', label: 'Rename or change what has focus, as a double click does', bare: false },
 
   /* A HOME (`lib/page`, PageBody in PageView mode=home: the declared Today, or any declared page a person opens on):
      what needs you, worked from the keyboard. They stand down while a box has

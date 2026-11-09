@@ -67,6 +67,7 @@
   import { ownMenu } from '../ui/context-menu.ts';
   import Menu from '../ui/Menu.svelte';
   import { VERB_ICONS, thingWords } from '../things/verbs.ts';
+  import { renames } from '../things/rename.ts';
 
   let {
     base,
@@ -535,7 +536,7 @@
   {@const here = isLit(p.href)}
   {@const name = shownName(p.name)}
   <li class="s-item" in:placeIn={{ hold: settling() }}>
-    <a class="s-row s-proj tap" href={at(p.href)} aria-current={here ? 'page' : undefined} aria-keyshortcuts={phone ? undefined : 'ArrowRight'} onkeydown={phone ? undefined : toPin}>
+    <a class="s-row s-proj tap" href={at(p.href)} aria-current={here ? 'page' : undefined} aria-keyshortcuts={phone ? undefined : 'ArrowRight'} onkeydown={phone ? undefined : toPin} {@attach renames(p.href)}>
       {@render mark(p)}
       {#if phone}
         <!-- ITS STATE ONLY ON THE PHONE (plan F8): "1 late", "Paid this month". The next step, cut to "Settle how Kiln
@@ -573,7 +574,7 @@
 
 {#snippet link(l: SideLink, nested: boolean)}
   <li in:placeIn={{ hold: settling() }}>
-    <a class="s-row s-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={isLit(l.href) ? 'page' : undefined}>
+    <a class="s-row s-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={isLit(l.href) ? 'page' : undefined} {@attach renames(l.href)}>
       {#if !nested}<Icon name={l.icon as IconName} size="m" />{/if}<span class="s-name">{l.label}</span>
       {#if l.count}<span class="s-count num">{l.count.toLocaleString('en-GB')}</span>{/if}
     </a>

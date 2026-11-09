@@ -12,6 +12,8 @@
   record has not named yet is said as one.
 -->
 <script lang="ts">
+  /* A DOUBLE CLICK ON A PERSON OR AN ORGANISATION RENAMES THEM, on the page the line opens (`things/rename.ts`). */
+  import { renames } from '$lib/things/rename.ts';
   import { flip } from 'svelte/animate';
   import Swap from '$lib/motion/Swap.svelte';
   import { dismiss, lineIn, listMotion, springy } from '$lib/motion/index.ts';
@@ -122,7 +124,7 @@
 {#snippet person(m: Member, at_: number | null)}
   {@const name = nameOf(m.entry)}
   {@const detail = detailOf(m, at_)}
-  <a class="line line-tall" href={at(`/r/${register}/${m.entry.seq}`)} {@attach openCardMenu && ownMenu((p) => openCardMenu(m.entry.seq, document.body, p))}>
+  <a class="line line-tall" href={at(`/r/${register}/${m.entry.seq}`)} {@attach openCardMenu && ownMenu((p) => openCardMenu(m.entry.seq, document.body, p))} {@attach renames(`/r/${register}/${m.entry.seq}`)}>
     <span class="line-mark"><Face {name} kind="person" you={m.self} size="m" picture={pictureOfRow(register, m.entry.fields)} row="{register}#{m.entry.seq}" /></span>
     <span class="line-main">
       <span class="line-title" dir="auto">{name}{#if m.self}<span class="you">{seenWords.you}</span>{/if}</span>
@@ -170,7 +172,7 @@
             {@const shown = folded ? item.members.slice(0, 1) : item.members}
             <li class="group">
               <!-- THE ORGANISATION, WHICH OPENS ITS OWN PAGE: its people, its projects, its money. -->
-              <a class="line line-tall" href={org ? at(`/r/${org.to}/${item.org}`) : undefined}>
+              <a class="line line-tall" href={org ? at(`/r/${org.to}/${item.org}`) : undefined} {@attach org ? renames(`/r/${org.to}/${item.org}`) : null}>
                 <span class="line-mark"><IconWell name={orgIcon} size="l" /></span>
                 <span class="line-main">
                   <span class="line-title" dir="auto">{name}</span>

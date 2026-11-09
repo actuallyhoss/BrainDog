@@ -34,6 +34,7 @@
   import { dismiss, lineIn } from '$lib/motion';
   import { settle } from '$lib/ui/motion.ts';
   import { apiBase, at, signInFirst } from '$lib/at.ts';
+  import { renames } from '$lib/things/rename.ts';
   import { onDestroy, onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
@@ -893,7 +894,7 @@
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="key" size="l" /></span>
               <span class="line-main">
-                {#if href}<a class="line-title key-name tap" href={at(href)} data-own>{keyName(k.label)}</a>{:else}<span class="line-title key-name" data-own>{keyName(k.label)}</span>{/if}
+                {#if href}<a class="line-title key-name tap" href={at(href)} data-own {@attach renames(href)}>{keyName(k.label)}</a>{:else}<span class="line-title key-name" data-own>{keyName(k.label)}</span>{/if}
                 {#if k.account}<span class="line-detail key-account" data-own>{k.account}</span>{/if}
                 <!-- WHERE IT APPLIES, THEN WHAT IT OPENS, as words in the meta line: the project's dot and name, or "All
                      projects". A saved value draws nothing; a key with no value says so with the ring and the words. -->

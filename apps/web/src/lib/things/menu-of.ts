@@ -45,6 +45,7 @@ import { editWords, openAutomations } from '../flow/source.ts';
 import { live } from '../data/live.svelte.ts';
 import { askPage } from './page-verbs.ts';
 import { askSheet } from './asks.svelte.ts';
+import { aboutOf, renameSheetOf } from './rename.ts';
 import { dotOf } from './state-dot.ts';
 import { thingOf, type Thing } from './thing.ts';
 import { quick } from '../money/quick.svelte.ts';
@@ -156,22 +157,7 @@ async function rowItems(list: string, seq: number, shell: Shell): Promise<ThingI
   const out: ThingItem[] = [];
   const key = `${list}#${seq}`;
   if (seq && !facts.archived) out.push(item('send', 'send', sendWords.sheet, G.keep, { run: () => void openSheet({ kind: list, attach: [{ ref: key, label: name }] }) }));
-  if (verbs.includes('rename'))
-    out.push(
-      item('rename', 'rename', thingWords.rename, G.change, {
-        run: () =>
-          askSheet({
-            kind: 'rename',
-            title: thingWords.renameThis(decl.one),
-            label: thingWords.nameField,
-            value: String(row.fields[decl.title] ?? ''),
-            save: async (value) => {
-              const wrote = await write.update(list, seq, { [decl.title]: value }, row.version);
-              return wrote.ok ? null : wrote.fix;
-            },
-          }),
-      }),
-    );
+  if (verbs.includes('rename')) out.push(item('rename', 'rename', thingWords.rename, G.change, { run: () => askSheet(renameSheetOf(list, seq, decl, row, write)) }));
   /* ITS STATES, THE LIST'S OWN, the one it is in ticked. A list's state is what a person moves a row between. */
   const field = decl.state ? decl.fields.find((f) => f.id === decl.state) : undefined;
   if (facts.changes && !facts.archived && field && (field.values?.length ?? 0) > 0) {
@@ -248,14 +234,6 @@ function pageItems(href: string, shell: Shell, from: ThingFrom, look: unknown, h
   }
   if (shell.me?.owner !== false && from.wide) out.push(item('arrange', 'layout', copy.arrange, G.page, { run: () => askPage(href, 'arrange') }));
   return out;
-}
-
-/** Where a page is about a row, which row. */
-function aboutOf(slug: string): { list: string; seq: number } | null {
-  const p = saidRowPages().pages.find((x) => x.slug === slug);
-  if (p?.about && typeof p.about.seq === 'number') return { list: p.about.register, seq: p.about.seq };
-  const spoken = /^([a-z][a-z0-9_]*)#([1-9]\d*)$/u.exec(slug);
-  return spoken ? { list: spoken[1]!, seq: Number(spoken[2]) } : null;
 }
 
 /** A page as the record answers it, as far as a menu reads it. */

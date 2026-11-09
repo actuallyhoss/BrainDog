@@ -77,6 +77,9 @@
   import { workingNow } from '$lib/home/waits.svelte.ts';
   import { putBackOf, valueWords } from '$lib/record/field-write.ts';
   import { draftOf, editable, isFile, isJson, isQuantity, patchOf, unitOf, unitsOf, wrongValue } from '$lib/record/field-draft.ts';
+  import { dbl } from '$lib/ui/dbl.ts';
+  import { answerVerbs } from '$lib/things/page-verbs.ts';
+  import { renamesLinks } from '$lib/things/rename.ts';
   import FileField from '$lib/ui/FileField.svelte';
   import DayBox from '$lib/ui/DayBox.svelte';
   import QuantityBox from '$lib/ui/QuantityBox.svelte';
@@ -490,6 +493,18 @@
     const f = fields.find((x) => x.id === decl?.title && editable(x, id)) ?? fields.find((x) => editable(x, id));
     if (f) startEdit(f);
   }
+
+  /* A DOUBLE CLICK OPENS THE SAME BOXES (`lib/ui/dbl.ts`): the title from its name, a value where it stands, and, from a
+     card or a cell of the list that opened this page, the title or that value (`rename`, `edit:<field>`,
+     `things/rename.ts`). Only for a reader who may change the row, as the pencils are. */
+  $effect(() => {
+    if (!row || !live || !changes || archived) return;
+    const verbs: Record<string, () => void> = { rename: editTitle, ...(decl ? { [`edit:${decl.title}`]: editTitle } : {}) };
+    for (const f of readable) if (editable(f, id)) verbs[`edit:${f.id}`] = () => startEdit(f);
+    return answerVerbs(verbs);
+  });
+  /** `{@attach edits(f)}`: a double click on a value opens its box, as its pencil does. */
+  const edits = (f: FieldDecl) => (changes && editable(f, id) && editing !== f.id ? dbl(() => startEdit(f)) : null);
 
   /* ESC CLOSES THE BOX it was pressed in, unsaved (motion F5.4), and goes no further: a sheet or panel round the page
      closes on the next one. */
@@ -1615,7 +1630,7 @@
          way (`rowIn`, `rowOut`; a fade alone under reduced motion). The first six are simply there. -->
     <div class="fact" in:foldIn={more} out:foldOut={more}>
       <dt class="fact-label">{labelOf(f)}</dt>
-      <dd class="fact-value" data-type={f.type} data-own={OWN_TYPES.has(f.type) ? '' : undefined} data-late={f.id === dueField?.id && lateTone === 'bad' ? '' : undefined} dir={dirOf(id, f.id)}>
+      <dd class="fact-value" data-type={f.type} data-own={OWN_TYPES.has(f.type) ? '' : undefined} data-late={f.id === dueField?.id && lateTone === 'bad' ? '' : undefined} dir={dirOf(id, f.id)} {@attach edits(f)}>
         {#if editing === f.id}
           {@render fieldEditor(f, value)}
         {:else}
@@ -1655,7 +1670,7 @@
   <!-- AN ORGANISATION'S PAGE WEARS ITS LOGO where its list keeps one (People 4.8.0), the square its list draws it in,
        with its initials until it has one. -->
   {#snippet orgWell()}<Face name={orgNameSaid(String(row?.fields[decl?.title ?? ''] ?? ''))} of="project" size="l" picture={rowPicture} row="{id}#{seq}" change={pictureChange} />{/snippet}
-  <div class="row-head">
+  <div class="row-head" {@attach renamesLinks}>
   <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : (lineHead ?? rowNameSaid(id, String(row.fields[decl.title] ?? '')))} sentence={headLine} well={meets ? personWell : orgRole && pictureFieldOf(id) !== null ? orgWell : undefined}>
     {#snippet actions()}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER. A row's page led with a developer verb: the first control a
@@ -1738,7 +1753,9 @@
   {#if mergeable && row}<MergeSheet bind:open={mergeOpen} register={id} seq={row.seq} name={String(row.fields[decl.title] ?? '')} title={decl.title} mergedInto={decl.meets?.merged_into} />{/if}
   {#if live && proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={() => (got = got && { ...got })} />{/if}
 
-  <div class="page">
+  <!-- A LINK HERE TO ANOTHER ROW (its project, its invoices, the people at it) renames that row on a double click, as
+       one in the head does (its projects, who it is with). -->
+  <div class="page" {@attach renamesLinks}>
     <!-- SAID ON THE ROW, because every list leaves an archived row out and nothing else on this
          screen would say why it has gone from them. -->
     {#if archived}
@@ -1805,12 +1822,12 @@
           {/if}
           {#if aboutLine}
             <div class="about about-line">
-              <p>{aboutLine.text}</p>
+              <p {@attach edits(aboutLine.field)}>{aboutLine.text}</p>
               {#if changes && editable(aboutLine.field, id)}<div class="about-pencil">{@render pencil(aboutLine.field)}</div>{/if}
             </div>
           {/if}
           {#if about}
-            <div class="about">
+            <div class="about" {@attach edits(decl.fields.find((x) => x.id === about.field)!)}>
               <NoteText text={about.text} />
               {#if changes && editable(decl.fields.find((x) => x.id === about.field)!, id)}<div class="about-pencil">{@render pencil(decl.fields.find((x) => x.id === about.field)!)}</div>{/if}
             </div>
@@ -1822,7 +1839,7 @@
                 {@render fieldEditor(figureField, row.fields[figureField.id])}
               {:else}
                 <div class="figure-line">
-                  <p class="figure-value num" data-sign={figureWay ?? undefined}>{#if figureWay === 'in'}+{/if}<Money minor={figureWay === 'out' ? -Math.abs(figure) : figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" /></p>
+                  <p class="figure-value num" data-sign={figureWay ?? undefined} {@attach edits(figureField)}>{#if figureWay === 'in'}+{/if}<Money minor={figureWay === 'out' ? -Math.abs(figure) : figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" /></p>
                   {#if changes && editable(figureField, id)}{@render pencil(figureField)}{/if}
                 </div>
                 {#if paidPart}
@@ -1848,7 +1865,7 @@
                     {@const chip = knownChip(k)}
                     <div class="fact">
                       <dt class="fact-label">{k.label}</dt>
-                      {#if chip}<dd class="fact-value">{@render foundChips([chip])}</dd>{:else}<dd class="fact-value" dir="auto" data-own>{k.value}</dd>{/if}
+                      {#if chip}<dd class="fact-value" {@attach edits(g.field)}>{@render foundChips([chip])}</dd>{:else}<dd class="fact-value" dir="auto" data-own {@attach edits(g.field)}>{k.value}</dd>{/if}
                       {#if i === 0 && changes && editable(g.field, id)}<dd class="fact-pencil">{@render pencil(g.field)}</dd>{/if}
                     </div>
                   {/each}

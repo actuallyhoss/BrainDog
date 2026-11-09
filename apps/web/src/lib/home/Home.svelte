@@ -163,6 +163,7 @@
   import type { Near } from '$lib/data/local.ts';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import { settle } from '$lib/ui/same.ts';
+  import { dbl } from '$lib/ui/dbl.ts';
 
   let { data }: { data: Shell } = $props();
 
@@ -1699,6 +1700,30 @@
    */
   const mayArrange = $derived((Boolean(data.me?.owner) || (Boolean(data.me?.person) && seeingAs() === null)) && !data.refused && !data.stale);
 
+  /** The widget whose name a press landed on, on the board at rest. */
+  const namedWidget = (from: Element): string | null => from.closest('.block-name, .tile-title')?.closest<HTMLElement>('[data-board-key]')?.dataset.boardKey ?? null;
+  /** The widget whose Inspector opened from its name, so its caret goes there. */
+  let naming = $state<string | null>(null);
+  /**
+   * A WIDGET'S NAME DOUBLE-CLICKED (`lib/ui/dbl.ts`) opens Today's editor with that widget's Inspector and the caret in
+   * its name, as Edit Today and a tap on the widget would. Nothing is written until Done, as there.
+   */
+  const namesWidget = dbl(
+    (from) => {
+      const key = namedWidget(from);
+      if (key === null) return;
+      boardModel.enter();
+      naming = key;
+      boardModel.inspected = key;
+    },
+    {
+      can: (from) => {
+        const key = namedWidget(from);
+        return key !== null && !boardModel.editing && declaredOf(key) !== null;
+      },
+    },
+  );
+
   /**
    * DONE (§5.5): the steps between where the edit started and where it ended, written once as a new version of Today, with
    * "Today is arranged." and a 6 s Undo. The board keeps what was made on screen while the record takes it, so nothing
@@ -2021,7 +2046,7 @@
     -->
     <!-- DRAWN FROM THE COPY, IT SAYS WHEN IT IS FROM until the record answers (`kept-frame.ts` lays the same line in). -->
     {#if fromCopy && keptLine}<p class="kept-line" role="status">{keptLine}</p>{/if}
-    <div class="body" data-board={board ? '' : undefined} bind:this={bodyEl}>
+    <div class="body" data-board={board ? '' : undefined} bind:this={bodyEl} {@attach board && mayArrange ? namesWidget : null}>
       <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
       {#if board}
         <!-- TODAY IS A BOARD OF WIDGETS (the widgets plan of 29 October): each in its cell, and the editor over them. -->
@@ -2029,8 +2054,9 @@
         {#if inspectedWidget}
           <!-- THE INSPECTOR (W4): what a tapped widget shows, in one sentence; its changes are kept with the edit's Done. -->
           {#await import('$lib/board/Inspector.svelte') then { default: Inspector }}<Inspector
-            bind:open={() => boardModel.inspected !== null, (v) => { if (!v) boardModel.inspected = null; }}
+            bind:open={() => boardModel.inspected !== null, (v) => { if (!v) ((boardModel.inspected = null), (naming = null)); }}
             widget={inspectedWidget as never}
+            naming={naming === inspectedWidget.key}
             sizes={boardModel.sizesFor(inspectedWidget.key)}
             phoneHidden={boardModel.phoneHidden(inspectedWidget.key)}
             onchange={(key, block) => boardModel.setBlock(key, block as Record<string, unknown>)}

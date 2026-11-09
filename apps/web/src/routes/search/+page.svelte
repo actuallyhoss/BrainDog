@@ -28,6 +28,7 @@
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
+  import { renames } from '$lib/things/rename.ts';
   import { onDestroy, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
@@ -392,7 +393,7 @@
               <ul class="places">
                 {#each lately as { r, n, twice } (r.href)}
                   <li>
-                    <a class="place" href={at(r.href)}>
+                    <a class="place" href={at(r.href)} {@attach renames(r.href)}>
                       <span class="place-lead" aria-hidden="true"><Icon name={r.icon} size="m" /></span>
                       <span class="place-name">{readable(r.title)}{#if n > 1}<span class="place-list">{' · '}{words.changes(n)}</span>{:else if twice}<span class="place-list">{' · '}{r.list}</span>{/if}</span>
                       <span class="place-n">{daySaid(r.at.slice(0, 10), recordNow())}</span>
@@ -412,7 +413,7 @@
               <ul class="places">
                 {#each t.items as p (p.href)}
                   <li>
-                    <a class="place" href={at(p.href)}>
+                    <a class="place" href={at(p.href)} {@attach renames(p.href)}>
                       <span class="place-lead" aria-hidden="true">{#if p.hue !== undefined}<span class="hue" style:background="var(--cat-{slotOf(p.hue)}-fill)"></span>{:else}<Icon name={t.icon} size="m" />{/if}</span>
                       <span class="place-name">{p.title}</span>
                     </a>
@@ -426,7 +427,7 @@
               <ul class="places">
                 {#each people as p (p.href)}
                   <li>
-                    <a class="place" href={at(p.href)}>
+                    <a class="place" href={at(p.href)} {@attach renames(p.href)}>
                       <span class="place-lead"><Face name={p.title} size="m" /></span>
                       <span class="place-name">{p.title}</span>
                     </a>
@@ -440,7 +441,7 @@
               <ul class="places">
                 {#each lists as l (l.href)}
                   <li>
-                    <a class="place" href={at(l.href)}>
+                    <a class="place" href={at(l.href)} {@attach renames(l.href)}>
                       <span class="place-lead" aria-hidden="true"><Icon name={l.icon ?? 'rows'} size="m" /></span>
                       <span class="place-name">{l.title}</span>
                       <span class="place-n num">{words.entries(l.count)}</span>
@@ -479,7 +480,7 @@
            before the lists. "Where it matched" stood beside the lists as bars of what the headings already count. -->
       {#if best}
         <Tile title={words.best}>
-          <a class="line hit best" href={at(best.href)}>
+          <a class="line hit best" href={at(best.href)} {@attach renames(best.href)}>
             {@render lead(best)}
             <span class="line-main">
               <span class="line-title" dir="auto">{@render titled(best.title)}</span>
@@ -516,7 +517,7 @@
               <li>
                 <!-- THE ROW SAYS WHAT TELLS IT APART: its day and amount, or its Due cell (`second.ts`), else why it
                      matched, else the list it is in. -->
-                <a class="line line-tall hit" href={at(hit.href)}>
+                <a class="line line-tall hit" href={at(hit.href)} {@attach renames(hit.href)}>
                   <IconWell name={hit.icon} size="l" />
                   <span class="line-main">
                     <span class="line-title" dir="auto">{@render titled(hit.title)}</span>

@@ -17,6 +17,7 @@
   import { matching, renameThread } from '$lib/palette/conversations.svelte.ts';
   import { removeThread } from '$lib/palette/thread.svelte.ts';
   import { dayOf, shortWhen } from './with.ts';
+  import { dbl } from '$lib/ui/dbl.ts';
 
   let {
     threads,
@@ -139,7 +140,7 @@
                 </span>
               </div>
             {:else}
-              <a class="thread tap" href={at(`/slash?t=${encodeURIComponent(t.id)}`)} aria-current={t.id === current ? 'page' : undefined} data-thread onclick={(e) => pressed(e, t.id)}>
+              <a class="thread tap" href={at(`/slash?t=${encodeURIComponent(t.id)}`)} aria-current={t.id === current ? 'page' : undefined} data-thread onclick={(e) => pressed(e, t.id)} {@attach dbl(() => startRename(t))}>
                 <span class="q" dir="auto">{t.title || threadWords.untitled}</span>
                 {#if t.answering}<span class="live" title={threadWords.answering}><span class="sr">{threadWords.answering}</span></span>{/if}
                 <span class="when num">{shortWhen(t.at, now)}</span>

@@ -46,6 +46,12 @@
   import type { Picked } from './picked.svelte.ts';
   import type { RowHost } from './row-host.svelte.ts';
   import { rowOfKey } from './row-verbs.ts';
+  import type { RowAt } from './row-verbs.ts';
+  import { dbl } from '$lib/ui/dbl.ts';
+  import { MENU_AT } from '$lib/ui/context-menu.ts';
+  import { renamable, renameAt, askRename, rowLinkOf } from '$lib/things/rename.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import { dayFieldOf } from '$lib/board/sentence.ts';
   import JustChanged from './JustChanged.svelte';
   import Changed from './Changed.svelte';
   import { leadIndex } from './lead.ts';
@@ -1253,18 +1259,110 @@
             const r = host.rowOf(row);
             if (!r) return;
             rowKey = `${ids}b-${i + 1}|${r.register}#${r.seq}`;
+            opening = { r, at: performance.now() };
             host.open(r);
           },
           onmenu: (row: Row, anchor: HTMLElement, point?: { x: number; y: number; height: number }): boolean => {
             const r = host.rowOf(row);
             if (!r) return false;
             rowKey = `${ids}b-${i + 1}|${r.register}#${r.seq}`;
+            /* A DOUBLE CLICK ASKED THE ROW, NOT ITS MENU (`tableEdit`, below): it opens to be changed, beside the page, or on
+               its own page where this page holds no copy of it (what falls due across lists). */
+            if (asEdit !== null) {
+              const typed = fieldIn(r.register, asEdit);
+              asEdit = null;
+              if (host.open(r, typed)) return true;
+              renameAt(`/r/${r.register}/${r.seq}`, typed === true ? undefined : typed);
+              return true;
+            }
             /* WHAT THE ROW IS CALLED AS DRAWN, for a row this page holds no copy of: its first words, a link taken to its words. */
             const said = (row.cells.find((c) => c) ?? '').replace(/\[([^\]]*)\]\([^)]*\)/gu, '$1').trim();
             return host.openMenu(r, anchor, 'row', point, said);
           },
         }
       : null;
+
+  /**
+   * A DOUBLE CLICK ON A ROW CHANGES IT (`lib/ui/dbl.ts`), in what its single press already opened:
+   *   - ON A PAGE THAT OPENS ROWS BESIDE IT, the panel the press opened takes the caret in the row's words, as `e` puts
+   *     it there, or in a line of money's amount, day or category where one of those was pressed; a row of a table,
+   *     which a press opens nothing for, opens with the caret in the value that was pressed.
+   *   - A ROW'S OWN LINK HAS ALREADY GONE TO ITS PAGE, which renames it there (`things/rename.ts`); so does a link to a
+   *     project's or a person's page. A link to anything else (a list, "All 17") keeps its own double click.
+   *   - ON A HOME, which opens no panel, a task is renamed in its menu's Rename sheet, where the press stays.
+   */
+  let opening: { r: RowAt; at: number } | null = null;
+  /** What a double click asks of the row a table's menu would open: the caret's place (a field, or the words). */
+  let asEdit: string | true | null = null;
+  const panels = $derived(host !== null && host !== undefined && mode === 'page' && writes !== null);
+
+  /** The row pressed: by the key it draws, or the one its title's press just opened (a card says no key). */
+  const pressedRow = (from: Element): RowAt | null => {
+    const said = rowOfKey(from.closest<HTMLElement>('[data-row]')?.dataset.row);
+    if (said) return said;
+    return opening && performance.now() - opening.at < 1500 && from.closest('.item-open') ? opening.r : null;
+  };
+  /** A row of a declared table, which says no key: it hears `menuat` as a right-click asks it, and its menu opens it. */
+  const tableRow = (from: Element): HTMLElement | null => from.closest<HTMLElement>('[role="row"][data-menu-host="self"]');
+  /**
+   * THE ROW'S OWN FIELD FOR A COLUMN: a table across lists (what falls due) names its columns for all of them ("title",
+   * "day", "amount"), so the value pressed is read as the row's field of that name, its day, or else its words.
+   */
+  const fieldIn = (register: string, field: string | true): string | true => {
+    if (field === true) return true;
+    const fields = REGISTERS[register]?.fields ?? [];
+    if (fields.some((f) => f.id === field)) return field;
+    return field === 'day' ? (dayFieldOf(fields) ?? true) : true;
+  };
+  /** The columns of the block a press landed in, as the page declared it. */
+  const columnsAt = (from: Element): readonly { field?: string }[] => {
+    const slot = from.closest('.block-slot')?.id.slice(`${ids}b-`.length);
+    return slot ? ((blocks[Number(slot) - 1]?.columns as readonly { field?: string }[] | undefined) ?? []) : [];
+  };
+  /**
+   * THE VALUE A PRESS ON A LINE OF MONEY LANDED ON: a timeline's cells are its columns, `day | title | amount | under |
+   * under | chip` (`timeline.ts` in braindog-render), so its day, the name it is drawn by (who was paid, on a ledger), its
+   * amount, and its category under the name or in its chip.
+   */
+  const lineField = (from: Element): string | undefined => {
+    if (!from.closest('.list[data-kind="timeline"]')) return undefined;
+    const at = from.closest('.item-marker') ? 0 : from.closest('.item-title') ? 1 : from.closest('.item-detail') ? 2 : from.closest('.item-under, .item-chip') ? 3 : -1;
+    return at < 0 ? undefined : columnsAt(from)[at]?.field;
+  };
+
+  function canChange(from: Element): boolean {
+    if (arranging || mode === 'preview') return false;
+    if (from.closest('a[href]')) {
+      const to = rowLinkOf(from);
+      return to !== null && renamable(to);
+    }
+    if (tableRow(from)) return panels;
+    if (from.closest('.item-open')) return panels;
+    const r = rowOfKey(from.closest<HTMLElement>('[data-row]')?.dataset.row);
+    return r !== null && (panels || renamable(`/r/${r.register}/${r.seq}`));
+  }
+
+  function change(from: Element): void {
+    const to = rowLinkOf(from);
+    if (to) return renameAt(to);
+    const tr = tableRow(from);
+    if (tr && panels) return tableEdit(tr, from);
+    const r = pressedRow(from);
+    if (!r) return;
+    if (panels) host?.open(r, lineField(from) ?? true);
+    else void askRename(r.register, r.seq);
+  }
+
+  /** The table row's own menu is asked as a right-click asks it, and answers with the row open on the pressed value. */
+  function tableEdit(tr: HTMLElement, from: Element): void {
+    const cell = from.closest('[role="gridcell"]');
+    const cells = [...tr.querySelectorAll(':scope > [role="gridcell"]')];
+    const field = cell ? columnsAt(from)[cells.indexOf(cell)]?.field : undefined;
+    const r = tr.getBoundingClientRect();
+    asEdit = field ?? true;
+    tr.dispatchEvent(new CustomEvent(MENU_AT, { cancelable: true, detail: { x: r.left, y: r.top, height: r.height, back: null } }));
+    asEdit = null;
+  }
 
   async function copyBlockLink(slotIndex: number) {
     const url = `${route.url.origin}${route.url.pathname}#${ids}b-${slotIndex + 1}`;
@@ -1527,7 +1625,7 @@
 <!-- A LIST while arranging, and nothing while reading. The blocks become a reorderable list only in the mode where they
      are reorderable; announcing "list, 5 items" to somebody reading a page is describing the furniture. ON A PAGE WITH A
      RAIL EACH COLUMN IS ITS OWN LIST while arranging, named, and the page is neither. -->
-<div class="page" data-mode={mode} data-narrow={narrow ? '' : undefined} data-headed={lifted ? '' : undefined} role={arranging && !layout ? 'list' : undefined} bind:this={pageEl}>
+<div class="page" data-mode={mode} data-narrow={narrow ? '' : undefined} data-headed={lifted ? '' : undefined} role={arranging && !layout ? 'list' : undefined} bind:this={pageEl} {@attach dbl(change, { can: canChange, through: '.item-open, a[href]' })}>
   <!-- JUST CHANGED OPENS THE PAGE, before what it holds; on a page whose head rides over its lead tile it follows that
        tile instead, or the head would sit over it. -->
   <!-- A PAGE WITH NO HEADLINE STILL OPENS ON THE LOOK'S NEXT ACTION, before what narrows it. -->

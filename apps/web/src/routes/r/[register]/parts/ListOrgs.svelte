@@ -11,6 +11,8 @@
   is and who is with it, and the last day it was seen. Each row opens its organisation's page.
 -->
 <script lang="ts">
+  /* A DOUBLE CLICK ON AN ORGANISATION RENAMES IT, on the page the line opens (`things/rename.ts`). */
+  import { renames } from '$lib/things/rename.ts';
   import { apiBase, at } from '$lib/at.ts';
   import { createClient } from '@braindog/client';
   import { display } from '$lib/record/api.ts';
@@ -106,6 +108,7 @@
               class="line line-tall"
               href={at(`/r/${register}/${item.entry.seq}`)}
               {@attach openCardMenu && ownMenu((p) => openCardMenu(item.entry.seq, document.body, p))}
+              {@attach renames(`/r/${register}/${item.entry.seq}`)}
             >
               <span class="line-mark"><Face {name} of="project" size="m" picture={pictureOfRow(register, item.entry.fields)} row="{register}#{item.entry.seq}" /></span>
               <span class="line-main">

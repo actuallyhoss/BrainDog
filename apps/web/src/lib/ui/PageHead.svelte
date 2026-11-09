@@ -66,6 +66,8 @@
   import { at, here } from '../at.ts';
   import { page as pageState } from '$app/state';
   import { PAGE_MENU } from './context-menu.ts';
+  /* A DOUBLE CLICK ON THE NAME RENAMES WHAT THE PAGE IS ABOUT, where the page says it can (`page-verbs.ts`). */
+  import { renamesPage } from '../things/page-verbs.ts';
   import { copy } from '../copy.ts';
   import { openPalette } from '../palette/open.svelte.ts';
   import { inIosApp } from '../shell.ts';
@@ -368,8 +370,8 @@
   {/if}
   <div class="bar-lead" data-greets={shortGreeting(where) !== null ? '' : undefined}>
     <!-- WHERE YOU ARE, the same words the desk's crumb ends on, and over it the page's name once it has scrolled away. -->
-    <p class="bar-where" data-word={!cut && /\s/u.test(whereShown.trim()) ? undefined : ''} bind:this={whereEl}>{whereShown}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
-    <p class="bar-title" data-word={!cut && /\s/u.test(title.trim()) ? undefined : ''} aria-hidden="true">{title}</p>
+    <p class="bar-where" data-word={!cut && /\s/u.test(whereShown.trim()) ? undefined : ''} bind:this={whereEl} {@attach renamesPage}>{whereShown}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
+    <p class="bar-title" data-word={!cut && /\s/u.test(title.trim()) ? undefined : ''} aria-hidden="true" {@attach renamesPage}>{title}</p>
   </div>
   <span class="bar-end">
     {#if barred && actions}<span class="head-actions bar-actions">{@render actions()}</span>{/if}
@@ -410,7 +412,7 @@
     {:else if titled}
       <!-- THE NAME IS THE BAR'S: the `h1` is here for a screen reader and the focus a move lands, and the sentence stands
            in the name's row. -->
-      <h1 class="name-unseen" tabindex="-1">{title}</h1>
+      <h1 class="name-unseen" tabindex="-1" {@attach renamesPage}>{title}</h1>
       {#if sentence}
         <p class="page-said head-said">{@render said()}</p>
       {:else if held && !inBar}
@@ -420,7 +422,7 @@
       <!-- The `dir="auto"` is on a SPAN around the title, not on the `h1`: the title came from whoever typed it, the glyph
            beside it is ours, and the attribute on the `h1` would resolve the direction of our own glyph too. -->
       <div class="name-row" data-thing={pageAddress} data-menu-host={PAGE_MENU}>
-        <h1 class="page-name" tabindex="-1" bind:this={heading}
+        <h1 class="page-name" tabindex="-1" bind:this={heading} {@attach renamesPage}
           >{#if well}<span class="name-well">{@render well()}</span
             >{:else if icon}<span class="name-icon" style={hue === undefined ? undefined : `--slot-ink:var(--cat-${slotOf(hue)})`} data-hue={hue === undefined ? undefined : ''}
               ><Icon name={icon} size="xl" /></span

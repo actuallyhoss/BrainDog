@@ -50,6 +50,7 @@
   import { inField, notTheShells } from '$lib/a11y/typed.ts';
   import { watchKeyboard } from '$lib/a11y/keyboard.ts';
   import { hearThings, watchMenus } from '$lib/ui/context-menu.ts';
+  import { watchDoubles } from '$lib/ui/dbl.ts';
   import { things } from '$lib/things/asks.svelte.ts';
   import TopBar from '$lib/ui/TopBar.svelte';
   import { assets } from '$app/paths';
@@ -1559,6 +1560,8 @@
 
   /* A RIGHT-CLICK, A HELD THUMB OR `⇧F10` ON AN ITEM WITH A "…" OPENS THAT MENU (`context-menu.ts`), once for every screen. */
   $effect(() => watchMenus());
+  /* A DOUBLE CLICK, A DOUBLE TAP OR `F2` ON WHAT HAS AN EDIT GOES STRAIGHT TO IT (`dbl.ts`), once for every screen. */
+  $effect(() => watchDoubles());
   /* A RIGHT-CLICK ON ANYTHING THAT STANDS FOR A THING: the shell's one menu, its own chunk, drawn the first time (`things/ThingMenu.svelte`). */
   $effect(() =>
     hearThings((ask) => {

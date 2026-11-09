@@ -19,6 +19,7 @@
 -->
 <script lang="ts">
   import { PAGE_MENU } from './context-menu.ts';
+  import { renamesPage } from '../things/page-verbs.ts';
   import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
@@ -68,7 +69,7 @@
           {#if step.href}
             <a class="crumb-up" href={at(step.href)}>{step.label}</a>
           {:else}
-            <span class="crumb-here" aria-current="page" data-thing={page.url.pathname + page.url.search} data-menu-host={PAGE_MENU}>{step.label}</span>{#if i === crumb.length - 1 && frame.figure}<span class="crumb-figure num">{frame.figure}</span>{/if}
+            <span class="crumb-here" aria-current="page" data-thing={page.url.pathname + page.url.search} data-menu-host={PAGE_MENU} {@attach renamesPage}>{step.label}</span>{#if i === crumb.length - 1 && frame.figure}<span class="crumb-figure num">{frame.figure}</span>{/if}
           {/if}
         </li>
       {/each}

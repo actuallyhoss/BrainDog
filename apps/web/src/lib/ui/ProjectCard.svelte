@@ -32,6 +32,7 @@
   import Icon from './Icon.svelte';
   import ProjectWell from './ProjectWell.svelte';
   import AgentFace from './AgentFace.svelte';
+  import { renames } from '../things/rename.ts';
   import { money } from 'braindog-render';
   import { homeCurrency } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
@@ -141,7 +142,7 @@
   });
 </script>
 
-<a class="pcard" href={at(card.href)} style={slotStyle(card.hue)} aria-label={named} data-thin={thin ? '' : undefined}>
+<a class="pcard" href={at(card.href)} style={slotStyle(card.hue)} aria-label={named} data-thin={thin ? '' : undefined} {@attach renames(card.href)}>
   <span class="pc-a">
     <ProjectWell mark={card.mark} name={title} hue={card.hue} picture={card.picture} row={card.key} />
     <span class="pc-id">

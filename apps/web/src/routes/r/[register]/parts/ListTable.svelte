@@ -21,7 +21,9 @@
   import { Table, type Column, type TableRow } from 'braindog-render/svelte';
   import { display, DOM_CAP, homeCurrency, identityOf, labelOf } from '$lib/record/api.ts';
   import { currencyTypedIn } from '$lib/ui/money-typed.ts';
-  import { isFile, isJson, isQuantity, unitOf, unitsOf } from '$lib/record/field-draft.ts';
+  import { editable, isFile, isJson, isQuantity, unitOf, unitsOf } from '$lib/record/field-draft.ts';
+  import { dbl } from '$lib/ui/dbl.ts';
+  import { renameAt } from '$lib/things/rename.ts';
   import { page } from '$app/state';
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -135,6 +137,21 @@
     /** The row's menu, hung from its "…", or at the pointer when a right-click or a held thumb opened it. */
     openCardMenu: (seq: number, el: HTMLElement, point?: MenuAt) => void;
   } = $props();
+
+  /*
+   * A DOUBLE CLICK ON A VALUE OPENS IT WHERE THE CELL'S PRESS GOES (`lib/ui/dbl.ts`): the row's own page, which the first
+   * click has already opened, with that value's box open, as the pencil opens it here, or the title in Rename. The grid
+   * is still read with single clicks, which keep opening the row at once; a double click never waits on them. For a reader
+   * who may change the list, and only a value the row's page can open a box for.
+   */
+  const writes = $derived.by(() => {
+    const shell = page.data as unknown as Partial<Shell>;
+    return shell.me !== undefined && may(shell as Shell, 'write', register);
+  });
+  const opensOn = (seq: number, field: string) => {
+    const f = fieldOf(field);
+    return writes && f && editable(f, register) ? dbl(() => renameAt(`/r/${register}/${seq}`, field === decl.title ? undefined : field)) : null;
+  };
 
   /* THE PERSON'S OWN WORDS, AS WRITTEN (`data-own`, `lib/ui/own.ts`): a text field holds what somebody typed, which the
      look's words check forgives, while a date, an amount or a choice is drawn by the app and is still read. */
@@ -583,7 +600,7 @@
           control per cell is four thousand tab stops. The keyboard path is `e`, which the `?`
           sheet has advertised since the grid was written.
         -->
-        <span class="cell-said" data-own={ownWords(column.field) ? '' : undefined}>{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{@render plainSaid(row, column.field, value)}{/if}<button
+        <span class="cell-said" data-own={ownWords(column.field) ? '' : undefined} {@attach opensOn(seq, column.field)}>{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{@render plainSaid(row, column.field, value)}{/if}<button
             type="button"
             class="cell-pen"
             tabindex="-1"
@@ -593,7 +610,7 @@
               openEditor(seq, column.field);
             }}
           ><Icon name="edit" size="s" /></button></span>
-      {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{@render plainSaid(row, column.field, value)}{/if}{/if}
+      {:else}{@const opens = opensOn(seq, column.field)}{#if opens}<span class="cell-opens" {@attach opens}>{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{@render plainSaid(row, column.field, value)}{/if}</span>{:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}{@render enumSaid(row, column.field, value)}{:else}{@render plainSaid(row, column.field, value)}{/if}{/if}{/if}
     {/snippet}
   </Table>
 </div>
@@ -918,6 +935,11 @@
      pointer. */
   .table-slot:not(:focus-within) :global(.rowgroup .tr[data-focused]:not([aria-selected='true'], :hover)::before) {
     background: none;
+  }
+
+  /* A VALUE A DOUBLE CLICK OPENS WHERE NO PENCIL IS DRAWN (a saved view): only a node for the press, drawn as nothing. */
+  .cell-opens {
+    display: contents;
   }
 
   /**
