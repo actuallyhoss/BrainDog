@@ -9138,8 +9138,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the version (`stamp`), so nothing written is missed; what moves without one, a run's heartbeat and the clock, is at
    * most `HELD_MS` old. A clock that went back reads again. `most` keys are kept, the oldest let go first.
    */
-  const heldFor = <T>(store: Map<string, Held<T>>, key: string, make: () => T, most = 32): T => {
-    const version = stamp();
+  const heldFor = <T>(store: Map<string, Held<T>>, key: string, make: () => T, most = 32, at: () => string = () => stamp()): T => {
+    const version = at();
     const now = clock.now();
     const was = store.get(key);
     if (was !== undefined && was.version === version && was.at <= now && now - was.at < HELD_MS) return was.value;
@@ -9165,10 +9165,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * THE VERSION OF WHAT THE PAGES ARE MADE FROM, AND NOT OF THE LOG: the rows (their newest, how many, their versions and
+   * their newest change), the declarations, the add-ons on and the rows kept private. A page is a declaration, filled
+   * from a row where it is a row's, so a line that changed no row (a key opened, an arrival read, a question) leaves every
+   * page as it was; `stamp` moved with each, and every page was resolved again, the most of `boot`'s time between writes.
+   */
+  const pagesStamp = (): string => {
+    const rows = sql.one<Record<string, unknown>>('SELECT max(rowid) AS r, count(*) AS n, total(version) AS v, max(updated_at) AS u FROM entry');
+    const at = sql.one<Record<string, unknown>>(
+      `SELECT (SELECT max(rowid) FROM declaration) AS d, (SELECT group_concat(id || ':' || coalesce(disabled_at, ''), ',') FROM pack) AS p,
+              (SELECT max(rowid) FROM entry_private) AS x, (SELECT count(*) FROM entry_private) AS y`,
+    );
+    return JSON.stringify([rows?.r ?? null, rows?.n ?? null, rows?.v ?? null, rows?.u ?? null, at?.d ?? null, at?.p ?? null, at?.x ?? null, at?.y ?? null]);
+  };
+
+  /**
    * THE VERSION LESS THE RUNS' OWN ROWS (`quietStamp`): the newest line of the log that is not about a row of the runs
    * list, with the newest declaration, the newest question, how many are open and which add-ons are on. Every agent's
    * start and handoff writes its run's row, so on a record agents work in the version moved between any two starts and
-   * the questions were read again for every card, though no question had moved.
+   * the questions were read again for every card, though no question had moved. NOR A KEY OPENED OR AN ARRIVAL READ
+   * (`grant`, `inbox_raw`): a script reads its key several times a minute on his record, and each weighed the pen again,
+   * two thirds of `boot`. A question an arrival raises moves the questions' own count and newest.
    *
    * WALKED ONCE PER LINE: what was seen is kept, the top of the log and its id, and only the lines written since are
    * looked at. A top line that is not the one seen there (a write rolled back, and another written in its place) is
@@ -9185,7 +9202,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const still = was.top !== 0 && top > was.top && sql.one<{ id: string }>('SELECT id FROM event WHERE rowid = ?', was.top)?.id === was.id;
       const moved = still
         ? sql.one<{ m: number | null }>(
-            `SELECT max(e.rowid) AS m FROM event e WHERE e.rowid > ?
+            `SELECT max(e.rowid) AS m FROM event e WHERE e.rowid > ? AND coalesce(e.target_kind, '') NOT IN ('grant', 'inbox_raw')
                AND NOT (e.target LIKE 'entry:%' AND EXISTS (SELECT 1 FROM entry n WHERE n.id = substr(e.target, 7) AND n.register = ?))`,
             was.top,
             SESSION,
@@ -9243,7 +9260,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (!slugAt.has(`${p.about.register}#${p.about.seq}`)) slugAt.set(`${p.about.register}#${p.about.seq}`, p.slug);
         }
       return every;
-    });
+    }, 32, pagesStamp);
 
   /**
    * THE OPEN QUESTIONS, AS THE KERNEL READS THEM, held while only the runs move (`quietFor`): `boot` read every one three
