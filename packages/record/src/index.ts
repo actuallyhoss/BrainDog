@@ -3382,6 +3382,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** Who is looking, for the rows their makers kept private: a person, the person a token acts for, or `NOBODY` for a read that leaves the record. */
   const viewerOf = (ctx: CallContext): string | undefined => viewerOfRead(ctx);
 
+  /**
+   * How a row's fields worked out through a link are read for this caller (`kernel.get`'s `reads` and `viewer`): only
+   * from a linked row on a list she reads whole, and never from one kept private from her, so such a field reads empty
+   * to her, as `list` answers it, and never says what a row she is not shown holds.
+   */
+  const linkSight = (ctx: CallContext): { reads: (register: string) => boolean; viewer: string | undefined } => ({
+    reads: (register) => readable(ctx, register) === null && sight.whole(ctx, register),
+    viewer: viewerOf(ctx),
+  });
+
   /** A page of rows with the ones the viewer kept private marked (`private`), so a list can draw a lock beside them. */
   const marked = <T extends { rows: Entry[] }>(out: Result<T>): Result<T> => {
     if (!out.ok || out.value.rows.length === 0) return out;
@@ -13597,13 +13607,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               `No register you can read numbers its rows ${/^[A-Z]+/.exec(said)?.[0] ?? said}. A suggestion (SG) or a decision (D) is read with governance.`,
               { at: 'spoken', ...(/^(?:SG|D)[1-9][0-9]*$/u.test(said) ? { try: `governance ${JSON.stringify({ id: said })}` } : {}) },
             );
-          const owned = kernel.get(said) ?? folded(said, ctx);
+          const owned = kernel.get(said, linkSight(ctx)) ?? folded(said, ctx);
           {
             const out = readFrom(ctx, ok(markedRow(ctx, owned && owned.register === owner.id && sight.admits(ctx, owned) ? owned : null)));
             return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
           }
         }
-        const row = kernel.get(said) ?? folded(said, ctx);
+        const row = kernel.get(said, linkSight(ctx)) ?? folded(said, ctx);
         {
           const out = readFrom(ctx, ok(markedRow(ctx, row && !readable(ctx, row.register) && sight.admits(ctx, row) ? row : null)));
           return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
@@ -13613,7 +13623,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
-      const row = kernel.get({ register: args.register as string, seq: args.seq as number });
+      const row = kernel.get({ register: args.register as string, seq: args.seq as number }, linkSight(ctx));
       {
         const out = readFrom(ctx, ok(markedRow(ctx, row && sight.admits(ctx, row) ? row : null)));
         return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
@@ -13727,6 +13737,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             marked(kernel.list(
               {
                 ...asked,
+                /* WHO ASKED, NEVER WHAT THEY SENT: a field read through a link leaves out the rows kept from them. */
+                viewer: viewerOf(ctx),
                 reads: (register) => readable(ctx, register) === null,
                 /* A HOP GOES ONLY INTO A LIST SHE READS WHOLE (where-hop-49): one her grant narrows would be counted whole,
                    and one with a field hidden from her could be filtered by it. */
@@ -19335,7 +19347,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* EVERY HIT ASKED AT ONCE (`sight.rows`): a hit by meaning (`near.ts`) is drawn from outside the words' query, so
          it is held here even though the words' hits already were. */
       const read = searched.hits.flatMap((hit) => {
-        const row = kernel.get(hit.id);
+        const row = kernel.get(hit.id, linkSight(ctx));
         return row ? [{ row, id: row.id, register: row.register, ...('by' in hit ? { by: hit.by } : {}) }] : [];
       });
       /* A HIT'S RANK IS ITS PLACE AMONG THE HITS SHE IS SHOWN (leak matrix N3), never `bm25`'s score, which reads the

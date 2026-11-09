@@ -29,7 +29,7 @@ import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { renameDeclarations } from './migrations/0016_slash.ts';
-import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, unprivateLine, type Compiled, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, unprivate, unprivateLine, type Compiled, type Predicate, type Schema } from '@braindog/where';
 import {
   disablePack as disableDeclaredPack,
   enablePack as enableDeclaredPack,
@@ -1750,6 +1750,9 @@ const NIGHT_FIGURES: Readonly<Record<string, string>> = {
   owed_by_me: 'owed-by-you',
 };
 
+/** Which figure fills which net-worth field of a night, where `snapshots` declares them (`worthOfNight`). */
+const NIGHT_WORTH = { held: 'held-beyond-cash', owed_later: 'owed-over-time', worth: 'net-worth' } as const;
+
 /**
  * How late a reading may be taken and still be honest about the night it names.
  *
@@ -2452,13 +2455,59 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return now;
   };
 
+  /** A figure's declaration as the record holds it, by its id without `metric.`, or one the record works out itself, or `null`. */
+  const figureBody = (id: string): MetricDecl | null => {
+    const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
+    return row ? (JSON.parse(row.body) as MetricDecl) : builtInFigure(id);
+  };
+
+  /* THE NIGHTS ARE THE WHOLE RECORD'S (`writeNight`): each row of `snapshots` holds cash, what is owed and net worth worked
+     out with nobody looking, so it counts every row somebody kept private. */
+  /** Every list a night's figures read (`figureLists`), worked out once a declaration revision. `*` is the whole record. */
+  let nightRead: { revision: number; lists: readonly string[] } | null = null;
+  const nightLists = (): readonly string[] => {
+    if (nightRead !== null && nightRead.revision === revision) return nightRead.lists;
+    const lists = new Set<string>();
+    for (const id of [...Object.values(NIGHT_FIGURES), ...Object.values(NIGHT_WORTH)]) {
+      const decl = figureBody(id);
+      if (decl !== null) for (const list of figureLists(decl, figureBody)) lists.add(list);
+    }
+    nightRead = { revision, lists: [...lists] };
+    return nightRead.lists;
+  };
+
+  /**
+   * Whether every night is kept from this viewer: she has a row kept from her on a list a night's figures read, so a
+   * night's totals would say what that row holds. The list then reads empty to her, every way it is read, and a figure
+   * over it reads nothing. A viewer with nothing kept from her, and a read by nobody in particular, read every night.
+   */
+  const nightsKept = (viewer: string | undefined): boolean => {
+    if (viewer === undefined || !registers.has(NIGHT_REGISTER) || !anyHiddenFrom(viewer)) return false;
+    const key = `${viewer}\n\u0000nights`;
+    const was = moment?.hidden.get(key);
+    if (was !== undefined) return was;
+    const now = nightLists().some((list) => list === '*' || anyHiddenFrom(viewer, list));
+    moment?.hidden.set(key, now);
+    return now;
+  };
+
+  /** A rule no row meets: no row holds `seq` nought. */
+  const NO_ROW: Json = { field: 'seq', is: 0 };
+
+  /**
+   * `scopeFor` as every reader here asks it: the grant's rule and the rows kept private from the viewer, and for the
+   * nights' list no row at all to a viewer the nights are kept from (`nightsKept`).
+   */
+  const readScope = (wheres: Readonly<Wheres> | undefined, register: string, viewer: string | undefined): Json | undefined =>
+    register === NIGHT_REGISTER && nightsKept(viewer) ? scopeFor({ [register]: NO_ROW }, register, viewer, true) : scopeFor(wheres, register, viewer, anyHiddenFrom(viewer, register));
+
   /**
    * THE ONE READ-SCOPE HELPER every reader asks for a list, in place of `whereFor(ctx.wheres, register)`: the caller's
    * grant rule and the private rows left out for them, as one value `list` and `count` understand (`scopeFor`).
    */
   const scope = (ctx: { wheres?: Readonly<Wheres> | undefined; principal: { kind: string; id: string; person?: string }; outbound?: boolean | undefined; preview?: string | undefined }, register: string): Json | undefined => {
     const viewer = viewerOfRead(ctx);
-    return scopeFor(ctx.wheres, register, viewer, anyHiddenFrom(viewer, register));
+    return readScope(ctx.wheres, register, viewer);
   };
 
   /**
@@ -2469,7 +2518,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   const writeScope = (ctx: Parameters<typeof scope>[0] & { writes?: Readonly<Wheres> | undefined }, register: string): Json | undefined => {
     if (ctx.writes === undefined || !Object.hasOwn(ctx.writes, register)) return scope(ctx, register);
     const viewer = viewerOfRead(ctx);
-    return scopeFor({ [register]: ctx.writes[register]! }, register, viewer, anyHiddenFrom(viewer, register));
+    return readScope({ [register]: ctx.writes[register]! }, register, viewer);
   };
 
   /**
@@ -2479,7 +2528,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * Its bare column names resolve to the innermost `entry` of the statement it is put in.
    */
   const admitClause = (register: string, grant: Readonly<Wheres> | undefined, viewer: string | undefined): { sql: string; params: (string | number)[] } | null => {
-    const rule = scopeFor(grant, register, viewer, anyHiddenFrom(viewer, register));
+    const rule = readScope(grant, register, viewer);
     return rule === undefined ? null : scopeClause(register, rule);
   };
 
@@ -2798,7 +2847,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   const hopSchemaOf = (register: string, reads?: (register: string) => boolean, viewer?: string): Schema | undefined =>
     registers.has(register) && (reads?.(register) ?? true)
-      ? { ...schemaOf(register), ...(viewer !== undefined && anyHiddenFrom(viewer, register) ? { except: viewer } : {}), schemaOf: (r: string) => hopSchemaOf(r, reads, viewer) }
+      ? {
+          ...schemaOf(register),
+          ...(viewer !== undefined && anyHiddenFrom(viewer, register) ? { except: viewer } : {}),
+          /* AND THE NIGHTS, EVERY ONE, FROM A VIEWER THEY ARE KEPT FROM (`nightsKept`). */
+          ...(register === NIGHT_REGISTER && nightsKept(viewer) ? { withheld: true as const } : {}),
+          schemaOf: (r: string) => hopSchemaOf(r, reads, viewer),
+        }
       : undefined;
   /** The list a reader asked about, whole, with its hops held to what `reads` lets through and to the rows `viewer` is shown. */
   const readerSchemaOf =
@@ -2813,17 +2868,21 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * or `reads` without it): a list outside it, or one she sees narrowed, answers nothing, so every link into it derives
    * null rather than a value from a row she cannot open. A deleted row is gone, and derives null too. Absent is the
    * record's own sight, every live row.
+   * AND `viewer` IS WHO READS: a linked row kept private from her (migration 40), or a night kept from her
+   * (`nightsKept`), is one she cannot open either, so the link derives null and never what that row holds.
    */
   const sightOf =
-    (reads?: (register: string) => boolean): DeriveResolve =>
+    (reads?: (register: string) => boolean, viewer?: string): DeriveResolve =>
     (register, ids, field) => {
-      if (ids.length === 0 || (reads !== undefined && !reads(register))) return new Map();
+      if (ids.length === 0 || (reads !== undefined && !reads(register)) || (register === NIGHT_REGISTER && nightsKept(viewer))) return new Map();
+      const kept = viewer !== undefined && anyHiddenFrom(viewer, register);
       /* THE IDS AS ONE JSON ARRAY, read with `json_each`, because a Durable Object refuses a statement past a hundred
          bound values and a page is up to five hundred rows (`param-sweep.test.ts`). */
       const found = sql.all<{ id: string; fields: string }>(
-        'SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND id IN (SELECT value FROM json_each(?))',
+        `SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND id IN (SELECT value FROM json_each(?))${kept ? ` AND ${unprivate()}` : ''}`,
         register,
         JSON.stringify(ids),
+        ...(kept ? [viewer] : []),
       );
       return new Map(found.map((r) => [r.id, ((JSON.parse(r.fields) as Record<string, Json>)[field] ?? null) as Json]));
     };
@@ -2833,10 +2892,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * doors out (`get` as the record hands it, a page of `list`), never inside the write path, which reads a row to
    * change it and must see what is stored. A list with no derived field hands the row back as it is.
    */
-  const readOut = (entry: Entry | null, reads?: (register: string) => boolean): Entry | null => {
+  const readOut = (entry: Entry | null, reads?: (register: string) => boolean, viewer?: string): Entry | null => {
     const decl = entry === null ? undefined : registers.get(entry.register);
     if (entry === null || decl === undefined || !decl.fields.some((f) => f.derived === true && f.derive !== undefined)) return entry;
-    return withDerived([entry], decl.fields, sightOf(reads))[0]!;
+    return withDerived([entry], decl.fields, sightOf(reads, viewer))[0]!;
   };
 
   /**
@@ -4247,7 +4306,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        its caller may not open or sees narrowed. A declared page's read passes no `reads`; reach checked its lists. */
     /* AND OVER THE ROWS SHE IS SHOWN THERE: the viewer her scope carries, else the reader a page's read names, so a
        block's `pointed` never counts a row kept private from her on the list it hops into. */
-    const whole = readerSchemaOf(q.hops ?? q.reads, viewerOfScope(grant) ?? q.reader)(q.register)!;
+    const viewer = q.viewer ?? viewerOfScope(grant) ?? q.reader;
+    const whole = readerSchemaOf(q.hops ?? q.reads, viewer)(q.register)!;
     const schema: Schema = hidden.size === 0 ? whole : { ...whole, fields: Object.fromEntries(Object.entries(whole.fields).filter(([id]) => !hidden.has(id))) };
     const said = predicateOf(q.where, schema, q.reads === undefined ? evalContext([], undefined, q.reader) : { ...evalContext([], undefined, q.reader), reads: q.reads });
     if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
@@ -4488,7 +4548,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* THE PAGE LEAVES WITH ITS WORKED-OUT FIELDS FILLED, after the cursor's row is chosen, and a `via` read
        through the reader's own sight: the lists she reads whole, as a hop from her filter is held. */
     const decl = registers.get(q.register)!;
-    const out = decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf(q.hops ?? q.reads)) : rows;
+    /* A FIELD READ THROUGH A LINK, AS THE READER IS SHOWN THE LINKED ROW (`sightOf`): one kept private from her derives null. */
+    const out = decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf(q.hops ?? q.reads, viewer)) : rows;
     /* AND A SORTED ANSWER HANDS BACK ITS OWN KIND OF CURSOR: the last row's value under each sort key, read by the
        same expressions the ORDER BY used, so the next page compares like with like. */
     const paging = !(more && last)
@@ -7675,6 +7736,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return {
         ...s,
         ...(near || anyHiddenFrom(viewer, s.register) ? { except: viewer } : {}),
+        /* AND THE NIGHTS FROM A VIEWER THEY ARE KEPT FROM (`nightsKept`): a figure over them reads none. */
+        ...(s.register === NIGHT_REGISTER && nightsKept(viewer) ? { withheld: true as const } : {}),
         ...(hop === undefined ? {} : { schemaOf: (r: string) => ((there) => (there === undefined ? undefined : kept(there, false)))(hop(r)) }),
       };
     };
@@ -8490,12 +8553,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        read with no private-row clause live too, so its line is drawn as before. */
     const lineHidden = (series: string): boolean => {
       if (viewer === undefined || !anyHiddenFrom(viewer)) return false;
-      const declOf = (id: string): MetricDecl | null => {
-        const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
-        return row ? (JSON.parse(row.body) as MetricDecl) : builtInFigure(id);
-      };
-      const decl = declOf(series.split(':')[0] ?? '');
-      return decl === null || figureLists(decl, declOf).some((list) => list !== '*' && anyHiddenFrom(viewer, list));
+      const decl = figureBody(series.split(':')[0] ?? '');
+      return decl === null || figureLists(decl, figureBody).some((list) => list !== '*' && anyHiddenFrom(viewer, list));
     };
     return {
     pages: () =>
@@ -8533,8 +8592,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         ...(q.limit ? { limit: q.limit } : {}),
         ...(q.order?.length ? { order: q.order } : {}),
         ...(q.cursor ? { cursor: q.cursor } : {}),
-        ...(viewer === undefined ? {} : { reader: viewer }),
-      }, scopeFor(undefined, q.register, viewer, anyHiddenFrom(viewer, q.register)));
+        ...(viewer === undefined ? {} : { reader: viewer, viewer }),
+      }, readScope(undefined, q.register, viewer));
       return out.ok ? ok({ rows: out.value.rows, matched: out.value.matched, cursor: out.value.cursor }) : out;
     },
     /* WITH THE HOP, as a figure has it (`hopSchemaOf`): a block's `where` may read a field through a link (`through`),
@@ -8594,7 +8653,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     readings: (q) =>
       holdAcross(factsHeld as HeldReadings<ReturnType<NonNullable<PageDeps['readings']>>>, JSON.stringify(['readings', q, viewer ?? null]), readableZone(recordTz()), clock.now(), once, () => {
         if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
-        const schema = { ...schemaOf(q.register), ...(anyHiddenFrom(viewer, q.register) ? { except: viewer } : {}) };
+        const schema = {
+          ...schemaOf(q.register),
+          ...(anyHiddenFrom(viewer, q.register) ? { except: viewer } : {}),
+          /* AND NO NIGHT TO A VIEWER THEY ARE KEPT FROM (`nightsKept`). */
+          ...(q.register === NIGHT_REGISTER && nightsKept(viewer) ? { withheld: true as const } : {}),
+        };
         const c = compile(q.where, schema);
         if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
         const at = fieldSqlIn(schema, q.when);
@@ -10392,11 +10456,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const declared = new Set((registers.get(NIGHT_REGISTER)?.fields ?? []).map((f) => f.id));
     if (!declared.has('worth')) return {};
     const read: Record<string, number> = {};
-    for (const [field, id] of [
-      ['held', 'held-beyond-cash'],
-      ['owed_later', 'owed-over-time'],
-      ['worth', 'net-worth'],
-    ] as const) {
+    for (const [field, id] of Object.entries(NIGHT_WORTH) as [keyof typeof NIGHT_WORTH, string][]) {
       const figure = pageDeps().metric(id);
       if (!figure) return {};
       const out = evaluateMetric(sql, figure, ctx);
@@ -10742,10 +10802,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const { grant, hide, maskMoney, ...asked } = opts;
     const mask = maskMoney === true ? maskMoneyText : undefined;
     const indexed = (q: string, o: Parameters<typeof ftsSearchMatched>[2]): Searched => (mask === undefined ? ftsSearchMatched(sql, q, o) : maskedMatched(sql, q, o ?? {}, mask));
-    const admits = Object.keys(grant ?? {}).flatMap((register) => {
-      const c = admitClause(register, grant, undefined);
-      return c === null ? [] : [{ register, ...c }];
-    });
+    const admits = [
+      ...Object.keys(grant ?? {}).flatMap((register) => {
+        const c = admitClause(register, grant, undefined);
+        return c === null ? [] : [{ register, ...c }];
+      }),
+      /* AND NO NIGHT, TO A VIEWER THE NIGHTS ARE KEPT FROM (`nightsKept`), so neither a hit nor `matched` counts one. */
+      ...(nightsKept(asked.viewer) ? [{ register: NIGHT_REGISTER, sql: '0', params: [] as (string | number)[] }] : []),
+    ];
     /* A LIST WITH A SEARCHABLE FIELD HIDDEN FROM HER IS NOT ASKED OF THE INDEX, which holds that
        field's words, so a hit would say what it holds. It is searched by `contains` over the fields she is shown, under
        the same grant and private rows, its hits after the index's. */
@@ -14118,17 +14182,17 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * caller's sight for a `via`, the lists she reads whole; absent is the record's own. The closure's `get`, which the
      * write path reads a row through, stays the stored row.
      */
-    get: (ref: string | { register: string; seq: number }, opts: { includeDeleted?: boolean; reads?: (register: string) => boolean } = {}): Entry | null =>
-      readOut(get(ref, opts), opts.reads),
+    get: (ref: string | { register: string; seq: number }, opts: { includeDeleted?: boolean; reads?: (register: string) => boolean; viewer?: string | undefined } = {}): Entry | null =>
+      readOut(get(ref, opts), opts.reads, opts.viewer),
     /**
      * Many rows by id at once, each answered as `get` answers it: one statement per 500 ids where `get` asked one a row.
      * A ref that is spoken (`S4`, `tasks#3`) is asked through `get` itself, so it means what it always meant.
      */
-    getEach: (refs: readonly string[], opts: { includeDeleted?: boolean } = {}): Map<string, Entry | null> => {
+    getEach: (refs: readonly string[], opts: { includeDeleted?: boolean; viewer?: string | undefined } = {}): Map<string, Entry | null> => {
       const out = new Map<string, Entry | null>();
       const ids: string[] = [];
       for (const ref of new Set(refs)) {
-        if (parseSpoken(ref) ?? prefixed(ref)) out.set(ref, readOut(get(ref, opts)));
+        if (parseSpoken(ref) ?? prefixed(ref)) out.set(ref, readOut(get(ref, opts), undefined, opts.viewer));
         else ids.push(ref);
       }
       for (let i = 0; i < ids.length; i += 500) {
@@ -14146,7 +14210,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const read = new Map<string, Entry>();
         for (const [register, rows] of by) {
           const decl = registers.get(register);
-          const made = decl !== undefined && decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf()) : rows;
+          const made = decl !== undefined && decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf(undefined, opts.viewer)) : rows;
           for (const entry of made) read.set(entry.id, entry);
         }
         for (const entry of entries) out.set(entry.id, read.get(entry.id) ?? null);

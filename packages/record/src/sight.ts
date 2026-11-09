@@ -225,7 +225,8 @@ export function readSight(kernel: Kernel) {
       if (kind === 'entry') about.push(colon > 0 ? target.slice(colon + 1) : target);
     }
     /* EVERY ROW THE BATCH NAMES IN ONE READ (`getEach`): one a line was 400 reads for Today's news. */
-    const held = kernel.getEach(about, { includeDeleted: true });
+    /* AS THE CALLER IS SHOWN THEM: a field read through a link to a row kept private from her reads empty (`viewer`). */
+    const held = kernel.getEach(about, { includeDeleted: true, viewer: viewer(ctx) });
     for (const id of about) {
       if (read.has(id)) continue;
       const row = held.get(id) ?? null;
@@ -238,7 +239,7 @@ export function readSight(kernel: Kernel) {
     const shown = new Set<string>();
     for (const [register, ids] of by) for (const id of admitted(ctx, register, ids)) shown.add(id);
     return {
-      row: (id) => (read.has(id) ? read.get(id)! : kernel.get(id, { includeDeleted: true })),
+      row: (id) => (read.has(id) ? read.get(id)! : kernel.get(id, { includeDeleted: true, viewer: viewer(ctx) })),
       admits: (row) => (read.has(row.id) ? shown.has(row.id) : admits(ctx, row)),
     };
   };
