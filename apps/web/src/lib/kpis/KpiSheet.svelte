@@ -44,6 +44,7 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import '$lib/ui/forms.css';
+  import { dbl } from '$lib/ui/dbl.ts';
   import { findReadingList, projectsOf, type Reads } from './kpi-rows.ts';
   import { PAST_READ, pastAfter, pastBackOf, pastOf, pastPatchOf, pastWhere, setByOf, whoSaid, type Past, type PastEvent } from './past.ts';
   import { daySaid, projectFieldOf } from './stale-fix.ts';
@@ -680,7 +681,7 @@
                     </span>
                   </div>
                 {:else}
-                  <span class="kpi-past-words">
+                  <span class="kpi-past-words" {@attach !d && !busy ? dbl(() => void editPast(p)) : null}>
                     <span class="kpi-past-value">{said(p)}</span>
                     <span class="kpi-past-meta"
                       >{day}{#if by}{' · '}{copy.kpiPastBy(by)}{/if}{#if d?.kind === 'removed'}{' · '}{copy.kpiPastRemoved}{:else if d}{' · '}{copy.kpiPastChanged(said(d.before))}{/if}</span

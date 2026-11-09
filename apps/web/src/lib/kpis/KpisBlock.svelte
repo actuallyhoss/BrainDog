@@ -313,8 +313,13 @@
         cellAt = at;
       } else tileAt = at;
     };
+    numberMenus.edit = (name) => {
+      const k = kpis.find((x) => x.name === name);
+      if (k) void openKpi(k as KpiInput);
+    };
     return () => {
       numberMenus.open = null;
+      numberMenus.edit = null;
     };
   });
 
