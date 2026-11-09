@@ -2514,17 +2514,40 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     LIST_ID.test(register) ? { sql: `register = '${register}'`, params: [] } : { sql: 'register = ?', params: [register] };
 
   const RULES_KEPT = 512;
-  const rulesKept = new Map<string, Compiled>();
+  /* AND WHAT COMPILING IT READ (`read`), handed to every reading being read when the rule is handed out again (`within`),
+     as a held value's reads are (`readMemo`): a name looked up in `things` holds the reading on `things` too. */
+  const rulesKept = new Map<string, { c: Compiled; read: ReadTrace }>();
   const ruleCompiled = (register: string, rule: Json): Compiled => {
-    const key = [revision, version(), Math.floor(clock.now() / 60_000), register, JSON.stringify(rule)].join('\u0000');
+    /* THE VERSION IN THE KEY IS NO READ OF THE READINGS BEING READ (`traces`): it reads the log, which no held reading may,
+       so every count by a rule (how many rows fill a field, how many are open) was read again on every ask, and the pen
+       counted a 20,000 row ledger's dated rows again on every `boot`. What compiling reads is theirs, as it was. A sign or
+       a draw still sees it. */
+    const watching = traces.splice(0);
+    let at: number;
+    try {
+      at = version();
+    } finally {
+      traces.push(...watching);
+    }
+    const key = [revision, at, Math.floor(clock.now() / 60_000), register, JSON.stringify(rule)].join('\u0000');
     const hit = rulesKept.get(key);
     if (hit !== undefined) {
       rulesKept.delete(key);
       rulesKept.set(key, hit);
-      return hit;
+      for (const t of traces) within(t, hit.read);
+      return hit.c;
     }
-    const c = ruleOf(rule, readerSchemaOf()(register) ?? schemaOf(register), evalContext());
-    rulesKept.set(key, c);
+    const read = traceOf();
+    traces.push(read);
+    let c: Compiled;
+    try {
+      c = ruleOf(rule, readerSchemaOf()(register) ?? schemaOf(register), evalContext());
+    } finally {
+      traces.pop();
+    }
+    /* KEPT ONLY WHERE WHAT IT READ WAS SEEN: compiled while reads are not noted (`muted`), it would be handed out reading nothing. */
+    if (muted > 0) return c;
+    rulesKept.set(key, { c, read });
     while (rulesKept.size > RULES_KEPT) rulesKept.delete(rulesKept.keys().next().value as string);
     return c;
   };
