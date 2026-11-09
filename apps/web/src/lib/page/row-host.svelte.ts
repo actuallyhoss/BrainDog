@@ -76,8 +76,13 @@ export class RowHost {
    * of the board opens. One panel at a time, so opening a row closes it and opening it closes the row.
    */
   changesOpen = $state(false);
-  /** Whether the panel opened to type: the caret goes in the words. */
-  typing = $state(false);
+  /**
+   * Whether the panel opened to type: the caret goes in the words, or in the box of the field named (a double click on a
+   * value, `lib/ui/dbl.ts`).
+   */
+  typing = $state<boolean | string>(false);
+  /** Each ask to type, counted: a row already open is asked again and takes the caret again (`e` twice, a double click). */
+  typed = $state(0);
   /** Whether the panel holds words typed and not saved, which the cursor moving must not throw away. */
   dirty = $state(false);
   /** The row whose menu is open, which of the menu's steps it shows, and where the row was when it opened. */
@@ -388,13 +393,17 @@ export class RowHost {
 
   /* ── the panel and the menu ─────────────────────────────────────────────── */
 
-  /** Opens the row in the docked panel; `type` puts the caret in its words. A row no block holds does not open. */
-  open(row: RowAt | null, type = false) {
+  /**
+   * Opens the row in the docked panel; `type` puts the caret in its words, or in the named field's box. A row no block
+   * holds does not open. The row already open keeps what is typed in it, and only takes the caret.
+   */
+  open(row: RowAt | null, type: boolean | string = false) {
     if (!row || !this.entry(row) || !this.shapeOf(row.register)) return false;
-    this.dirty = false;
+    if (!(this.panelOpen && this.opened && keyOf(this.opened) === keyOf(row))) this.dirty = false;
     this.menuOpen = false;
     this.opened = row;
     this.typing = type;
+    if (type !== false) this.typed += 1;
     this.changesOpen = false;
     this.panelOpen = true;
     this.seeRow(row);

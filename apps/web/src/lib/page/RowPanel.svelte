@@ -202,19 +202,31 @@
     if (host.panelOpen && row && !entry) host.close();
   });
 
-  /** The caret in the words, once the panel has drawn: a frame later it may still be opening. */
+  /** The caret in the words, or in the box of the field it was opened on, once the panel has drawn: a frame later it may still be opening. */
   async function caret() {
     await tick();
     requestAnimationFrame(() => {
       const r = row;
       const s = r ? host.shapeOf(r.register) : null;
       if (!r || !s) return;
-      /* `RowForm`'s own id for a box, `new-<list>-<field>`. */
-      const box = document.getElementById(`new-${r.register}-${s.title}`) as HTMLInputElement | HTMLTextAreaElement | null;
+      /* `RowForm`'s own id for a box, `new-<list>-<field>`: the field asked for where the form draws it, else the title. */
+      const asked = typeof host.typing === 'string' ? document.getElementById(`new-${r.register}-${host.typing}`) : null;
+      const at = asked ?? document.getElementById(`new-${r.register}-${s.title}`);
+      /* A BOX DRAWN INSIDE ITS OWN CONTROL (a day, a link picked by name) carries the id on its wrapper or its field. */
+      const box = at?.matches('input, select, textarea, button') ? at : at?.querySelector<HTMLElement>('input, select, textarea, button');
       box?.focus();
-      box?.select();
+      if (box instanceof HTMLInputElement || box instanceof HTMLTextAreaElement) box.select();
     });
   }
+
+  /* ASKED TO TYPE ON THE ROW ALREADY OPEN (`e` again, a double click on what a press just opened): the form stays as it is,
+     with what is typed in it, and only the caret moves. A form not loaded yet takes it as it loads, above. */
+  $effect(() => {
+    void host.typed;
+    untrack(() => {
+      if (host.typing && row && loaded === keyOf(row) && seeded) void caret();
+    });
+  });
 
   function save(e?: SubmitEvent) {
     e?.preventDefault();
