@@ -264,6 +264,7 @@ import type { EngineHealthRead } from './methods/engine.ts';
 import type { SealedStore } from './methods/sealed.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from './emergent.ts';
+import { VIEWS_SECTION } from './emergent-views.ts';
 import { drewCostWhy } from './design-agent.ts';
 import { drawingsOf, drewDraft, drewFiled, DREW_MODEL_PREF } from './drew.ts';
 import { censusSlices, methods as censusMethods, type CensusPart } from './methods/pages-census.ts';
@@ -11247,8 +11248,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      (`page.render`'s count, `opensSince`). Every read an agent makes raises some other count, and keying on the total
      of every count meant the pen was weighed again on every call while an agent worked (bench 24 Oct, H1: `context` and
      `governance` each spent most of their `boot` here, on a record whose pen had not changed). */
+  /* AND ONLY A SAVED VIEW'S OPENS ARE COUNTED (`opensSince`, the one read of how often): every other page is read by the
+     day it was opened on, a new line. Each page the phone opened raised the count, and `boot`, which is held by this
+     too, was worked out whole again on the next open: 0.1 s of the record's time on every boot after a page. */
   const usedNow = (): unknown =>
-    sql.one("SELECT count(*) AS lines, (SELECT total(n) FROM observation WHERE kind = 'page.render') AS opens FROM observation") ?? null;
+    sql.one(
+      "SELECT count(*) AS lines, (SELECT total(n) FROM observation WHERE kind = 'page.render' AND subject IN (SELECT value FROM json_each(?))) AS opens FROM observation",
+      JSON.stringify(pagesNow().flatMap((p) => (p.nav?.section === VIEWS_SECTION ? [p.slug] : []))),
+    ) ?? null;
 
   /**
    * AN OFFER AS `boot` SENDS IT: a draft that is the very declaration keeping it writes (`change.to`, as both kinds of
@@ -13215,7 +13222,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const { batch: _batch, provedAt: _proved, ...caller } = ctx;
       const who = person(ctx);
       const standing = who === null ? null : [kernel.prefsOf(who), sql.all('SELECT register, level, row_where FROM member WHERE person_id = ?', who)];
+      let made = false;
       const [answer, look, looks] = heldFor(bootHeld, JSON.stringify([caller, standing, usedNow()]), () => kernel.transaction(() => {
+        made = true;
         const out: Boot['registers'] = [];
         /* THE KERNEL'S OWN LISTS SAY SO (`kernel: true`), by their declaration, so no screen leaves them out by a name. */
         const own = new Set(kernel.kernelLists());
@@ -13288,7 +13297,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         };
         return [answered, themeInstalled(ctx), looksOf(kernel.declarations().filter((d) => d.kind === 'theme'))] as const;
       }), 16);
-      return ok({ ...structuredClone(answer), now: new Date(clock.now()).toISOString(), theme: look === null ? null : await themeDrawn(look), looks: structuredClone(looks) });
+      /* A HELD ANSWER GOES OUT WITH WHAT THE CLOCK ALONE MOVES WORKED OUT NOW: the runs at work, how long each has run and
+         been quiet, and how many questions are late. Held now across a page opened, it would otherwise say a run's age
+         as it was when it was worked out; these few reads are what every other part of it saves. */
+      const out = structuredClone(answer);
+      if (!made) {
+        const moving = kernel.transaction(() => ({ sessions: readable(ctx, SESSION) ? [] : live(ctx), waits: waitsFor(ctx), working: workingFor(ctx) }));
+        Object.assign(out, moving, { counts: { ...out.counts, decide: moving.waits.questions, inbox: moving.waits.inbox } });
+      }
+      return ok({ ...out, now: new Date(clock.now()).toISOString(), theme: look === null ? null : await themeDrawn(look), looks: structuredClone(looks) });
     },
 
     /**
