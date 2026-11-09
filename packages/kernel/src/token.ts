@@ -310,14 +310,32 @@ const USES_MOST = 512;
 function usesStale(uses: TokenUses, ids: readonly string[], now: number, surface: string | null, build: string | null): boolean {
   return ids.some((id) => {
     const was = uses.get(id);
-    return was === undefined || now - was.at >= USE_WRITE_MS || now < was.at || was.surface !== surface || (build !== null && was.build !== build);
+    return (
+      was === undefined ||
+      now - was.at >= USE_WRITE_MS ||
+      now < was.at ||
+      was.surface !== surface ||
+      (build !== null && was.build !== build && !olderBuild(build, was.build))
+    );
   });
 }
 
-/** Note a use as written for `ids`, the build kept being the one said or the one already noted. */
+/** Note a use as written for `ids`, the build kept being the one said or the one already noted, whichever `verifyToken` kept. */
 function usesWritten(uses: TokenUses, ids: readonly string[], now: number, surface: string | null, build: string | null): void {
   if (uses.size >= USES_MOST) for (const [id, was] of uses) if (now - was.at >= USE_WRITE_MS) uses.delete(id);
-  for (const id of ids) uses.set(id, { at: now, surface, build: build ?? uses.get(id)?.build ?? null });
+  for (const id of ids) {
+    const was = uses.get(id)?.build ?? null;
+    uses.set(id, { at: now, surface, build: build === null || olderBuild(build, was) ? was : build });
+  }
+}
+
+/** A build bundled on a day, `2026.11.09+…`, as SQLite's `GLOB` reads it; its first ten characters are the day. */
+const DATED_BUILD = '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]+*';
+
+/** Whether `said` was bundled on an earlier day than `kept`, which a key does not take over it (`verifyToken`). */
+function olderBuild(said: string, kept: string | null): boolean {
+  const dated = /^\d{4}\.\d{2}\.\d{2}\+/u;
+  return kept !== null && dated.test(said) && dated.test(kept) && said.slice(0, 10) < kept.slice(0, 10);
 }
 
 /**
@@ -709,6 +727,12 @@ const rank = (scope: Scope): number => SCOPES.indexOf(scope);
  * A value that is not a build (`isBuild`) is dropped and the build already kept stays: a header anybody can send is not
  * let into a column a person reads.
  *
+ * AND A BUILD BUNDLED ON AN EARLIER DAY THAN THE ONE KEPT DOES NOT TAKE ITS PLACE (`olderBuild`). A bridge an agent
+ * opened days ago answers with the build it started on until its session ends, beside the command updated since on the
+ * same key; measured on 9 November, the MacBook's key went back and forth between 2026.11.05 from such a bridge and
+ * 2026.11.09, and `arrived` read it red each time the old one called last. What the computer has installed is the
+ * newest build its key has said; a checkout's (`dev+`) has no day and is kept as before.
+ *
  * AT MOST ONCE A MINUTE A KEY, with `deps.uses`: the first use, a use a minute or more after the last one written, and a
  * use through another door or with a new build are written, and the rest are not (`USE_WRITE_MS`). On a busy record a
  * write per call was a storage write every answer waited for.
@@ -723,9 +747,16 @@ export async function verifyToken(deps: TokenDeps, bearer: string, surface?: str
   const ids = row.parent_id === null ? [row.id] : [row.id, row.parent_id];
   if (deps.uses === undefined || usesStale(deps.uses, ids, deps.nowMs, door, kept)) {
     deps.sql.exec(
-      'UPDATE token SET last_used_at = ?, last_surface = ?, last_build = COALESCE(?, last_build) WHERE id IN (?, ?)',
+      `UPDATE token SET last_used_at = ?, last_surface = ?,
+         last_build = CASE WHEN ? IS NULL OR (last_build GLOB ? AND ? GLOB ? AND substr(?, 1, 10) < substr(last_build, 1, 10)) THEN last_build ELSE ? END
+       WHERE id IN (?, ?)`,
       instant(deps.nowMs),
       door,
+      kept,
+      DATED_BUILD,
+      kept,
+      DATED_BUILD,
+      kept,
       kept,
       row.id,
       row.parent_id ?? row.id,
