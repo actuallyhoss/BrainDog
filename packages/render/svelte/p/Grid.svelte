@@ -13,7 +13,7 @@
 -->
 <script lang="ts">
   import { tick } from 'svelte';
-  import { figureChars, headlineFigure, hrefFor, inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { figureChars, headlineFigure, hrefFor, inline, leadingCode, rowKeys, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { columnAt, columnsOf, dropTarget, lanes, laneShown, moveTarget, type Moves } from '../../src/board.ts';
   import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
   import { TODO_META_JOIN, boardMeta } from '../../src/todo.ts';
@@ -78,6 +78,9 @@
   /** Moves made since this block was drawn, by row index. Nothing has been written yet. */
   let moved = $state<Moves>({});
   const board = $derived(lanes(block.rows, moved));
+  /* A CARD KEYED BY ITS ROW'S OWN KEY (`rowKeys`), not its place in the block, so a card the record added is a new element
+     and the cards after it keep theirs, which a host can move in and out. */
+  const cardKeys = $derived(rowKeys(block.rows));
 
   /**
    * ONE LANE AT A TIME ON A PHONE, behind a switch of their names and counts: stacked, the
@@ -451,7 +454,7 @@
         {:else}
           {@render laneHead(lane.name, lane.cards.length)}
         {/if}
-        {#each lane.cards as card (card.at)}
+        {#each lane.cards as card (cardKeys[card.at] ?? card.at)}
           <!-- The card's controls are tab stops only on the card that holds the board's one; on a board nothing moves,
                each is its own stop. -->
           {@const stop = live ? (card.at === focus ? 0 : -1) : undefined}

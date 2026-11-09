@@ -56,6 +56,7 @@
   import Changed from './Changed.svelte';
   import { leadIndex } from './lead.ts';
   import { blockKeys, recomposer, rewritten } from './recompose.ts';
+  import { pageRows } from './page-rows.ts';
   import { lookOrder, nextOf, placedOf, repeatsFirst } from './look.ts';
   import { asksAside } from './asks.ts';
   import { judgedWith } from './panels.ts';
@@ -496,6 +497,9 @@
   /* THE PAGE'S OWN ELEMENT, declared before the effects that read it: a `$effect.pre` runs while the component is
      still being set up, and reading a `let` the script has not reached yet is a TDZ error that blanks the page. */
   let pageEl = $state<HTMLElement | null>(null);
+  /* A ROW THE RECORD ADDS RISES INTO ITS LIST AND ONE IT DROPS LETS GO (`page-rows.ts`), whichever block holds it; never in
+     a preview, which no record moves under. */
+  $effect(() => (pageEl && mode !== 'preview' ? pageRows(pageEl) : undefined));
   /**
    * A ROW ANOTHER HAND CHANGED WEARS A FAINT TINT UNTIL IT IS SEEN (`byline.ts`): an agent, a rule or Slash, on a page at
    * its own address. The renderer draws its rows and takes no word from the host about them, so the tint is an attribute

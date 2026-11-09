@@ -30,8 +30,10 @@ import { FADE, ms, rowIn, rowOut, still } from '../ui/motion.ts';
 export { ms, still };
 
 import { spring } from './spring.ts';
+import { pressedJustNow, washIfGrown } from './grow.ts';
 
 export { spring };
+export { growing, moved, wash, washIfGrown } from './grow.ts';
 
 /* ── the first second of a screen ────────────────────────────────────────── */
 
@@ -68,14 +70,31 @@ const fadeIn = (delay = 0): TransitionConfig => ({ delay, duration: FADE, css: (
  * `--form-in`, its opacity in over the first part. `delay` staggers a group (`staggered`). Still in a screen's first
  * second; a fade under reduced motion.
  */
-export function arrive(_node: Element, { delay = 0, rise = 10, from = 0.97 }: { delay?: number; rise?: number; from?: number } = {}): TransitionConfig {
+export function arrive(node: Element, { delay = 0, rise = 10, from = 0.97 }: { delay?: number; rise?: number; from?: number } = {}): TransitionConfig {
   if (calm()) return NONE;
+  /* THE RECORD GREW WHILE HE LOOKED: the card wears the arrival wash as it lands (`grow.ts`). */
+  washIfGrown(node);
   if (still()) return fadeIn();
   return {
     delay,
     duration: ms('--form-in', 320),
     easing: spring,
     css: (t, u) => `opacity:${Math.min(1, t * 2.5)};transform:translateY(${(u * rise).toFixed(2)}px) scale(${(1 - u * (1 - from)).toFixed(4)})`,
+  };
+}
+
+/**
+ * A COUNT COMING ON where there was none (Needs you's red capsule, the bell's badge): it swells from 60% to its size on
+ * the spring, a little past and back, and fades in, over `--form-in`. Still in a screen's first second; a fade under
+ * reduced motion.
+ */
+export function pop(_node: Element): TransitionConfig {
+  if (calm()) return NONE;
+  if (still()) return fadeIn();
+  return {
+    duration: ms('--form-in', 320),
+    easing: spring,
+    css: (t, u) => `opacity:${Math.min(1, t * 2.5).toFixed(3)};transform:scale(${(1 - u * 0.4).toFixed(4)})`,
   };
 }
 
@@ -273,12 +292,40 @@ export const listMotion =
     return () => seen.disconnect();
   };
 
+/**
+ * A ROW'S WHOLE ROOM ON THE BLOCK AXIS, as it is drawn: its height and the padding and rules inside it. A row opening or
+ * closing by its height alone stopped at its padding, the box being measured border-box, and jumped the last 20px when
+ * it was put in or taken out; a row with a least height (`--row-h`) did not open at all.
+ */
+function roomOf(el: HTMLElement): Record<'blockSize' | 'paddingBlockStart' | 'paddingBlockEnd' | 'borderBlockStartWidth' | 'borderBlockEndWidth', string> {
+  const s = getComputedStyle(el);
+  return {
+    blockSize: `${el.offsetHeight}px`,
+    paddingBlockStart: s.paddingBlockStart,
+    paddingBlockEnd: s.paddingBlockEnd,
+    borderBlockStartWidth: s.borderBlockStartWidth,
+    borderBlockEndWidth: s.borderBlockEndWidth,
+  };
+}
+
+const NO_ROOM = { blockSize: '0px', paddingBlockStart: '0px', paddingBlockEnd: '0px', borderBlockStartWidth: '0px', borderBlockEndWidth: '0px' } as const;
+
 function arriveNow(el: HTMLElement): void {
+  /* THE RECORD GREW WHILE HE LOOKED: the row wears the arrival wash as it lands (`grow.ts`). */
+  washIfGrown(el);
   if (still()) return void play(el, { opacity: [0, 1] }, { duration: FADE });
-  const h = el.offsetHeight;
+  const room = roomOf(el);
   const long = ms('--form-in', 320);
   /* ITS ROOM OPENS while it rises, so what is under it glides down rather than jumping. */
-  el.animate({ blockSize: ['0px', `${h}px`], overflow: ['clip', 'clip'] }, { duration: long * 0.6, easing: 'cubic-bezier(0.2, 0, 0, 1)' });
+  const opening = el.animate(
+    [
+      { ...NO_ROOM, minBlockSize: '0px', overflow: 'clip' },
+      { ...room, minBlockSize: '0px', overflow: 'clip' },
+    ],
+    { duration: long * 0.6, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+  );
+  /* NAMED, so a board's fit measures the row again once it has opened (`board/fit.ts`). */
+  opening.id = 'room';
   play(el, { opacity: [0, 1], transform: ['translateY(10px) scale(0.97)', 'none'] }, { duration: long });
 }
 
@@ -289,22 +336,176 @@ function leaveFrom(box: HTMLElement, el: HTMLElement, next: Node | null, prev: N
   el.setAttribute('aria-hidden', 'true');
   el.inert = true;
   box.insertBefore(el, before);
-  const h = el.offsetHeight;
+  const room = roomOf(el);
   const gap = Number.parseFloat(getComputedStyle(box).rowGap) || 0;
   const last = el.nextElementSibling === null;
-  const room = last ? 'marginBlockStart' : 'marginBlockEnd';
+  const side = last ? 'marginBlockStart' : 'marginBlockEnd';
   el.style.overflow = 'clip';
   el.style.pointerEvents = 'none';
   const a = el.animate(
     [
-      { opacity: 1, transform: 'none', blockSize: `${h}px`, [room]: '0px', offset: 0, easing: 'cubic-bezier(0.4, 0, 1, 0.5)' },
-      { opacity: 0, transform: 'scale(0.97)', blockSize: `${h}px`, [room]: '0px', offset: 0.4, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
-      { opacity: 0, transform: 'scale(0.97)', blockSize: '0px', [room]: `${-gap}px`, offset: 1 },
+      { opacity: 1, transform: 'none', ...room, minBlockSize: '0px', [side]: '0px', offset: 0, easing: 'cubic-bezier(0.4, 0, 1, 0.5)' },
+      { opacity: 0, transform: 'scale(0.97)', ...room, minBlockSize: '0px', [side]: '0px', offset: 0.4, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+      { opacity: 0, transform: 'scale(0.97)', ...NO_ROOM, minBlockSize: '0px', [side]: `${-gap}px`, offset: 1 },
     ],
     { duration: ms('--form-out', 180) + ms('--form-settle', 380) * 0.75, fill: 'forwards' },
   );
+  a.id = 'leave';
   const gone = () => el.remove();
   void a.finished.then(gone, gone);
+}
+
+/* ── the rows of a page, arriving and leaving ────────────────────────────── */
+
+/**
+ * One kind of row a page draws, for `rowsMotion`: the list it sits in (`in`), the row itself (`row`, a selector that
+ * names the row alone, since a row that has gone has no list round it to match), and whether it is a `line` in a column
+ * of them, which opens and closes its room, or a `card` in a grid, which rises in its cell while the cards round it
+ * glide to theirs.
+ */
+export type RowsOf = { in: string; row: string; as: 'line' | 'card' };
+
+/** More rows than this coming or going at once is a new answer (a list drawn again, a page of rows), drawn still. */
+export const MOST_AT_ONCE = 4;
+
+/**
+ * THE RECORD GROWING INSIDE A PAGE'S BLOCKS (31 Oct, "the way your braindog forms and evolves"), watched from the page
+ * itself: `rowsMotion(ROWS)(page)`, which `PageBody` runs on its page (`page/page-rows.ts`). A task an agent added
+ * rises into Your work this week, a person met into the people's cards, a line paid elsewhere leaves Late, without a
+ * component of the page knowing: the lists only need to be keyed, so a row that arrives is a new element and one that
+ * goes is taken out.
+ *
+ * A LINE THAT ARRIVES opens its room and rises into it, as `lineIn` does, and wears the arrival wash where the record
+ * grew while he looked (`grow.ts`); A LINE THAT GOES lets go and its room closes, gap and all (`listMotion`'s two). A CARD
+ * THAT ARRIVES rises in its cell while the cards after it glide to theirs (FLIP, measured with the new card out of the
+ * flow for one read in the same task, so nothing is painted between); A CARD THAT GOES sinks and fades where it stood,
+ * and then the cards after it glide back into the gap.
+ *
+ * NEVER A FIRST DRAW AND NEVER A NEW ANSWER: nothing in a screen's first second (`calm`), on a board still settling
+ * (`data-still`) or being arranged, or in a tab nobody is looking at; a row put in as part of a list drawn whole is not
+ * seen at all (only a row put into a list already there is); more than `MOST_AT_ONCE` rows at once is a new answer and
+ * is drawn still; and a row that takes another's place, where the other stood, changes there (fluid F9). Under reduced
+ * motion an arrival fades and wears the wash held, and a leaving row is simply gone.
+ */
+export const rowsMotion =
+  (kinds: readonly RowsOf[]) =>
+  (box: HTMLElement): (() => void) | void => {
+    if (typeof MutationObserver === 'undefined') return;
+    const kindOf = (el: Node, list: Node | null): RowsOf | null => {
+      if (!(el instanceof HTMLElement) || !(list instanceof HTMLElement)) return null;
+      /* NOT IN A BLOCK BEING ARRANGED, nor in a copy of one fading out (`recompose.ts`). */
+      if (list.closest('[data-arranging], [data-leaving]')) return null;
+      for (const k of kinds) if (el.matches(k.row) && list.matches(k.in)) return k;
+      return null;
+    };
+    const seen = new MutationObserver((records) => {
+      /* HIS OWN PRESS HAS ITS OWN ANSWER (a tick kept where it was, a card dropped, a fold opened, a line being edited):
+         this is for what changes while he only looks. */
+      if (calm() || pressedJustNow() || document.hidden || box.closest('[data-still], [data-editing]')) return;
+      const out = new Set<Node>();
+      for (const r of records) for (const n of r.removedNodes) out.add(n);
+      type At = { el: HTMLElement; kind: RowsOf; list: HTMLElement; next: Node | null; prev: Node | null };
+      const came: At[] = [];
+      const went: At[] = [];
+      for (const r of records) {
+        if (r.type !== 'childList' || !(r.target instanceof HTMLElement) || !r.target.isConnected) continue;
+        for (const n of r.addedNodes) {
+          if (out.has(n) || !(n instanceof HTMLElement) || !n.isConnected || n.hasAttribute('data-leaving')) continue;
+          const kind = kindOf(n, r.target);
+          if (kind) came.push({ el: n, kind, list: r.target, next: r.nextSibling, prev: r.previousSibling });
+        }
+        for (const n of r.removedNodes) {
+          if (!(n instanceof HTMLElement) || n.isConnected || n.inert || n.hasAttribute('data-leaving')) continue;
+          const kind = kindOf(n, r.target);
+          if (kind) went.push({ el: n, kind, list: r.target, next: r.nextSibling, prev: r.previousSibling });
+        }
+      }
+      if (came.length + went.length === 0 || came.length > MOST_AT_ONCE || went.length > MOST_AT_ONCE) return;
+      /* ONE THAT TAKES ANOTHER'S PLACE, WHERE THE OTHER STOOD, CHANGES THERE: a typed line and the record's row for it are
+         one row, and one closing while the other opened drew two over each other (fluid F9). */
+      const swapped = (a: At, b: At): boolean => a.list === b.list && ((a.next !== null && a.next === b.next) || (a.prev !== null && a.prev === b.prev));
+      const coming = came.filter((c) => !went.some((w) => swapped(c, w)));
+      const going = went.filter((w) => !came.some((c) => swapped(c, w)));
+      for (const c of came) if (!coming.includes(c)) washIfGrown(c.el);
+      const cards = coming.filter((c) => c.kind.as === 'card').map((c) => c.el);
+      if (cards.length > 0) arriveCards(cards);
+      for (const c of coming) if (c.kind.as === 'line') arriveNow(c.el);
+      for (const w of going) {
+        if (w.kind.as === 'card') leaveCard(w.list, w.el, w.next, w.prev);
+        else leaveFrom(w.list, w.el, w.next, w.prev);
+      }
+    });
+    seen.observe(box, { childList: true, subtree: true });
+    return () => seen.disconnect();
+  };
+
+/**
+ * Plays an element from `dx`, `dy` away back to where it is, on transform alone: one glide at a time. A CARD THAT WENT
+ * TO ANOTHER LINE OF THE GRID does not cross the board to get there (a whole row's width, the move `recompose.ts` holds
+ * to `SLIDE_MAX`): it glides the last 24px on the same heading and fades in, so the way it went is felt.
+ */
+function glideFrom(el: HTMLElement, dx: number, dy: number, line = Number.POSITIVE_INFINITY): void {
+  if (Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5) return;
+  const far = Math.hypot(dx, dy);
+  const wrapped = Math.abs(dy) > line / 2 && far > 96;
+  const k = wrapped ? 24 / far : 1;
+  const from = `translate(${(dx * k).toFixed(2)}px, ${(dy * k).toFixed(2)}px)`;
+  const a = play(el, wrapped ? { transform: [from, 'none'], opacity: [0, 1] } : { transform: [from, 'none'] }, { duration: ms('--form-settle', 380) });
+  if (a) a.id = 'glide';
+}
+
+/** The cards beside `except` in the lists that hold them, the ones that may have to make room. */
+const cardsBeside = (lists: Iterable<HTMLElement | null>, except: readonly Element[]): HTMLElement[] =>
+  [...new Set(lists)].flatMap((l) => (l ? [...l.children] : [])).filter((c): c is HTMLElement => c instanceof HTMLElement && !except.includes(c) && !c.hasAttribute('data-leaving'));
+
+/** Plays `change` between two measures of `cards`, gliding each from where it stood to where it stands now. */
+function makeRoom(cards: readonly HTMLElement[], change: () => void): void {
+  const was = cards.map((c) => c.getBoundingClientRect());
+  /* A GLIDE STILL PLAYING ENDS HERE, from where it was drawn, so the next one starts from the reader's picture. */
+  for (const c of cards) for (const a of c.getAnimations()) if (a.id === 'glide') a.cancel();
+  change();
+  cards.forEach((c, i) => {
+    if (!c.isConnected) return;
+    const r = c.getBoundingClientRect();
+    glideFrom(c, was[i]!.left - r.left, was[i]!.top - r.top, r.height);
+  });
+}
+
+function arriveCards(els: readonly HTMLElement[]): void {
+  for (const el of els) washIfGrown(el);
+  if (still()) {
+    for (const el of els) play(el, { opacity: [0, 1] }, { duration: FADE });
+    return;
+  }
+  /* WHERE THE CARDS AFTER THEM STOOD: the new ones out of the flow for one measure, then back, in this task. */
+  const held = els.map((el) => [el.style.getPropertyValue('display'), el.style.getPropertyPriority('display')] as const);
+  for (const el of els) el.style.setProperty('display', 'none', 'important');
+  makeRoom(cardsBeside(els.map((el) => el.parentElement), els), () =>
+    els.forEach((el, i) => {
+      const [value, priority] = held[i]!;
+      if (value) el.style.setProperty('display', value, priority);
+      else el.style.removeProperty('display');
+    }),
+  );
+  for (const el of els) play(el, { opacity: [0, 1], transform: ['translateY(10px) scale(0.97)', 'none'] }, { duration: ms('--form-in', 320) });
+}
+
+function leaveCard(list: HTMLElement, el: HTMLElement, next: Node | null, prev: Node | null): void {
+  if (still() || typeof el.animate !== 'function') return;
+  const before = next && next.parentNode === list ? next : prev && prev.parentNode === list ? prev.nextSibling : null;
+  el.setAttribute('data-leaving', '');
+  el.setAttribute('aria-hidden', 'true');
+  el.inert = true;
+  el.style.pointerEvents = 'none';
+  list.insertBefore(el, before);
+  /* IT LETS GO WHERE IT STOOD, and then the cards after it glide back into the gap. */
+  const a = el.animate({ opacity: [1, 0], transform: ['none', 'scale(0.96)'] }, { duration: ms('--form-out', 180), easing: 'cubic-bezier(0.4, 0, 1, 0.5)', fill: 'forwards' });
+  a.id = 'leave';
+  const gone = () => {
+    if (!el.isConnected) return;
+    makeRoom(cardsBeside([el.parentElement], [el]), () => el.remove());
+  };
+  void a.finished.then(gone, () => el.remove());
 }
 
 /** An element's place in a group assembling (`[data-forming]` in `app.css`): `style="--form-i: …"` in one word. */

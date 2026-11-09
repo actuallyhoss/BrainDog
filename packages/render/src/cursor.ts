@@ -19,6 +19,22 @@ type Keyed = { cells: readonly string[]; ref?: { register: string; seq: number }
 export const rowKey = (row: Keyed, at: number): string =>
   row.ref ? `${row.ref.register}#${row.ref.seq}` : String(at);
 
+/**
+ * EACH ROW'S KEY FOR A KEYED LIST, by place (the record growing, 9 Nov): `rowKey`, with a second row of one key told
+ * apart by its count, so no two drawn rows ever share one. A list keyed by these draws a row the record added as a new
+ * element and takes one it dropped out as that element, which is what lets a host move them in and out; drawn by place,
+ * every row under a new one was the row above it changing its words.
+ */
+export const rowKeys = (rows: readonly Keyed[]): string[] => {
+  const seen = new Map<string, number>();
+  return rows.map((row, at) => {
+    const key = rowKey(row, at);
+    const n = seen.get(key) ?? 0;
+    seen.set(key, n + 1);
+    return n === 0 ? key : `${key}~${n}`;
+  });
+};
+
 /** The most options a number key answers: 1 to 9, one key each. */
 export const CHOICE_KEYS = 9;
 

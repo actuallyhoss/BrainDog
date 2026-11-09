@@ -18,7 +18,7 @@
   import { FEED_DAY, feedCasedNodes, feedFold } from '../src/feed.ts';
   import { RUN_OPEN, runFaceOf, runMarkOf, type RunFace } from '../src/cards.ts';
   import { hrefFor } from '../src/html.ts';
-  import { rowAt, rowKey } from '../src/cursor.ts';
+  import { rowAt, rowKey, rowKeys } from '../src/cursor.ts';
   import type { Row } from '../src/parse.ts';
   import Text from './Text.svelte';
 
@@ -43,6 +43,8 @@
   }
 
   const plan = $derived(feedPlan(block.rows));
+  /* EACH LINE KEYED BY ITS ROW'S OWN KEY (`rowKeys`), so a line the record added is a new element a host can move in. */
+  const lineKeys = $derived(new Map(rowKeys(block.rows).map((k, i) => [block.rows[i], k] as const)));
   const said = (v: string | undefined): string => text(inline(v ?? '', opts));
   const nodes = (v: string | undefined) => inline(v ?? '', opts);
   /** The mark the host draws for the name in a cell, or `null`, as `markFor` in `src/html.ts`. */
@@ -106,7 +108,7 @@
         <!-- A DAY'S HEAD COUNTS ONLY WHAT IS NEW, and the lines above the first day have no name to head them. -->
         {#if !plan.lone && g.label !== ''}<h3 class="feed-head">{g.label}{#if g.fresh > 0}<span class="feed-new num">{feedNew(g.fresh)}</span>{:else if g.by !== FEED_DAY}<span class="feed-tally num" data-calm="">{g.total}</span>{/if}</h3>{/if}
         <ul class="feed-rows">
-          {#each g.rows as { row, fresh, by }, i}
+          {#each g.rows as { row, fresh, by }, i (lineKeys.get(row) ?? i)}
             {@const who = row.cells[1] ?? ''}
             {@const run = runFaceOf(who, null, false)}
             <!-- A RULE WEARS NO FACE AT ALL, an agent its maker's mark where the host draws one, and a person their initial. -->

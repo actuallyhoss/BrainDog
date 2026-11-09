@@ -11,10 +11,12 @@
   ring of the bar's own colour so it reads cut out of the glyph it sits on.
 
   THE NUMBER IS THE MEANING, so the name says what it counts for a screen reader where the caller knows (`label`); the
-  shape and the hue only agree with it. A change rolls through `Figure`.
+  shape and the hue only agree with it. A change rolls through `Figure`; a count that comes on swells in (`pop`), and one
+  that goes up swells as it counts (`count.ts`), the record growing while he looks.
 -->
 <script lang="ts">
   import Figure from './Figure.svelte';
+  import { pop } from '$lib/motion/index.ts';
 
   let {
     n,
@@ -33,7 +35,8 @@
   const said = $derived(n > 99 ? '99+' : String(n));
 </script>
 
-{#if n > 0}<span class="badge num" data-needs-n data-size={size} role={label ? 'img' : undefined} aria-label={label}><Figure value={said} /></span>{/if}
+<!-- IT COMES ON WITH A SWELL where there was none (`pop`), and swells again as the count goes up (`count.ts`). -->
+{#if n > 0}<span class="badge num" data-needs-n data-size={size} role={label ? 'img' : undefined} aria-label={label} in:pop><Figure value={said} /></span>{/if}
 
 <style>
   .badge {

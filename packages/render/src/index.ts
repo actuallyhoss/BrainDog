@@ -80,7 +80,7 @@ export {
   type CaptureRowKind,
 } from './capture.ts';
 export { takeWorking, workingCell, WORKING_GLYPH, WORKING_LABEL, WORKING_MARK } from './working.ts';
-export { CHOICE_KEYS, choiceOf, rowAt, rowKey } from './cursor.ts';
+export { CHOICE_KEYS, choiceOf, rowAt, rowKey, rowKeys } from './cursor.ts';
 export {
   FILTERS_ALL,
   FILTER_CHIPS,
