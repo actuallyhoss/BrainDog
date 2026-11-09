@@ -14084,11 +14084,26 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if (parseSpoken(ref) ?? prefixed(ref)) out.set(ref, readOut(get(ref, opts)));
         else ids.push(ref);
       }
-      for (let i = 0; i < ids.length; i += 500)
-        for (const row of sql.all<Record<string, unknown>>(`SELECT ${COLUMNS} FROM entry WHERE id IN (SELECT value FROM json_each(?))`, JSON.stringify(ids.slice(i, i + 500)))) {
-          const entry = hydrate(row);
-          out.set(entry.id, !opts.includeDeleted && entry.deleted_at ? null : readOut(entry));
+      for (let i = 0; i < ids.length; i += 500) {
+        const entries = sql.all<Record<string, unknown>>(`SELECT ${COLUMNS} FROM entry WHERE id IN (SELECT value FROM json_each(?))`, JSON.stringify(ids.slice(i, i + 500))).map(hydrate);
+        /* EACH LIST'S ROWS READ OUT TOGETHER (`withDerived`), so a field worked out through a link is one lookup for the
+           batch and not one a row: the news on `boot` read each payment's linked row alone, a third of a `boot` after a
+           write on a ledger of 20,000 rows. Each row is worked out from its own link as `readOut` works it out. */
+        const by = new Map<string, Entry[]>();
+        for (const entry of entries) {
+          if (!opts.includeDeleted && entry.deleted_at) continue;
+          const rows = by.get(entry.register);
+          if (rows) rows.push(entry);
+          else by.set(entry.register, [entry]);
         }
+        const read = new Map<string, Entry>();
+        for (const [register, rows] of by) {
+          const decl = registers.get(register);
+          const made = decl !== undefined && decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf()) : rows;
+          for (const entry of made) read.set(entry.id, entry);
+        }
+        for (const entry of entries) out.set(entry.id, read.get(entry.id) ?? null);
+      }
       for (const id of ids) if (!out.has(id)) out.set(id, null);
       return out;
     },
