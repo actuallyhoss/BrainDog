@@ -9168,7 +9168,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * THE VERSION LESS THE RUNS' OWN ROWS (`quietStamp`): the newest line of the log that is not about a row of the runs
    * list, with the newest declaration, the newest question, how many are open and which add-ons are on. Every agent's
    * start and handoff writes its run's row, so on a record agents work in the version moved between any two starts and
-   * the questions were read again for every card, though no question had moved.
+   * the questions were read again for every card, though no question had moved. NOR A KEY OPENED OR AN ARRIVAL READ
+   * (`grant`, `inbox_raw`): a script reads its key several times a minute on his record, and each weighed the pen again,
+   * two thirds of `boot`. A question an arrival raises moves the questions' own count and newest.
    *
    * WALKED ONCE PER LINE: what was seen is kept, the top of the log and its id, and only the lines written since are
    * looked at. A top line that is not the one seen there (a write rolled back, and another written in its place) is
@@ -9185,7 +9187,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const still = was.top !== 0 && top > was.top && sql.one<{ id: string }>('SELECT id FROM event WHERE rowid = ?', was.top)?.id === was.id;
       const moved = still
         ? sql.one<{ m: number | null }>(
-            `SELECT max(e.rowid) AS m FROM event e WHERE e.rowid > ?
+            `SELECT max(e.rowid) AS m FROM event e WHERE e.rowid > ? AND coalesce(e.target_kind, '') NOT IN ('grant', 'inbox_raw')
                AND NOT (e.target LIKE 'entry:%' AND EXISTS (SELECT 1 FROM entry n WHERE n.id = substr(e.target, 7) AND n.register = ?))`,
             was.top,
             SESSION,

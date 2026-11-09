@@ -2262,7 +2262,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * asked for as example rows, tagged `formed` beside `example` (`seed` `carriedDocument`); it is neither cleared nor
    * counted, and it counts as a row of theirs when it names an example.
    */
-  function untouchedExamples(): { untouched: Entry[]; touched: number } {
+  function untouchedExamples(): { untouched: Entry[]; touched: number; live: string[] } {
     const tagged = sql.all<{ id: string; deleted_at: string | null }>(
       "SELECT DISTINCT e.id, e.deleted_at FROM entry e, json_each(e.fields, '$.tags') t WHERE json_type(e.fields, '$.tags') = 'array' AND t.value = 'example'" +
         " AND NOT EXISTS (SELECT 1 FROM json_each(e.fields, '$.tags') f WHERE f.value = 'formed')",
@@ -2348,7 +2348,39 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (row) untouched.push(row);
       else touched++;
     }
-    return { untouched, touched };
+    return { untouched, touched, live: live.map((one) => one.id) };
+  }
+
+  /**
+   * THE UNTOUCHED EXAMPLES, HELD WHILE NOTHING THEY TURN ON HAS MOVED: the rows (their newest, how many, their versions and
+   * their newest change, which a tag, an edit, a delete and a row naming an example all move) and the newest line about
+   * any live example (a note on one writes no row). Not the runs' rows, which move with every step an agent takes and
+   * are never planted: a run naming an example is seen at the next write to any other row. `boot` asked on every line the log took, a key opened and an agent's
+   * step among them, and each ask read every row's tags: on his record most of `boot`'s time between two writes.
+   * Read again inside a write, and past `HELD_EXAMPLES_MOST` examples, whose lines are too many to ask about in one go.
+   */
+  let examplesHeld: { key: string; value: ReturnType<typeof untouchedExamples> } | null = null;
+  const HELD_EXAMPLES_MOST = 90;
+  const examplesKey = (live: readonly string[]): string | null => {
+    if (live.length > HELD_EXAMPLES_MOST) return null;
+    const rows = sql.one<{ r: number | null; n: number; v: number; u: string | null }>(
+      'SELECT max(rowid) AS r, count(*) AS n, total(version) AS v, max(updated_at) AS u FROM entry WHERE register <> ?',
+      SESSION,
+    );
+    const lines =
+      live.length === 0
+        ? null
+        : (sql.one<{ m: number | null }>(`SELECT max(rowid) AS m FROM event WHERE target IN (${live.map(() => '?').join(', ')})`, ...live.map((id) => `entry:${id}`))?.m ?? null);
+    return JSON.stringify([rows?.r ?? null, rows?.n ?? 0, rows?.v ?? 0, rows?.u ?? null, lines]);
+  };
+  function untouchedExamplesHeld(): ReturnType<typeof untouchedExamples> {
+    if (depth > 0 && txWrote) return untouchedExamples();
+    const was = examplesHeld;
+    if (was !== null && examplesKey(was.value.live) === was.key) return was.value;
+    const value = untouchedExamples();
+    const key = examplesKey(value.live);
+    examplesHeld = key === null ? null : { key, value };
+    return value;
   }
 
   /** A row as a person says it, `S42` or `things#3`, or its id when the row is gone. */
@@ -4580,6 +4612,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * lines of its own, and the questions are read past every list. A log that went back (a write rolled back and another
    * in its place) moves everything, as does the first look.
    */
+  /**
+   * THE LINES ABOUT A TABLE NO HELD READING READS (`HELD_TABLES` in `held-readings.ts`), which move no list either: a
+   * question, a key opened (`grant.read`, written each time a script or an agent runs with a key, several a minute on his
+   * record) and an arrival filed or read (`inbox_raw`). Each moved every list, so every figure, walk and fact held over
+   * the ledger was read again after a script read its key: a book's page went from 0.2 s to 1.8 s of the record's time.
+   * A row such a write changes still moves its own list, by its line or by what its rows add up to (`listsStamp`).
+   */
+  const QUIET_TARGETS: ReadonlySet<string> = new Set(['suggestion', 'grant', 'inbox_raw']);
   type ListsSeen = { head: string; whole: string; top: number; id: string; base: number; other: number; tops: Map<string, number> };
   let listsSeen: ListsSeen | null = null;
   const listsNow = (): ListsSeen => {
@@ -4609,7 +4649,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       kept,
     )) {
       if (line.g !== null) tops.set(line.g, line.r);
-      else if (!(line.k === 'pull' && line.tk === 'declaration') && line.tk !== 'suggestion') other = line.r;
+      else if (!(line.k === 'pull' && line.tk === 'declaration') && !(line.tk !== null && QUIET_TARGETS.has(line.tk))) other = line.r;
     }
     return (listsSeen = { head, whole, top, id, base: was.base, other, tops });
   };
@@ -11622,7 +11662,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** The example rows a use case planted that nobody has touched, and how many examples somebody has (`untouchedExamples`). */
     examples: (): { untouched: number; touched: number; registers: Record<string, number>; others: number } => {
-      const { untouched, touched } = untouchedExamples();
+      const { untouched, touched } = untouchedExamplesHeld();
       const registers: Record<string, number> = {};
       for (const row of untouched) registers[row.register] = (registers[row.register] ?? 0) + 1;
       /* THE ROWS OF THEIR OWN BESIDE THEM, in the same lists: above zero once somebody has imported or typed their own, which is
