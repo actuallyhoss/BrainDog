@@ -948,7 +948,7 @@
      the few the web knows lead it (a key number: what it measures, which way is good, how often), then the rest. */
   const LEAD_OF: Readonly<Record<string, readonly string[]>> = { kpis: ['measures', 'good', 'every', 'thing', 'source'] };
   const leadOrder = $derived.by((): readonly string[] => {
-    const marked = (decl?.fields ?? []).filter((f) => (f as { lead?: unknown }).lead === true).map((f) => f.id);
+    const marked = (decl?.fields ?? []).filter((f) => f.lead === true).map((f) => f.id);
     return marked.length > 0 ? marked : (LEAD_OF[id] ?? []);
   });
   const leadRank = (field: string): number => {

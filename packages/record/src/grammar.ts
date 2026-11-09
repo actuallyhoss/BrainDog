@@ -286,6 +286,7 @@ const REGISTER = {
     derive: '{sum: [a, b, ...]}, {diff: [a, b]}, {product: [a, b]}, {ratio: [a, b]}, {band: {of, steps: [{upto, is}], else?}}, {via: {ref, field}} or {normalise: {of, how: lower, trim or digits}}: worked out from other fields of the row at read and never stored or written; a field it reads may be worked out too, never in a ring',
     derived: "BrainDog's own; never write it",
     hidden_from_agents: "true: the field's own bookkeeping, such as a mark or a hue; an agent's short answers leave it out and format full keeps it",
+    lead: "true: one of the facts a row's page shows first, in the list's order, such as what a key number measures",
     parts_of: "on a json field, a money field of the same list: the row split into parts ({category, amount, note}) adding up to it",
     on_delete: 'unlink, on a ref or a list of refs: a link the record drew itself, cleared when the row it points at is deleted and put back by Undo',
     when: '{holds: [people]}: the field is there only while this BrainDog holds those lists or roles (rates, meets, org). Never on a required field',

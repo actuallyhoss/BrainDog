@@ -122,6 +122,8 @@ export type FieldDecl = {
    * a deadline are different things and only the declaration knows which this is.
    */
   deadline?: boolean;
+  /** One of the facts a row's page puts first, in the list's order (1 Nov, L19; the kernel's `FIELD_KEYS` takes it). */
+  lead?: boolean;
   required?: boolean;
   /** One row a value: a `day` held unique makes the list one reading a day (`snapshots.on`), whose figure is its newest. */
   unique?: boolean;
