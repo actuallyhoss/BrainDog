@@ -49,7 +49,7 @@ import type { ContactArgs, ContactMet, EraseReport, EraseRequest } from '@braind
 import { NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
-import { JOINED_AT, PUSH_KINDS, SAID_MOST, mayOf, openInstructions, shareMeOf, tokenOfRun, type Instr, type Profile, type Stop } from '@braindog/kernel';
+import { JOINED_AT, PUSH_KINDS, SAID_MOST, clientFor, mayOf, openInstructions, shareMeOf, tokenOfRun, type Instr, type Profile, type Stop } from '@braindog/kernel';
 import { OWN_RUN, nameMid, personNamed, stopLine, toldOf, toldTo, type Told } from './methods/instructions.ts';
 import { saysOf } from './methods/agent-profile.ts';
 import type { Grant, InvitationRow } from '@braindog/kernel';
@@ -15733,7 +15733,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           /* `other` SAYS NOTHING ABOUT WHO THE RUN IS, so it never writes over a kind the run already has: a client that
              names no agent re-attaching a Claude run left it a nameless one. */
           if (patch.agent === 'other' && typeof run.fields.agent === 'string' && run.fields.agent !== 'other') delete patch.agent;
-          if (hints.client_id !== undefined && run.fields.client_id === undefined) patch.client_id = hints.client_id;
+          /* AND ITS CLIENT ID AS THE LADDER KEEPS ONE (`clientFor`): one another key's run holds is kept under this key's own,
+             so the attach is never refused for a host session that changed keys. */
+          const client = hints.client_id === undefined || run.fields.client_id !== undefined ? null : clientFor(sql, hints.client_id, ctx.principal.id);
+          if (client !== null) patch.client_id = client;
           if (REVIVED.includes(run.state ?? '')) patch.state = 'active';
           const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}`, within: sight.added(ctx, SESSION) });
           if (!out.ok) return out as Result<never>;

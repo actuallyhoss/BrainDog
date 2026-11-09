@@ -371,6 +371,7 @@ import {
   SESSION,
   agentOf as runAgentOf,
   begun,
+  clientFor,
   clipTitle,
   findSession,
   isHelper,
@@ -433,7 +434,7 @@ export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 /** The `field` of the line `setPrivate` writes on a row, kept private or shared again (leak matrix N1). */
 export const PRIVATE_NOTE = 'private';
 export { DRAFT_FIELD, TOPIC_MAX, cleanName, firstProjectFields, firstProjectName, noPlace, topicName } from './first-project.ts';
-export { DEVICES, KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, onMachine, plainApp, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
+export { DEVICES, KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clientFor, clipTitle, isHelper, keyedClient, leftFreshStep, onMachine, plainApp, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 /* A FIELD WORKED OUT FROM OTHER FIELDS: its shapes and refusals, and the rows filled at read. `shapeOf` is the
    ingest's name here, so the derive's is exported as `deriveShapeOf`. */
 export { DERIVE_SHAPES, DERIVE_REFUSES, NORMALISE_HOW, deriveFault, derived, isDerived, shapeOf as deriveShapeOf, sourcesOf, type Derive, type DeriveField, type DeriveShape } from './derive.ts';
@@ -5231,8 +5232,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          it is opened or re-attached only at persist, so a refused write still opens no run. */
       let located: Located | undefined;
       const locate = (): Located => (located ??= locateRun(w));
-      /* A RUN BELONGS TO THE TOKEN THAT OPENED IT: a key that names another key's run, or holds its
-         client id, is refused rather than signed as it, and so is a key writing that run's row. */
+      /* A RUN BELONGS TO THE TOKEN THAT OPENED IT: a key whose hints name another key's run, or hold its client id, is
+         signed as its own run, which the ladder finds or opens, never as that one; a key writing that run's row is refused. */
       if (w.principal?.kind === 'token') {
         const foreign = locate().found;
         if (foreign?.foreign) return notYours<Entry>(`${registers.get(SESSION)?.seq_prefix ?? 'S'}${foreign.seq}`);
@@ -6247,6 +6248,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const seq = Number(sql.one<{ n: number }>('SELECT next AS n FROM counter WHERE name = ?', `seq:${SESSION}`)?.n ?? 1);
     const runs = runRegister();
     const fields = opening(w.session ?? {}, runs);
+    /* A HOST SESSION ANOTHER KEY'S RUN HOLDS IS KEPT UNDER THIS KEY'S OWN ID FOR IT (`clientFor`), which is how the ladder
+       finds this run again; written as it came, the unique `client_id` refused the run and the write went unsigned. */
+    if (typeof fields.client_id === 'string') {
+      const kept = clientFor(sql, fields.client_id, w.principal?.kind === 'token' ? (w.principal.token ?? null) : null);
+      if (kept === null) delete fields.client_id;
+      else fields.client_id = kept;
+    }
     const parent = parentOf(w);
     /* A RUN IS NEVER UNTITLED: until its agent says what it is doing, it is named for the agent and where it opened. A
        project is named by its title and never by its number, which is no name a person reads. */
@@ -6605,13 +6613,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return found && !found.foreign ? byId(found.id) : null;
   }
 
-  /** The refusal for a key reaching a run another key opened: `FORBIDDEN` at `session`, `30 §6`. */
+  /**
+   * The refusal for a key reaching a run another key opened: `FORBIDDEN` at `session`, `30 §6`. Since the ladder passes
+   * such a run over and opens the caller's own (`findSession`), only a call that names it outright meets this: a write to
+   * that run's row, or an end naming it.
+   */
   function notYours<T>(spoken: string): Result<T> {
-    return no<T>(
-      'FORBIDDEN',
-      `${spoken} is a run another key opened, and a key works only as the runs it opened. Leave the run's name and client id out to open your own.`,
-      { at: 'session' },
-    );
+    return no<T>('FORBIDDEN', `${spoken} is a run another key opened, so only that key changes or ends it. Leave it out and your calls go to your own run.`, {
+      at: 'session',
+    });
   }
 
   /**
