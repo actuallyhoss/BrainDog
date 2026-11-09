@@ -35,6 +35,7 @@
 
 <script lang="ts">
   import { PAGE_MENU } from '$lib/ui/context-menu.ts';
+  import { handOver } from '$lib/shell/head-actions.ts';
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
   import type { ComponentProps, Snippet } from 'svelte';
   import { apiBase } from '../at.ts';
@@ -603,6 +604,15 @@
 
   /** The arranging controls, whose way in the head's page menu offers. */
   let arranger = $state<ReturnType<typeof Arrange>>();
+
+  /* IN THE IPHONE APP THE LEAD ROW'S BUTTONS GO UP INTO NATIVE'S BAR (`shell/head-actions.ts`), as the head's do: with the
+     name the bar's, the row under it held nothing but them, a lone row of round buttons over the sentence. */
+  let leadActions = $state<HTMLElement>();
+  let leadHanded = $state(false);
+  $effect(() => {
+    if (!leadActions || !barTitled()) return;
+    return handOver(leadActions, (on) => (leadHanded = on));
+  });
 
   /**
    * WHETHER THE PAGE OPENS ON ITS SENTENCE (`lead.ts`), which is then the header's line and not a tile (a page header,
@@ -1257,14 +1267,14 @@
     {@const crumb = headKicker && headKicker.trim().toLowerCase() !== live.page.page.title.trim().toLowerCase() ? headKicker : undefined}
     {@const backTo = backInKicker ? declared?.back?.href : projectBack}
     <!-- WHERE A BAR SAYS THE NAME (`barTitled`), its glyph, name, count and parent are the bar's, and the `h1` is unseen. -->
-    <div class="lead-head" data-barred={barTitled() ? '' : undefined}>
+    <div class="lead-head" data-barred={barTitled() ? '' : undefined} data-handed={leadHanded ? '' : undefined}>
       <span class="lead-glyph" aria-hidden="true"><Icon name={iconFor(live.page.page.icon, 'doc')} size="m" /></span>
       <h1 class="lead-name" tabindex="-1" dir="auto" data-thing={route.url.pathname + route.url.search} data-menu-host={PAGE_MENU}>{live.page.page.title}</h1>
       {#if declared?.count?.value}<span class="lead-count num">{declared.count.value.toLocaleString('en')}</span>{/if}
       {#if crumb}
         {#if backTo}<a class="lead-crumb" href={at(backTo)}>{crumb}</a>{:else}<span class="lead-crumb">{crumb}</span>{/if}
       {/if}
-      <span class="lead-actions">{@render pageButtons()}</span>
+      <span class="lead-actions" bind:this={leadActions} data-handed={leadHanded ? '' : undefined}>{@render pageButtons()}</span>
     </div>
     {#if headBelow}{@render declaredBelow()}{/if}
     {@render bookScope()}
@@ -1730,6 +1740,20 @@
 
   .lead-head[data-barred] :is(.lead-glyph, .lead-count, .lead-crumb) {
     display: none;
+  }
+
+  /* HANDED TO NATIVE'S BAR: unseen and out of the flow, still in the page so a press, a menu or a sheet anchored to a button
+     works, near the bar's own buttons; and a barred row with nothing left in it takes no room. */
+  .lead-actions[data-handed] {
+    position: fixed;
+    inset-block-start: env(safe-area-inset-top, 0px);
+    inset-inline-end: var(--gutter);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .lead-head[data-barred][data-handed] {
+    min-block-size: 0;
   }
 
   .lead-head[data-barred] .lead-name {
