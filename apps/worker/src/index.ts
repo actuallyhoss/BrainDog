@@ -5535,6 +5535,8 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     /* WHETHER SIGN-IN MAIL IS DOWN: the last five letters all failed, the newest inside the quarter hour
        (`Directory$.lettersDown`), so `/auth/methods` answers `magic: 'down'` and the page says so. */
     mailDown: () => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).lettersDown(),
+    /* THE INVITATIONS ONE ACCOUNT HAS HAD MAILED TODAY (`ABUSE.inviteMail`), counted in the Directory like every limit there. */
+    invitesMailed: (person) => abuseWait(env, 'inviteMail', person),
     /* THE OPERATOR'S STOP GOES ON INTO EVERY RECORD, and the answer says how many it did not reach, so a stop that is only
        half done is one the operator can see and send again. */
     auth: (async (call: AuthCall) => {

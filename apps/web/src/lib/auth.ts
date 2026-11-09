@@ -65,8 +65,8 @@ export type Link = { kind: 'magic' | 'claim'; token: string };
 export type Failure =
   /** The host said no. `fix` is its sentence when it sent one. */
   | { kind: 'refused'; fix: string | null }
-  /** Too many tries: `retryAfter` is in seconds. */
-  | { kind: 'locked'; retryAfter: number }
+  /** Too many tries: `retryAfter` is in seconds, and `fix` the host's sentence when it sent one (a day's invitations mailed). */
+  | { kind: 'locked'; retryAfter: number; fix?: string }
   /** 503: the host could not check, so it let nobody in. */
   | { kind: 'closed' }
   | { kind: 'absent' }
@@ -157,7 +157,10 @@ async function call(io: Io, path: string, body?: Record<string, unknown>): Promi
     }
     const said: unknown = await res.json().catch(() => undefined);
     const env = isObj(said) ? said : null;
-    if (res.status === 429) return { ok: false, kind: 'locked', retryAfter: secondsOf(env?.retryAfter, res.headers.get('retry-after')) };
+    if (res.status === 429) {
+      const fix = fixOf(env?.refusal);
+      return { ok: false, kind: 'locked', retryAfter: secondsOf(env?.retryAfter, res.headers.get('retry-after')), ...(fix ? { fix } : {}) };
+    }
     if (res.status === 503) return { ok: false, kind: 'closed' };
     /* A proxy in front of a host that is down, which is the host being unreachable and not absent. */
     if (res.status === 502 || res.status === 504) return { ok: false, kind: 'unreachable' };

@@ -16,7 +16,7 @@ export const tooManyLine = (seconds: number): string => {
 };
 
 /** One counted limit: how many in how many seconds, who it counts, and why that number. */
-export type AbuseRule = { readonly most: number; readonly seconds: number; readonly by: 'ip' | 'record'; readonly why: string };
+export type AbuseRule = { readonly most: number; readonly seconds: number; readonly by: 'ip' | 'record' | 'person'; readonly why: string };
 
 /** The MCP door's minute for one token, `RL_MCP` when bound. Above any one person's agent, below a loop. */
 export const MCP_PER_MINUTE = 300;
@@ -37,6 +37,9 @@ export const ABUSE = {
   inboxStrangerHour: { most: 300, seconds: 3600, by: 'record', why: 'Arrivals nothing verified, kept apart so a stranger who knows the address cannot spend the hour its real senders need.' },
   uploadDay: { most: 200 * 1024 * 1024, seconds: 86_400, by: 'record', why: 'File bytes kept per day for one record, counted in bytes; the bucket is paid for per byte.' },
   slashDay: { most: 200, seconds: 86_400, by: 'record', why: 'Slash asks per day on the included model, on top of the plan month; stops a day spending a month.' },
+
+  /* PER PERSON: what one account can have this host send in its name. */
+  inviteMail: { most: 20, seconds: 86_400, by: 'person', why: 'An invitation mailed from brain.dog to any address, with the name its sender chose; twenty a day is a team asked in, more is a list.' },
 } as const satisfies Record<string, AbuseRule>;
 
 export type AbuseName = keyof typeof ABUSE;

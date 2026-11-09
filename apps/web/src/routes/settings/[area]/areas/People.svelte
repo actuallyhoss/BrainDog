@@ -405,7 +405,7 @@
 
   /** The host's sentence for an invitation it did not mail, when it gave one. */
   function unsentOf(sent: Awaited<ReturnType<typeof sendInvite>> | null): string | null {
-    return sent && !sent.ok && sent.kind === 'refused' && sent.fix ? sent.fix : null;
+    return sent && !sent.ok && (sent.kind === 'refused' || sent.kind === 'locked') && sent.fix ? sent.fix : null;
   }
 
   async function mint(make: () => ReturnType<typeof inviteEmail>): Promise<boolean> {

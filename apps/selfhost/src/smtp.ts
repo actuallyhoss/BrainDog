@@ -365,14 +365,15 @@ function missedWhat(payload: { subject?: unknown; because?: unknown }): string {
 export function letterOf(kind: SignInMailKind | undefined, link: string, vars: LetterVars = {}): { subject: string; text: string } {
   const unasked = 'If you did not ask for this, you can ignore this email.';
   /* THE INVITER AND THE BRAINDOG BY NAME, as the Cloud's letter says them (collab pass, 2 Nov); the host hands both over
-     when it knows them, and a letter without them reads as it did. */
+     when it knows them, and a letter without them reads as it did. In the text and never the subject (security pass,
+     8 Nov), as the Cloud's: both are words the sender typed. */
   if (kind === 'invite.sent') {
     const from = oneLine(vars.from);
     const record = oneLine(vars.record);
     const who = from ? `${from} invited you` : 'You were invited';
     const where = record ? `their BrainDog, ${record}` : 'a BrainDog';
     return {
-      subject: from ? `${from} invited you to ${record ? record : 'their BrainDog'}` : "You're invited to a BrainDog",
+      subject: "You're invited to a BrainDog",
       text: `${who} to join ${where}. Open this link to see what you can do there and join:\n\n${link}\n\nThe link works once, for this address, and ends in 24 hours. ${unasked}`,
     };
   }

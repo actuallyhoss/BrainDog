@@ -293,12 +293,15 @@ export type InviteProved = { email: string; invite: string; name: string | null;
  * than fifteen minutes old, so changing a passkey asks for a fresh one. It says so, because the person is who they
  * say they are and needs to know to sign in again rather than that something failed; its refusal is
  * `NEEDS_BROWSER_SESSION`, the keychain's code for the same fact, and the cookie is kept.
+ *
+ * A 429 SAYS WHY ONLY WHERE THE COUNT IS THE PERSON'S OWN (`refusal`): the invitations one account may have mailed in a
+ * day (`invite.ts` in `@braindog/host`). A lockout's says nothing, since what it counts is somebody guessing.
  */
 export type AuthResult<B = unknown> =
   | { status: 200; body: B; session?: { sid: string } | 'clear'; mail?: Mail }
   | { status: 401; refusal: Refusal; reason?: 'stale'; session?: { sid: string } | 'clear' }
   | { status: 403 | 404 | 422; refusal: Refusal; session?: { sid: string } | 'clear' }
-  | { status: 429; retryAfter: number; session?: { sid: string } | 'clear' }
+  | { status: 429; retryAfter: number; refusal?: Refusal; session?: { sid: string } | 'clear' }
   | { status: 503; session?: { sid: string } | 'clear' };
 
 /** The body each flow answers with on a 200. */

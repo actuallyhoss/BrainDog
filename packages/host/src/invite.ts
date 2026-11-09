@@ -28,6 +28,7 @@
 import type { Auth, AuthBodies, AuthResult, Methods, Refusal, Result, Who } from '@braindog/ports';
 import type { Level } from '@braindog/record';
 
+import { ABUSE } from './abuse.ts';
 import type { AuthDoor, AuthRoute } from './auth.ts';
 import { httpStatus } from './index.ts';
 
@@ -170,7 +171,15 @@ export function personName(raw: unknown): Result<string | null> {
  * `origin` AND `mail` ARE FOR PATH 3 ALONE: the proof is mailed as a link to this origin's invitation page. A door
  * with no `mail` proves nothing, and path 3 answers `NO_MAIL`.
  */
-type Door = { on: 'selfhost' | 'worker'; origin: string; ip: string; auth: Auth; invite?: InviteDoor | undefined; mail?: AuthDoor['mail'] };
+type Door = {
+  on: 'selfhost' | 'worker';
+  origin: string;
+  ip: string;
+  auth: Auth;
+  invite?: InviteDoor | undefined;
+  mail?: AuthDoor['mail'];
+  invitesMailed?: AuthDoor['invitesMailed'];
+};
 
 /** What path 3 says on a host that cannot send mail, whose Directory therefore proves no address. */
 export const NO_MAIL =
@@ -324,6 +333,18 @@ export async function serveInvite(
     if (!live || !who) return refusal(401, { code: 'UNAUTHORIZED', fix: 'Sign in to send an invitation.', at: 'session' });
     const send = door.mail;
     if (!send) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: noMailSend(door.on, email), at: 'email' });
+    /* AND AT MOST `ABUSE.inviteMail` A DAY FROM ONE ACCOUNT (security pass, 8 Nov, L4). Every send was counted against the
+       address it went to and none against who sent it, so a new account could have this host mail any number of strangers,
+       each letter carrying a name it chose. Counted before the proof is minted, so a capped account spends nothing of an
+       address's count; the answer says why, and the link is still there to copy. */
+    const wait = (await door.invitesMailed?.(who.person)) ?? null;
+    if (wait !== null)
+      return finish({
+        status: 429,
+        retryAfter: wait,
+        refusal: { code: 'RATE_LIMITED', fix: `BrainDog emails up to ${String(ABUSE.inviteMail.most)} invitations a day from one account, so this one was not emailed.`, retry_after: wait },
+        ...(live.session === undefined ? {} : { session: live.session }),
+      });
     const vars = { ...(found.value.record ? { record: found.value.record } : {}), ...(found.value.by ? { from: found.value.by } : {}) };
     let link = `${door.origin}/invite#${token}`;
     /* EVERY SEND IS COUNTED AGAINST THE ADDRESS (security pass, 2 Nov), a known one too: the proof flow is what keeps

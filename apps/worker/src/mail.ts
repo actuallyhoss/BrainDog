@@ -223,9 +223,12 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
           { say: 'If you did not accept an invitation, you can ignore this message and nothing changes.' },
         ],
       };
+    /* THE SUBJECT NAMES NOBODY (security pass, 8 Nov, L4). Who sent it and what their BrainDog is called are words the
+       sender typed, and a subject is read first, in an inbox list, where this letter's own look is not around them. Both
+       stay in the letter's first line. */
     case 'invite.sent':
       return {
-        subject: v.from ? `${v.from} invited you to ${v.record || 'their BrainDog'}` : `You're invited to ${v.record || 'a BrainDog'}`,
+        subject: "You're invited to a BrainDog",
         parts: [
           { say: v.from ? `${v.from} invited you to ${v.record || 'their BrainDog'}, where they keep their work, projects and plans.` : `You're invited to ${v.record || 'a BrainDog'}.` },
           { say: 'Open this link to see what you can do there and join. It works once, for this address, and ends in 24 hours.' },

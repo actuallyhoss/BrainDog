@@ -22,7 +22,8 @@
  *            `reason: 'stale'` beside its refusal: the session is good and its last proof is more than
  *            fifteen minutes old, so the page signs in again rather than telling somebody they failed.
  *   429      a `Retry-After` header in seconds, and `{ ok: false, retryAfter }`. The operator's key is
- *            locked out the same way: ten wrong keys from one address, then fifteen minutes of 429.
+ *            locked out the same way: ten wrong keys from one address, then fifteen minutes of 429. An
+ *            invitation mailed past the day's count says so beside it (`refusal`, `RATE_LIMITED`).
  *   503      `{ ok: false }`: the lockout's store failed, and a lockout that cannot count refuses.
  *   Cookie   `__Host-bd_s` on https, `bd_s` on http at a loopback name, and none on any other http
  *            origin, where `/auth/methods` says `why: 'insecure'`. One opaque id; the record is on the row.
@@ -1020,6 +1021,12 @@ export type AuthDoor = {
    * slow answer is read as not down, so a count that cannot be read never hides a way in that works.
    */
   mailDown?: (() => boolean | Promise<boolean>) | undefined;
+  /**
+   * The seconds to wait once this person has had as many invitations mailed in a day as `ABUSE.inviteMail` allows, or
+   * `null` to go on, asked by `/auth/invite`'s send before anything is mailed. Absent, nothing is counted: a self-host
+   * takes no sign-ups, so everybody who can send one there was let in by whoever runs it.
+   */
+  invitesMailed?: ((person: string) => Promise<number | null>) | undefined;
 };
 
 type Header = readonly [string, string];
@@ -1209,7 +1216,7 @@ function answered(out: AuthResult, mode: CookieMode): Response {
       return reply(200, { ok: true, value: out.body }, extra);
     case 429:
       extra.push(['retry-after', String(out.retryAfter)]);
-      return reply(429, { ok: false, retryAfter: out.retryAfter }, extra);
+      return reply(429, { ok: false, retryAfter: out.retryAfter, ...(out.refusal ? { refusal: out.refusal } : {}) }, extra);
     case 503:
       return reply(503, { ok: false }, extra);
     /* `stale` GOES OUT BESIDE THE REFUSAL, because it is the one 401 a page answers by signing in again rather than

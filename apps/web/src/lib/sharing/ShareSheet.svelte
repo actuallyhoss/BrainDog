@@ -285,7 +285,7 @@
         /* MAILED TO THEM AT ONCE (collab pass, 2 Nov), the proof inside it for an address new here; the link stays to copy. */
         const sent = await import('$lib/auth.ts').then(({ sendInvite }) => sendInvite(made.value)).catch(() => null);
         /* NOT MAILED, the host's own sentence says why when it gave one (a self-host with no mail set up). */
-        const unsent = sent && !sent.ok && sent.kind === 'refused' && sent.fix ? sent.fix : null;
+        const unsent = sent && !sent.ok && (sent.kind === 'refused' || sent.kind === 'locked') && sent.fix ? sent.fix : null;
         link = { email, href: inviteLink(location.origin, made.value), sent: sent?.ok === true, unsent };
         return;
       }
