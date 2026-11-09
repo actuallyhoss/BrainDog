@@ -99,6 +99,7 @@ export {
   PASSPHRASE_MOST,
   PASSPHRASE_SALT_BYTES,
   passphraseOf,
+  unlockedFor,
   unlockedKey,
   withKeychainPassphrase,
   wrapUnderPassphrase,
@@ -106,8 +107,12 @@ export {
   type PassphraseRewrap,
   type PassphraseUnlock,
   type RecordWrapping,
+  type Resealed,
   type RootKeys,
   type KeychainPassphrase,
+  type SealedUnderRecord,
+  type SealedValue,
+  type UnlockedKey,
   type WrappingChange,
 } from './passphrase.ts';
 

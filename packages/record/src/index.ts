@@ -18975,7 +18975,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ref: row?.id ?? null,
           field: KEY_FIELD,
           fields,
-          grant: { label, opens, kind, ciphertext: s.ciphertext, nonce: s.nonce, kdf: s.kdf, wrapped_by: 'kek', kek_id: s.kek_id, bytes: s.bytes, hint: s.hint, sealed_for: { id, version }, sealed_under: under },
+          /* `wrapping` IS THE KEY THE HOST WAS HANDED, by its wrapping's nonce: the passphrase going on while it sealed
+             replaces that key, and the bind is then a conflict rather than bytes nothing the record holds opens. */
+          grant: { label, opens, kind, ciphertext: s.ciphertext, nonce: s.nonce, kdf: s.kdf, wrapped_by: 'kek', kek_id: s.kek_id, bytes: s.bytes, hint: s.hint, sealed_for: { id, version, wrapping: key.nonce }, sealed_under: under },
         },
         /* An agent's deposit is signed by its run, and a person's by the person: a person's name on an agent's
            act is the attribution a run replaces, and an agent's name on a person's act is the same mistake back. */

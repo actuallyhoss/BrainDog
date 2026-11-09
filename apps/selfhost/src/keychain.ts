@@ -40,10 +40,11 @@ import {
   type SessionHints,
   type KeychainDoor,
   type KeychainGrantSeen,
+  type UnlockedKey,
 } from '@braindog/host';
 import type { CallContext, RecordApi, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
-import { unlockedKey } from '@braindog/host';
+import { unlockedFor, unlockedKey } from '@braindog/host';
 
 import { offeredId, unwrap, type KeyStore } from './keys.ts';
 
@@ -63,19 +64,23 @@ const text = (x: unknown): string => (typeof x === 'string' ? x : '');
  * The grant's own key, or `null` when this host's key store does not open the record's.
  *
  * `unlocked` IS THE RECORD KEY A PASSPHRASE OPENED FOR THIS REQUEST (`unlockedKey`), and behind a passphrase it is the
- * only way in: the root key opens nothing there. The caller zero-fills it when its request is answered.
+ * only way in: the root key opens nothing there. It is used only for the wrapping it was opened from (`unlockedFor`),
+ * since a passphrase taken off and put on again is a new key. The caller zero-fills it when its request is answered.
  */
 async function grantKey(
   store: KeyStore,
   record: string,
   key: SealTarget['key'],
   grant: string,
-  unlocked: Uint8Array | null = null,
+  unlocked: UnlockedKey | null = null,
   purpose: SealedUnder = 'record',
 ): Promise<webcrypto.CryptoKey | null> {
   /* A CONNECTOR KEY IS NEVER BEHIND THE PASSPHRASE (ADR-052): a scheduled run has no person to type it, so only the
      record key can be, and the key a passphrase opened is that one and no other. */
-  if (key.wrapped_by === 'passphrase') return unlocked === null || purpose !== 'record' ? null : await deriveGrantKey(unlocked, grant);
+  if (key.wrapped_by === 'passphrase') {
+    const opened = unlockedFor(unlocked, key);
+    return opened === null || purpose !== 'record' ? null : await deriveGrantKey(opened, grant);
+  }
   if (key.kek_id === null) return null;
   /* THE PURPOSE IS HALF THE WRAPPING'S ADDITIONAL DATA, so the connector key unwraps only when asked for as itself. */
   const dek = await unwrap(store, record, purpose, { wrapped: key.wrapped, nonce: key.nonce, kek_id: key.kek_id, wrapped_by: 'kek' });
@@ -172,7 +177,7 @@ function steps(api: RecordApi, store: KeyStore) {
       return await api.depositGrant(args, by, hints, seal, opts);
     } finally {
       value.fill(0);
-      recordKey?.fill(0);
+      recordKey?.key.fill(0);
     }
   };
 
@@ -197,7 +202,7 @@ function steps(api: RecordApi, store: KeyStore) {
         return keychainReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
       return answerOpen(sealed.credential, sealed.label, opened as Plaintext);
     } finally {
-      recordKey?.fill(0);
+      recordKey?.key.fill(0);
     }
   };
 

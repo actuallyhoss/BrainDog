@@ -33,8 +33,9 @@
 
 import {
   grantKey as deriveGrantKey, NONCE_BYTES, openSealed as openBytes, purposeOf, seal as sealBytes, sealedUnderOf,
-  serveKeys, serveKeychain, servesKeys, servesKeychain, unlockedKey, KEYCHAIN_HEADERS, keychainReply,
+  serveKeys, serveKeychain, servesKeys, servesKeychain, unlockedFor, unlockedKey, KEYCHAIN_HEADERS, keychainReply,
   type KeysDoor, type PassphraseUnlock, type RootKeys, type SealedUnder, type SessionHints, type KeychainGrantSeen, type KeychainPassphrase,
+  type UnlockedKey,
 } from '@braindog/host';
 import type { CallContext, Deposited, OpenedForGrant, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
@@ -115,19 +116,23 @@ const text = (x: unknown): string => (typeof x === 'string' ? x : '');
  * The grant's own key, or `null` when this key store does not open the record's.
  *
  * `unlocked` IS THE RECORD KEY A PASSPHRASE OPENED FOR THIS REQUEST (`unlockedKey`), and behind a passphrase it is the
- * only way in: the root key opens nothing there. The caller zero-fills it when its request is answered.
+ * only way in: the root key opens nothing there. It is used only for the wrapping it was opened from (`unlockedFor`),
+ * since a passphrase taken off and put on again is a new key. The caller zero-fills it when its request is answered.
  */
 async function grantKey(
   store: KeyStore,
   record: string,
   key: SealTarget['key'],
   grant: string,
-  unlocked: Uint8Array | null = null,
+  unlocked: UnlockedKey | null = null,
   purpose: SealedUnder = 'record',
 ) {
   /* A CONNECTOR KEY IS NEVER BEHIND THE PASSPHRASE (ADR-052): a scheduled run has no person to type it, so only the
      record key can be, and the key a passphrase opened is that one and no other. */
-  if (key.wrapped_by === 'passphrase') return unlocked === null || purpose !== 'record' ? null : await deriveGrantKey(unlocked, grant);
+  if (key.wrapped_by === 'passphrase') {
+    const opened = unlockedFor(unlocked, key);
+    return opened === null || purpose !== 'record' ? null : await deriveGrantKey(opened, grant);
+  }
   if (key.kek_id === null) return null;
   /* THE PURPOSE IS HALF THE WRAPPING'S ADDITIONAL DATA, so the connector key unwraps only when asked for as itself. */
   const dek = await unwrap(store, record, purpose, { wrapped: key.wrapped, nonce: key.nonce, kek_id: key.kek_id, wrapped_by: 'kek' });
@@ -179,7 +184,7 @@ function answerOpen(credential: string, label: string, plain: Plaintext): Respon
  * `unlockKeychain` puts the keychain gate first and counts the try, and a record key behind a passphrase names no root key,
  * so it would otherwise read as a record made before the store was bound. `recordKey` is the caller's to zero-fill.
  */
-async function ready(keys: KeyDeps, record: string, by: By, body: Record<string, unknown>): Promise<Result<{ store: KeyStore; recordKey: Uint8Array | null }>> {
+async function ready(keys: KeyDeps, record: string, by: By, body: Record<string, unknown>): Promise<Result<{ store: KeyStore; recordKey: UnlockedKey | null }>> {
   const store = await keys.store();
   if (!store) return no('NOT_IN_THIS_BUILD', NO_STORE, { at: 'keys' });
   const ask = keys.unlockKeychain;
@@ -231,7 +236,7 @@ function doors(keys: KeyDeps, record: () => string | null) {
             : { label: body.label, opens: body.opens, kind: body.kind, sealed_under: sealedUnder, everywhere: body.everywhere };
         return await keys.depositGrant(id, args, by, hints, seal, opts);
       } finally {
-        recordKey?.fill(0);
+        recordKey?.key.fill(0);
       }
     } finally {
       value.fill(0);
@@ -259,7 +264,7 @@ function doors(keys: KeyDeps, record: () => string | null) {
         return keychainReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
       return answerOpen(sealed.credential, sealed.label, decrypted as Plaintext);
     } finally {
-      recordKey?.fill(0);
+      recordKey?.key.fill(0);
     }
   };
 
