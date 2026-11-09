@@ -295,21 +295,6 @@
                   <p class="bill-state" data-state={r.state}>{said}</p>
                 {/if}
                 {#if credits.left}<p class="bill-state num">{credits.left}</p>{/if}
-                <!-- SLASH CREDIT PACKS, under what the record says of its plan: one quiet rectangle a pack, each
-                     with its credits and the Worker's price. None while the host sells no pack, so that answer is today's. -->
-                {#if credits.buy.length > 0}
-                  <div class="bill-packs" role="group" aria-labelledby="packs-{r.record}">
-                    <span class="bill-state" id="packs-{r.record}">{billWords.buyCredits}</span>
-                    <div class="bill-pack-buttons">
-                      {#each credits.buy as b (b.pack.id)}
-                        {@const mine = going === `${r.record} ${b.pack.id}`}
-                        <Button onclick={() => goBuy(r, b.pack.id)} aria-label={mine ? undefined : b.said} aria-busy={mine} disabled={going !== null}
-                          >{mine ? copy.billingOpening : b.label}</Button
-                        >
-                      {/each}
-                    </div>
-                  </div>
-                {/if}
               </div>
               <!-- A FREE RECORD'S ONE OFFER, as a quiet button: the page's one ink button stays the person's own act. -->
               {#if upgrade}
@@ -339,6 +324,24 @@
                   <Button onclick={() => goPay('portal', r)} aria-busy={going === r.record} disabled={going !== null}
                     >{copy.billingManage}</Button
                   >
+                </div>
+              {/if}
+              <!-- SLASH CREDIT PACKS, under what the record says of its plan: one quiet rectangle a pack, each
+                   with its credits and the Worker's price. None while the host sells no pack, so that answer is today's.
+                   AFTER THE VERBS IN THE MARKUP (G22, 9 Nov): on a phone, where the verbs go under the words, a free
+                   record's "Cloud gives you… for $12 a month" stood two pack buttons away from its Upgrade to Cloud, and
+                   a lapsed one's sentence as far from Pay again. At a desk they draw where they did (`.bill-packs`). -->
+              {#if credits.buy.length > 0}
+                <div class="bill-packs" role="group" aria-labelledby="packs-{r.record}">
+                  <span class="bill-state" id="packs-{r.record}">{billWords.buyCredits}</span>
+                  <div class="bill-pack-buttons">
+                    {#each credits.buy as b (b.pack.id)}
+                      {@const mine = going === `${r.record} ${b.pack.id}`}
+                      <Button onclick={() => goBuy(r, b.pack.id)} aria-label={mine ? undefined : b.said} aria-busy={mine} disabled={going !== null}
+                        >{mine ? copy.billingOpening : b.label}</Button
+                      >
+                    {/each}
+                  </div>
                 </div>
               {/if}
             </li>
@@ -517,6 +520,30 @@
     margin-block-start: var(--sp-2);
   }
 
+  /* EVERY PART IN ITS COLUMN BY NAME, because the packs follow the verbs in the markup: under the words, in the words'
+     column, with the well and the verbs beside both, as when the packs were inside the words. */
+  .bill > :global(:first-child) {
+    grid-column: 1;
+  }
+
+  .bill-main,
+  .bill-packs {
+    grid-column: 2;
+  }
+
+  .bill-main {
+    grid-row: 1;
+  }
+
+  .bill-actions {
+    grid-column: 3;
+  }
+
+  .bill:has(> .bill-packs) > :global(:first-child),
+  .bill:has(> .bill-packs) > .bill-actions {
+    grid-row: 1 / span 2;
+  }
+
   .bill-pack-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -594,7 +621,10 @@
       min-block-size: 60px;
     }
 
-    .bill-actions {
+    /* UNDER THE WORDS AND BEFORE THE PACKS, so what the record says is followed by the press it asks for. */
+    .bill-actions,
+    .bill:has(> .bill-packs) > .bill-actions {
+      grid-row: auto;
       grid-column: 2;
       flex-direction: column;
       align-items: stretch;
