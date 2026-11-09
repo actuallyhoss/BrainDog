@@ -16,6 +16,8 @@ import { LEGACY } from './legacy-lists.ts';
 export { ABANDON_MS, QUIET_MS, STALE_MS, WORKING_MS, isQuiet, isStale, presenceOf, type Presence } from './presence.ts';
 export { GROUP_CAP, isBucket } from './buckets.ts';
 export { isEventKind } from './events.ts';
+/* WHICH LINES THE BELL HOLDS, which the record walks its log by and the web's bell reads its answer by. */
+export { RAN_BADLY, bellNever, bellWorthy, runFailed, writerOf, type BellShape } from './bell.ts';
 
 /**
  * The list `meet` wrote by name before any list declared `meets:`, and still does while none does. The record's `meet`

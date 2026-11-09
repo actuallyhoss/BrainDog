@@ -622,6 +622,8 @@ export { BYDAY, REPEAT_READ, atMs, expandRepeat, nextRepeat, offsetMs, reminders
 export type { Remindable, Repeat, Reminder } from './schedule.ts';
 export type { ImportReport, Section, TableShape } from './brainl.ts';
 export { EVENT_KINDS, isEventKind } from './events.ts';
+export { RAN_BADLY, bellNever, bellWorthy, runFailed, writerOf } from './bell.ts';
+export type { BellShape } from './bell.ts';
 export type { EventKind } from './events.ts';
 export { OUTBOX_KINDS, backoffMs, retryDead, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
