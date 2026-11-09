@@ -14,6 +14,9 @@
  *
  * ONLY A CHANGE: a figure or a bar drawn for the first time is a new element and is not watched for; nothing moves in a
  * screen's first second (`calm`), and nothing under reduced motion.
+ *
+ * A FIGURE THAT COUNTS WEARS THE ARRIVAL WASH (`countText`, 9 Nov), and under reduced motion it still does, held and let
+ * go in one step, because that is the fact that it changed.
  */
 
 import { calm, ms, play, still } from './index.ts';
@@ -51,7 +54,9 @@ function grow(el: HTMLElement | SVGElement, axis: 'x' | 'y', from: number): void
 export function watchChanges(root: Node | null = typeof document !== 'undefined' ? document.body : null): () => void {
   if (!root || typeof MutationObserver === 'undefined') return () => {};
   const seen = new MutationObserver((records) => {
-    if (still() || calm()) return;
+    /* UNDER REDUCED MOTION A FIGURE STILL WEARS ITS WASH, held and let go (`countText`), and nothing counts or grows. */
+    if (calm()) return;
+    const less = still();
     /* A CHART DRAWN AGAIN AT ANOTHER SIZE is not a change to what it says. */
     const redrawn = new Set<Node>();
     for (const r of records) if (r.type === 'attributes' && r.attributeName === 'viewBox') redrawn.add(r.target);
@@ -67,7 +72,7 @@ export function watchChanges(root: Node | null = typeof document !== 'undefined'
         countText(text, wrote.get(text) ?? from, now);
         continue;
       }
-      if (r.type !== 'attributes' || r.oldValue === null) continue;
+      if (less || r.type !== 'attributes' || r.oldValue === null) continue;
       const el = r.target as Element;
       if (r.attributeName === 'width' || r.attributeName === 'height') {
         const axis = r.attributeName === 'width' ? 'x' : 'y';

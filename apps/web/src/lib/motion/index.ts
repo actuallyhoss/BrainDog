@@ -84,6 +84,21 @@ export function arrive(node: Element, { delay = 0, rise = 10, from = 0.97 }: { d
 }
 
 /**
+ * A COUNT COMING ON where there was none (Needs you's red capsule, the bell's badge): it swells from 60% to its size on
+ * the spring, a little past and back, and fades in, over `--form-in`. Still in a screen's first second; a fade under
+ * reduced motion.
+ */
+export function pop(_node: Element): TransitionConfig {
+  if (calm()) return NONE;
+  if (still()) return fadeIn();
+  return {
+    duration: ms('--form-in', 320),
+    easing: spring,
+    css: (t, u) => `opacity:${Math.min(1, t * 2.5).toFixed(3)};transform:scale(${(1 - u * 0.4).toFixed(4)})`,
+  };
+}
+
+/**
  * A LINE ARRIVING IN A LIST: a payment, a person, a to-do. Its row opens, so the lines under it glide down to make room,
  * while it rises into place on the spring and fades in (`ui/motion.ts` `rowIn`, which every list shares). A fade under
  * reduced motion; still in a screen's first second.

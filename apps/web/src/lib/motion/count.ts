@@ -6,6 +6,10 @@
  */
 
 import { ms, still } from '../ui/motion.ts';
+import { bump, wash } from './grow.ts';
+
+/** A count drawn on a fill of its own (Needs you's red capsule, the bell's badge), which swells rather than washes. */
+const FILLED = '.badge, [data-needs-n], .bell-count';
 
 /** What surrounds a figure's number, the number, and how it is written. */
 export type Shape = { pre: string; n: number; post: string; places: number; grouped: boolean };
@@ -83,12 +87,24 @@ export const wrote = new WeakMap<Text, string>();
 
 /**
  * Counts a text from `from` to what it says now, writing each frame into the text itself, and leaves it saying exactly
- * what it said. A count still running on the same text is taken over from where it stands. Nothing under reduced
- * motion, and nothing for a change that cannot count.
+ * what it said. A count still running on the same text is taken over from where it stands. Nothing for a change that
+ * cannot count.
+ *
+ * AND THE FIGURE WEARS THE ARRIVAL WASH WHILE IT COUNTS (9 Nov, the record growing; `grow.ts`): the tint a new row wears,
+ * held round the digits and let go over a second and a half, so a number the record moved is seen to have moved after
+ * the count has landed. Under reduced motion it does not count and the wash is held and let go in one step, which is
+ * the fact that it changed and not a movement.
  */
 export function countText(text: Text, from: string, to: string): boolean {
   const pair = counts(from, to);
-  if (!pair || still() || typeof requestAnimationFrame !== 'function') return false;
+  if (!pair) return false;
+  const host = text.parentElement?.closest('.fig, .num, [data-count]') ?? text.parentElement;
+  const filled = host?.closest(FILLED);
+  /* A FILLED COUNT SWELLS AS IT GOES UP, and goes down as it is answered with nothing more to say. */
+  if (filled) {
+    if (pair[1].n > pair[0].n) bump(filled);
+  } else wash(host, { figure: true });
+  if (still() || typeof requestAnimationFrame !== 'function') return false;
   const [a, b] = pair;
   const prior = running.get(text);
   if (prior !== undefined) cancelAnimationFrame(prior);

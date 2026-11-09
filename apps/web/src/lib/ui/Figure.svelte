@@ -39,7 +39,8 @@
 
   /* THE FIGURE LAST DRAWN, to count from; not state. */
   let shown: string | null = null;
-  const counting = (from: string | null, to: string): boolean => from !== null && drawn.yet && !calm() && !still() && counts(from, to) !== null;
+  /* UNDER REDUCED MOTION IT STILL GOES TO `countText`, which counts nothing there and holds the arrival wash a moment. */
+  const counting = (from: string | null, to: string): boolean => from !== null && drawn.yet && !calm() && counts(from, to) !== null;
   /* AS EACH FIGURE IS MADE: one that can count from the last takes over its text and counts, and does not roll. */
   const tally = (node: HTMLElement) => {
     const now = node.textContent ?? '';
