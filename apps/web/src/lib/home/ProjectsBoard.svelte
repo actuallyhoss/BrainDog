@@ -14,11 +14,19 @@
   PIN TO SIDEBAR IS A WORD ON EVERY PROJECT, never a hover: this page is the way into the sidebar (3 Nov), and pinned reads
   in the sidebar's own lit colour.
 
+  EACH PROJECT WEARS ITS PICTURE, its logo, where it holds one, and for a reader who may change the projects its mark is
+  the picture changer's button (his word of 4 November: "change icon of the project by hovering on the profile
+  picture"): hovered it shows a camera, and a press opens the changer in place of the project.
+
   While the reads are out the page holds its place, so what stands under it does not jump (`BlockSlot.svelte`).
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { flip } from 'svelte/animate';
+  import { page } from '$app/state';
+  import type { PictureTarget } from '$lib/picture/picture.ts';
+  import { may } from '$lib/record/may.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import { arrive, depart, springy } from '$lib/motion/index.ts';
   import { apiBase, at } from '$lib/at.ts';
   import { live } from '$lib/data/live.svelte.ts';
@@ -103,6 +111,13 @@
   /* NOT IN THE APP: it has no sidebar to pin to. */
   const showHint = $derived(!inIosApp && navPrefs.pins.length === 0 && views.length > 0);
 
+  /* THE MARK CHANGES THE PICTURE WHERE THE READER MAY WRITE THE PROJECTS (`PictureChange`): each card's own row, by its key. */
+  const writes = $derived(may(page.data as unknown as Shell, 'write', list));
+  const changeOf = (key: string, name: string, mark: string, hue: number | null, picture: string | null): PictureTarget | null => {
+    const m = /^(.+)#(\d+)$/u.exec(key);
+    return writes && m ? { register: m[1]!, seq: Number(m[2]), name, round: false, picture, mark, hue } : null;
+  };
+
   /* WHO IS AT WORK ON IT NOW, by the project's name, as the sidebar's dot says it. */
   const busy = $derived(new Set(workingNow().map((w) => w.project).filter((p): p is string => typeof p === 'string')));
 
@@ -129,7 +144,7 @@
 {#snippet card(r: BoardRow)}
   {@const s = trail(r)}
     <div class="c-head">
-      <ProjectWell mark={r.mark} name={r.name} hue={r.hue} />
+      <ProjectWell mark={r.mark} name={r.name} hue={r.hue} picture={r.picture} row={r.key} change={changeOf(r.key, r.name, r.mark, r.hue, r.picture)} />
       <div class="c-id">
         <a class="c-name own-dir" href={at(r.href)}>{r.name}</a>
         {#if r.laneWord || HEALTH[r.health]}
@@ -157,7 +172,7 @@
 {/snippet}
 
 {#snippet quietRow(r: BoardRow)}
-    <ProjectWell mark={r.mark} name={r.name} hue={r.hue} />
+    <ProjectWell mark={r.mark} name={r.name} hue={r.hue} picture={r.picture} row={r.key} change={changeOf(r.key, r.name, r.mark, r.hue, r.picture)} />
     <div class="l-words">
       <a class="c-name own-dir" href={at(r.href)}>{r.name}</a>
       <p class="small own-dir l-next">{r.next || words.noNext}</p>
@@ -168,7 +183,7 @@
 {/snippet}
 
 {#snippet shelfRow(p: Parked)}
-    <ProjectWell mark={p.mark} name={p.name} hue={p.hue} />
+    <ProjectWell mark={p.mark} name={p.name} hue={p.hue} picture={p.picture} row={p.key} change={changeOf(p.key, p.name, p.mark, p.hue, p.picture)} />
     <div class="l-words">
       <a class="c-name own-dir" href={at(p.href)}>{p.name}</a>
       {#if p.due}<p class="small l-next" data-warn="">{p.due}</p>{/if}

@@ -68,6 +68,16 @@ public final class Client: Sendable {
         return try decodeValue(data)
     }
 
+    /// A file the record keeps, as its bytes (`GET /api/files/<sha256>`): the answer is the file, never the envelope, so
+    /// nothing is decoded. The session goes with it as with every call, which `AsyncImage` could not send.
+    public func bytes(_ path: String) async throws(CallFailure) -> Data {
+        var request = URLRequest(url: Server.url(path))
+        request.httpMethod = "GET"
+        request.setValue("*/*", forHTTPHeaderField: "accept")
+        if let cookie = Session.shared.cookieHeader { request.setValue(cookie, forHTTPHeaderField: "cookie") }
+        return try await send(request, path: path)
+    }
+
     /// The envelope's `value`, or the refusal it carried.
     private func decodeValue<T: Decodable>(_ data: Data) throws(CallFailure) -> T {
         do {

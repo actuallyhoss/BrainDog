@@ -124,6 +124,13 @@ export type RenderOptions = InlineOptions & {
    * nothing draws each row as it always did, so the HTML twin needs nothing.
    */
   partLook?: (label: string) => { glyph: string; slot: string | null } | null;
+  /**
+   * WHO WAS PAID, AS THEIR LOGO, WHERE THE HOST KNOWS ONE (People 4.8.0, the payee logos Cash Fish shows): handed a
+   * timeline line's title cell as it holds it, the host answers the address of the logo of the organisation it names,
+   * or null to keep the chip. A filed line wears it in its chip's place; one nothing has filed keeps its "?". A host
+   * that passes nothing draws every chip as it always did, so the HTML twin needs nothing.
+   */
+  logo?: (payee: string) => string | null;
   /** The day a link opened a calendar on (`?day=`, `YYYY-MM-DD`): its cell is marked `aria-current="date"`. */
   day?: string | null;
   /** Turn a spoken id into an address. A link the host cannot resolve renders as plain text. */

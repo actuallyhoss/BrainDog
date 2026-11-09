@@ -4747,6 +4747,21 @@ function onceFault(id: string, fields: readonly (FieldLike & { derived?: boolean
   );
 }
 
+/** Why a list's `identity.picture` names no file field of its own, or `null` when it names one or none at all. */
+function pictureFault(id: string, fields: readonly FieldLike[], identity: unknown): Refusal | null {
+  if (identity === null || typeof identity !== 'object' || Array.isArray(identity)) return null;
+  const picture = (identity as { picture?: unknown }).picture;
+  if (picture === undefined) return null;
+  const field = fields.find((f) => f.id === picture && f.retired !== true);
+  if (typeof picture === 'string' && field?.type === 'file') return null;
+  return bad(
+    'DECLARATION_INVALID',
+    `${id}'s rows are drawn by the picture in ${JSON.stringify(picture)}, and that is a file field of ${id}, such as picture.`,
+    'identity.picture',
+    fields.filter((f) => f.type === 'file' && f.retired !== true).map((f) => String(f.id)),
+  );
+}
+
 /** Why a list's `hand:` would write what its fields cannot hold, or `null` when every part it names is there. */
 function handFault(id: string, fields: readonly FieldLike[], state: unknown, hand: unknown): Refusal | null {
   const said = hand !== null && typeof hand === 'object' && !Array.isArray(hand) ? (hand as Record<string, unknown>) : null;
@@ -6228,6 +6243,15 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
      field or leave a row in a state its list does not have. Checked here, at install, and not when somebody presses. */
   if (decl.body.hand !== undefined) {
     const fault = handFault(id, fields as unknown as FieldLike[], state, decl.body.hand);
+    if (fault) return fault;
+  }
+
+  /* `identity.picture` NAMES A FILE FIELD OF THIS LIST (his word of 4 and 9 November: a project's logo, a person's photo),
+     or every drawer of a row's mark would be handed a text or a number to draw as a picture. Only the part that is new is
+     held here: `mark` and `accent` were never checked, and a list installed with either naming a field it lost still
+     installs as it did. */
+  if (decl.body.identity !== undefined) {
+    const fault = pictureFault(id, fields as unknown as FieldLike[], decl.body.identity);
     if (fault) return fault;
   }
 

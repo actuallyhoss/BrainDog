@@ -154,11 +154,14 @@
     margin-block-start: var(--sp-2);
   }
 
-  /* A GLYPH IS A FLAT SQUARE, radius 8 as every button is; the picked one takes the selection wash and a check. */
+  /* A GLYPH IS A FLAT SQUARE, radius 8 as every button is; the picked one takes the selection wash and a check. ITS
+     COLUMN'S WIDTH, said here, because the skin's own `.glyph` (a tone's dot, `packages/skin/blocks.css`) is a 6px dot,
+     and on a page that draws one every cell of the picker was cut to it. */
   .glyph {
     position: relative;
     display: grid;
     place-items: center;
+    inline-size: auto;
     block-size: 2.75rem;
     padding: 0;
     background: none;

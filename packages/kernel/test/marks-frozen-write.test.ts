@@ -1,8 +1,8 @@
 /**
  * The mark rules on the write path and the figure through the record, where `marks-unknown.test.ts` holds the
- * two functions by themselves: a write that would change or clear a mark naming a picture is refused with
- * `MARK_IS_FROZEN`, a word that draws nothing takes one more write, and `marks-unknown` is read by the record's own
- * `metric`, which is what a stat block calls.
+ * two functions by themselves: a key's write that would change or clear a mark naming a picture is refused with
+ * `MARK_IS_FROZEN` while a person's goes through (his word of 4 November), a word that draws nothing takes one more
+ * write, and `marks-unknown` is read by the record's own `metric`, which is what a stat block calls.
  */
 
 import { test } from 'node:test';
@@ -38,21 +38,25 @@ const PROJECTS: Declaration = {
 };
 
 const W = { actor: 'p_1' };
+/* AN AGENT'S KEY, whose writes keep a chosen mark as it is. */
+const KEY = { actor: 'agent:claude', principal: { kind: 'token' as const, token: 'tok_1' } };
 
-test('A MARK THAT NAMES A PICTURE TAKES NO CHANGE AND NO CLEAR, and the rest of the row is still written', async () => {
+test('A MARK THAT NAMES A PICTURE TAKES NO CHANGE AND NO CLEAR FROM A KEY, and the rest of the row is still written', async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   value(await k.install([PROJECTS]));
   const row = value<{ id: string }>(k.create('things', { name: 'BrainDog', mark: 'rocket' }, W));
 
   for (const next of ['cake', 'koala', '', null]) {
-    const out = k.update('things', row.id, { mark: next } as never, W) as Out<unknown>;
+    const out = k.update('things', row.id, { mark: next } as never, KEY) as Out<unknown>;
     assert.equal(out.ok, false, `rocket to ${String(next)} went through`);
     assert.deepEqual([out.refusal?.code, out.refusal?.fix, out.refusal?.at], [MARK_IS_FROZEN, MARK_IS_FROZEN_SAYS, 'mark']);
   }
   /* WHAT IS ALREADY THERE, SENT BACK, IS NO CHANGE: a form that sends the whole row is not refused. */
-  const kept = value<{ fields: Record<string, unknown> }>(k.update('things', row.id, { name: 'BrainDog 2', mark: 'rocket' }, W));
+  const kept = value<{ fields: Record<string, unknown> }>(k.update('things', row.id, { name: 'BrainDog 2', mark: 'rocket' }, KEY));
   assert.deepEqual([kept.fields.name, kept.fields.mark], ['BrainDog 2', 'rocket']);
+  /* A PERSON CHANGES IT, where it is drawn. */
+  assert.equal(value<{ fields: Record<string, unknown> }>(k.update('things', row.id, { mark: 'cake' }, W)).fields.mark, 'cake');
   sql.close();
 });
 
@@ -63,8 +67,8 @@ test('A WORD THAT DRAWS NOTHING TAKES ONE MORE WRITE, and is held once it names 
   const row = value<{ id: string }>(k.create('things', { name: 'Driftwood', mark: 'koala' }, W));
   const bare = value<{ id: string }>(k.create('things', { name: 'Kiln' }, W));
 
-  assert.equal(value<{ fields: Record<string, unknown> }>(k.update('things', row.id, { mark: 'rocket' }, W)).fields.mark, 'rocket');
-  assert.equal((k.update('things', row.id, { mark: 'cake' }, W) as Out<unknown>).refusal?.code, MARK_IS_FROZEN);
+  assert.equal(value<{ fields: Record<string, unknown> }>(k.update('things', row.id, { mark: 'rocket' }, KEY)).fields.mark, 'rocket');
+  assert.equal((k.update('things', row.id, { mark: 'cake' }, KEY) as Out<unknown>).refusal?.code, MARK_IS_FROZEN);
   /* AN EMPTY MARK WAS NEVER A CHOICE, so its first picture goes in. */
   assert.equal(value<{ fields: Record<string, unknown> }>(k.update('things', bare.id, { mark: 'gift' }, W)).fields.mark, 'gift');
   sql.close();

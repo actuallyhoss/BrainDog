@@ -1034,11 +1034,19 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  * - money-core 3.38.9 (8 Nov, the page-print check): a book's What is due draws Runs out only while it has an answer, a
  *   day or "Lasts past" one, by a cell's own `when:` (`page.money-book`). Over two currencies it drew a dash. No id
  *   added or taken away.
+ * - portfolio 1.32.0 and people 4.8.0 (9 Nov, the owner, 4 Nov: "make it so i can change icon of the project by hovering
+ *   on the profile picture, as well as setting a picture/logo. same with people", and 9 Nov: "i want projects to be able
+ *   to change their logo, set profile pictures, etc. same with people"): `register.things` gains `picture`, a file, and
+ *   names it as `identity.picture`, so a project's logo is drawn in place of its mark; `register.people` gains `picture`
+ *   (Photo) and declares `identity: { picture }`, so a person's photo is drawn in place of their letter; and
+ *   `register.organisations` the same as Logo, drawn on the payments that name it too (the payee logos Cash Fish
+ *   shows). All optional and none hidden from agents, since an agent that finds a logo or a photo saves it. One field
+ *   added to each list and nothing taken away, so a minor step that goes in quietly and keeps every row.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
-  portfolio: '1.31.2',
-  people: '4.7.2',
+  portfolio: '1.32.0',
+  people: '4.8.0',
   'money-core': '3.39.0',
   estate: '2.8.1',
   work: '1.26.2',

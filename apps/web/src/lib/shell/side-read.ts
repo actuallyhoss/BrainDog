@@ -13,6 +13,7 @@ import { drawnRead, hueOf, projectsOf, type CardDecl, type CardRow } from '../ho
 import { REGISTERS } from '../record/held.ts';
 import { learn } from '../record/remote.ts';
 import { rowHref } from '../record/row-href.ts';
+import { pictureOf } from '../picture/picture.ts';
 import { MONEY_IN, monthsOf, type MoneyIn } from '../../routes/r/[register]/[seq]/figures.ts';
 import { laneSaid, lanesOf, type Lanes, type ListFacts, type SideProject } from './side.ts';
 import { keepSide, keptPerson, keptSide, type SideCopy } from './side-copy.ts';
@@ -114,8 +115,9 @@ async function readSideOnce(base: string, lists: readonly { id: string }[]): Pro
         seq,
         name,
         href: rowHref(`${decl.id}#${seq}`) ?? `/r/${decl.id}/${seq}`,
-        mark: decl.identity ? said(fields[decl.identity.mark]) : '',
+        mark: decl.identity?.mark ? said(fields[decl.identity.mark]) : '',
         hue: hueOf(decl, fields),
+        ...((sha) => (sha === null ? {} : { picture: sha }))(decl.identity?.picture ? pictureOf(fields[decl.identity.picture]) : null),
         lane: decl.state ? said(fields[decl.state]) : '',
         /* ITS NEXT STEP, the field its card says it from (`cardsOf`), for the phone's row (Z32 of 25 October). */
         ...(said(fields.next) === '' ? {} : { next: said(fields.next) }),

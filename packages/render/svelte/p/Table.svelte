@@ -48,7 +48,7 @@
    * `apps/web/src/lib/record/page-live.ts`, which builds it; `Cards.svelte` writes the same shape out for the one it
    * reads from `RenderOptions`. Written here rather than imported, because nothing in this package imports the app.
    */
-  type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, { mark: string | null; hue: number | null }> };
+  type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, { mark: string | null; hue: number | null; picture?: string | null }> };
 
   let {
     columns,
@@ -346,7 +346,7 @@
   mark is the project's character, drawn as `Cards.svelte` draws a card's, and hidden from a screen reader, which reads
   the name. The same markup as `Cards.svelte`'s chip, so a scope reads alike in a table and on a card.
 -->
-{#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.mark}{@const sm = markOf(m.mark, said)}{@const sg = markGlyphOf(sm)}{#if sm}<span class="scope-mark" data-glyph={sg ?? undefined} style={m.hue === null ? undefined : `--hue:${m.hue}`} data-slot={m.hue === null ? undefined : slotOf(m.hue)} aria-hidden="true">{#if sg}{@const d = markArt(sg)}{#if d}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path {d} /></svg>{/if}{:else}{sm}{/if}</span>{/if}{/if}<span class="scope-name">{said}</span></span>{/snippet}
+{#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.picture}<span class="scope-mark" data-picture="" aria-hidden="true"><img class="scope-picture" src={m.picture} alt="" width="16" height="16" loading="lazy" decoding="async" /></span>{:else if m?.mark}{@const sm = markOf(m.mark, said)}{@const sg = markGlyphOf(sm)}{#if sm}<span class="scope-mark" data-glyph={sg ?? undefined} style={m.hue === null ? undefined : `--hue:${m.hue}`} data-slot={m.hue === null ? undefined : slotOf(m.hue)} aria-hidden="true">{#if sg}{@const d = markArt(sg)}{#if d}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path {d} /></svg>{/if}{:else}{sm}{/if}</span>{/if}{/if}<span class="scope-name">{said}</span></span>{/snippet}
 
 <!--
   ONE CELL BODY, DRAWN BY BOTH ARMS.
@@ -789,6 +789,15 @@
     :global(.scope-mark[data-slot='yellow']) { color: var(--cat-yellow); }
     :global(.scope-mark[data-slot='lime']) { color: var(--cat-lime); }
     :global(.scope-mark[data-slot='slate']) { color: var(--cat-slate); }
+
+    /* A PROJECT'S PICTURE, its logo, in place of its mark, at the glyph's size and in a small square of its own. */
+    :global(.scope-picture) {
+      display: block;
+      inline-size: var(--icon-s);
+      block-size: var(--icon-s);
+      border-radius: 4px;
+      object-fit: cover;
+    }
 
     :global(.scope-name) {
       min-inline-size: 0;

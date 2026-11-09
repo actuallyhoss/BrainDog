@@ -446,9 +446,10 @@ export type BlockResult = PageBlock & {
   scopes?: (string | null)[];
   /**
    * Aligned with `scopes`: the mark and hue of the project each row applies to (the first, where a row names several),
-   * or `null` where it applies everywhere. A project that declares no mark or hue answers `null` in that half.
+   * or `null` where it applies everywhere. A project that declares no mark or hue answers `null` in that half. `picture` is
+   * the hash of the project's picture, its logo, where it holds one, which a host draws in place of the mark.
    */
-  scope_marks?: ({ mark: string | null; hue: number | null } | null)[];
+  scope_marks?: ({ mark: string | null; hue: number | null; picture?: string } | null)[];
   /** A `cards` block's: how far along each row is from the steps under it, where its ring's own field is empty (`steps.ts`). */
   rings?: (number | null)[];
   /**
@@ -1089,7 +1090,7 @@ export type PageDeps = {
   /** Every open of a key since an instant, newest first: the grant.read events on the grant a key's row points at, as the record's usedBy walks them. runs_on counts the runs among them and answers no grant. */
   keyUses?: (grant: string, since: string) => readonly { actor: string; ts: string }[];
   /** The fields a list marks its rows by, its `identity:` (`{ mark, accent }`), or `null` when it declares none. */
-  identityOf?: (register: string) => { mark?: string; accent?: string } | null;
+  identityOf?: (register: string) => { mark?: string; accent?: string; picture?: string } | null;
   /**
    * The open questions, dearest first and the oldest first within a band, cut to `limit`, and how many are open in all.
    *
@@ -4802,7 +4803,7 @@ function scopesOf(
   deps: PageDeps,
   rows: readonly Entry[],
   scope: { field: string; to: string },
-): { scopes: (string | null)[]; scope_marks: ({ mark: string | null; hue: number | null } | null)[] } {
+): { scopes: (string | null)[]; scope_marks: (ScopeMark | null)[] } {
   const said = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' ? [v] : []);
   const ids = [...new Set(rows.flatMap((r) => said(r.fields[scope.field])))];
   const title = deps.titleOf(scope.to);
@@ -4821,19 +4822,28 @@ function scopesOf(
   };
 }
 
+/** A project's mark, hue and picture, as a chip beside a row's scope is drawn from them. */
+type ScopeMark = { mark: string | null; hue: number | null; picture?: string };
+
 /**
- * A project's mark and hue, by the fields its list names in `identity:`, or `null` in each half it does not hold.
+ * A project's mark and hue, by the fields its list names in `identity:`, or `null` in each half it does not hold, and
+ * its picture's hash where it holds one, which a host draws in place of the mark (his word of 4 and 9 November).
  *
  * A HUE IS A WHOLE DEGREE FROM 0 TO 359 OR NOTHING, because a host draws it straight into a colour and a value outside
- * the wheel would be a colour nobody chose. OWN PROPERTIES ONLY, as everywhere a declaration names a field.
+ * the wheel would be a colour nobody chose. OWN PROPERTIES ONLY, as everywhere a declaration names a field. THE PICTURE
+ * IS ITS HASH ALONE, never the file's name or size, and is left out where there is none, so a chip a host already draws
+ * reads exactly as it did.
  */
-function markOf(row: Entry | undefined, identity: { mark?: string; accent?: string } | null): { mark: string | null; hue: number | null } {
+function markOf(row: Entry | undefined, identity: { mark?: string; accent?: string; picture?: string } | null): ScopeMark {
   const at = (field: string | undefined): Json | undefined => (row && field !== undefined && Object.hasOwn(row.fields, field) ? row.fields[field] : undefined);
   const mark = at(identity?.mark);
   const hue = at(identity?.accent);
+  const file = at(identity?.picture);
+  const sha = file !== null && typeof file === 'object' && !Array.isArray(file) ? (file as { sha256?: unknown }).sha256 : undefined;
   return {
     mark: typeof mark === 'string' && mark.trim() !== '' ? mark : null,
     hue: typeof hue === 'number' && Number.isInteger(hue) && hue >= 0 && hue <= 359 ? hue : null,
+    ...(typeof sha === 'string' && /^[0-9a-f]{64}$/u.test(sha) ? { picture: sha } : {}),
   };
 }
 
@@ -5214,14 +5224,14 @@ const SPOKEN = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
  * AND EACH PROJECT'S MARK AND HUE BESIDE ITS NAME (`scope_marks`), read off the same rows, so a run's card wears the
  * chip a row of that project wears. A run whose project names no row is marked by nothing.
  */
-function projectsOf(deps: PageDeps, rows: readonly Entry[]): { scopes: (string | null)[]; scope_marks: ({ mark: string | null; hue: number | null } | null)[] } {
+function projectsOf(deps: PageDeps, rows: readonly Entry[]): { scopes: (string | null)[]; scope_marks: (ScopeMark | null)[] } {
   const asked = new Map<string, Set<number>>();
   for (const r of rows) {
     const m = SPOKEN.exec(typeof r.fields.project === 'string' ? r.fields.project : '');
     if (m) asked.set(m[1]!, (asked.get(m[1]!) ?? new Set<number>()).add(Number(m[2])));
   }
   const names = new Map<string, string>();
-  const marks = new Map<string, { mark: string | null; hue: number | null }>();
+  const marks = new Map<string, ScopeMark>();
   for (const [register, seqs] of asked) {
     const title = deps.titleOf(register);
     const listed = title ? deps.list({ register, where: { field: 'seq', in: [...seqs] }, limit: 200 }) : null;

@@ -238,7 +238,7 @@ const REGISTER = {
   },
   rare: {
     pack: 'the pack that ships the list; a list Slash builds leaves it off',
-    identity: '{mark: <enum field>, accent: <int field>}: each row carries a mark and one accent hue',
+    identity: '{mark?: <text field>, accent?: <int field>, picture?: <file field>}: each row carries a mark and one accent hue, and a picture (a logo, a photo) drawn in place of the mark where it holds one',
     series: 'true for a list of dated facts, such as a rate each day, rather than of things with names',
     scopes: "{repos?, folders?}: on the one list whose rows are projects, the list-of-text fields naming each one's places",
     rates: 'on the one list holding the rates a money figure converts by, the field that plays each part',

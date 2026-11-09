@@ -103,14 +103,20 @@ public struct IconWell: View {
     }
 }
 
-/// A face: a who, round, with their initial on the tile-2 ground.
+/// A face: a who, round, with their initial on the tile-2 ground, or their photo where the record keeps one.
+///
+/// THE INITIAL UNTIL THE PHOTO IS READ, and in its place when it cannot be: the photo is laid over the same circle at the
+/// same side, so nothing moves when it arrives (`Pictures`).
 public struct Face: View {
     let name: String
     let side: CGFloat
+    let picture: String?
+    @State private var photo: Image?
 
-    public init(_ name: String, side: CGFloat = 32) {
+    public init(_ name: String, side: CGFloat = 32, picture: String? = nil) {
         self.name = name
         self.side = side
+        self.picture = picture
     }
 
     public var body: some View {
@@ -119,6 +125,18 @@ public struct Face: View {
             .foregroundStyle(Palette.ink2)
             .frame(width: side, height: side)
             .background(Palette.tile2, in: Circle())
+            .overlay {
+                if let photo {
+                    photo.resizable().scaledToFill().frame(width: side, height: side).clipShape(Circle()).accessibilityHidden(true)
+                }
+            }
             .accessibilityLabel(name)
+            .task(id: picture) {
+                guard let picture else {
+                    photo = nil
+                    return
+                }
+                photo = await Pictures.shared.image(picture)
+            }
     }
 }

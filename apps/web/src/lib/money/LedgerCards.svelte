@@ -11,6 +11,11 @@
   less than the table they stand for. AND EVERY FIGURE IS WRITTEN AS THE TABLE WRITES IT (`tableCellBody`, with the
   record's home currency): the cards printed the stored "GBP 1,070.25" where the table beside them said "£1,070.25".
   A TABLE WITH NO CATEGORY DRAWS NO CHIP, since a "?" on every line said "not filed" about lines nobody asked to file.
+
+  WHO WAS PAID, AS THEIR LOGO (People 4.8.0, the payee logos Cash Fish shows): a filed line whose payee is an
+  organisation that keeps a logo wears the logo in its chip's place, found by the payee's name or the bank line the
+  organisation was met by (`logoOf`); its category is still said under its name. A line nothing has filed keeps its
+  "?", which asks for something, and a move between your own accounts its arrows.
 -->
 <script module lang="ts">
   import { flip } from 'svelte/animate';
@@ -70,8 +75,11 @@
 </script>
 
 <script lang="ts">
+  import { SvelteSet } from 'svelte/reactivity';
   import Icon from '$lib/ui/Icon.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
+  import { pictureSrc } from '$lib/picture/picture.ts';
+  import { logoOf, wantLogos } from '$lib/picture/pictures.svelte.ts';
   import { looks } from './looks.svelte.ts';
   /* A "?" IS A LINE WITH NO CATEGORY YET (2 Nov, a walk: six imported lines drew it and nothing said what it meant), said
      as the Money page's Ledger tile says it (`UNFILED_HINT`). */
@@ -96,7 +104,7 @@
   } = $props();
 
   type Extra = { label: string; value: string };
-  type Line = { key: string; title: string; under: string; amount: string; after: string; extras: Extra[]; href: string | null; category: string; inflow: boolean; between: boolean; tone: TableRow['tone'] };
+  type Line = { key: string; title: string; under: string; amount: string; after: string; extras: Extra[]; href: string | null; category: string; inflow: boolean; between: boolean; tone: TableRow['tone']; logo: string | null };
   type Day = { day: string; lines: Line[] };
 
   const days = $derived.by(() => {
@@ -105,7 +113,8 @@
       const day = cellSaid(r.cells[plan.day], undefined, now);
       /* WHO WAS PAID AS THE LEDGER SAYS IT (`timelineTitle`, audit 2 B4): Tax set aside drew "RAVENSWORTH LTD INV 2026-038"
          and Receipts "PAPERHAUS SUPPLIES" where the Ledger says "Ravensworth Ltd" and "Paperhaus Supplies". */
-      const title = timelineTitle(plan.title.map((i) => plain(r.cells[i])).find((t) => t !== '') ?? '');
+      const payee = plan.title.map((i) => plain(r.cells[i])).find((t) => t !== '') ?? '';
+      const title = timelineTitle(payee);
       const category = plan.category >= 0 ? plain(r.cells[plan.category]) : '';
       const account = plan.account >= 0 ? plain(r.cells[plan.account]) : '';
       const amount = cellSaid(r.cells[plan.amount], home, now);
@@ -128,6 +137,7 @@
         inflow: amount.startsWith('+') && !between,
         between,
         tone: r.tone,
+        logo: between ? null : logoOf(payee),
       };
       const last = out.at(-1);
       if (last && last.day === day) last.lines.push(line);
@@ -138,6 +148,11 @@
   const afterLabel = $derived(plan.after >= 0 ? (columns[plan.after]?.label ?? '') : '');
   /* A CHIP ONLY WHERE THE TABLE SAYS A CATEGORY: with none, a "?" on every line read as "not filed". */
   const chipped = $derived(plan.chip >= 0 || plan.category >= 0);
+  /* THE LOGOS ARE ASKED ONCE A WHILE, by the first ledger drawn, and one that would not load gives the chip back. */
+  $effect(() => {
+    if (chipped) wantLogos();
+  });
+  const broken = new SvelteSet<string>();
 </script>
 
 <ol class="lc">
@@ -150,7 +165,12 @@
           <!-- A PAYMENT LANDING opens its line and rises into it; one taken away closes (`$lib/motion`). -->
           <li in:lineIn out:dismiss animate:flip={springy()}>
             <svelte:element this={l.href ? 'a' : 'div'} class="lc-line" href={l.href ? at(l.href) : undefined} data-intent={l.tone} data-chipless={chipped ? undefined : ''}>
-              {#if chipped}
+              {#if chipped && look && l.logo && !broken.has(l.logo)}
+                {@const logo = l.logo}
+                <span class="item-chip lc-chip lc-logo" aria-hidden="true"
+                  ><img src={pictureSrc(logo)} alt="" width="36" height="36" loading="lazy" decoding="async" onerror={() => broken.add(logo)} /></span
+                >
+              {:else if chipped}
                 <span class="item-chip lc-chip" data-slot={look?.slot ?? undefined} data-unfiled={look ? undefined : ''} title={look ? undefined : unfiledHint} aria-hidden="true"
                   >{#if look}<Icon name={look.glyph as IconName} size="s" />{:else}?{/if}</span
                 >
@@ -236,6 +256,27 @@
     grid-area: chip;
     inline-size: 36px;
     block-size: 36px;
+  }
+
+  /* A LOGO FILLS THE CHIP, over the quiet fill while it loads, with the ring a face wears on top of it. */
+  .lc-logo {
+    position: relative;
+    overflow: hidden;
+    background: var(--tile-2);
+  }
+
+  .lc-logo::after {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px var(--sep);
+    content: '';
+  }
+
+  .lc-logo > img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
   }
 
   .lc-title {

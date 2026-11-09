@@ -31,6 +31,7 @@ import { declaredValue, schemaOf } from './where.ts';
 import { labels, relabelInto } from '../voice.ts';
 import { survivorsOf } from './names.ts';
 import { heldNow, holdsList, listsSettled } from './lists-held.ts';
+import { learnFaces } from '../picture/pictures.svelte.ts';
 
 /** One register's rows, by the ULID the record stores a ref as, and back again. */
 export type RefMap = {
@@ -212,6 +213,9 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
   TITLES.set(register, new Map([...idOf.keys()].map((seq) => [seq, titleOf.get(seq) ?? ''])));
   FINISHED.set(register, over);
   MONEY_HELD.set(register, kept);
+  /* AND EACH PERSON'S PHOTO BY THEIR NAME, where the list keeps faces (`pictures.svelte.ts`): a face drawn by a name alone,
+     who a question is from or who wrote a line, is drawn by it from now on. */
+  learnFaces(register, rows);
   return { seqOf, idOf, titleOf, markOf, ...(chipOf.size > 0 ? { chipOf } : {}) };
 }
 

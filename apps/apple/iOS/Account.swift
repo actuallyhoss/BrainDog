@@ -15,7 +15,7 @@ struct AccountSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s5) {
                 HStack(spacing: Space.s3) {
-                    Face(app.boot?.me?.name ?? "B", side: 44)
+                    Face(app.boot?.me?.name ?? "B", side: 44, picture: app.boot?.me?.picture)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(app.boot?.me?.name ?? Words.account).font(Typeface.heading).foregroundStyle(Palette.ink)
                     }

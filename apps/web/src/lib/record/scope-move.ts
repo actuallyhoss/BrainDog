@@ -213,14 +213,14 @@ function placeOf(to: string, row: RecordRow): Place | null {
   if (row.seq === null) return null;
   const decl = REGISTERS[to];
   const title = decl ? row.fields[decl.title] : undefined;
-  const mark = decl?.identity ? row.fields[decl.identity.mark] : undefined;
+  const mark = decl?.identity?.mark ? row.fields[decl.identity.mark] : undefined;
   return {
     id: row.id,
     ref: `${to}#${row.seq}`,
     spoken: spokenOf(to, row.seq),
     name: typeof title === 'string' && title.trim() !== '' ? title : words.someProject,
     mark: typeof mark === 'string' && mark.trim() !== '' ? mark : null,
-    hue: decl?.identity ? hueOf(row.fields[decl.identity.accent]) : null,
+    hue: decl?.identity?.accent ? hueOf(row.fields[decl.identity.accent]) : null,
   };
 }
 

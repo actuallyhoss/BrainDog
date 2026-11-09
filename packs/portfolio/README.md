@@ -8,6 +8,9 @@ a file anybody can read, the same as any other plugin.
   the agent on it, with a note, its repositories, folders and domains. Only the name and the status must be said, and
   a project others point at is not deleted out from under them. A project can also say what kind it is: a business,
   client work, a product or content, and whether its plan is kept as its stages alone or as a roadmap alone.
+- **Its picture.** A project wears its mark, a glyph or its first letter, or its logo where it holds one: a picture
+  drawn in place of the mark, changed by hovering the mark. An agent that finds the logo saves it, and asks before
+  replacing one already chosen.
 - **Stages.** The stages a project goes through, in order, each with the line that says when it is done. Its page
   draws them as its road, the done ones marked and the next one said.
 - **Numbers and key numbers.** Numbers holds the readings a project reports, one measure at one moment. Each project's

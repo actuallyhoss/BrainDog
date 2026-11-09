@@ -113,6 +113,8 @@ export type Boot = {
     kind: 'person' | 'token' | 'system';
     person: string | null;
     name: string | null;
+    /** The hash of the owner's own photo, at `/api/files/<sha256>`, while his row in People holds one. The owner only. */
+    picture?: string;
     level: string | null;
     /** The level the caller holds on each list, by id, as the record's `shellFor` answers it. Absent from an older host. */
     levels?: Record<string, string>;

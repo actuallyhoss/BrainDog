@@ -170,7 +170,7 @@
             <div class="draft" style={slotStyle(c.hue)}>
               <a class="d-open" href={at(c.href)}>
                 <span class="d-top">
-                  <ProjectWell mark={c.mark} name={shownName(c.name)} hue={c.hue} />
+                  <ProjectWell mark={c.mark} name={shownName(c.name)} hue={c.hue} picture={c.picture} row={c.key} />
                   <span class="d-name" dir="auto">{shownName(c.name)}</span>
                 </span>
                 <span class="d-said">{words.formed}</span>

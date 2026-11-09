@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.31.2",
+  "version": "1.32.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "Projects opens on your projects. The bar of how they are going is gone; each project says it if it is at risk or off track.",
+  "changes": "A project can wear a picture, its logo, in place of its mark: hover its mark to change it, and an agent that finds the logo saves it.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -19,7 +19,7 @@
       "mobile": [ "name", "lane", "revenue" ],
       "state": "lane",
       "pack": "portfolio",
-      "identity": { "mark": "mark", "accent": "hue" },
+      "identity": { "mark": "mark", "accent": "hue", "picture": "picture" },
       "scopes": { "repos": "repos", "folders": "folders" },
       "delete": "refuse_while_referenced",
       "fields": [
@@ -66,6 +66,7 @@
         },
         { "id": "mark", "type": "text", "hidden_from_agents": true },
         { "id": "hue", "type": "int", "hidden_from_agents": true },
+        { "id": "picture", "label": "Picture", "type": "file" },
         { "id": "note", "type": "document" },
         { "id": "repos", "label": "Repositories", "type": "list", "of": "text" },
         { "id": "folders", "label": "Folders", "type": "list", "of": "text" },

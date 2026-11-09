@@ -21,15 +21,22 @@
   now opens on the row whole (`host.whole`) and Save is worked out against it; until it is read the body holds the
   wait, and a row that cannot be read whole says so in place of its form.
 
-  THE ROW'S MARK HEADS THE BODY where its list declares one, its picture or the first letter of its name in its own
-  hue (`markOf`, as every drawer of a mark). For a reader who may change the row it is a button, "Change the mark":
-  pressing it loads the glyph picker by `import()`, never as the panel opens, and a pick writes the mark's field alone
-  through the panel's own row write (`host.write`), with its receipt and Undo, so nothing typed in the form changes.
-  The form itself never shows the mark (`readableFields`): the identity is picked as a picture, not typed.
+  THE ROW'S MARK HEADS THE BODY where its list declares one: its picture where it holds one (a project's logo), else its
+  glyph or the first letter of its name in its own hue (`markOf`, as every drawer of a mark); a person, whose list keeps
+  a picture and no mark, heads it with their face, and an organisation with its logo in its square. For a reader who may
+  change the row the mark is the picture changer's button (`PictureChange.svelte`): hovered it shows a camera, and a
+  press or a double press opens the changer, loaded by `import()` and never as the panel opens, where a picture is
+  chosen, dropped or pasted and placed, or a glyph picked. Each writes one field through the panel's own row write
+  (`host.write`), with its receipt and Undo, so nothing typed in the form changes. The form itself never shows the mark
+  or the picture (`readableFields`): the identity is changed where it is drawn, not typed.
 -->
 <script lang="ts">
-  import { tick, untrack, type Component } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { markOf } from 'braindog-render';
+  import { changer } from '$lib/picture/changer.svelte.ts';
+  import { pictureFieldOf, pictureOf, pictureSrc, roundOf, type PictureTarget } from '$lib/picture/picture.ts';
+  import { pictureNow } from '$lib/picture/pictures.svelte.ts';
+  import Face from '$lib/ui/Face.svelte';
   import { at as inApp } from '$lib/at.ts';
   import { currencyFor, identityOfRow, readableFields } from '$lib/record/api.ts';
   import type { Entry, Fields } from '$lib/record/schema.ts';
@@ -45,7 +52,7 @@
   import { bylineWords } from './byline.ts';
   import UndoAsk from './UndoAsk.svelte';
   import { keyOf, titleOf, words } from './row-verbs.ts';
-  import { MARK_WORDS, markFieldOf, markPatch } from './mark-pick.ts';
+  import { markFieldOf } from './mark-pick.ts';
 
   let { host }: { host: RowHost } = $props();
 
@@ -71,59 +78,34 @@
   /* A mark longer than one letter is a glyph's name, as `IdentityMark` reads it. */
   const markGlyph = $derived(markDrawn !== null && markDrawn.length > 1 && isGlyph(markDrawn) ? markDrawn : null);
 
-  type Picker = Component<{ value?: string | null; onpick: (name: string) => void }>;
-  /** The glyph picker, loaded the first time the mark is pressed and kept for the next. */
-  let GlyphPicker = $state.raw<Picker | null>(null);
-  let picking = $state(false);
-  /** Said under the mark when a pick was refused or could not be loaded. */
-  let markSaid = $state('');
-  let markButton = $state<HTMLButtonElement | null>(null);
+  /* ITS PICTURE, where its list keeps one: what the row holds, and what this tab just wrote to it first. */
+  const pictureField = $derived(row ? pictureFieldOf(row.register) : null);
+  const pictureHeld = $derived(entry && pictureField !== null ? pictureOf(entry.fields[pictureField]) : null);
+  const pictureDrawn = $derived(row ? pictureNow(keyOf(row), pictureHeld) : null);
+  /* A PICTURE THAT WOULD NOT LOAD gives the mark back. */
+  let pictureFailed = $state<string | null>(null);
 
-  /** The picker closed by a pick or Done: focus goes back to the mark, since what held it has gone. */
-  async function shut() {
-    picking = false;
-    await tick();
-    markButton?.focus();
-  }
-
-  /* THE PICKER CLOSES WHEN THE PANEL MOVES TO ANOTHER ROW. */
-  const openKey = $derived(row ? keyOf(row) : '');
-  $effect(() => {
-    void openKey;
-    untrack(() => {
-      picking = false;
-      markSaid = '';
-    });
-  });
-
-  async function pressMark() {
-    markSaid = '';
-    if (picking) return void (picking = false);
-    if (!GlyphPicker) {
-      try {
-        GlyphPicker = (await import('./GlyphPicker.svelte')).default as Picker;
-      } catch {
-        markSaid = MARK_WORDS.unloaded;
-        return;
-      }
-    }
-    picking = true;
-  }
-
-  /** One pick, one write: the mark's field alone, through the panel's row write and its Undo. */
-  function pickMark(glyph: string | null) {
+  /** The row as the picture changer writes it, through the panel's own write: only for a reader who may change it. */
+  const changing = $derived.by((): PictureTarget | null => {
     const r = row;
     const e = entry;
-    if (!r || !e || !shape || !mayWrite) return;
-    if (glyph === markHeld) return void shut();
-    const patch = markPatch(r.register, glyph);
-    if (!patch) return void (markSaid = MARK_WORDS.refused);
-    const title = titleOf(e, shape);
-    if (host.write(r, patch, words.marks.edited, glyph === null ? MARK_WORDS.cleared(title) : MARK_WORDS.said(title))) {
-      markSaid = '';
-      void shut();
-    }
-  }
+    if (!r || !e || !shape || !mayWrite || (markField === null && pictureField === null)) return null;
+    return {
+      register: r.register,
+      seq: r.seq,
+      version: e.version,
+      name: titleOf(e, shape),
+      round: markField === null && roundOf(r.register),
+      picture: pictureDrawn,
+      ...(markField === null ? {} : { mark: markHeld }),
+      hue: identity?.hue ?? null,
+      write: (patch, said) => host.write(r, patch as Fields, words.marks.edited, said),
+    };
+  });
+  /* A ROW THE READER MAY CHANGE LOADS THE HOVER, once (`changer.svelte.ts`). */
+  $effect(() => {
+    if (changing) changer.want();
+  });
 
   /** What the form opened on, the row's fields as typed text. A new object is a new form (`{#key}` below). */
   let seeded = $state.raw<Record<string, string> | null>(null);
@@ -290,40 +272,36 @@
   {:else if row && entry && shape}
     {@const r = row}
     {#if identity}
-      <!-- THE MARK, a button only where the reader may change the row; its picture is the name the screen reader
-           hears none of, so the button says what it does. -->
+      <!-- THE MARK, the picture changer's button only where the reader may change the row (`PictureChange`); its picture
+           is the name the screen reader hears none of, so the button says what it does. -->
+      {@const shown = pictureDrawn !== null && pictureDrawn !== pictureFailed ? pictureDrawn : null}
+      {#snippet markOfRow()}<span
+          class="p-mark"
+          style="--slot-ink:var(--cat-{slotOf(identity.hue)});--slot-tint:var(--cat-{slotOf(identity.hue)}-tint)"
+          data-retired={identity.retired ? '' : undefined}
+          data-picture={shown ? '' : undefined}
+          aria-hidden="true"
+          >{#if shown}<img class="p-picture" src={pictureSrc(shown)} alt="" width="44" height="44" decoding="async" onerror={() => (pictureFailed = shown)} />{:else if markGlyph}<Icon
+              name={markGlyph}
+              size="l"
+            />{:else if markDrawn}{markDrawn}{/if}</span
+        >{/snippet}
       <div class="p-mark-line">
-        {#if markField !== null && mayWrite}
-          <button
-            bind:this={markButton}
-            type="button"
-            class="p-mark"
-            style="--slot-ink:var(--cat-{slotOf(identity.hue)});--slot-tint:var(--cat-{slotOf(identity.hue)}-tint)"
-            data-retired={identity.retired ? '' : undefined}
-            aria-label={MARK_WORDS.change}
-            aria-expanded={picking ? 'true' : 'false'}
-            title={MARK_WORDS.change}
-            onclick={() => void pressMark()}
-          >
-            {#if markGlyph}<Icon name={markGlyph} size="l" />{:else if markDrawn}{markDrawn}{/if}
-          </button>
-        {:else}
-          <span class="p-mark" style="--slot-ink:var(--cat-{slotOf(identity.hue)});--slot-tint:var(--cat-{slotOf(identity.hue)}-tint)" data-retired={identity.retired ? '' : undefined} aria-hidden="true"
-            >{#if markGlyph}<Icon name={markGlyph} size="l" />{:else if markDrawn}{markDrawn}{/if}</span
-          >
-        {/if}
-        {#if markSaid}<p class="p-sure" role="status">{markSaid}</p>{/if}
+        {#if changing && changer.component}{@const Changer = changer.component}<Changer target={changing}>{@render markOfRow()}</Changer>{:else}{@render markOfRow()}{/if}
       </div>
-      {#if picking && GlyphPicker && mayWrite}
-        <div class="p-picker" role="group" aria-label={MARK_WORDS.heading}>
-          <p class="p-picker-head">{MARK_WORDS.heading}</p>
-          <GlyphPicker value={markHeld} onpick={(name) => pickMark(name)} />
-          <div class="p-picker-foot">
-            {#if markHeld !== null}<Button size="sm" onclick={() => pickMark(null)}>{MARK_WORDS.clear}</Button>{/if}
-            <Button size="sm" onclick={() => void shut()}>{MARK_WORDS.close}</Button>
-          </div>
-        </div>
-      {/if}
+    {:else if pictureField !== null}
+      <!-- A PERSON HEADS IT WITH THEIR FACE, their photo where they have one, and an organisation with its logo in its
+           square, each changed the same way. -->
+      <div class="p-mark-line">
+        {#if roundOf(r.register)}<Face name={titleOf(entry, shape)} kind="person" size="l" picture={pictureHeld} row={keyOf(r)} change={changing} />{:else}<Face
+            name={titleOf(entry, shape)}
+            of="project"
+            size="l"
+            picture={pictureHeld}
+            row={keyOf(r)}
+            change={changing}
+          />{/if}
+      </div>
     {/if}
     <!-- WHAT THE ROW HOLDS TO LOOK AT, loaded with the drawer's first row and not with the page, so a page that only lists
          its rows carries none of it. -->
@@ -404,19 +382,15 @@
     color: var(--ink-3);
   }
 
-  button.p-mark {
-    cursor: pointer;
+  /* A PICTURE FILLS THE SQUARE, over the slot's tint while it loads. */
+  .p-mark[data-picture] {
+    overflow: hidden;
   }
 
-  button.p-mark:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    button.p-mark:hover {
-      background: color-mix(in oklab, var(--slot-tint, var(--hover)) 90%, var(--ink));
-    }
+  .p-picture {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
   }
 
   @media (pointer: coarse) {
@@ -424,27 +398,6 @@
       inline-size: var(--tap);
       block-size: var(--tap);
     }
-  }
-
-  .p-picker {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    margin: 0 0 var(--sp-4);
-  }
-
-  .p-picker-head {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 600;
-  }
-
-  .p-picker-foot {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: var(--sp-2);
   }
 
   /* A FIELDSET ONLY TO TURN EVERY BOX OFF AT ONCE for a reader who may not write, so it draws as nothing. */

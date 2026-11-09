@@ -102,7 +102,7 @@ test('THE KEY NUMBERS LIST IS THE CONTRACT: every field and every enum value is 
 });
 
 test('PORTFOLIO PROVIDES NUMBERS AND KEY NUMBERS, needs no other list, and founder 3.0.0 hands Numbers to it and lays its two links', () => {
-  assert.equal(FIRST_PARTY_VERSIONS.portfolio, '1.31.2');
+  assert.equal(FIRST_PARTY_VERSIONS.portfolio, '1.32.0');
   const m = firstPartyManifest('portfolio');
   assert.deepEqual(m.requires, []);
   for (const id of ['register.datapoints', 'register.kpis', 'metric.kpis-held', 'metric.kpi-stale']) assert.ok(m.provides.includes(id), id);

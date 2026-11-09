@@ -11,6 +11,9 @@ with it, and it is written here as a file anybody can read, the same as any othe
   own. Health, Calendar and Activity are pages here too.
 - **Facts as fields.** A person's legal name, nationality, handles, deal and paperwork are fields of their own. A script
   reads each person's note and asks once whether to keep what it found as fields; nothing changes without a yes.
+- **Photos and logos.** A person wears their first letter, or their photo where they have one, and an organisation its
+  logo, on its payments too; either is changed by hovering it. An agent that finds a photo or a logo saves it, and asks
+  before replacing one already chosen.
 - **What it does by itself.** Whoever writes in is met: the person a mail is from, the organisation the domain belongs
   to, and who a payment was with. Nobody is asked anything.
 - **Projects and Money.** Which projects a person or an organisation was met in, and an organisation's projects and

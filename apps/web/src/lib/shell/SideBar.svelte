@@ -27,6 +27,8 @@
   import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import { markOf } from 'braindog-render';
+  import { pictureSrc } from '$lib/picture/picture.ts';
+  import { pictureNow } from '$lib/picture/pictures.svelte.ts';
   import { at, here as inside } from '../at.ts';
   import { slotStyle } from '../home/project-cards.ts';
   import Count from '../ui/Count.svelte';
@@ -522,7 +524,11 @@
 
 {#snippet mark(p: SideProject)}
   {@const m = markFor(p)}
-  <span class="s-pm" style={slotStyle(p.hue)} aria-hidden="true">{#if m.glyph}<Icon name={m.glyph} size="s" />{:else}{m.letter}{/if}</span>
+  <!-- ITS PICTURE, its logo, where it holds one (`pictureNow`: what this tab just wrote first), else its glyph or letter. -->
+  {@const pic = pictureNow(p.key, p.picture ?? null)}
+  <span class="s-pm" style={slotStyle(p.hue)} data-picture={pic ? '' : undefined} aria-hidden="true"
+    >{#if pic}<img class="s-pic" src={pictureSrc(pic)} alt="" width="20" height="20" loading="lazy" decoding="async" />{:else if m.glyph}<Icon name={m.glyph} size="s" />{:else}{m.letter}{/if}</span
+  >
 {/snippet}
 
 {#snippet project(p: SideProject)}
@@ -1105,6 +1111,17 @@
     inline-size: 13px;
     block-size: 13px;
     color: inherit;
+  }
+
+  /* A PICTURE FILLS THE MARK, over the slot's tint while it loads. */
+  .s-pm[data-picture] {
+    overflow: hidden;
+  }
+
+  .s-pic {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
   }
 
   /* IN THE DARK THE MARKS GO ONE STEP QUIETER (plan F4): the slot's tint and colour read louder than the place glyphs

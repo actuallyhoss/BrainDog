@@ -21,6 +21,7 @@
   import type { Names } from '$lib/record/remote.ts';
   import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
   import Face from '$lib/ui/Face.svelte';
+  import { pictureOfRow } from '$lib/picture/picture.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
@@ -122,7 +123,7 @@
   {@const name = nameOf(m.entry)}
   {@const detail = detailOf(m, at_)}
   <a class="line line-tall" href={at(`/r/${register}/${m.entry.seq}`)} {@attach openCardMenu && ownMenu((p) => openCardMenu(m.entry.seq, document.body, p))}>
-    <span class="line-mark"><Face {name} kind="person" you={m.self} size="m" /></span>
+    <span class="line-mark"><Face {name} kind="person" you={m.self} size="m" picture={pictureOfRow(register, m.entry.fields)} row="{register}#{m.entry.seq}" /></span>
     <span class="line-main">
       <span class="line-title" dir="auto">{name}{#if m.self}<span class="you">{seenWords.you}</span>{/if}</span>
       {#if detail}<span class="line-detail">{detail}</span>{/if}

@@ -29,6 +29,8 @@
   import { looks as moneyLooks } from '$lib/money/looks.svelte.ts';
   import LedgerCards, { cardsOf as linesOf } from '$lib/money/LedgerCards.svelte';
   import { linesSaid } from '$lib/money/ledger-lines.ts';
+  import { pictureSrc } from '$lib/picture/picture.ts';
+  import { logoOf, wantLogos } from '$lib/picture/pictures.svelte.ts';
   import { recordToday } from '$lib/record/zone.ts';
   import { kpiHref, kpisIn } from './kpis-in.ts';
   import QueueAnswer from './QueueAnswer.svelte';
@@ -339,6 +341,14 @@
       if (/account/u.test(s)) return moneyLooks.account(label);
       if (/paid most|how often|payee|who was paid/iu.test(heading)) return moneyLooks.payee(label);
       return null;
+    },
+    /* WHO WAS PAID, AS THEIR LOGO (People 4.8.0, the payee logos Cash Fish shows): a ledger line's payee among the
+       organisations that keep a logo, by name or by the bank line each was met by (`$lib/picture/pictures.svelte.ts`). */
+    logo: (payee: string) => {
+      if (block.kind !== 'timeline' || !/transactions/u.test(typeof (block as { source?: unknown }).source === 'string' ? (block as { source: string }).source : '')) return null;
+      wantLogos();
+      const sha = logoOf(payee);
+      return sha === null ? null : pictureSrc(sha);
     },
     /* A forecast's knobs and its readout: arithmetic over the walk already on the page, kept in memory. */
     scenario: true,

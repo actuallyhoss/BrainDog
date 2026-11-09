@@ -8,15 +8,19 @@
   ITS COLOUR IS ITS SLOT. The row's frozen hue picks the nearest of the eight category slots (`slotOf` in `face.ts`),
   each solved to clear 4.5:1 on the tile and on its own tint in light and dark; a retired row is the neutral slot.
   Never the only signal: the name always sits beside it.
+
+  ITS PICTURE, its logo, where the row holds one (`Identity.picture`), is drawn in the well in place of the mark, and
+  `change` (handed where the reader may write the row) makes the well the picture changer's button.
 -->
 <script lang="ts">
   import { markOf } from 'braindog-render';
+  import type { PictureTarget } from '$lib/picture/picture.ts';
   import type { Identity } from '../record/api.ts';
   import { slotOf } from './face.ts';
   import IconWell from './IconWell.svelte';
   import { isGlyph, type IconName } from './icons.ts';
 
-  let { identity, size = 'sm' }: { identity: Identity; size?: 'sm' | 'md' } = $props();
+  let { identity, size = 'sm', change }: { identity: Identity; size?: 'sm' | 'md'; change?: PictureTarget | null | undefined } = $props();
 
   const mark = $derived(markOf(identity.mark, identity.name));
   /* A mark longer than one letter is a glyph's name: `markOf` answers a letter or a name the set holds. */
@@ -25,7 +29,7 @@
 </script>
 
 <span class="thing" data-size={size} data-retired={identity.retired ? '' : undefined}>
-  <IconWell name={glyph} {letter} size={size === 'md' ? 'l' : 'm'} slot={identity.retired ? 'slate' : slotOf(identity.hue)} />
+  <IconWell name={glyph} {letter} size={size === 'md' ? 'l' : 'm'} slot={identity.retired ? 'slate' : slotOf(identity.hue)} picture={identity.picture} {change} />
   <span class="name">{identity.name}</span>
 </span>
 

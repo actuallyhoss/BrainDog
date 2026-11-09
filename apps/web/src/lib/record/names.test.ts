@@ -23,7 +23,7 @@ const SAMPLE = ROWS[TARGET.id]![0]!;
 const liveRow = (seq: number, title: string, mark: string, hue: number) => ({
   id: `01LIVE${seq}`,
   seq,
-  fields: { [TARGET.title]: title, [TARGET.identity!.mark]: mark, [TARGET.identity!.accent]: hue },
+  fields: { [TARGET.title]: title, [TARGET.identity!.mark!]: mark, [TARGET.identity!.accent!]: hue },
 });
 
 test('a live ref is named and marked by the record, and the sample row of that number is never read', () => {

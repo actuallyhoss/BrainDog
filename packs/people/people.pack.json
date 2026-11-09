@@ -1,9 +1,9 @@
 {
   "pack": "people",
-  "version": "4.7.2",
+  "version": "4.8.0",
   "title": "People",
   "summary": "Clients, contractors and accountants, the organisations they are with, and where each one was seen.",
-  "changes": "A note inside the people-fields script no longer carries real names. Nothing you see changes.",
+  "changes": "A person can wear a photo in place of their letter, and an organisation its logo: hover either to change it, and an agent that finds one saves it.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -33,6 +33,7 @@
         "aliases": "aliases"
       },
       "delete": "refuse_while_referenced",
+      "identity": { "picture": "picture" },
       "fields": [
         { "id": "name", "type": "text", "required": true, "search": true },
         {
@@ -78,6 +79,7 @@
         },
         { "id": "titles", "label": "Roles", "type": "list", "of": "text" },
         { "id": "about", "label": "About", "type": "text" },
+        { "id": "picture", "label": "Photo", "type": "file" },
         { "id": "nationality", "label": "Nationality", "type": "text" },
         { "id": "country", "label": "Country", "type": "text" },
         { "id": "city", "label": "City", "type": "text" },
@@ -135,6 +137,7 @@
         "retired": "retired_on"
       },
       "delete": "refuse_while_referenced",
+      "identity": { "picture": "picture" },
       "fields": [
         { "id": "name", "label": "Organisation", "type": "text", "required": true, "search": true },
         {
@@ -154,6 +157,7 @@
           "index": true
         },
         { "id": "domain", "label": "Website", "type": "text", "index": true },
+        { "id": "picture", "label": "Logo", "type": "file" },
         { "id": "keys", "label": "Known by", "type": "list", "of": "text" },
         {
           "id": "projects",

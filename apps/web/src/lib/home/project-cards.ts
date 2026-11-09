@@ -14,6 +14,7 @@ import { rowHref, rowScreen } from '../record/row-href.ts';
 import { keptOrder } from '../shell/project-order.ts';
 import { LANES_DEFAULT } from '../shell/side.ts';
 import { hueFor, slotOf } from '../ui/face.ts';
+import { pictureOf } from '../picture/picture.ts';
 
 import type { CardKpi } from './card-kpi.ts';
 
@@ -22,7 +23,7 @@ export type CardDecl = {
   id: string;
   title: string;
   state?: string | undefined;
-  identity?: { mark: string; accent: string } | undefined;
+  identity?: { mark?: string | undefined; accent?: string | undefined; picture?: string | undefined } | undefined;
   scopes?: unknown;
   fields: readonly { id: string; type: string }[];
 };
@@ -36,6 +37,8 @@ export type ProjectCard = {
   mark: string;
   /** The row's own hue, else the one its name is drawn in everywhere (`hueOf`). */
   hue: number | null;
+  /** Its picture, its logo, by hash, where it holds one: drawn in place of the mark. */
+  picture?: string | null | undefined;
   lane: string;
   /** How it is going, the stored value (`on_track`, `at_risk`, `off_track`), or '' where nobody said. */
   health: string;
@@ -207,13 +210,13 @@ export function lifeOf(card: Pick<ProjectCard, 'worked' | 'last' | 'moved'>, age
 }
 
 /**
- * The read of every project the sidebar draws, by the fields a row of it is drawn from: its name, mark, hue, lane and
- * next step, each row keeping its number and id. Read whole, his 27 projects were 468 KB at every open, nearly all of it
+ * The read of every project the sidebar draws, by the fields a row of it is drawn from: its name, mark, hue, picture,
+ * lane and next step, each row keeping its number and id. Read whole, his 27 projects were 468 KB at every open, nearly all of it
  * their notes. ONE SHAPE FOR THE SIDEBAR AND THE WEEK'S LATE WORK (`card-late.ts`), which reads the same rows for their
  * ids, so the two are one read kept by the version, as they were while both read the rows whole.
  */
 export function drawnRead(decl: Pick<CardDecl, 'id' | 'title' | 'state' | 'identity' | 'fields'>, limit: number): { register: string; limit: number; fields?: string[] } {
-  const drawn = [decl.title, decl.identity?.mark, decl.identity?.accent ?? 'hue', decl.state, 'next'];
+  const drawn = [decl.title, decl.identity?.mark, decl.identity?.accent ?? 'hue', decl.identity?.picture, decl.state, 'next'];
   const fields = [...new Set(drawn)].filter((f): f is string => typeof f === 'string' && decl.fields.some((d) => d.id === f));
   return { register: decl.id, limit, ...(fields.length > 0 ? { fields } : {}) };
 }
@@ -260,8 +263,9 @@ export function cardsOf(decl: CardDecl, rows: readonly CardRow[], most = DESK_MO
     return {
       key: `${decl.id}#${r.seq}`,
       name,
-      mark: decl.identity ? said(f[decl.identity.mark]) : '',
+      mark: decl.identity?.mark ? said(f[decl.identity.mark]) : '',
       hue: hueOf(decl, f),
+      picture: decl.identity?.picture ? pictureOf(f[decl.identity.picture]) : null,
       lane,
       health: said(f.health),
       progress: Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null,

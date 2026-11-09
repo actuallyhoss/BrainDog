@@ -281,6 +281,10 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
        can be pointed elsewhere first. A person folded into another by a merge goes as before when nothing names them;
        when something does, accepting the merge is refused with the same sentence, which is the stranding this stops. */
     delete: 'refuse_while_referenced',
+    /* A PERSON'S PHOTO, SINCE People 4.8.0 (his word of 4 and 9 November: "same with people"): the file field their
+       picture is kept in, drawn in place of their letter wherever their face is. People wear no mark and no accent, so the
+       picture is all their identity names. */
+    identity: { picture: 'picture' },
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
       /* Optional, because a person an agent meets in a commit has no role until somebody gives one.
@@ -331,6 +335,10 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
       { id: 'titles', label: 'Roles', type: 'list', of: 'text' },
       /* ONE SHORT LINE ABOUT THEM, drawn under their name; `note` below it is everything else. */
       { id: 'about', label: 'About', type: 'text' },
+      /* THEIR PHOTO, SINCE People 4.8.0: a file the record holds, `{ sha256, mime, bytes, name }`, drawn in place of their
+         letter. An agent that finds one saves it here, and asks before replacing one already chosen. Optional, so every
+         person already written stays valid. */
+      { id: 'picture', label: 'Photo', type: 'file' },
       { id: 'nationality', label: 'Nationality', type: 'text' },
       { id: 'country', label: 'Country', type: 'text' },
       { id: 'city', label: 'City', type: 'text' },
@@ -404,6 +412,9 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
     org: { name: 'name', keys: 'keys', kind: 'kind', domain: 'domain', merged_into: 'merged_into', met: 'met', projects: 'projects', retired: 'retired_on' },
     /* A PERSON OR A PAYMENT NAMES ITS ORGANISATION, so it is not deleted out from under them, as a person is not. */
     delete: 'refuse_while_referenced',
+    /* ITS LOGO, SINCE People 4.8.0, as a person's photo and a project's logo: the file field it is drawn by, in place of
+       its letter, here and on every payment that names it. */
+    identity: { picture: 'picture' },
     fields: [
       { id: 'name', label: 'Organisation', type: 'text', required: true, search: true },
       /* WHAT IT IS TO YOU, which is what decides how it is met: a bank's alert, a shop's receipt, a client's mail. A
@@ -419,6 +430,9 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
       },
       /* THE ADDRESS ITS MAIL COMES FROM, `halden.example`, and never a public one such as a free mail service. */
       { id: 'domain', label: 'Website', type: 'text', index: true },
+      /* ITS LOGO, SINCE People 4.8.0: a file the record holds, drawn in place of its letter. An agent that finds one saves
+         it, and asks before replacing one already chosen. Optional, so every organisation already written stays valid. */
+      { id: 'picture', label: 'Logo', type: 'file' },
       { id: 'keys', label: 'Known by', type: 'list', of: 'text' },
       { id: 'projects', label: 'Projects', type: 'list', of: 'ref', to: 'things', scope: { links: true } },
       /* WHERE IT WAS SEEN, one dated line each with where: the evidence a match was made on. */

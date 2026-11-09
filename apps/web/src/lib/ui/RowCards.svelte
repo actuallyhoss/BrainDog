@@ -64,6 +64,7 @@
   import { flip } from 'svelte/animate';
   import { sameEntries } from '$lib/record/same-entries.ts';
   import Face from './Face.svelte';
+  import { pictureOfRow } from '$lib/picture/picture.ts';
   import Money from './Money.svelte';
   import ScopeChip from './ScopeChip.svelte';
   import StateDot from './StateDot.svelte';
@@ -382,7 +383,7 @@
           <span class="card-title" dir={dirOf(register, titleField)} data-whole={figure ? undefined : ''} data-slot={slotted ? '' : undefined} data-own={title === null ? undefined : ''}>
             {#if faced}
               <!-- `aria-hidden` inside `Face`, because the name it is drawn from is the title beside it. -->
-              <span class="card-face"><Face name={title ?? ''} kind="person" size="s" /></span>
+              <span class="card-face"><Face name={title ?? ''} kind="person" size="s" picture={pictureOfRow(register, e.fields)} row="{register}#{e.seq}" /></span>
             {/if}
             <!-- A TITLE NOBODY SET SAYS SO, in the dim ink the grid gives a missing value. An empty
                  first line would read as a card that failed to draw. -->

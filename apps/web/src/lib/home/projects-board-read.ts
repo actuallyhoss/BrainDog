@@ -23,6 +23,7 @@ import { symbolText } from '../record/money.ts';
 import { learn } from '../record/remote.ts';
 import { calledOf } from '../voice.ts';
 import { rowHref } from '../record/row-href.ts';
+import { pictureOf } from '../picture/picture.ts';
 import { registerHref } from '../record/where.ts';
 import { viaOf } from '../../routes/r/[register]/[seq]/figures.ts';
 import { localDay } from '../../routes/r/[register]/[seq]/said.ts';
@@ -125,7 +126,7 @@ export function projectsFrom(list: string, entries: readonly Row[]): BoardProjec
   if (!d) return [];
   const title = d.title ?? 'name';
   const state = d.state ?? 'lane';
-  const identity = (d as { identity?: { mark: string; accent: string } }).identity;
+  const identity = d.identity;
   const out: BoardProject[] = [];
   for (const e of entries) {
     const f = e.fields ?? {};
@@ -139,8 +140,9 @@ export function projectsFrom(list: string, entries: readonly Row[]): BoardProjec
       id: typeof e.id === 'string' ? e.id : null,
       spoken: `${list}#${e.seq}`,
       name,
-      mark: identity ? text(f[identity.mark]) : '',
+      mark: identity?.mark ? text(f[identity.mark]) : '',
       hue: Number.isFinite(h) ? h : null,
+      picture: identity?.picture ? pictureOf(f[identity.picture]) : null,
       lane: text(f[state]),
       next: text(f.next),
       health: text(f.health),
