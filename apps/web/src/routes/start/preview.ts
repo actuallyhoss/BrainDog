@@ -310,6 +310,8 @@ export const words = {
   yours: 'Drawn with only what you gave it. Nothing is kept until you keep it.',
   /** Under the first pages, the door to the rest. */
   morePages: (n: number) => `${n} more ${n === 1 ? 'page' : 'pages'}`,
+  /** On a phone, where no page is listed until asked: the door to all of them, the tile's head having said how many. */
+  showPages: 'Show the pages',
   /** Where the record cannot draw the pages: the rail above still says what is made. */
   undrawn: 'These pages could not be drawn here. They are made as shown above.',
 } as const;
