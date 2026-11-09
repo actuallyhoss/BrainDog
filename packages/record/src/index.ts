@@ -5828,7 +5828,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       patch.relation = of[word] ?? word;
     }
     /* WHAT NO FIELD TOOK IS KEPT IN THEIR NOTE, after what it already says, in his words. */
-    const left = read === null ? words : typeof read.patch.note === 'string' ? read.patch.note : read.patch.note === undefined ? '' : words;
+    /* NOR IS THE NOTE MADE TO SAY AGAIN WHAT A FIELD NOW HOLDS: "A person, matter of fact he's my father." leaves nothing
+       once To you says Parent, and "a person" is what the answer already was. */
+    const left = (read === null ? words : typeof read.patch.note === 'string' ? read.patch.note : read.patch.note === undefined ? '' : words)
+      .replace(/^a person\b[\s,.;:-]*/iu, '')
+      .replace(
+        /(?:[\s,;]*(?:and|but)?\s*(?:as a )?(?:matter of fact|in fact|actually)?[\s,]*)?(?:(?:he|she|they)(?:'s|’s| is| are|'re|’re)\s+)?(?:my|our)\s+(?:wife|husband|partner|girlfriend|boyfriend|father|mother|dad|mum|mom|brother|sister|son|daughter|cousin|aunt|uncle|friend|mentor)\b/giu,
+        (m) => (patch.relation !== undefined || (row.relation !== undefined && row.relation !== null && row.relation !== '') ? '' : m),
+      )
+      .replace(/^[\s,.;:-]+|[\s,;:-]+(?=[.!?]?$)/gu, '')
+      .replace(/^(?:and|but)\s+/iu, '')
+      .replace(/^\w/u, (c) => c.toUpperCase());
     delete patch.note;
     if (has('note') && left.trim() !== '') {
       const before = typeof row.note === 'string' ? row.note.trim() : '';
