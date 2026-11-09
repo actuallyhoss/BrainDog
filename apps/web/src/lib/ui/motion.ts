@@ -23,6 +23,7 @@ import { cubicOut } from 'svelte/easing';
 import type { TransitionConfig } from 'svelte/transition';
 
 import { spring } from '../motion/spring.ts';
+import { washIfGrown } from '../motion/grow.ts';
 
 /** Whether the reader asked for less motion. */
 export const still = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -102,10 +103,12 @@ const gapCss = (gap: ReturnType<typeof gapOf>, part: number): string => (gap ? `
 
 /**
  * A ROW ARRIVING (the record forming of 1 November): its height opens on the even curve, so the rows under it glide down
- * to make room, while it rises 8px into place on the spring (`--ease-spring`) and fades in, over `--form-in`.
+ * to make room, while it rises 8px into place on the spring (`--ease-spring`) and fades in, over `--form-in`. One the
+ * record grew while he looked wears the arrival wash as it lands (`motion/grow.ts`).
  */
 export function rowIn(node: Element): TransitionConfig {
   if (swapping || settling()) return { duration: 0 };
+  washIfGrown(node);
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
   const gap = gapOf(node);

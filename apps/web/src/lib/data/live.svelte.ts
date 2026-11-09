@@ -27,6 +27,8 @@ const wipeLocal = (): Promise<void> => localTab().then((m) => m.wipeLocal());
 import { dropShell, forget, hear, hearShell, keep } from './offline.ts';
 import { forgetSignedOut } from '../record/signed-out.ts';
 import { shellSignedOut } from '../shell.ts';
+/* WHAT ARRIVES IN THE NEXT MOMENT IS THE RECORD GROWING (`motion/grow.ts`): the screens' re-reads land after this. */
+import { moved } from '../motion/grow.ts';
 
 /**
  * `state` is what the hairline draws.
@@ -272,7 +274,14 @@ export function follow(base: string | null): void {
   /* A RECORD ITS AGENTS ARE WRITING TO MOVES SEVERAL TIMES A SECOND, and every move asked the shell, every read on screen and
      the board again. So the screens hear of it at most once in `SCREENS_EVERY_MS`: the first move at once, what follows
      after the wait (`paced`, `live.ts`). */
-  const told = paced((version: number) => (live.version = version), SCREENS_EVERY_MS, timers);
+  const told = paced(
+    (version: number) => {
+      moved();
+      live.version = version;
+    },
+    SCREENS_EVERY_MS,
+    timers,
+  );
   const stopPoll = poller({
       ask: asker(base),
       timers,
@@ -341,6 +350,7 @@ export async function reread(): Promise<void> {
   /* A PULL ASKS THE RECORD ITSELF: nothing kept at this version answers it. */
   await import('@braindog/client').then((c) => c.forgetReads(), () => undefined);
   pulls += 1;
+  moved();
   live.version = pulls + 0.5;
   await tick();
 }

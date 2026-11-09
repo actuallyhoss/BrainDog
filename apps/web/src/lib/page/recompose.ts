@@ -39,6 +39,8 @@
  * the page.
  */
 
+import { washIfGrown } from '$lib/motion/grow.ts';
+
 /** A block's place on the page, relative to the page's own box, in CSS pixels. */
 export type Box = { x: number; y: number; w: number; h: number };
 
@@ -426,6 +428,9 @@ export function recomposer(): {
         const el = now.get(key)?.el;
         if (!el) continue;
         running.push(el.animate(less ? { opacity: [0, 1] } : { opacity: [0, 1], transform: ['translateY(12px) scale(0.97)', 'none'] }, { ...enter, fill: 'backwards' }));
+        /* A TILE THE RECORD GREW WHILE HE LOOKED (a widget it made, a section that now has something) wears the arrival
+           wash as it rises, as a row does (`$lib/motion/grow.ts`). */
+        washIfGrown(el);
       }
       /* A PLACE ANOTHER BLOCK NOW TAKES IS LET GO OF QUICKLY. Under it is not enough: a list drawn without a box has
          no ground, so the old block's words read through the new one's for the whole fade. It fades on the shorter

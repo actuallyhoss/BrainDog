@@ -30,8 +30,10 @@ import { FADE, ms, rowIn, rowOut, still } from '../ui/motion.ts';
 export { ms, still };
 
 import { spring } from './spring.ts';
+import { washIfGrown } from './grow.ts';
 
 export { spring };
+export { growing, moved, wash, washIfGrown } from './grow.ts';
 
 /* ── the first second of a screen ────────────────────────────────────────── */
 
@@ -68,8 +70,10 @@ const fadeIn = (delay = 0): TransitionConfig => ({ delay, duration: FADE, css: (
  * `--form-in`, its opacity in over the first part. `delay` staggers a group (`staggered`). Still in a screen's first
  * second; a fade under reduced motion.
  */
-export function arrive(_node: Element, { delay = 0, rise = 10, from = 0.97 }: { delay?: number; rise?: number; from?: number } = {}): TransitionConfig {
+export function arrive(node: Element, { delay = 0, rise = 10, from = 0.97 }: { delay?: number; rise?: number; from?: number } = {}): TransitionConfig {
   if (calm()) return NONE;
+  /* THE RECORD GREW WHILE HE LOOKED: the card wears the arrival wash as it lands (`grow.ts`). */
+  washIfGrown(node);
   if (still()) return fadeIn();
   return {
     delay,
@@ -274,6 +278,8 @@ export const listMotion =
   };
 
 function arriveNow(el: HTMLElement): void {
+  /* THE RECORD GREW WHILE HE LOOKED: the row wears the arrival wash as it lands (`grow.ts`). */
+  washIfGrown(el);
   if (still()) return void play(el, { opacity: [0, 1] }, { duration: FADE });
   const h = el.offsetHeight;
   const long = ms('--form-in', 320);
