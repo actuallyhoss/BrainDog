@@ -15,7 +15,7 @@
 -->
 <script lang="ts">
   import Icon from '$lib/ui/Icon.svelte';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { kindsFor, WIDGET_SIZES, type WidgetSize } from 'braindog-render';
   import { apiBase } from '$lib/at.ts';
   import { homeCurrency } from '$lib/record/api.ts';
@@ -40,6 +40,7 @@
     onremove,
     onhidephone,
     home = homeCurrency(),
+    naming = false,
   }: {
     open?: boolean;
     /** The widget on the board: its key, its block as stored, and its size. */
@@ -52,6 +53,8 @@
     onremove?: ((key: string) => unknown) | undefined;
     onhidephone?: ((key: string, hidden: boolean) => unknown) | undefined;
     home?: string | null;
+    /** Whether it opens with the caret in its name: the widget's name double-clicked on the board (`lib/ui/dbl.ts`). */
+    naming?: boolean;
   } = $props();
 
   const words = {
@@ -85,6 +88,7 @@
   let cost = $state<string | null>(null);
   /** The part whose choices are open, and its choices. */
   let menu = $state<{ part: Part; options: { label: string; value: string | null }[] } | null>(null);
+  let nameEl = $state<HTMLInputElement | null>(null);
 
   const register = $derived(typeof draft.source === 'string' && draft.source.startsWith('register.') ? draft.source.slice('register.'.length) : null);
   const parts = $derived(sentenceOf(draft, register ? listName(register) : null, fields));
@@ -114,6 +118,14 @@
         void schemaOf(apiBase(), register).then((d) => {
           fields = ((d?.fields ?? []) as FieldSaid[]).map((f) => ({ id: f.id, type: f.type, values: f.values, to: (f as { to?: string }).to, label: (f as { label?: string }).label }));
         });
+      /* ITS NAME DOUBLE-CLICKED: the caret in the name, chosen, once the sheet has taken the focus it opens with. */
+      if (naming)
+        void tick().then(() =>
+          requestAnimationFrame(() => {
+            nameEl?.focus();
+            nameEl?.select();
+          }),
+        );
     });
   });
 
@@ -279,7 +291,7 @@
 
     <label class="in-field">
       <span class="in-h">{words.name}</span>
-      <input value={typeof draft.heading === 'string' ? draft.heading : ''} oninput={(e) => (draft = { ...draft, heading: (e.currentTarget as HTMLInputElement).value })} maxlength="60" />
+      <input bind:this={nameEl} value={typeof draft.heading === 'string' ? draft.heading : ''} oninput={(e) => (draft = { ...draft, heading: (e.currentTarget as HTMLInputElement).value })} maxlength="60" />
     </label>
 
     {#if onhidephone}
