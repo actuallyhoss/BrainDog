@@ -97,6 +97,36 @@ export const statePath = (env: Env, id: string): string => join(sessionsDir(env)
 /** What a hook with work prints, made ready before it runs: `.ready`, and beside it `.ready.state` and `.ready.flags`. */
 export const readyPath = (env: Env, id: string, which: 'prompt' | 'tool' | 'stop'): string => join(sessionsDir(env), `${fileId(id)}.inbox.${which}.ready`);
 
+/* ── the session's turn ────────────────────────────────────────────────── */
+
+/**
+ * WHERE A SESSION'S TURN IS KEPT: `work` from his prompt until the turn ends, `rest` from then, and from the start, until
+ * his first prompt. The hook scripts write it with the shell's own `printf`, so no program starts; a stop this module
+ * does not hold open writes `rest` here (`runHook`). The next session's start hook reads it for a window that closed
+ * with no end (`lostEnds` in `hooks.ts`): one closed at rest is ended then, and one closed at work is left to the
+ * record's sweep, which writes it off as abandoned, the one end that word is for.
+ */
+export const turnPath = (env: Env, id: string): string => join(sessionsDir(env), `${fileId(id)}.turn`);
+
+/** The session's turn, written. Never throws: a turn not kept leaves a closed window's run to the sweep, as before. */
+export function markTurn(env: Env, id: string, turn: 'work' | 'rest'): void {
+  try {
+    writeWhole(turnPath(env, id), `${turn}\n`);
+  } catch {
+    /* The sweep writes the run off, as it did. */
+  }
+}
+
+/** The session's turn as last written, or `null` for none: a session started by a command from before the turn was kept. */
+export function turnOf(env: Env, id: string): 'work' | 'rest' | null {
+  try {
+    const said = readFileSync(turnPath(env, id), 'utf8').trim();
+    return said === 'work' || said === 'rest' ? said : null;
+  } catch {
+    return null;
+  }
+}
+
 /* ── what the files hold ───────────────────────────────────────────────── */
 
 /** How often the bridge pulses, and how often while he has stopped or paused the run (plan §2.3 C). */
@@ -398,14 +428,22 @@ function printed(which: Which, out: { context: string } | { reason: string }): s
   return JSON.stringify({ decision: 'block', reason: (out as { reason: string }).reason });
 }
 
-/** Files of sessions not written to in twelve hours, removed so the folder stays small. Never throws. */
+/**
+ * How long a session's turn is kept (`turnPath`): the week the record's sign of runs reads, which is as far back as a
+ * start looks for a window that closed with no end. Past twelve hours, as the inbox files go, a window left open at rest
+ * over a night and then closed would have lost the word that it was at rest.
+ */
+export const TURN_KEEP_MS = 7 * 86_400_000;
+
+/** Files of sessions not written to in twelve hours, removed so the folder stays small, and turns past theirs. Never throws. */
 export function pruneInboxes(env: Env, now: number = Date.now()): void {
   try {
     const dir = sessionsDir(env);
     for (const name of readdirSync(dir)) {
-      if (!/\.(?:inbox\.json|inbox\.flags|hooks\.json|inbox\.(?:prompt|tool|stop)\.ready(?:\.state|\.flags)?)$/u.test(name)) continue;
+      const turn = name.endsWith('.turn');
+      if (!turn && !/\.(?:inbox\.json|inbox\.flags|hooks\.json|inbox\.(?:prompt|tool|stop)\.ready(?:\.state|\.flags)?)$/u.test(name)) continue;
       const file = join(dir, name);
-      if (now - statSync(file).mtimeMs > KEEP_MS) unlinkSync(file);
+      if (now - statSync(file).mtimeMs > (turn ? TURN_KEEP_MS : KEEP_MS)) unlinkSync(file);
     }
   } catch {
     /* A file left behind is a few bytes. */
@@ -497,6 +535,18 @@ export type Which = (typeof HOOKS)[number];
  * waits on anything but the two files. `now` is a test's clock.
  */
 export function runHook(which: Which, stdin: string, env: Env, now: number = Date.now()): string {
+  const said = answer(which, stdin, env, now);
+  /* A TURN THAT ENDS HERE RESTS (`turnPath`): a stop this hook does not hold open, and never a subagent's, whose stop is
+     not the session's. A stop it holds open goes on working. */
+  if (which === 'stop' && said === '') {
+    const event = eventOf(stdin);
+    if (event.session !== null && event.agent === null) markTurn(env, event.session, 'rest');
+  }
+  return said;
+}
+
+/** What one hook prints, as `runHook` says it. Never throws. */
+function answer(which: Which, stdin: string, env: Env, now: number): string {
   try {
     const event = eventOf(stdin);
     if (event.session === null) return '';

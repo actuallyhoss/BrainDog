@@ -315,18 +315,21 @@ export function lintAnswer(page: PageResult, waiting: number | null, typesOf?: T
   /* A PART THAT SAYS ONE OF ITS ROW'S OWN TEXTS AND NOTHING ELSE IS HIS (`rowWords`). */
   const own = new Set(rowWords.map((w) => w.replace(/\s+/gu, ' ').trim().toLowerCase()).filter((w) => w !== ''));
   const his = (html: string): boolean => own.size > 0 && own.has(plain(html).replace(/[.!?]$/u, '').toLowerCase());
+  /* AND A NAME FROM THE CODE THAT ONE OF THOSE TEXTS HOLDS IS HIS WHEREVER A PART SAYS IT (`LintPart.row`): the Keys note
+     of a service's page says "Keys for bluff.golf are kept in the Keychain", the name he gave the service. */
+  const row = rowWords.length === 0 ? {} : { row: rowWords };
   for (const b of page.blocks) {
     if (b.drawn === false) continue;
     const name = b.heading ? (plain(drawn(b.heading, b.values)) || title) : title;
     const parts: LintPart[] = [];
     /* THE HEADING IS READ AS HIS WORDS: a template fills it with a row's name, and the copy rules hold the product's. */
-    if (b.heading) parts.push({ name, html: drawn(b.heading, b.values), theirs: true });
+    if (b.heading) parts.push({ name, html: drawn(b.heading, b.values), theirs: true, ...row });
     const written = (b as { body?: unknown }).body;
     const body = typeof written === 'string' && b.kind === 'note' && (b as { lead?: unknown }).lead === true ? leadDrawn(written, b.values, (b as { said?: unknown }).said) : written;
     /* A DOCUMENT IS HIS, as a project's note is. A note that is not one is the declaration's own sentence. */
     if (typeof body === 'string' && body.trim() !== '' && !/^\{\{\w+\}\}$/u.test(body.trim()))
-      parts.push({ name, html: drawn(body, b.values), theirs: b.document === true || his(drawn(body, b.values)) });
-    if (b.empty && b.matched === 0 && (b.rows ?? []).length === 0) parts.push({ name, html: drawn(b.empty, b.values) });
+      parts.push({ name, html: drawn(body, b.values), theirs: b.document === true || his(drawn(body, b.values)), ...row });
+    if (b.empty && b.matched === 0 && (b.rows ?? []).length === 0) parts.push({ name, html: drawn(b.empty, b.values), ...row });
     const found: LintFinding[] = parts.flatMap((p) => lintPart(p));
     /* AND ITS CELLS, which the web draws from the rows: a time or an id a cell prints raw is on the page as surely as a
        note's. Only `CELL_RULES` read a cell; anything else a cell holds is his to write. */

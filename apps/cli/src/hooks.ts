@@ -11,7 +11,7 @@
 
 import { execFile, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +28,7 @@ import { briefing, cardOf, nextLine, words, type Moved, type Where } from './bri
 import { budgetOf, clientFor, hostsPath, readHosts, sameHost, target, type Target } from './http.ts';
 import { authoredIn, childHeads, commitsBy, joinedAt, listedBy, localRepo, LOG_FORMAT, meeter, meetingOf, MIN_COMMITS, ownerOf, readLayout, type Layout, type MeetCall, type Meeting, type Owner, type Reader } from './people.ts';
 import { mark } from './hook-trace.ts';
-import { seedInbox, toldAtStart } from './inbox-file.ts';
+import { markTurn, seedInbox, toldAtStart, TURN_KEEP_MS, turnOf } from './inbox-file.ts';
 import { cliBuild, git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
 import type { AgentIo } from './skills.ts';
 import { startOffer, startOwed, startWork, topOf, WORK_MS, WORK_STEP_MS } from './session-start.ts';
@@ -571,6 +571,9 @@ export async function hookStart(io: Io): Promise<void> {
   const started = io.began ?? performance.timeOrigin;
   const event = eventOf(io.stdin, io.cwd);
   const id = event.client_id ?? null;
+  /* THE SESSION BEGINS AT REST, waiting on his first prompt (`markTurn`), so a window opened and closed with none is not
+     taken for one that died at work. Not after a compaction, which can come in the middle of a turn. */
+  if (id !== null && event.source !== 'compact') markTurn(io.env, id, 'rest');
   const before = rememberedIn(io.env, event.cwd, id);
   const began = Date.now();
   const soon =
@@ -608,6 +611,10 @@ export async function hookStart(io: Io): Promise<void> {
      is written, and a path that returns early leaves it to the process, which stays open while it is in flight. */
   const owed = before !== null && event.client_id !== undefined && before.client_id === event.client_id ? before : null;
   const marking = owedMark(to, owed, at, io.env, signal);
+  /* AND THE RUNS OF WINDOWS THIS COMPUTER CLOSED AT REST WITH NO END (`lostEnds`), ended beside the attach and waited for
+     with the mark. Only by a session that begins, and never by a subagent, which starts inside a window still open. */
+  const lost = !child && (event.source === 'startup' || event.source === 'resume') ? lostEnds(io.env, to.key, id) : [];
+  const ending = lost.length === 0 ? Promise.resolve() : endLost(io.env, to, lost, at, signal);
   const out = await client.attach({
     source: event.source,
     ...(event.client_id === undefined ? {} : { client_id: event.client_id }),
@@ -734,6 +741,7 @@ export async function hookStart(io: Io): Promise<void> {
         /* The same folder as above: the sign loses one time, and nothing else. */
       }
     await marking;
+    await ending;
     mark('marked');
   }
 }
@@ -1119,3 +1127,93 @@ export async function owedMark(to: Target, held: SessionFile | null, at: Positio
 
 /** What a host with no `end` answers: no such method at all, or a route whose record is older than it. */
 const OLDER_HOST: ReadonlySet<string> = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);
+
+/* ── the ends a closed window lost ─────────────────────────────────────── */
+
+/** The most runs one start ends for windows that closed with no end (`lostEnds`). */
+export const LOST_ENDS_MOST = 3;
+
+/** A session file the start hook wrote for one session, `<folder>-<session>.json`, and none of the folder's or window's. */
+const OWN_FILE = /^[0-9a-f]{12}-[0-9a-f]{12}\.json$/u;
+
+/** Whether a process is running, by its id. One this user may not signal is running too. */
+export function pidAlive(pid: string): boolean {
+  try {
+    process.kill(Number(pid), 0);
+    return true;
+  } catch (e) {
+    return (e as { code?: unknown }).code === 'EPERM';
+  }
+}
+
+/**
+ * THE RUNS THIS COMPUTER'S WINDOWS LEFT OPEN AT REST: a session file of this host, from this week (`TURN_KEEP_MS`), whose
+ * run no end hook said it ended, whose window's process is gone, and whose turn had ended when it went (`turnOf`). The
+ * newest first, one a session, at most `LOST_ENDS_MOST`, and never `own`, the session starting now, which a resume
+ * re-attaches.
+ *
+ * A WINDOW CLOSED AT REST WAS NOT ABANDONED. A window killed rather than closed takes Claude Code, its end hook and its
+ * bridge with it, so no end lands, and twelve hours on the sweep wrote the run off as abandoned: measured, 18 of his 40
+ * runs in the first week of November, on the MacBook and the PC alike, their bridges still pulsing for minutes or hours
+ * after their last call, and some never prompted at all. A run that went at work, its turn still `work`, is left to the
+ * sweep, so abandoned still says a run died at its work, and a session from a command that kept no turn is left as it
+ * always was.
+ */
+export function lostEnds(env: Env, host: string, own: string | null, now: number = Date.now(), alive: (pid: string) => boolean = pidAlive): { file: string; held: SessionFile }[] {
+  const dir = join(dirname(hostsPath(env)), 'sessions');
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  const files = names
+    .filter((n) => OWN_FILE.test(n))
+    .flatMap((n) => {
+      try {
+        const at = statSync(join(dir, n)).mtimeMs;
+        return now - at <= TURN_KEEP_MS ? [{ file: join(dir, n), at }] : [];
+      } catch {
+        return [];
+      }
+    })
+    .sort((a, b) => b.at - a.at);
+  const out: { file: string; held: SessionFile }[] = [];
+  const seen = new Set<string>();
+  for (const { file } of files) {
+    if (out.length >= LOST_ENDS_MOST) break;
+    const held = readSession(file);
+    if (held === null || held.host !== host || held.client_id === undefined || seen.has(held.client_id)) continue;
+    /* THE NEWEST FILE OF A SESSION SAYS WHERE IT STANDS: one resumed in another folder has a file there too. */
+    seen.add(held.client_id);
+    if (held.client_id === own || held.ended !== undefined || held.pid === undefined) continue;
+    if (turnOf(env, held.client_id) !== 'rest' || alive(held.pid)) continue;
+    out.push({ file, held });
+  }
+  return out;
+}
+
+/**
+ * The ends `lostEnds` found, each sent as its own run, by its spoken id and session id, beside the attach and on its
+ * deadline; `ended` is written on each file the host answered for, so none is sent twice. A host that did not answer
+ * leaves the file for the next start. Never throws.
+ */
+export async function endLost(env: Env, to: Target, lost: readonly { file: string; held: SessionFile }[], at: Position, signal: AbortSignal): Promise<void> {
+  await Promise.all(
+    lost.map(async ({ file, held }) => {
+      try {
+        /* WHERE THAT RUN STARTED, not where this one stands, so nothing of this session is said for it. */
+        const where: Position = { cwd: held.cwd ?? at.cwd, repo: held.repo ?? null, remote: held.remote ?? null, host: at.host, branch: null, head: null };
+        const run = { spoken: held.spoken, ...(held.client_id === undefined ? {} : { client_id: held.client_id }) };
+        const ended = await clientFor(to, async () => sessionHeaders(where, 'claude', run, { env }), signal).call('end', {});
+        if (!ended.ok && (signal.aborted || (refused(ended) && ended.refusal.code === 'UNREACHABLE'))) return;
+        const now = readSession(file);
+        if (now !== null && now.spoken === held.spoken && now.at === held.at && now.ended === undefined) writeSession(file, { ...now, ended: new Date().toISOString() });
+        /* A RUN ITS BRIDGE ENDED ALREADY answers `changed: false`, since the bridge says it on no file, and is not logged. */
+        if (ended.ok && isObject(ended.value) && ended.value.changed === true) hookLog(env, `${held.spoken}'s window closed at rest with no end, so a start here ended it.`);
+      } catch {
+        /* The run is left to the sweep, as before. */
+      }
+    }),
+  );
+}

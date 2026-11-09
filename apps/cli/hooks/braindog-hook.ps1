@@ -44,10 +44,16 @@ try {
     if (-not $m.Success) { exit 0 }
     $id = $m.Groups[1].Value -replace '[^A-Za-z0-9_-]', '_'
     $base = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } elseif ($env:APPDATA) { $env:APPDATA } else { Join-Path $env:USERPROFILE '.config' }
+    # THE SESSION'S TURN (inbox-file.ts, turnPath): work from his prompt, rest once a turn ends with no hook holding it
+    # open, so the next start here can tell a window closed at rest from one that died at work. A subagent's stop is
+    # not the session's.
+    $turn = Join-Path $base "braindog\sessions\$id.turn"
+    if ($Which -eq 'prompt') { try { [System.IO.File]::WriteAllText($turn, 'work') } catch { } }
+    $rest = ($Which -eq 'stop') -and ($raw -notmatch '"agent_id"')
     $flags = Join-Path $base "braindog\sessions\$id.inbox.flags"
-    if (-not (Test-Path -LiteralPath $flags)) { exit 0 }
+    if (-not (Test-Path -LiteralPath $flags)) { if ($rest) { try { [System.IO.File]::WriteAllText($turn, 'rest') } catch { } }; exit 0 }
     $words = ([System.IO.File]::ReadAllText($flags)) -split '\s+'
-    if ($words -notcontains $Which) { exit 0 }
+    if ($words -notcontains $Which) { if ($rest) { try { [System.IO.File]::WriteAllText($turn, 'rest') } catch { } }; exit 0 }
     try { $raw | & node (Join-Path $PSScriptRoot '..\src\inbox-file.ts') $Which } catch { }
     exit 0
   }

@@ -81,6 +81,11 @@ export type LintPart = {
   /** The keys of the closed lists the part draws: one printed as itself is a key where its name goes. */
   keys?: readonly string[];
   /**
+   * The texts of the row the part is drawn about, as he wrote them. A name from the code that one of them holds is his,
+   * not the code's: a service he named by its domain, `bluff.golf`, said in the Keys note its page fills with the name.
+   */
+  row?: readonly string[];
+  /**
    * The part is a whole screen read as one (a gate's `#main`), so it holds many parts. The one writer says an amount
    * short among words and exact in a ledger or a progress row (`money.ts`, `read` and `exact`), so "£16 over its
    * budget" in a note above "£16.00 over" on the row is each part written its own way, and `two-spellings` reads only
@@ -543,12 +548,16 @@ const RULES: readonly RuleSpec[] = [
     rule: 'dev-name',
     copy: false,
     says: 'A name from the code, such as a dotted or hyphened identifier, where a sentence should say what it is.',
-    /* In his own words, only a sentence that opens on one: a name from the code in the middle of his note is his to write. */
-    find: (v) =>
-      v.lines
+    /* In his own words, only a sentence that opens on one: a name from the code in the middle of his note is his to write.
+       And never one his row holds (`row`), which the page filled in: "golf" is no site's end the list knows, and
+       measured on 9 November his service bluff.golf read as raw code on its own page. */
+    find: (v) => {
+      const his = (v.part.row ?? []).map((t) => t.toLowerCase());
+      return v.lines
         .filter(SENTENCE)
-        .flatMap((l) => devNames(l, GLYPH_NAMES).filter((d) => !v.part.theirs || l.startsWith(d)))
-        .map((d) => ({ raw: d, label: '' })),
+        .flatMap((l) => devNames(l, GLYPH_NAMES).filter((d) => (!v.part.theirs || l.startsWith(d)) && !his.some((t) => t.includes(d))))
+        .map((d) => ({ raw: d, label: '' }));
+    },
     said: (n) => many(n, 'Prints a name from the code where a sentence should say what it is.', 'Prints # names from the code where sentences should say what they are.'),
   },
   {
