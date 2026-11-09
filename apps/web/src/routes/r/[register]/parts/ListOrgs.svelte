@@ -7,8 +7,8 @@
   group under a quiet heading with its count, so the groups add up to the number at the top.
 
   THE SAME LEDGER AS PEOPLE (`ListPeople.svelte`): rows without boxes, a square mark of the name's initial on one
-  neutral tint (a thing, where a person is a circle), the name, what it is and who is with it, and the last day it was
-  seen. Each row opens its organisation's page.
+  neutral tint (a thing, where a person is a circle), or its logo where it keeps one (People 4.8.0), the name, what it
+  is and who is with it, and the last day it was seen. Each row opens its organisation's page.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -19,6 +19,7 @@
   import { flip } from 'svelte/animate';
   import { dismiss, lineIn, springy } from '$lib/motion/index.ts';
   import Face from '$lib/ui/Face.svelte';
+  import { pictureOfRow } from '$lib/picture/picture.ts';
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
   import { foldOrgs, orgFieldOf, orgNameSaid, orgRoleOf, orgsCounted, meetsOf, seenWords, type OrgGroup } from '../folk.ts';
   import { daySaid } from '../[seq]/said.ts';
@@ -106,7 +107,7 @@
               href={at(`/r/${register}/${item.entry.seq}`)}
               {@attach openCardMenu && ownMenu((p) => openCardMenu(item.entry.seq, document.body, p))}
             >
-              <span class="line-mark"><Face {name} of="project" size="m" /></span>
+              <span class="line-mark"><Face {name} of="project" size="m" picture={pictureOfRow(register, item.entry.fields)} row="{register}#{item.entry.seq}" /></span>
               <span class="line-main">
                 <span class="line-title" dir="auto">{name}</span>
                 {#if detail}<span class="line-detail">{detail}</span>{/if}

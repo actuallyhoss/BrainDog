@@ -38,7 +38,7 @@
 <div class="pw" data-shape-waiting role="status" aria-busy="true">
   <span class="said">{copy.waiting}</span>
   <section class="pw-hero" style={slotStyle(project.hue)}>
-    <span class="pw-well" aria-hidden="true"><ProjectWell mark={project.mark} name={project.name} hue={project.hue} size="xl" /></span>
+    <span class="pw-well" aria-hidden="true"><ProjectWell mark={project.mark} name={project.name} hue={project.hue} size="xl" picture={project.picture ?? null} /></span>
     <div class="pw-name">
       <h1 class="pw-title" dir="auto">{project.name}</h1>
       {#if project.lane}<p class="pw-status">{lane}</p>{:else}<span class="bar status"></span>{/if}

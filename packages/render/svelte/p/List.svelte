@@ -111,6 +111,9 @@
 
   const acts = $derived(act !== undefined && Array.isArray(rowActions) && rowActions.length > 0);
 
+  /* A PAYEE'S LOGO THAT WOULD NOT LOAD gives the line its chip back (`opts.logo`). */
+  let broken = $state<readonly string[]>([]);
+
   /** The queue this list hands its question to, so `choose` can reach it. */
   let queue = $state<{ choose(i: number, key?: string | null): boolean } | undefined>(undefined);
 
@@ -367,9 +370,11 @@
         {@const look = !own && !chip.unfiled && opts.partLook ? opts.partLook(text(inline(row.cells[TIMELINE_UNDER[0]] ?? '', opts))) : null}
         {@const art = (own ?? look?.glyph) ? (void landed, glyphPath((own ?? look?.glyph)!, opts)) : null}
         {@const approx = said && opts.approx ? opts.approx((row.cells[2] ?? '').trim()) : null}
+        {@const logoAt = opts.logo && !chip.between && !chip.unfiled ? opts.logo(row.cells[1] ?? '') : null}
+        {@const logo = logoAt !== null && !broken.includes(logoAt) ? logoAt : null}
         <li class="item" data-menu-host={onmenu ? 'self' : undefined} {@attach onmenu && pointed((p) => onmenu?.(row, document.body, p))} data-rich="" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
-          <span class="item-chip" data-slot={chip.colour ?? look?.slot ?? undefined} data-unfiled={chip.unfiled ? '' : undefined} title={chip.unfiled ? UNFILED_HINT : undefined} aria-hidden="true"
-            >{#if art}<svg
+          <span class="item-chip" data-slot={logo ? undefined : (chip.colour ?? look?.slot ?? undefined)} data-unfiled={chip.unfiled ? '' : undefined} data-logo={logo ? '' : undefined} title={chip.unfiled ? UNFILED_HINT : undefined} aria-hidden="true"
+            >{#if logo}<img class="item-logo" src={logo} alt="" width="32" height="32" loading="lazy" decoding="async" onerror={() => (broken = [...broken, logo])} />{:else if art}<svg
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"

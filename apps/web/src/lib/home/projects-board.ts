@@ -40,6 +40,8 @@ export type BoardProject = {
   name: string;
   mark: string;
   hue: number | null;
+  /** Its picture, its logo, by hash, where it holds one: drawn in place of the mark. */
+  picture?: string | null | undefined;
   lane: string;
   next: string;
   health: string;
@@ -136,6 +138,8 @@ export type BoardRow = {
   name: string;
   mark: string;
   hue: number | null;
+  /** Its picture, its logo, by hash, where it holds one. */
+  picture: string | null;
   href: string;
   lane: string;
   /** Its lane in the record's own word ("Building", a person's "Active"). */
@@ -162,7 +166,7 @@ export type WeekTile = { count: number; said: string; lines: WeekLine[]; more: n
 export type EarnLine = { name: string; hue: number | null; minor: number; said: string; status: string; warn: boolean; left: boolean; href: string };
 /** What the earning projects bring in a month. `count` is every project earning, money linked or not, as the list counts them. */
 export type Earning = { total: string | null; year: string | null; currency: string | null; count: number; lines: EarnLine[]; empty: string | null; also: string | null };
-export type Parked = { name: string; mark: string; hue: number | null; href: string; due: string | null };
+export type Parked = { name: string; mark: string; hue: number | null; href: string; due: string | null; key: string; picture: string | null };
 export type Board = {
   date: string;
   headline: string;
@@ -634,6 +638,7 @@ export function boardOf(input: BoardInput): Board {
     name: f.p.name,
     mark: f.p.mark,
     hue: f.p.hue,
+    picture: f.p.picture ?? null,
     href: f.p.href,
     lane: f.p.lane,
     laneWord: laneSaid(input.laneLabels, f.p.lane),
@@ -730,11 +735,11 @@ export function boardOf(input: BoardInput): Board {
         const r = f.renews[0];
         const t = f.due[0] ?? null;
         const due = r ? `${r.name} renews ${dayChip(r.day).slice(4)}` : f.late.length > 0 ? lateWords(f.lateDays) : t ? `due ${dayChip(t.day)}` : f.asks.length > 0 ? questionsSaid(f.asks.length) : null;
-        return { name: f.p.name, mark: f.p.mark, hue: f.p.hue, href: f.p.href, due };
+        return { name: f.p.name, mark: f.p.mark, hue: f.p.hue, href: f.p.href, due, key: f.p.spoken, picture: f.p.picture ?? null };
       })
       .sort((a, b) => Number(b.due !== null) - Number(a.due !== null) || a.name.localeCompare(b.name)),
     finished: { count: finished.length, names: finished.map((f) => f.p.name).sort() },
-    closed: finished.map((f) => ({ name: f.p.name, mark: f.p.mark, hue: f.p.hue, href: f.p.href, due: null })).sort((a, b) => a.name.localeCompare(b.name)),
+    closed: finished.map((f) => ({ name: f.p.name, mark: f.p.mark, hue: f.p.hue, href: f.p.href, due: null, key: f.p.spoken, picture: f.p.picture ?? null })).sort((a, b) => a.name.localeCompare(b.name)),
     said: { earning: earningSaid, parked: parkedSaid, finished: finishedSaid },
   };
 }

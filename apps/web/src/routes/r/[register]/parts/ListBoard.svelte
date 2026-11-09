@@ -24,6 +24,7 @@
   import { isMoney, type Entry, type RegisterDecl } from '$lib/record/schema.ts';
   import Chip from '$lib/ui/Chip.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import { pictureOfRow } from '$lib/picture/picture.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Money from '$lib/ui/Money.svelte';
   import { ofPeople } from '$lib/ui/RowCards.svelte';
@@ -164,7 +165,7 @@
     <a class="bcard-open" href={at(`/r/${register}/${e.seq}`)} draggable="false">
       <span class="bcard-title" dir="auto">
         {#if fresh.has(e.seq)}<span class="fresh" data-fresh={e.seq} aria-hidden="true"></span>{/if}
-        {#if faced}<span class="bcard-face"><Face name={title ?? ''} kind="person" size="s" /></span>{/if}
+        {#if faced}<span class="bcard-face"><Face name={title ?? ''} kind="person" size="s" picture={pictureOfRow(register, e.fields)} row="{register}#{e.seq}" /></span>{/if}
         <!-- A LOCK ON A ROW ITS MAKER KEPT PRIVATE, as the grid draws one. -->
         {#if e.private}<span class="bcard-lock" title={copy.rowPrivateLock} role="img" aria-label={copy.rowPrivateLock}><Icon name="lock" size="s" /></span>{/if}
         {#if title === null}<span class="bcard-missing">{words.unset}</span>{:else}{title}{/if}

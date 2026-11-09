@@ -143,7 +143,7 @@
 
 <a class="pcard" href={at(card.href)} style={slotStyle(card.hue)} aria-label={named} data-thin={thin ? '' : undefined}>
   <span class="pc-a">
-    <ProjectWell mark={card.mark} name={title} hue={card.hue} />
+    <ProjectWell mark={card.mark} name={title} hue={card.hue} picture={card.picture} row={card.key} />
     <span class="pc-id">
       <span class="pc-name own-dir">{title}</span>
       {#if lane || health}

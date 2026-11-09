@@ -39,6 +39,7 @@
   import { peopleMayBe } from '$lib/ui/ref-pick.ts';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import { pictureOfRow } from '$lib/picture/picture.ts';
   import { ofPeople } from '$lib/ui/RowCards.svelte';
   import StateDot from '$lib/ui/StateDot.svelte';
   import { rowIn, rowOut, settle } from '$lib/ui/motion.ts';
@@ -236,7 +237,7 @@
          by this attribute, so what is scrolled to and what is marked cannot disagree. -->
     {#if fresh.has(seq)}<span class="fresh" data-fresh={seq} aria-hidden="true"></span>{/if}
     <!-- A PERSON IS LED BY THEIR FACE, drawn from the name the title cell prints beside it; `Face` is `aria-hidden`. -->
-    {#if faced}<span class="row-face"><Face name={display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? ''} kind="person" size="s" /></span>{/if}
+    {#if faced}<span class="row-face"><Face name={display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? ''} kind="person" size="s" picture={pictureOfRow(register, rowAt(seq)?.fields ?? {})} row="{register}#{seq}" /></span>{/if}
     <!-- A LOCK ON A ROW ITS MAKER KEPT PRIVATE: only they are reading this, so it says nothing more than it is theirs. -->
     {#if rowAt(seq)?.private}<span class="row-lock" title={copy.rowPrivateLock}><Icon name="lock" size="s" /><span class="row-lock-word">{copy.rowPrivateLock}</span></span>{/if}
   {/snippet}

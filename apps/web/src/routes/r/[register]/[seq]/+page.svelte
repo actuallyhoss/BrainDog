@@ -47,7 +47,8 @@
   import { VERB_ICONS, thingWords } from '$lib/things/verbs.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { currencyFor, dirOf, display, homeCurrency, iconFor, identityOf, labelOf, readableFields, spokenRow, toneOf } from '$lib/record/api.ts';
+  import { currencyFor, dirOf, display, homeCurrency, iconFor, identityOf, labelOf, marked, readableFields, spokenRow, toneOf } from '$lib/record/api.ts';
+  import { pictureFieldOf, pictureOfRow, roundOf, type PictureTarget } from '$lib/picture/picture.ts';
   import { REGISTERS, TITLES } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { rowIn, rowOut } from '$lib/ui/motion.ts';
@@ -1001,7 +1002,16 @@
   /* WHETHER THE ROW IS THE PERSON WHOSE RECORD THIS IS, by the list's own `self` part. */
   const self = $derived(Boolean(meets?.self && row?.fields[meets.self] === true));
   /* A LIST OF PROJECTS, by what it declares: rows with a mark and a hue, or the list that says it scopes the rest. */
-  const isProjects = (list: string): boolean => REGISTERS[list]?.identity !== undefined || (REGISTERS[list] as { scopes?: unknown } | undefined)?.scopes !== undefined;
+  const isProjects = (list: string): boolean => marked(list) || (REGISTERS[list] as { scopes?: unknown } | undefined)?.scopes !== undefined;
+  /* A PERSON'S PHOTO OR AN ORGANISATION'S LOGO, where their list keeps one, and the face changes it where the reader may
+     write them (his word of 4 and 9 November: "same with people"): hovered it shows a camera, and a press opens the
+     changer. */
+  const rowPicture = $derived(row ? pictureOfRow(id, row.fields) : null);
+  const pictureChange = $derived.by((): PictureTarget | null =>
+    row && changes && pictureFieldOf(id) !== null
+      ? { register: id, seq, ...(typeof row.version === 'number' ? { version: row.version } : {}), name: String(row.fields[decl?.title ?? ''] ?? ''), round: roundOf(id), picture: rowPicture }
+      : null,
+  );
   /** The projects a list-of-links field names, by name, each opening its page; one the record has not named is left out. */
   const projectsOf = (field: string | undefined): Named[] => {
     const v = field && row ? row.fields[field] : null;
@@ -1641,9 +1651,12 @@
        Halden…". -->
   <!-- A PERSON'S PAGE WEARS THEIR FACE, as every list draws them: a who is round, and the list's group glyph beside one
        person's name read as a crowd. -->
-  {#snippet personWell()}<Face name={String(row?.fields[decl?.title ?? ''] ?? '')} kind="person" you={self && owner} size="l" />{/snippet}
+  {#snippet personWell()}<Face name={String(row?.fields[decl?.title ?? ''] ?? '')} kind="person" you={self && owner} size="l" picture={rowPicture} row="{id}#{seq}" change={pictureChange} />{/snippet}
+  <!-- AN ORGANISATION'S PAGE WEARS ITS LOGO where its list keeps one (People 4.8.0), the square its list draws it in,
+       with its initials until it has one. -->
+  {#snippet orgWell()}<Face name={orgNameSaid(String(row?.fields[decl?.title ?? ''] ?? ''))} of="project" size="l" picture={rowPicture} row="{id}#{seq}" change={pictureChange} />{/snippet}
   <div class="row-head">
-  <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : (lineHead ?? rowNameSaid(id, String(row.fields[decl.title] ?? '')))} sentence={headLine} well={meets ? personWell : undefined}>
+  <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : (lineHead ?? rowNameSaid(id, String(row.fields[decl.title] ?? '')))} sentence={headLine} well={meets ? personWell : orgRole && pictureFieldOf(id) !== null ? orgWell : undefined}>
     {#snippet actions()}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER. A row's page led with a developer verb: the first control a
            person saw on an invoice was the one that puts `obligations#1` on the clipboard, ahead of anything that does
@@ -1788,7 +1801,7 @@
           {#if self && !lead?.last}
             <!-- THE PERSON WHOSE RECORD THIS IS, MARKED: the list's `self` part, which the facts leave out because it is
                  said here, beside the face their row wears in every list. -->
-            <p class="self-line"><Face name={String(row.fields[decl.title] ?? '')} kind="person" you={owner} size="m" /><span>{personWords.self}</span></p>
+            <p class="self-line"><Face name={String(row.fields[decl.title] ?? '')} kind="person" you={owner} size="m" picture={rowPicture} row="{id}#{seq}" /><span>{personWords.self}</span></p>
           {/if}
           {#if aboutLine}
             <div class="about about-line">

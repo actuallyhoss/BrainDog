@@ -27,6 +27,7 @@ import { REGISTERS } from '$lib/record/held.ts';
 import { localDay } from '../../routes/r/[register]/[seq]/said.ts';
 import { symbolText } from '$lib/record/money.ts';
 import { rowScreen } from '$lib/record/row-href.ts';
+import { pictureOf } from '$lib/picture/picture.ts';
 import { registerHref } from '$lib/record/where.ts';
 import { actor } from '$lib/record/names.ts';
 import { shapeFrom, type ShapeRead, type WorkRow } from './shape-answer.ts';
@@ -218,7 +219,11 @@ export class ShapeHold {
     return { lane, health: h, since, quiet };
   });
   name = $derived(this.read && this.decl ? String(this.read.fields[this.decl.title] ?? '').trim() : '');
-  mark = $derived(this.read && this.decl?.identity ? String(this.read.fields[this.decl.identity.mark] ?? '') : '');
+  mark = $derived(this.read && this.decl?.identity?.mark ? String(this.read.fields[this.decl.identity.mark] ?? '') : '');
+  /** Its picture, its logo, by hash, where it holds one: the hero draws it in place of the mark. */
+  picture = $derived(this.read && this.decl?.identity?.picture ? pictureOf(this.read.fields[this.decl.identity.picture]) : null);
+  /** The version the page read the project at, so a change of its picture is held to it. */
+  version = $derived(this.read?.row.version ?? undefined);
   /** The next step, once, as the hero's last line, a link to the task it names where one does. */
   nextLine = $derived.by(() => {
     const read = this.read;

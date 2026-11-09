@@ -16,7 +16,11 @@
   the most urgent thing, and a quiet one beside it.
 -->
 <script lang="ts">
+  import { page } from '$app/state';
   import { apiBase, at } from '$lib/at.ts';
+  import type { PictureTarget } from '$lib/picture/picture.ts';
+  import { may } from '$lib/record/may.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import { actor } from '$lib/record/names.ts';
   import { midnightOf, type SessionRow } from '$lib/record/today-live.ts';
   import VisualStrip from '../visual/VisualStrip.svelte';
@@ -44,6 +48,13 @@
   import { askAboutHref } from '$lib/query/slash.ts';
 
   let { hold, parts }: { hold: ShapeHold; parts: readonly string[] } = $props();
+
+  /* THE HERO'S MARK CHANGES THE PROJECT'S PICTURE where the reader may write it (his word of 4 November: "change icon of
+     the project by hovering on the profile picture"): hovered it shows a camera, and a press opens the changer. */
+  const changing = $derived.by((): PictureTarget | null => {
+    if (!hold.read || hold.register === '' || hold.seq <= 0 || !may(page.data as unknown as Shell, 'write', hold.register)) return null;
+    return { register: hold.register, seq: hold.seq, ...(typeof hold.version === 'number' ? { version: hold.version } : {}), name: hold.name, round: false, picture: hold.picture, mark: hold.mark, hue: hold.hue };
+  });
 
   /* WHO WROTE THE LINE, on hover: the model, from this project's figures. */
   const WROTE = 'Written by BrainDog from this project’s figures';
@@ -162,7 +173,7 @@
       {@const steps = hold.checklist.filter((c) => !facts.headline.includes(c.text.length > 60 ? c.text.slice(0, 57).trimEnd() : c.text))}
       <section class="hero" aria-label={name} style={slotStyle(hold.hue)} data-quiet={status.quiet || undefined} id="part-overview" data-part="Overview" data-part-icon="eye">
         <div class="h-top">
-          <span class="h-well"><ProjectWell mark={hold.mark} {name} hue={hold.hue} size="l" /></span>
+          <span class="h-well"><ProjectWell mark={hold.mark} {name} hue={hold.hue} size="l" picture={hold.picture} row={hold.key} change={changing} /></span>
           <div class="h-name">
             <!-- THE PROJECT'S NAME IS THE PAGE'S HEADING, and the sentence under it a paragraph (Q60 of 29 October). HEARD, NOT
                  SEEN (3 Nov): the bar over the page already says the name at its largest, and the hero said it again under

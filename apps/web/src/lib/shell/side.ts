@@ -14,6 +14,8 @@ export type SideProject = {
   href: string;
   mark: string;
   hue: number | null;
+  /** Its picture, its logo, by hash, where it holds one: drawn in place of the mark. */
+  picture?: string | null | undefined;
   lane: string;
   /** Its next step as the row says it, where it says one: what the phone's row says under its name beside the lane. */
   next?: string | undefined;

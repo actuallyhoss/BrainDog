@@ -11,7 +11,7 @@
  */
 
 /** A project as its page's shape is drawn before the page answers. */
-export type KnownProject = { name: string; mark: string; hue: number | null; lane: string; list?: string };
+export type KnownProject = { name: string; mark: string; hue: number | null; lane: string; list?: string; picture?: string | null | undefined };
 
 /** A project as a list of them names it: the address its page opens on, and its row in its list. */
 export type ProjectSeen = Omit<KnownProject, 'list'> & { href: string; key: string };
@@ -26,7 +26,7 @@ export function knowProjects(base: string, seen: readonly ProjectSeen[], place?:
     if (p.name.trim() === '') continue;
     /* ITS LIST TOO, by its row (`things#3`), so the page while it opens says the lane in that list's words. */
     const list = p.key.includes('#') ? p.key.slice(0, p.key.indexOf('#')) : '';
-    const one: KnownProject = { name: p.name, mark: p.mark, hue: p.hue, lane: p.lane, ...(list === '' ? {} : { list }) };
+    const one: KnownProject = { name: p.name, mark: p.mark, hue: p.hue, lane: p.lane, ...(list === '' ? {} : { list }), ...(p.picture ? { picture: p.picture } : {}) };
     byHref.set(`${base} ${p.href}`, one);
     byKey.set(`${base} ${p.key}`, one);
   }

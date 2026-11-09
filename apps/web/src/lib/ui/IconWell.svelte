@@ -15,9 +15,17 @@
   `--good`; `warn` is `--warn-tint` with `--warn`. `ink` is the chosen form, an ink well with the icon in the tile's
   colour. A tile's heading never passes a tone (`Tile` drops it).
 
+  A PICTURE, WHERE THE ROW HOLDS ONE (`picture`, a hash): a project's logo fills the well in the well's own shape, over
+  its slot's tint while it loads, so nothing moves when it arrives; a picture that will not load gives the glyph or the
+  letter back. `change`, handed only by a screen whose reader may write the row, makes the well the picture changer's
+  button (`PictureChange.svelte`, loaded the first time one is handed): hovered it shows a camera, and a press or a
+  double press opens the changer.
+
   Decorative: the words beside a well say what it means, so the well is hidden from assistive tech.
 -->
 <script lang="ts">
+  import { changer } from '$lib/picture/changer.svelte.ts';
+  import { pictureSrc, type PictureTarget } from '$lib/picture/picture.ts';
   import type { Slot } from './face.ts';
   import Icon from './Icon.svelte';
   import type { IconName } from './icons.ts';
@@ -28,6 +36,8 @@
     size = 'm',
     tone,
     slot,
+    picture,
+    change,
   }: {
     /** The glyph; when there is none, `letter` is drawn instead. */
     name?: IconName | undefined;
@@ -37,16 +47,32 @@
     tone?: 'ink' | 'action' | 'danger' | 'late' | 'earn' | 'good' | 'live' | 'warn' | undefined;
     /** A project's category slot, or `here` for the project whose page this is. */
     slot?: Slot | 'here' | undefined;
+    /** The row's picture, by hash, drawn in place of the glyph or the letter. */
+    picture?: string | null | undefined;
+    /** The row the well may change the picture of, handed only where the reader may write it. */
+    change?: PictureTarget | null | undefined;
   } = $props();
 
   /* The old tone names say the same three meanings. */
   const MEANS = { action: 'late', danger: 'late', late: 'late', earn: 'good', good: 'good', live: 'good', warn: 'warn', ink: 'ink' } as const;
   const means = $derived(tone ? MEANS[tone] : undefined);
+
+  /* THE PICTURE THAT WOULD NOT LOAD, so the well draws its glyph again rather than a broken image. */
+  let failed = $state<string | null>(null);
+  const shown = $derived(picture && picture !== failed ? picture : null);
+  /* THE SIZE IT IS DRAWN AT, for the image's own width and height, so the browser lays it before it arrives. */
+  const PX = { m: 28, l: 32, card: 40, xl: 56 } as const;
+  /* A WELL THAT MAY BE CHANGED LOADS THE HOVER, once for every well (`changer.svelte.ts`). */
+  $effect(() => {
+    if (change) changer.want();
+  });
 </script>
 
-<span class="well" data-size={size} data-tone={tone} data-means={means} data-slot={slot} aria-hidden="true"
-  >{#if name}<Icon {name} size="l" />{:else if letter}<span class="well-letter">{letter}</span>{/if}</span
->
+{#snippet well()}<span class="well" data-size={size} data-tone={tone} data-means={means} data-slot={slot} data-picture={shown ? '' : undefined} aria-hidden="true"
+    >{#if shown}<img class="well-picture" src={pictureSrc(shown)} alt="" width={PX[size]} height={PX[size]} loading="lazy" decoding="async" onerror={() => (failed = shown)} />{:else if name}<Icon {name} size="l" />{:else if letter}<span class="well-letter">{letter}</span>{/if}</span
+  >{/snippet}
+
+{#if change && changer.component}{@const Changer = changer.component}<Changer target={change} big={size === 'xl'}>{@render well()}</Changer>{:else}{@render well()}{/if}
 
 <style>
   .well {
@@ -191,6 +217,17 @@
 
   .well-letter {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* A PICTURE FILLS THE WELL in its own shape, over the slot's tint while it loads. */
+  .well[data-picture] {
+    overflow: hidden;
+  }
+
+  .well-picture {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
   }
 
   /* Forced colours drop the fill, so the chosen well keeps an edge to be told from the rest by. */

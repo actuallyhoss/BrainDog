@@ -73,6 +73,7 @@ import { scriptOf } from './scripts.ts';
 import { noteWithoutLeftovers } from './brief.ts';
 import { learnZone, recordToday } from './zone.ts';
 import { pathOf } from '../ui/icons.ts';
+import { pictureOf, pictureSrc } from '../picture/picture.ts';
 import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
 
@@ -453,8 +454,11 @@ export type LiveBlock = BlockResult & {
   synthetic?: true;
 };
 
-/** The mark and hue of the project a row applies to, as the kernel answers them beside `scopes` (`scope_marks`). */
-export type ScopeMark = { mark: string | null; hue: number | null };
+/**
+ * The mark and hue of the project a row applies to, as the kernel answers them beside `scopes` (`scope_marks`), and the
+ * address of its picture, its logo, where it holds one, which the chip draws in place of the mark.
+ */
+export type ScopeMark = { mark: string | null; hue: number | null; picture?: string | null };
 
 /**
  * WHAT A SCOPE CELL DRAWS ITS CHIP FROM, handed to the renderer beside the block.
@@ -491,10 +495,12 @@ const EVERYWHERE = 'Everywhere';
  */
 const scopeMarkOf = (v: unknown): ScopeMark | null => {
   if (!isObject(v)) return null;
-  const { mark, hue } = v;
+  const { mark, hue, picture } = v;
+  const sha = pictureOf(picture);
   return {
     mark: typeof mark === 'string' && mark.trim() !== '' ? mark : null,
     hue: typeof hue === 'number' && Number.isInteger(hue) && hue >= 0 && hue <= 359 ? hue : null,
+    ...(sha === null ? {} : { picture: pictureSrc(sha) }),
   };
 };
 

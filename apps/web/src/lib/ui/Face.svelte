@@ -13,8 +13,14 @@
   A PERSON IS THEIR SLOT: their hue picks one of the eight category slots, the disc
   is its tint and the letter its colour.
 
-  AN INITIAL, NOT A PHOTO. `20 §6` refuses avatar stacks on a business record, and a letter in a
-  disc is a face without inventing one. It is `aria-hidden` because the name always sits beside it.
+  THEIR PHOTO WHERE THEY HAVE ONE, ELSE AN INITIAL (his word of 4 and 9 November, which this once refused: "AN INITIAL,
+  NOT A PHOTO"). A person whose row holds a picture is drawn by it, in the disc, over their slot's tint while it loads:
+  handed as `picture` where the caller holds the row, else found by their name (`faceOf`, learnt from every people row
+  this tab reads). A letter in a disc is still the face of everybody with no photo, and a face is never invented. A
+  project or a record handed a `picture` draws it in its square. It is `aria-hidden` because the name always sits beside
+  it. `change`, handed only where the reader may write the person, makes the face the picture changer's button: hovered
+  it shows a camera, and a press or a double press opens the changer (`PictureChange.svelte`, loaded the first time
+  one is handed).
 
   THREE SIZES: `s` is 20px, for an entry that
   is one line and not two (a row, a row's history), where a larger disc would set the line's
@@ -25,6 +31,9 @@
   actor at all, and BrainDog, the record itself, wears the square too.
 -->
 <script lang="ts">
+  import { changer } from '$lib/picture/changer.svelte.ts';
+  import { pictureSrc, type PictureTarget } from '$lib/picture/picture.ts';
+  import { faceOf, pictureNow, wantFaces } from '$lib/picture/pictures.svelte.ts';
   import type { ActorKind } from '../record/names.ts';
   import { faceKindOf, hueFor, initialOf, initialsOf, slotOf, type RunLive } from './face.ts';
   import AgentFace from './AgentFace.svelte';
@@ -40,6 +49,9 @@
     run = null,
     live = 'stopped',
     of,
+    picture,
+    row,
+    change,
   }: {
     name: string;
     you?: boolean | undefined;
@@ -54,6 +66,12 @@
     live?: RunLive | undefined;
     /** A project or a record, which is a thing and not an actor: its rounded square with its initials, in its hue. */
     of?: 'project' | 'record' | undefined;
+    /** Their picture, by hash, where the caller holds their row; absent, a person's is found by their name. */
+    picture?: string | null | undefined;
+    /** Their row as every screen names it (`people#4`), so a picture this tab just wrote is drawn at once. */
+    row?: string | null | undefined;
+    /** The person, handed where the reader may write them: the face changes their picture. */
+    change?: PictureTarget | null | undefined;
   } = $props();
 
   const drawn = $derived<ActorKind | 'project' | 'record'>(of ?? (you ? 'you' : (kind ?? faceKindOf(name))));
@@ -63,6 +81,27 @@
   const slot = $derived(slotOf(hue ?? hueFor(name)));
   /* THE MARK A LITTLE UNDER HALF THE DISC, in the height `Mark` takes, so its width (which follows the artwork) stays inside it. */
   const markHeight = $derived(size === 's' ? 8 : size === 'l' ? 14 : 10);
+
+  /* A PERSON'S PHOTO: the one handed, what this tab just wrote to their row, else the one their name is known by. */
+  const someone = $derived(drawn === 'person' || drawn === 'you');
+  const held = $derived(picture === undefined ? null : picture);
+  const photo = $derived.by(() => {
+    const own = row ? pictureNow(row, held) : held;
+    if (own !== null || picture !== undefined || !someone) return own;
+    return faceOf(name);
+  });
+  /* THE FIRST FACE DRAWN ASKS FOR EVERYBODY'S, once, and only on a record whose people keep photos (`wantFaces`). */
+  $effect(() => {
+    if (someone && picture === undefined) wantFaces();
+  });
+  /* A FACE THAT MAY BE CHANGED LOADS THE HOVER, once for every face (`changer.svelte.ts`). */
+  $effect(() => {
+    if (change) changer.want();
+  });
+  /* A PHOTO THAT WOULD NOT LOAD gives the letter back rather than a broken image. */
+  let failed = $state<string | null>(null);
+  const shown = $derived(photo !== null && photo !== failed && drawn !== 'automation' && drawn !== 'rule' && drawn !== 'slash' && drawn !== 'system' && drawn !== 'sample' ? photo : null);
+  const PX = { s: 20, m: 24, l: 32 } as const;
 </script>
 
 <!-- AN AUTOMATION AND A RULE ARE NOT PEOPLE, SO THEY DO NOT WEAR AN INITIAL: they take the glyph the
@@ -70,14 +109,16 @@
      slash, and BrainDog the product's mark in ink, never in the brand's red, which a face repeated
      down a log would spend. AN AGENT IS `AgentFace`: its maker's mark, or its kind's glyph in its run's hue, where the caller
      names the run, at the size a line of text takes and the list size for a page's own. -->
+{#snippet face()}<span class="face" data-kind={drawn} data-size={size} data-shape={square ? 'square' : 'circle'} data-slot={slot} data-picture={shown ? '' : undefined} aria-hidden="true"
+    >{#if shown}<img class="face-picture" src={pictureSrc(shown)} alt="" width={PX[size]} height={PX[size]} loading="lazy" decoding="async" onerror={() => (failed = shown)} />{:else if drawn === 'automation' || drawn === 'rule'}<Icon name="refresh" size={size === 's' ? 's' : 'm'} />{:else if drawn === 'slash'}<svg
+        class="face-slash"
+        viewBox="0 0 24 24"><path d="M15.5 4.5 8.5 19.5" /></svg
+      >{:else if drawn === 'system' || drawn === 'sample'}<Mark height={markHeight} tone="inherit" />{:else if drawn === 'project' || drawn === 'record'}{initialsOf(name)}{:else}{initialOf(name)}{/if}</span
+  >{/snippet}
+
 {#if drawn === 'agent'}
   <AgentFace agent={name} run={run ?? ''} {live} size={size === 'l' ? 'm' : 'xs'} />
-{:else}<span class="face" data-kind={drawn} data-size={size} data-shape={square ? 'square' : 'circle'} data-slot={slot} aria-hidden="true"
-  >{#if drawn === 'automation' || drawn === 'rule'}<Icon name="refresh" size={size === 's' ? 's' : 'm'} />{:else if drawn === 'slash'}<svg
-      class="face-slash"
-      viewBox="0 0 24 24"><path d="M15.5 4.5 8.5 19.5" /></svg
-    >{:else if drawn === 'system' || drawn === 'sample'}<Mark height={markHeight} tone="inherit" />{:else if drawn === 'project' || drawn === 'record'}{initialsOf(name)}{:else}{initialOf(name)}{/if}</span
-  >{/if}
+{:else if change && changer.component}{@const Changer = changer.component}<Changer target={change}>{@render face()}</Changer>{:else}{@render face()}{/if}
 
 <style>
   .face {
@@ -177,6 +218,27 @@
   .face[data-kind='system'],
   .face[data-kind='sample'] {
     color: var(--ink);
+  }
+
+  /* A PHOTO FILLS THE DISC, over the slot's tint while it loads, and its ring stays on top of it. */
+  .face[data-picture] {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .face[data-picture]::after {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px var(--sep);
+    content: '';
+    pointer-events: none;
+  }
+
+  .face-picture {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
   }
 
   .face-slash {

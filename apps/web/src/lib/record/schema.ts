@@ -189,8 +189,11 @@ export type RegisterDecl = {
   /** Its rows are steps of the row a `ref` field points at, done when a `bool` field is true (the kernel's `steps.ts`). */
   steps?: { of: string; done: string };
   fields: readonly FieldDecl[];
-  /** Rows of this register HAVE an identity: a mark and a frozen accent hue (13 §2.1b). */
-  identity?: { mark: string; accent: string };
+  /**
+   * Rows of this register HAVE an identity: a mark and a frozen accent hue (13 §2.1b), and the file field a row's picture
+   * is kept in, its logo or its photo (`ui/picture.ts`). People declare a picture and no mark, so either may be absent.
+   */
+  identity?: { mark?: string; accent?: string; picture?: string };
   /** The rail glyph. Falls back to `rows`, which is what a register is. */
   icon?: IconRef;
   /** The pack that owns it, or absent for a register the person made. */

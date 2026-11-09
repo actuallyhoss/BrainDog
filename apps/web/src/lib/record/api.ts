@@ -28,6 +28,7 @@ import type { BlockResult as Answer } from '@braindog/kernel';
 
 import { amountOf, currencyOf } from './money.ts';
 import { isGlyph, type IconName } from '../ui/icons.ts';
+import { pictureOfRow } from '../picture/picture.ts';
 import type { RunPresence } from '../ui/presence-words.ts';
 import { copy } from '../copy.ts';
 /* No cycle: `voice.ts` reads the copy and two word lists, never this file. */
@@ -210,9 +211,9 @@ export const dirOf = (register: string, field: string): 'auto' | undefined =>
 /**
  * The fields a PERSON sees, which is not the same list as the fields a register declares.
  *
- * Two kinds come out. A `secret` is never rendered anywhere, which was already true. And the two
- * fields named by `identity` are the row's MARK and its frozen accent hue: machinery that exists so
- * a thing can be recognised at a glance, chosen once at create and never hand-picked (13 §2.1b).
+ * Two kinds come out. A `secret` is never rendered anywhere, which was already true. And the
+ * fields named by `identity` are the row's MARK, its frozen accent hue and its PICTURE: machinery that exists so
+ * a thing can be recognised at a glance (13 §2.1b), changed where the row is drawn and not in a form.
  *
  * They were being listed like any other field, so creating a project asked for "Mark" and "Hue" in
  * two text boxes, and the row page printed them as values. `labelOf` is what made it look
@@ -224,7 +225,7 @@ export const dirOf = (register: string, field: string): 'auto' | undefined =>
 export function readableFields(register: string): FieldDecl[] {
   const reg = REGISTERS[register];
   if (!reg) return [];
-  const internal = new Set([reg.identity?.mark, reg.identity?.accent].filter(Boolean));
+  const internal = new Set([reg.identity?.mark, reg.identity?.accent, reg.identity?.picture].filter(Boolean));
   return reg.fields.filter((f) => f.type !== 'secret' && !internal.has(f.id));
 }
 
@@ -563,7 +564,7 @@ export function display(
       if (register === 'session' && field === 'project') return spokenRow(value, names)?.label ?? String(value);
       /* A PROJECT TYPED AS A SLUG IS NAMED AS THE SIDEBAR NAMES IT (Q31 of 29 October): "mara-site" in the list,
          "Mara site" in the rail. Only the title of a list whose rows carry a mark, so a project or an organisation. */
-      if (REGISTERS[register]?.identity && REGISTERS[register]?.title === field) return shownName(String(value));
+      if (marked(register) && REGISTERS[register]?.title === field) return shownName(String(value));
       return String(value);
   }
 }
@@ -573,13 +574,20 @@ function refName(f: FieldDecl, register: string, value: unknown, names?: Names):
   if (names) {
     /* AND WHAT THIS TAB HAS LEARNT SINCE THE SCREEN READ ITS NAMES: a client made from a person a moment ago. */
     const known = names.get(`${f.to}#${value}`) ?? (f.to ? TITLES.get(f.to)?.get(Number(value)) || undefined : undefined);
-    return known ? (f.to && REGISTERS[f.to]?.identity ? shownName(known) : known) : unnamed(f.to ?? register, String(value), f.label);
+    return known ? (f.to && marked(f.to) ? shownName(known) : known) : unnamed(f.to ?? register, String(value), f.label);
   }
   /* AND WITHOUT `names`, THE NAMES THIS TAB HAS LEARNT (`held.ts` `TITLES`). This read the sample's rows, so a
      caller that handed none drew the sample's name for whatever number the record's ref held. */
   const said = f.to ? TITLES.get(f.to)?.get(Number(value)) : undefined;
-  return said === undefined || said === '' ? unnamed(f.to ?? register, String(value), f.label) : f.to && REGISTERS[f.to]?.identity ? shownName(said) : said;
+  return said === undefined || said === '' ? unnamed(f.to ?? register, String(value), f.label) : f.to && marked(f.to) ? shownName(said) : said;
 }
+
+/**
+ * Whether a list's rows wear a MARK: its `identity` names one. People declare an identity for their picture alone
+ * (`ui/picture.ts`), and a person is drawn as a face, so every question about a mark asks this and not whether the list
+ * declares an identity at all.
+ */
+export const marked = (register: string): boolean => typeof REGISTERS[register]?.identity?.mark === 'string' && REGISTERS[register]!.identity!.mark !== '';
 
 /**
  * The identity of the row a `ref` points at, when its register declares one.
@@ -592,19 +600,28 @@ function refName(f: FieldDecl, register: string, value: unknown, names?: Names):
  * It is never the only signal either: the name always sits beside it. Past four marks the name is
  * what carries identity anyway, which is why there is no fifth colour to find.
  */
-export type Identity = { mark: string; hue: number; name: string; retired: boolean };
+export type Identity = {
+  mark: string;
+  hue: number;
+  name: string;
+  retired: boolean;
+  /** The hash of its picture, its logo, where the list names one and the row holds it (`ui/picture.ts`): drawn in place of the mark. */
+  picture?: string | null;
+};
 
-/** One row's identity, from its own fields, when its register declares one. The sample's rows and a record's are read alike. */
+/** One row's identity, from its own fields, when its register declares a mark. The sample's rows and a record's are read alike. */
 export function identityOfRow(register: string, fields: Readonly<Record<string, unknown>>): Identity | null {
   const target = REGISTERS[register];
-  if (!target?.identity) return null;
+  const said = target?.identity;
+  if (!target || !said?.mark) return null;
   const lane = target.state ? String(fields[target.state] ?? '') : '';
   return {
-    mark: String(fields[target.identity.mark] ?? '●'),
-    hue: Number(fields[target.identity.accent] ?? 0),
+    mark: String(fields[said.mark] ?? '●'),
+    hue: Number((said.accent ? fields[said.accent] : undefined) ?? 0),
     name: String(fields[target.title] ?? ''),
     // A retired row is achromatic. It still has a mark; it no longer has a claim on a hue.
     retired: lane === 'retired' || lane === 'parked',
+    picture: pictureOfRow(register, fields),
   };
 }
 
@@ -615,7 +632,7 @@ export function identityOfRow(register: string, fields: Readonly<Record<string, 
 export function identityOf(register: string, field: string, value: unknown, names?: Names): Identity | null {
   const f = decl(register, field);
   if (!f || f.type !== 'ref' || !f.to) return null;
-  if (!REGISTERS[f.to]?.identity) return null;
+  if (!marked(f.to)) return null;
   if (names) return names.marks?.get(`${f.to}#${value}`) ?? null;
   const row = (ROWS[f.to] ?? []).find((e) => e.seq === Number(value));
   return row ? identityOfRow(f.to, row.fields) : null;
@@ -834,7 +851,7 @@ export function columnsFor(register: string, declared?: RegisterDecl, number = f
    * the project's name beside a small dot of its colour, where it can be read, sorted and hidden like any other. The
    * field is the one `identityFor` walks to: the first link to a list that declares an identity.
    */
-  const subject = r.fields.find((f) => f.type === 'ref' && f.to !== undefined && REGISTERS[f.to]?.identity !== undefined);
+  const subject = r.fields.find((f) => f.type === 'ref' && f.to !== undefined && marked(f.to));
   if (subject) wanted.add(subject.id);
 
   const cols: Column[] = [];
