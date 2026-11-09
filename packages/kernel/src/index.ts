@@ -243,7 +243,7 @@ import { capability } from './capabilities.ts';
 import { carryPins } from './pairs.ts';
 import { linkPatternFault, pruneFirings } from './rules.ts';
 import { REST_DAYS_SETTING, runway, type Horizon, type Leg, type Runway } from './forecast.ts';
-import { WALK_SOURCE } from './money-figures.ts';
+import { WALK_SOURCE, figureLists } from './money-figures.ts';
 import { referencedBy, unlinksOf } from './referenced.ts';
 import { createJob, sweepJobs } from './jobs.ts';
 import { mailPatterns, openRowset, unfile } from './ingest.ts';
@@ -8471,6 +8471,20 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND THE READ'S CLOCK, ZONE AND RATES BUILT ONCE (each figure read built them again: the record's row and the home
        currency, a query apiece). */
     const here = { ...evalContext([], viewer), walks };
+    /* A FIGURE'S KEPT LINE IS THE WHOLE RECORD'S: `snapshot` reads with nobody looking, so every night's point counts the
+       rows somebody kept private, and a member was drawn a whole-record total in a sparkline, a forecast's past and a
+       `{{figure.change}}` beside a tile that leaves them out. A reader with a row kept from her on a list the figure reads
+       (`figureLists`) is drawn no line of it at all. A figure over the whole record (`*`) is the owner's bookkeeping,
+       read with no private-row clause live too, so its line is drawn as before. */
+    const lineHidden = (series: string): boolean => {
+      if (viewer === undefined || !anyHiddenFrom(viewer)) return false;
+      const declOf = (id: string): MetricDecl | null => {
+        const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
+        return row ? (JSON.parse(row.body) as MetricDecl) : builtInFigure(id);
+      };
+      const decl = declOf(series.split(':')[0] ?? '');
+      return decl === null || figureLists(decl, declOf).some((list) => list !== '*' && anyHiddenFrom(viewer, list));
+    };
     return {
     pages: () =>
       sql
@@ -8631,12 +8645,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         return ok({ readings, latest });
       }),
     points: (series, from, to) =>
-      sql.all<{ at: string; value: number; unit: string | null }>(
-        "SELECT at, value, unit FROM metric_point WHERE series = ? AND grain = 'day' AND at >= ? AND at <= ? ORDER BY at",
-        series,
-        from,
-        to,
-      ),
+      lineHidden(series)
+        ? []
+        : sql.all<{ at: string; value: number; unit: string | null }>(
+            "SELECT at, value, unit FROM metric_point WHERE series = ? AND grain = 'day' AND at >= ? AND at <= ? ORDER BY at",
+            series,
+            from,
+            to,
+          ),
     scopeOf: (register) => {
       const f = scopeFieldOf(registers.get(register)?.fields ?? []);
       return f && 'to' in f && typeof f.to === 'string' ? { field: f.id, to: f.to } : null;
