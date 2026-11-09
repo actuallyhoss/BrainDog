@@ -497,7 +497,7 @@
      `things/rename.ts`). Only for a reader who may change the row, as the pencils are. */
   $effect(() => {
     if (!row || !live || !changes || archived) return;
-    const verbs: Record<string, () => void> = { rename: editTitle };
+    const verbs: Record<string, () => void> = { rename: editTitle, ...(decl ? { [`edit:${decl.title}`]: editTitle } : {}) };
     for (const f of readable) if (editable(f, id)) verbs[`edit:${f.id}`] = () => startEdit(f);
     return answerVerbs(verbs);
   });

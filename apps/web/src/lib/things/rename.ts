@@ -13,7 +13,8 @@ import { page } from '$app/state';
 import { apiBase } from '../at.ts';
 import { REGISTERS } from '../record/held.ts';
 import { may } from '../record/may.ts';
-import { saidRowPages } from '../record/row-href.ts';
+import { opensOnPage } from '../record/project.ts';
+import { ownPage, rowScreen, saidRowPages } from '../record/row-href.ts';
 import { rowReader } from '../record/row-live.ts';
 import { rowWriter, type RowWriter } from '../record/rows-write.ts';
 import type { Shell } from '../record/boot-live.ts';
@@ -57,9 +58,16 @@ export function renamable(address: string): boolean {
 /**
  * Rename the thing an address stands for, on its own page: the page its link opened, or opens now. `field` asks a row's
  * page for that value's box in place of its title (a cell of a list's table).
+ * A ROW WITH A PAGE OF ITS OWN (an account, a bill) is renamed on that page, where its address lands, and a value of it
+ * is changed on the row's screen, where its fields are written (`rowScreen`): asked of `/r/…` it went on to the page,
+ * and the page it named never answered.
  */
 export function renameAt(address: string, field?: string): void {
-  askPage(address, field ? `edit:${field}` : 'rename');
+  const t = thingOf(address);
+  if (t.kind !== 'row') return askPage(address, field ? `edit:${field}` : 'rename');
+  const own = opensOnPage(REGISTERS[t.list]) ? ownPage(t.list, t.seq, new URLSearchParams()) : null;
+  if (field) askPage(own ? rowScreen(t.list, t.seq) : address, `edit:${field}`);
+  else askPage(own ?? address, 'rename');
 }
 
 /**
