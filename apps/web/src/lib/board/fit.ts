@@ -90,6 +90,10 @@ export function fitBoard(board: HTMLElement): Animation[] {
   const moving: Animation[] = [];
   for (const frame of frames) {
     for (const a of frame.getAnimations()) if (a.playState !== 'finished') moving.push(a);
+    /* AND A ROW STILL OPENING OR CLOSING IN IT (the record growing, `rowsMotion`): it is measured at its part height
+       now, and fitted again where it lands. Only what ends: a live dot that never does would hold the fit back. */
+    for (const a of frame.getAnimations({ subtree: true }))
+      if ((a.effect as KeyframeEffect | null)?.target !== frame && a.playState !== 'finished' && /^(?:glide|room|leave)$/u.test(a.id)) moving.push(a);
     const box = frame.getBoundingClientRect();
     const frameCss = getComputedStyle(frame);
     const pad = parseFloat(frameCss.paddingBlockEnd) || 0;
@@ -102,6 +106,8 @@ export function fitBoard(board: HTMLElement): Animation[] {
     /* THE OUTERMOST ROWS ONLY: a card's own list is the card's, and goes with it. */
     const rows = [...frame.querySelectorAll<HTMLElement>(ROWS)].filter((row) => {
       if (row.closest(FOOT)) return false;
+      /* A ROW LETTING GO (`rowsMotion`) is already gone from the list, and takes no room the fit counts. */
+      if (row.closest('[data-leaving]')) return false;
       const chart = row.closest<HTMLElement>(CHART);
       if (chart && frame.contains(chart)) return false;
       const outer = row.parentElement?.closest<HTMLElement>(ROWS);
