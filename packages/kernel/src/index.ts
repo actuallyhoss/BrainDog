@@ -4641,8 +4641,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * record) and an arrival filed or read (`inbox_raw`). Each moved every list, so every figure, walk and fact held over
    * the ledger was read again after a script read its key: a book's page went from 0.2 s to 1.8 s of the record's time.
    * A row such a write changes still moves its own list, by its line or by what its rows add up to (`listsStamp`).
+   * NOR AN ANSWER (`decision`): every question answered on the phone wrote one, and Money's page was read again whole
+   * after each, 0.9 s of the record's time on a ledger of 20,000 rows. What an answer changes is written with lines of
+   * its own: a row by its line, a declaration or an add-on by `whole`, the record's settings by a line about the record.
    */
-  const QUIET_TARGETS: ReadonlySet<string> = new Set(['suggestion', 'grant', 'inbox_raw']);
+  const QUIET_TARGETS: ReadonlySet<string> = new Set(['suggestion', 'grant', 'inbox_raw', 'decision']);
   type ListsSeen = { head: string; whole: string; top: number; id: string; base: number; other: number; tops: Map<string, number> };
   let listsSeen: ListsSeen | null = null;
   const listsNow = (): ListsSeen => {
