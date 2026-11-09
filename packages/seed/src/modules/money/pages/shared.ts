@@ -95,3 +95,33 @@ export const DUE_30D = `${OPEN}, due after yesterday, due before +31d`;
  * in reads `+`, from the Ledger's own Which way. `test/money-moved-way.test.ts` holds it on Money and on a book.
  */
 export const MOVED_COLUMNS = [{ field: 'on' }, { field: 'what' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }];
+
+/**
+ * WHAT IS HELD BEYOND CASH, AND THE NET WORTH THAT COUNTS IT, WHERE A BALANCE IS READ, SINCE money-core 3.41.0 (9 Nov, the
+ * owner: "can you make sure that my investments and stuff also show within my balances and stuff idk"). The gold, the
+ * funds, the certificates and the policies an add-on keeps were in net worth (`figures/worth.ts`) and on no page a
+ * balance is read on: Money opens on a book's page once there are two books, and net worth was drawn only on Money's
+ * home. So the Accounts page and each book's page draw these two cells, one array, in the same words.
+ *
+ * MONEY'S OWN TWO FIGURES AND NO ADD-ON'S: what is held is read through `held-beyond-cash`, which counts each add-on's part
+ * where the add-on is and nothing where it is not, so no cell names a figure nobody declared. DRAWN ONLY WHILE SOMETHING
+ * IS HELD BEYOND CASH (`HOLDS_BEYOND_CASH`), so a record that keeps only accounts reads no tile of noughts. No word here
+ * says who owes whom, as on every Money page (`money.ts`).
+ */
+export const HOLDS_BEYOND_CASH: Readonly<Record<string, unknown>> = { metric: 'held-beyond-cash', gt: 0 };
+export const BEYOND_CASH_CELLS: readonly Readonly<Record<string, unknown>>[] = [
+  { metric: 'held-beyond-cash', label: 'Held beyond cash', note: 'Gold, funds and policies, at what they are worth now' },
+  { metric: 'net-worth', label: 'Net worth', note: 'What you have, less what you have to pay' },
+];
+
+/**
+ * AND THE WAY TO EACH HOLDING, said only where the Holdings add-on holds one: its own count in a `when:`, which never holds
+ * on a record without it, as a plan's page says its line to Property (`plan.ts`). No figure of Holdings' is drawn here;
+ * what each holding cost and is worth is its page's, Investments and gold.
+ */
+export const TO_HOLDINGS: Readonly<Record<string, unknown>> = {
+  kind: 'note',
+  span: 12,
+  when: { all: [HOLDS_BEYOND_CASH, { metric: 'holdings-count', gt: 0 }] },
+  body: 'Each holding, with what it cost and what it is worth now, is on [Investments and gold](/p/holdings).',
+};

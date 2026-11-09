@@ -1046,12 +1046,19 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   the latest day among each plan's open parts, declared last, and Instalments (`page.money-forecast`, `page.money`) reads
  *   it as a sixth cell, so each plan's track says the day it ends beside its next part. One id added and nothing taken
  *   away, so a minor step that goes in quietly and keeps every row.
+ * - money-core 3.41.0 (9 Nov, the owner: "can you make sure that my investments and stuff also show within my balances and
+ *   stuff idk"): what is held beyond cash and the net worth that counts it (`metric.held-beyond-cash`, `metric.net-worth`)
+ *   were drawn only on Money's home, which a record of two books never opens, so the gold, funds, certificates and
+ *   policies an add-on keeps were on no page a balance is read on. `page.money-accounts` draws them under the accounts,
+ *   with the way to Investments and gold where Holdings holds something, and `page.money-book` under the book's
+ *   accounts, headed as every book's. Each only while something is held beyond cash. Money's own figures, no id added or
+ *   taken away, and a minor step, as 3.39.0's new order of a book's page was, that goes in quietly and keeps every row.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.32.0',
   people: '4.8.0',
-  'money-core': '3.40.0',
+  'money-core': '3.41.0',
   estate: '2.8.1',
   work: '1.26.2',
 };

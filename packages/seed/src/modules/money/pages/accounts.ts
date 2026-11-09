@@ -3,6 +3,7 @@
 import type { SeedPage } from '../../base.ts';
 import { MONEY_METRICS } from '../figures/index.ts';
 import { CONFIRMED_COLUMN, CONFIRMED_STALE } from './parts/ages.ts';
+import { BEYOND_CASH_CELLS, HOLDS_BEYOND_CASH, TO_HOLDINGS } from './shared.ts';
 
 /**
  * An account's card on this page: its name, the digits the bank prints, its book and its age. The digits read "Ending in
@@ -25,7 +26,8 @@ const ACCOUNT_CARD = [
  * is found, opened and kept current.
  *
  * WHAT IT SAYS, TOP TO BOTTOM: every account as a card, grouped Bank, Cash and Card, each opening its page, with what it
- * holds, the day its balance was last confirmed and the out-of-date mark past a week.
+ * holds, the day its balance was last confirmed and the out-of-date mark past a week. SINCE money-core 3.41.0, under them,
+ * what is held beyond cash and the net worth that counts it, while anything is (`shared.ts` `BEYOND_CASH_CELLS`).
  *
  * NO BALANCE ON THE CARDS. A card's money column is the balance somebody typed, while its day is the bank's newest word
  * (`CONFIRMED_STALE`), so an account the bank had printed a newer balance for read the old amount beside the new day.
@@ -79,6 +81,19 @@ export const accountsPage = (_declared: (figure: string) => boolean): SeedPage =
         span: 12,
         register: 'accounts',
       },
+      {
+        /* WHAT IS HELD BEYOND THESE ACCOUNTS, AND THE NET WORTH THAT COUNTS IT, SINCE money-core 3.41.0 (9 Nov, the owner:
+           "can you make sure that my investments and stuff also show within my balances"): under the accounts and the box
+           to add one, so the cash the cards hold and what is held beyond it are read on one page. Both are the whole
+           record's, as this page is. Only while something is held beyond cash, then the way to each holding. */
+        kind: 'stat',
+        heading: 'Beyond your accounts',
+        icon: 'hand-coins',
+        span: 12,
+        cells: BEYOND_CASH_CELLS,
+        when: HOLDS_BEYOND_CASH,
+      },
+      TO_HOLDINGS,
       {
         /* CLOSED ACCOUNTS, FOLDED AND LAST: kept for the lines that moved through them, and counted in nothing. A
            section over no card is not drawn, so a record that never closed one reads no word about it. */

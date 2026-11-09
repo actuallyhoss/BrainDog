@@ -228,6 +228,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.41.0', notes: "Accounts and each book's page show what you hold beyond cash and your net worth under the accounts, once you hold something; Accounts links to Investments and gold." },
     { version: '3.40.0', notes: 'Instalments says the day each plan ends, beside its next part.' },
     { version: '3.39.0', notes: "A book's page leads with its accounts, this month's in and out, and where the month's money went; Cash ahead comes after them." },
     { version: '3.38.9', notes: "A book's What is due shows Runs out only when it has an answer, so a book kept in two currencies no longer shows a dash there." },

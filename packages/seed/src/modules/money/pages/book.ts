@@ -3,7 +3,7 @@
 import type { SeedPage } from '../../base.ts';
 import { BOOK_FIGURES } from '../figures/books.ts';
 import { CONFIRMED_COLUMN, CONFIRMED_STALE } from './parts/ages.ts';
-import { BOOK_LEGS, DUE_30D, MOVED_COLUMNS } from './shared.ts';
+import { BEYOND_CASH_CELLS, BOOK_LEGS, DUE_30D, HOLDS_BEYOND_CASH, MOVED_COLUMNS } from './shared.ts';
 
 /**
  * ONE PAGE A BOOK, UNDER MONEY, SINCE money-core 3.1.0: the Money page's own layout over the rows filed in that book.
@@ -23,7 +23,8 @@ import { BOOK_LEGS, DUE_30D, MOVED_COLUMNS } from './shared.ts';
  * SINCE money-core 3.4.0 the month ahead and what moved are folded under the accounts, as Money's are.
  *
  * SINCE money-core 3.35.0 This month is drawn only while something came in or went out, and Accounts and Add an account
- * each take the whole row.
+ * each take the whole row. SINCE money-core 3.41.0 what is held beyond cash and net worth stand under them, said to be
+ * every book's (`shared.ts` `BEYOND_CASH_CELLS`).
  *
  * SINCE money-core 3.17.0 a book whose money never goes under in the year reads one line that it lasts (`lastsNote`),
  * and a record holding categories marked against how the Ledger books them says how many (`againstNotes`).
@@ -86,6 +87,20 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       span: 12,
       register: 'accounts',
       where: 'book is {{spoken}}',
+    },
+    {
+      /* WHAT IS HELD BEYOND CASH AND NET WORTH, EVERY BOOK'S AND SAID SO, SINCE money-core 3.41.0 (9 Nov, the owner: "can you
+         make sure that my investments and stuff also show within my balances"). Money opens on a book's page, so they
+         stand under its accounts and the box to add one. They are the whole record's and filed in no book, so the
+         heading says they cover every book, and each book's page draws the same two. Money's own figures, named whole
+         as `againstNotes` names its one, since neither is a figure of one book. Only while something is held beyond cash;
+         the way to each holding is on Accounts, where the page has room for it. */
+      kind: 'stat',
+      heading: 'Across every book',
+      icon: 'hand-coins',
+      span: 12,
+      cells: BEYOND_CASH_CELLS,
+      when: HOLDS_BEYOND_CASH,
     },
     {
       /* THIS BOOK'S MONTH IN ONE ROW: what came in, what went out and what is left, each read once a
