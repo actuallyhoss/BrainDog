@@ -47,6 +47,7 @@
 
 <svg
   class="icon"
+  data-icon={name}
   data-size={size}
   data-along={ALONG.has(name) ? '' : undefined}
   viewBox="0 0 24 24"

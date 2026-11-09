@@ -69,6 +69,7 @@
   import { copy } from '../copy.ts';
   import { openPalette } from '../palette/open.svelte.ts';
   import { inIosApp } from '../shell.ts';
+  import { handOver } from '../shell/head-actions.ts';
   import Bell from '../shell/Bell.svelte';
   import HereFaces from '$lib/shell/HereFaces.svelte';
   import { barTitled, frame, narrow } from '../shell/frame.svelte.ts';
@@ -338,6 +339,16 @@
     };
   });
 
+  /* IN THE IPHONE APP THE BUTTONS GO UP INTO NATIVE'S BAR beside the name it says (`shell/head-actions.ts`). The row stays
+     here, unseen and out of the flow, so a press and the menu it opens still work; a head whose name is its own content
+     keeps its row, and so does one whose row holds a field. */
+  let actionsRow = $state<HTMLElement>();
+  let handed = $state(false);
+  $effect(() => {
+    if (!inIosApp || !actionsRow || named || tiled || !(titled || headless)) return;
+    return handOver(actionsRow, (on) => (handed = on));
+  });
+
 </script>
 
 <div bind:this={mark} aria-hidden="true"></div>
@@ -388,7 +399,7 @@
   {/if}
 {/if}
 {#if !barred}
-<header class="page-head" data-titled={titled ? '' : undefined} data-under={under ? '' : undefined} data-kicked={crumb && !headless && !titled ? '' : undefined} data-headless={headless ? '' : undefined} data-tiled={tiled ? '' : undefined}>
+<header class="page-head" data-titled={titled ? '' : undefined} data-under={under ? '' : undefined} data-kicked={crumb && !headless && !titled ? '' : undefined} data-headless={headless ? '' : undefined} data-tiled={tiled ? '' : undefined} data-handed={handed ? '' : undefined}>
   <div class="head-main">
     {#if tiled}
       <!-- THE NAME IS THE LEAD TILE'S. -->
@@ -431,7 +442,7 @@
         <p class="head-title" aria-hidden="true">{title}{#if counted}<span class="head-title-count num">{(count ?? 0).toLocaleString('en')}</span>{/if}</p>
       </div>
     {/if}
-    {#if actions && !inBar}<div class="head-actions">{@render actions()}</div>{/if}
+    {#if actions && !inBar}<div class="head-actions" bind:this={actionsRow}>{@render actions()}</div>{/if}
   </div>
 </header>
 {/if}
@@ -736,6 +747,16 @@
     margin-inline-start: auto;
   }
 
+  /* HANDED TO NATIVE'S BAR: drawn nowhere and holding no room, but still there to be pressed and to anchor its menus. */
+  .page-head[data-handed] .head-actions {
+    position: fixed;
+    inset-block-start: env(safe-area-inset-top);
+    inset-inline-end: var(--gutter);
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
   /* IN THE DESK'S TOP BAR, beside the name: the bar's own 16 is the space before it. */
   .desk-bar-actions {
     margin-inline-start: 0;
@@ -787,6 +808,11 @@
   /* A PAGE WHOSE HERO HOLDS THE NAME: the back link and the actions only, on one 32px row. */
   .page-head[data-headless] .head-main {
     min-block-size: var(--ctl-h);
+  }
+
+  /* ITS BUTTONS ARE NATIVE'S, and in the app it draws no way back either, so no row is left. */
+  .page-head[data-headless][data-handed] .head-main {
+    min-block-size: 0;
   }
 
   .head-back {
@@ -876,14 +902,14 @@
 
   /* A SENTENCE WITH NO BUTTONS BESIDE IT STANDS WHERE ONE WITH BUTTONS DOES (AH34): Today's first line sat 16 under the
      bar's rule while every page with actions had the row's height to sit in. */
-  .page-head[data-titled]:has(.head-actions > :not(dialog), .head-said) .head-main {
+  .page-head[data-titled]:not([data-handed]):has(.head-actions > :not(dialog), .head-said) .head-main {
     min-block-size: var(--ctl-h);
   }
 
   /* A HEAD WITH NOTHING TO SAY BUT ITS NAME draws no room of its own. A closed sheet the actions hold (the arranging
      controls' "Which list to show") is not something to say: the buttons gone to the sentence's row (`PageView`'s
      `besideLead`) left a 52px band of nothing over the page for it. */
-  .page-head[data-titled]:not(:has(.head-said, .head-actions > :not(dialog))) {
+  .page-head[data-titled]:is([data-handed], :not(:has(.head-actions > :not(dialog)))):not(:has(.head-said)) {
     padding-block-start: 0;
     /* AND THE WORK UNDER IT STARTS ON THE PAGE'S TOP STEP, not the head's gap: a screen pads its top by
        `--page-head-gap` (16 on a phone) for the head it draws, and with nothing drawn its first line stood 16 under the
@@ -893,7 +919,7 @@
 
   /* A SENTENCE ALONE ENDS WITH ITS LINE (cleanup, 3 Nov): it keeps the 36 row's place at the top, so it stands where a
      sentence beside buttons does (AH34), but the row's other 7 under it made the head 31 from its content, not 24. */
-  .page-head[data-titled]:has(.head-said):not(:has(.head-actions > :not(dialog))) .head-main {
+  .page-head[data-titled]:has(.head-said):is([data-handed], :not(:has(.head-actions > :not(dialog)))) .head-main {
     min-block-size: 0;
     padding-block-start: calc((var(--ctl-h) - var(--lead-head)) / 2);
   }
