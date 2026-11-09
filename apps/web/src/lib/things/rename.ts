@@ -21,7 +21,8 @@ import type { Shell } from '../record/boot-live.ts';
 import type { Entry, RegisterDecl } from '../record/schema.ts';
 import { ownsRecord, type Me } from '../../routes/settings/levels.ts';
 import { askSheet, type SheetAsk } from './asks.svelte.ts';
-import { askPage } from './page-verbs.ts';
+import { askPage, isHere } from './page-verbs.ts';
+import { inIosApp } from '../shell.ts';
 import { thingOf } from './thing.ts';
 import { thingWords } from './verbs.ts';
 import { dbl } from '../ui/dbl.ts';
@@ -65,10 +66,15 @@ export function renamable(address: string): boolean {
  */
 export function renameAt(address: string, field?: string): void {
   const t = thingOf(address);
-  if (t.kind !== 'row') return askPage(address, field ? `edit:${field}` : 'rename');
-  const own = opensOnPage(REGISTERS[t.list]) ? ownPage(t.list, t.seq, new URLSearchParams()) : null;
-  if (field) askPage(own ? rowScreen(t.list, t.seq) : address, `edit:${field}`);
-  else askPage(own ?? address, 'rename');
+  let to = address;
+  if (t.kind === 'row') {
+    const own = opensOnPage(REGISTERS[t.list]) ? ownPage(t.list, t.seq, new URLSearchParams()) : null;
+    if (own !== null) to = field ? rowScreen(t.list, t.seq) : own;
+  }
+  /* IN THE IPHONE APP THE FIRST TAP ON A LINK IS A NATIVE PUSH (`shellVisit`): the page it opens is on a screen of its
+     own, so the screen left under it is not sent there too. Only what is renamed where it is drawn changes there. */
+  if (inIosApp && !isHere(to)) return;
+  askPage(to, field ? `edit:${field}` : 'rename');
 }
 
 /**

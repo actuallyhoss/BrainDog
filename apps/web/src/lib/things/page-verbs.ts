@@ -57,6 +57,9 @@ export function askPage(href: string, verb: string): void {
   void goto(at(href));
 }
 
+/** Whether the page on the screen is the one drawn at `href`. */
+export const isHere = (href: string): boolean => pathOf(location.pathname) === pathOf(href);
+
 /** Whether the page on the screen answers `verb` now. */
 export function answers(verb: string): boolean {
   for (const verbs of answering) if (verbs[verb]) return true;
