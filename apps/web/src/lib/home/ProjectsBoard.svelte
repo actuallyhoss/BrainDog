@@ -33,6 +33,7 @@
   import ProjectWell from '$lib/ui/ProjectWell.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
+  import { inIosApp } from '$lib/shell.ts';
   import { HEALTH, slotStyle } from './project-cards.ts';
   import { sectionsOf, trailOf, type Board, type BoardRow, type BoardSection, type Parked } from './projects-board.ts';
   import { readBoard } from './projects-board-read.ts';
@@ -99,7 +100,8 @@
   const view = $derived(picked !== null && views.some((v) => v.id === picked) ? picked : (views[0]?.id ?? 'play'));
 
   /* THE WAY INTO THE SIDEBAR, SAID WHILE NOTHING IS PINNED, beside the switch. */
-  const showHint = $derived(navPrefs.pins.length === 0 && views.length > 0);
+  /* NOT IN THE APP: it has no sidebar to pin to. */
+  const showHint = $derived(!inIosApp && navPrefs.pins.length === 0 && views.length > 0);
 
   /* WHO IS AT WORK ON IT NOW, by the project's name, as the sidebar's dot says it. */
   const busy = $derived(new Set(workingNow().map((w) => w.project).filter((p): p is string => typeof p === 'string')));
