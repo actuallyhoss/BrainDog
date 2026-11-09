@@ -31,7 +31,7 @@ import { pairsReads, type PairsDecl } from './pairs.ts';
 import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { egressChanged } from './script.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
-import { causeFault, causeOf, canon, noop } from './cause.ts';
+import { COULD_NOT_APPLY, causeFault, causeOf, canon, noop } from './cause.ts';
 import { costOf, costRows, costRowsOnce, optionCosts, pickCost, WAIT_RANK_SQL, WAIT_SQL, waitParams, WAITS, type Cost } from './weigh.ts';
 import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
 import { configValue, readPackConfig } from './declare.ts';
@@ -852,7 +852,10 @@ function remembered(deps: GovernDeps, cause: string, kind: BodyKind, body: Recor
     "SELECT id, body_kind, body, resolved_as, opened_by FROM suggestion WHERE cause = ? AND status <> 'open' ORDER BY opened_at DESC, rowid DESC LIMIT 1",
     cause,
   );
-  if (!q || !['wont-fix', 'incorrect', 'addressed'].includes(q.resolved_as ?? '')) return null;
+  if (!q) return null;
+  /* ONE NO PRESS COULD EVER APPLY IS NOT OFFERED AGAIN AS IT WAS (`settleCannot`): the very same ask is answered with why. */
+  if (q.resolved_as === 'moot') return couldNot(deps, q, kind, body);
+  if (!['wont-fix', 'incorrect', 'addressed'].includes(q.resolved_as ?? '')) return null;
   const was = parse(q.body);
   if (q.body_kind !== kind || !was) return null;
   const before = reaches(deps, kind, was);
@@ -927,12 +930,37 @@ function leftBy(deps: GovernDeps, body: Record<string, unknown>, batch: string):
 }
 
 /**
+ * A question closed because no press could ever apply it (`settleCannot`), remembered for the VERY SAME ask: the same
+ * kind, and the same rows with the same changes, no more and no fewer. An ask that drops the row the list refused, or
+ * reaches one more, is a new ask; one that only asks it all again is answered with why, and nothing is filed, so a
+ * script's nightly ask stops putting it back on Needs you. Any other `moot` close (the rows changed since, or were
+ * deleted) is no memory: asked again as the rows are now, it may well apply.
+ */
+function couldNot(deps: GovernDeps, q: { id: string; body_kind: string; body: string }, kind: BodyKind, body: Record<string, unknown>): Filed | null {
+  if (q.body_kind !== kind) return null;
+  const was = parse(q.body);
+  if (!was) return null;
+  const closed = deps.sql.one<{ ts: string; note: string | null }>(
+    "SELECT ts, note FROM event WHERE kind = 'resolve' AND target = ? ORDER BY rowid DESC LIMIT 1",
+    `suggestion:${q.id}`,
+  );
+  if (!closed?.note?.startsWith(CANNOT_NOTE)) return null;
+  const before = reaches(deps, kind, was);
+  const now = reaches(deps, kind, body);
+  if (before.size === 0 || before.size !== now.size || [...now].some((r) => !before.has(r))) return null;
+  const why = closed.note.slice(CANNOT_NOTE.length).replace(/\s*Nothing was written, and the question is closed\.\s*$/u, '').trim();
+  return { id: q.id, answered: { said: COULD_NOT_APPLY, reason: why === '' ? 'No reason was given.' : why, at: closed.ts } };
+}
+
+/**
  * The sentence an agent passes on when its proposal was answered from memory: what was said, the day, the reason, and
  * how to ask again. It names `again` every time, so an answer that has gone stale is never the last word.
  */
 export function rememberedLine(a: Remembered): string {
   const day = new Date(a.at);
   const when = Number.isFinite(day.getTime()) ? day.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : a.at.slice(0, 10);
+  if (a.said === COULD_NOT_APPLY)
+    return `This could not be applied on ${when}: ${a.reason.replace(/[.\s]+$/u, '')}. Nothing was filed. If something has changed, propose it again and say what in again.`;
   const said = a.said === 'No' ? 'This was declined' : `This was answered "${a.said}"`;
   const why = a.reason === 'No reason was given.' ? 'No reason was given.' : `The reason: ${a.reason.replace(/[.\s]+$/u, '')}.`;
   return `${said} on ${when}. ${why} Nothing was filed. If something has changed, propose it again and say what in again.`;
@@ -1380,6 +1408,83 @@ export function settleAbout(deps: Pick<GovernDeps, 'sql' | 'row' | 'mint'>, name
     out.push(q.id);
   }
   return out;
+}
+
+/* ── what no press can ever apply ───────────────────────────────── */
+
+/**
+ * The refusals a row's write meets that no later press changes: the list refuses the value, the field or the move itself,
+ * not the moment. A compare-and-set (`VERSION_STALE`), a level or a key the presser lacks, and a limit that lifts are
+ * none of them, and leave the question open as they always did.
+ */
+const NEVER_LANDS: ReadonlySet<string> = new Set([
+  'VALUE_MALFORMED',
+  'REQUIRED_MISSING',
+  'ENUM_VALUE_UNKNOWN',
+  'CURRENCY_UNKNOWN',
+  'CURRENCY_FIXED',
+  'OUT_OF_BOUNDS',
+  'INT_OUT_OF_RANGE',
+  'IMMUTABLE_FIELD',
+  'FIELD_UNKNOWN',
+  'REF_UNKNOWN',
+  'REF_REGISTER_MISMATCH',
+  'TRANSITION_ILLEGAL',
+  'TEXT_JSON_QUOTED',
+  'TEXT_ESCAPED_NEWLINE',
+  'PATCH_EMPTY',
+]);
+
+/** The row a refused accept could never write, by the refused answer it came back as (`landsNever`). */
+const NEVER_APPLIED = new WeakMap<object, { list: string; at: string | null }>();
+
+/** `out`, marked as a write its list refuses for good when its code says so (`NEVER_LANDS`), for `cannotApplyOf`. */
+function landsNever<R extends Result<unknown>>(out: R, list: string, at: unknown): R {
+  if (!out.ok && 'refusal' in out && NEVER_LANDS.has(out.refusal.code)) NEVER_APPLIED.set(out, { list, at: typeof at === 'string' ? at : null });
+  return out;
+}
+
+/**
+ * The list and row an accept was refused on for good, a rowset's row or a pick's entry the list will never take as
+ * asked, or `null` when the refusal is anything else. Read by the kernel's `decideOne` after the press rolled back.
+ */
+export const cannotApplyOf = (out: Result<unknown>): { list: string; at: string | null } | null => (out.ok ? null : (NEVER_APPLIED.get(out) ?? null));
+
+/** How the line under a question no press could ever apply begins, which is how `couldNot` knows it again. */
+export const CANNOT_NOTE = 'It could never be applied as asked. ';
+
+/**
+ * Close one open question its accept showed can never apply, SAID ONCE: the list's own sentence for the row it would not
+ * take, with the row by its words, and nothing written. Resolved `moot` as a question that moved under it is, with no
+ * decision and nothing held against whoever asked, and remembered by its cause (`couldNot`), so the very same ask filed
+ * again is answered with this line instead of waiting on Needs you to be refused at every press.
+ *
+ * MEASURED ON THE LIVE RECORD (SG242, 25 Oct): a question that could never apply came back night after night, and every
+ * yes was refused with nothing written. Its staleness is `settleOne`'s; this is the rest, a list that refuses the change.
+ */
+export function settleCannot(deps: Pick<GovernDeps, 'sql' | 'row' | 'mint'>, id: string, refusal: Refusal, where: { list: string; at: string | null }, nowMs: number): string | null {
+  const q = deps.sql.one<{ body_kind: string; body: string }>('SELECT body_kind, body FROM suggestion WHERE id = ? AND status = ?', id, 'open');
+  if (!q) return null;
+  /* A CHOICE WITH ANOTHER ANSWER THAT WRITES STAYS OPEN for that one: only the pick refused for good is said, as before. */
+  if (q.body_kind === 'options' && listOf(parse(q.body)?.options).filter((o) => isMap(o) && o.patches !== undefined).length > 1) return null;
+  const named = where.at === null ? null : rowWords(deps, where.list, where.at);
+  const fix = refusal.fix.trim().replace(/([^.!?])$/u, '$1.');
+  const line = `${CANNOT_NOTE}${named === null ? '' : `${named}: `}${fix} Nothing was written, and the question is closed.`;
+  deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE id = ? AND status = 'open'", id);
+  event(deps, instant(nowMs), 'system', 'resolve', `suggestion:${id}`, 'suggestion', 'moot', line);
+  return line;
+}
+
+/** A row's own words, quoted, by its list's title field, or `null` when it has none or is gone: never its handle. */
+function rowWords(deps: Pick<GovernDeps, 'sql' | 'row'>, list: string, at: string): string | null {
+  const row = deps.row(list, at);
+  if (!row) return null;
+  const decl = parse(
+    deps.sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', `register.${list}`)?.body ?? '',
+  );
+  const fields = parse(deps.sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', row.id)?.fields ?? '') ?? {};
+  const title = typeof decl?.title === 'string' ? fields[decl.title] : undefined;
+  return typeof title === 'string' && title.trim() !== '' ? `"${title.trim().slice(0, 80)}"` : null;
 }
 
 /**
@@ -3200,7 +3305,7 @@ function applyPatches(deps: GovernDeps, asked: string, raw: unknown, actor: stri
          them" on the older question then wrote the same book onto each again, two hundred lines saying nothing. */
       if (alreadySo(now.fields, r.patch)) continue;
       const made = applyUpdate(deps, list, { ...r, version }, actor, batch);
-      if (!made.ok) return made as Result<Patched>;
+      if (!made.ok) return landsNever(made, list, r.at) as Result<Patched>;
       out.wrote.push(made.value.id);
     }
   return ok(out);
@@ -3828,8 +3933,9 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         const made = 'at' in r ? applyUpdate(deps, register, now === undefined ? r : { ...r, version: now }, by, batch) : deps.write(register, r, mechanism, batch);
         /* ALL THE ROWS OR NONE. Half a rowset accepted is a decision whose answer is not true of the
            record, and the caller's transaction is what undoes the rest. A stale version is the
-           house conflict, and it undoes the rest the same way. */
-        if (!made.ok) return made as Result<Decided>;
+           house conflict, and it undoes the rest the same way. A row the list refuses for good is marked as one
+           (`landsNever`), so the press that rolled back closes the question saying why (`settleCannot`). */
+        if (!made.ok) return landsNever(made, typeof r.register === 'string' ? r.register : register, r.at) as Result<Decided>;
         wrote.push(made.value.id);
       }
     } else if (arranging(row.body_kind)) {

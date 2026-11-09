@@ -34,6 +34,13 @@ export function causeFault(cause: unknown): string | null {
   return null;
 }
 
+/**
+ * What a cause remembers it was answered when its question was closed because no press could ever apply it
+ * (`govern.ts` `settleCannot`): the same ask is not asked again, and its asker is told so. Here, beside the cause it is
+ * remembered by, so a script's run can say it without reaching back into the gate.
+ */
+export const COULD_NOT_APPLY = 'Could not be applied';
+
 /** How many hex characters of the hash a cause keeps: 96 bits, past any record's count of questions. */
 const KEPT = 24;
 

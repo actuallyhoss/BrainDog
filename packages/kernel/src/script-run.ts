@@ -33,6 +33,7 @@ import type { OutboxRow } from './outbox.ts';
 import { activeScript, type ScriptBody } from './script.ts';
 import { applyNotices, applyStored, scriptOwner } from './addon-state.ts';
 import { attempt } from './tx.ts';
+import { COULD_NOT_APPLY } from './cause.ts';
 
 /**
  * A write the sandbox asked for. Structurally `@braindog/script`'s `ScriptWrite`.
@@ -744,7 +745,10 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
       : put === null
         ? " It asked a question that nobody was shown: BrainDog does not put a script's questions to anybody yet."
         : put.answered !== undefined
-          ? ' Its question was answered on Decide before, so it asked nothing new.'
+          ? /* ONE NO PRESS COULD EVER APPLY IS SAID AS THAT, not as an answer somebody gave (`settleCannot`). */
+            (put.answered as { said?: unknown }).said === COULD_NOT_APPLY
+            ? ' Its question could never be applied as asked, so it asked nothing new.'
+            : ' Its question was answered on Decide before, so it asked nothing new.'
           : put.joined
             ? ' Its question was already waiting on Decide, so it asked nothing new.'
             : ' It asked one question, which waits on Decide.';

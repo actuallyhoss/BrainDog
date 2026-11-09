@@ -14,12 +14,19 @@
  * and fails below the bar. It is the one check here whose answer is a model's habit and not a rule, so a night under the
  * bar is read as the words `context` gives an agent, never as a flaky test to run again.
  *
+ * AND A SECOND ROW, NAMES, NEVER IDS, read off the same ten: every line a session said is held to `spokenIds`
+ * (`packages/mcp/src/words.ts`), and the row fails when any of them says an id where a name belongs, "LN3 says" or
+ * "tasks#14 is late", where "Fix the login (tasks#14)" keeps the id as its name's trailing reference. A real agent said
+ * both to the owner on 6 Nov with the rule in its instructions; the row carries the first lines it caught, so a red night
+ * is read as the instructions' third rule, as a night under the manners bar is.
+ *
  * WHAT IT NEEDS, as the door check: `ANTHROPIC_API_KEY`, else "not run: no key for the model"; `DOOR_TOKEN` or six
  * digits a person approves, and in CI without one, "not run". No key is minted here or written down.
  */
 
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spokenIds } from '../../packages/mcp/src/words.ts';
 import {
   APP,
   PIN,
@@ -96,6 +103,31 @@ export function tally(results, version = '') {
   return { app: APP, version, ok: both >= BAR, saw: saw.join('; ') };
 }
 
+/** The ids one session said where a name belongs, each with its line, from every line it said (`readStream`'s `said`). */
+export const namesOf = (s) => (s?.said ?? []).flatMap((x) => spokenIds(String(x.text ?? '')));
+
+/** A caught line around its id, short enough that two fit in a row. */
+const around = ({ id, line }) => {
+  const at = Math.max(0, line.indexOf(id));
+  const from = Math.max(0, at - 30);
+  const to = Math.min(line.length, at + id.length + 30);
+  return `${from > 0 ? '...' : ''}${line.slice(from, to).replace(/\s+/gu, ' ').trim()}${to < line.length ? '...' : ''}`;
+};
+
+/**
+ * The night's names row from each session's caught lines (`namesOf`), `null` for a session that never started. It fails
+ * when any session said an id where a name belongs, and when no session started, since nothing was said to read.
+ */
+export function namesTally(results, version = '') {
+  const started = results.filter((r) => r !== null && r !== undefined);
+  const spoke = started.filter((hits) => hits.length > 0);
+  const lost = results.length - started.length;
+  const saw = [`names: ${started.length - spoke.length} of ${started.length} said each thing by its name, with an id only in brackets after it`];
+  if (spoke.length > 0) saw.push(`${spoke.length} said an id where a name belongs: ${spoke.slice(0, 2).map((hits) => `"${around(hits[0])}"`).join(', ')}`);
+  if (lost > 0) saw.push(`${lost} never started`);
+  return { app: APP, version, ok: started.length > 0 && spoke.length === 0, saw: saw.join('; ') };
+}
+
 /** Each task in turn, `AT_ONCE` at a time, answering in the tasks' order. */
 async function inTurn(items, each) {
   const out = new Array(items.length);
@@ -134,9 +166,9 @@ async function night({ host, record, home, signal }) {
     args.push('--allowedTools', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'mcp__braindog');
     const got = await run(join(bin, 'claude'), args, { env, cwd: folder, signal, ms: SESSION_MS });
     const s = readStream(got.out);
-    return s.id ? mannersOf(s) : null;
+    return s.id ? { manners: mannersOf(s), names: namesOf(s) } : null;
   });
-  return tally(results, version);
+  return [tally(results.map((r) => r?.manners ?? null), version), namesTally(results.map((r) => r?.names ?? null), version)];
 }
 
 /** A scratch repository with the seed's files in its first commit. */

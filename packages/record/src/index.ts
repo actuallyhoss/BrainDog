@@ -170,7 +170,7 @@ import {
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
-import { arranger, carryUpdate, forgetHeld, installHeld, madeLine, madeSpans, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
+import { arranger, carryUpdate, forgetHeld, installHeld, madeLine, madeSpans, planAgain, speakingNow, staleToPerson, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
 import { LATE_DAYS, atWork, presenceOf, waiting as waitingOf, waitingOn, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, nightKeeps, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, lapsing, noticeUsage, pageShowsAgents, queueFiling, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, waitingCount, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
@@ -10791,7 +10791,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * owner's press in `decide` and the additive rule in `propose` must land a change the same way: the rule's install
    * reopening on a conflict is what keeps "automatic" from meaning "unchecked".
    */
-  const land = async (decided: Decided, actor: string): Promise<Awaited<ReturnType<typeof kernel.install>>> => {
+  const land = async (decided: Decided, actor: string, person = false): Promise<Awaited<ReturnType<typeof kernel.install>>> => {
     const decl = decided.install as { id?: string; kind?: string; body?: unknown };
     /* AND A `to` THAT IS NOT A DECLARATION THROWS RATHER THAN REFUSES. d15066d2 stopped one being filed, but a
        change already in the queue from before it still holds `{ values: [...] }`, and accepting it threw
@@ -10826,7 +10826,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         'refusal' in put
           ? put.refusal.fix
           : `${String((put.conflict.current as { id?: string } | null)?.id ?? decl.id)} changed after this was proposed and is at version ${String(put.conflict.version)} now. Propose it again against the list as it is.`;
-      kernel.reopen(decided.suggestion, why);
+      /* SAID TO A PERSON WHO PRESSED IN WHAT THEY CAN DO (`staleToPerson`): "Propose it again" is an agent's step. */
+      kernel.reopen(decided.suggestion, person ? staleToPerson(why) : why);
+      if (person && 'refusal' in put && put.refusal.fix !== staleToPerson(put.refusal.fix)) return { ok: false, refusal: { ...put.refusal, fix: staleToPerson(put.refusal.fix) } };
     }
     return put;
   };
@@ -16722,8 +16724,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            and the question stays open (`test/change-script-stale.test.ts`). */
         if (kind === 'change') {
           const stale = staleScriptLines(asked?.body);
-          if (stale.length > 0)
-            return no('PLAN_STALE', `This change now calls out something it did not show: ${stale.join('; ')}. Propose it again.`, { at: 'body.approve' });
+          if (stale.length > 0) {
+            /* SAID TO A PERSON WHO PRESSED IN WHAT THEY CAN DO (`staleToPerson`); an agent on his word proposes it again. */
+            const said = `This change now calls out something it did not show: ${stale.join('; ')}. Propose it again.`;
+            return no('PLAN_STALE', ctx.principal.kind === 'person' ? staleToPerson(said) : said, { at: 'body.approve' });
+          }
         }
       }
       /* A PICK FOLDS THE ONE PICKED AND DECLINES THE REST, in one transaction (`mergeAnswer`, `foldPicked`): a refusal
@@ -16806,8 +16811,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              installs it: "Propose it again" was a step only an agent could take. */
           const refusal = 'refusal' in applied ? applied.refusal : undefined;
           const again = refusal?.code === 'PLAN_STALE' ? await arrangement.askAgain(out.value.apply.kind, out.value.apply.body) : null;
-          kernel.reopen(out.value.suggestion, again?.said ?? refusal?.fix, again?.body);
-          return tail(again && refusal ? { ok: false as const, refusal: { ...refusal, fix: again.said } } : applied);
+          /* AND ONE THAT CANNOT BE ASKED AGAIN HERE IS SAID TO THE PERSON WHO PRESSED IN WHAT THEY CAN DO (`staleToPerson`):
+             decline it, and it can be asked again as things are now. An agent on his word is told to propose it again. */
+          const fix = refusal === undefined ? undefined : again !== null ? again.said : ctx.principal.kind === 'person' ? staleToPerson(refusal.fix) : refusal.fix;
+          kernel.reopen(out.value.suggestion, fix, again?.body);
+          return tail(refusal !== undefined && fix !== undefined && fix !== refusal.fix ? { ok: false as const, refusal: { ...refusal, fix } } : applied);
         }
         const { apply: _handed, ...decided } = out.value;
         /* KEPT ON THE DECISION, so what was applied is read back after a reload and by every other member. */
@@ -16815,7 +16823,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return tail(settledAs(ctx, args.id, ok({ ...decided, applied: applied.value })));
       }
       if (!out.ok || !out.value.install) return tail(settledAs(ctx, args.id, out));
-      const put = await land(out.value, actorOf(ctx));
+      const put = await land(out.value, actorOf(ctx), ctx.principal.kind === 'person');
       if (!put.ok) return tail(put);
       return tail(settledAs(ctx, args.id, out));
     },
@@ -17554,17 +17562,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * the phone's arrangement) on Done, or one step at once from a widget's menu; each lands on the page as the record
      * holds it now, so a draft an agent added meanwhile stays, and a step is refused only when its widget is gone
      * (`board-steps.ts`). A page not kept yet (Today, drawn from what the record holds) is kept from `base` on its first
-     * edit, so Add to Today works on every record. The owner's, as `setDeclaration` is. Answers the version written and
-     * the body before it, `null` where there was none, which Undo puts back.
+     * edit, so Add to Today works on every record. The owner's, as `setDeclaration` is: his session, and his own agent
+     * while he lets agents do everything without asking (`admin`, `agentFor`). Answers the version written and the body
+     * before it, `null` where there was none, which Undo puts back.
      */
     async boardSteps(args: { page?: unknown; version?: unknown; steps?: unknown; base?: unknown; put?: unknown } | undefined, ctx: CallContext) {
       /* DATA, SO THE LADDER FIRST (30 §10): a caller who reads nothing of the record arranges nothing, a report key
-         included. The owner's session is asked below for anything but a member's own Today. */
+         included. The owner's door is asked below for anything but a member's own Today: his session, or his own agent
+         on his switch or his word, as every owner's door admits one (`admin`). */
       const asked = guard(ctx, 'read');
       if (asked) return { ok: false as const, refusal: asked };
       const said = (args ?? {}) as Record<string, unknown>;
       /* A MEMBER ARRANGES THEIR OWN TODAY (W8), kept as theirs: Today alone, and nothing anybody else opens. Everybody
-         else is asked what they always were, the owner's session. */
+         else is asked what they always were, the owner's door. */
       const member = said.page === 'home' ? ownTodayFor(ctx) : null;
       if (member === null) {
         const stop = admin(ctx, 'arrange a board');

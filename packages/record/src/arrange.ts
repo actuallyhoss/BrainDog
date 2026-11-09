@@ -2459,6 +2459,27 @@ export function arranger(d: ArrangeDeps) {
       if (!fresh.ok || fresh.value.version === body.version) return null;
       return { body: fresh.value, said: `${String(fresh.value.title)} is at ${String(fresh.value.version)} now, so this asks to publish ${String(fresh.value.version)}. Read it again, and accept to publish it.` };
     }
+    /* WHAT A PLAN CALLS OUT THAT THE QUESTION DID NOT SHOW, line by line: the reason the yes stopped, said to the owner as
+       what is new, and asked again with it shown, never "Propose it again", a step only an agent could take. */
+    const approves = (b: Body): string[] => (Array.isArray(b.approve) ? b.approve.filter((l): l is string => typeof l === 'string') : []);
+    const unshown = (fresh: Body): string[] => approves(fresh).filter((l) => !approves(body).includes(l));
+    /* AN ADD-ON TO TURN ON THAT NOW CALLS OUT MORE THAN THE QUESTION SHOWED is asked again with what it calls out now. */
+    if (kind === 'pack' && typeof body.enable === 'string') {
+      const id = body.enable;
+      const fresh = await prepare('pack', { enable: id });
+      if (!fresh.ok) return null;
+      const added = unshown(fresh.value);
+      if (added.length === 0) return null;
+      return { body: fresh.value, said: `${titleOf(id)} now calls out ${added.join('; ')} when it is on, which this did not show, so it asks again with that shown. Read it again, and accept to turn it on.` };
+    }
+    /* A SETTING WHOSE ADD-ON MOVED SINCE IT WAS ASKED is planned again against the add-on as it is now. */
+    if (kind === 'settings' && typeof body.pack === 'string' && isMap(body.values) && body.voice === undefined) {
+      const id = body.pack;
+      const fresh = await prepare('settings', { pack: id, values: body.values });
+      if (!fresh.ok) return null;
+      if (JSON.stringify(fresh.value.plan ?? null) === JSON.stringify(body.plan ?? null) && unshown(fresh.value).length === 0) return null;
+      return { body: fresh.value, said: `${titleOf(id)} changed after this was asked, so it asks again against ${titleOf(id)} as it is now. Read it again, and accept to change the setting.` };
+    }
     if (kind !== 'pack' || typeof body.install !== 'string') return null;
     const id = body.install;
     const fresh = await prepare('pack', { install: id, ...(isMap(body.doc) ? { doc: body.doc } : {}) });
@@ -2469,10 +2490,27 @@ export function arranger(d: ArrangeDeps) {
     };
     const was = versionIn(body);
     const now = versionIn(fresh.value);
-    if (now === null || now === was) return null;
+    if (now === null) return null;
     const title = typeof fresh.value.title === 'string' && fresh.value.title.trim() !== '' ? fresh.value.title.trim() : titleOf(id);
+    /* AT THE SAME VERSION, ONE THAT NOW CALLS OUT SOMETHING THE QUESTION DID NOT SHOW (a key or a host the record holds
+       differently since) is asked again with that shown, as one whose version moved is. */
+    if (now === was) {
+      const added = unshown(fresh.value);
+      if (added.length === 0) return null;
+      return { body: fresh.value, said: `${title} now calls out ${added.join('; ')}, which this did not show, so it asks again with that shown. Read it again, and accept to install it.` };
+    }
     return { body: fresh.value, said: `${title} is at ${now} in the catalogue now${was === null ? '' : `, where this asked for ${was}`}, so it asks for ${now}. Read it again, and accept to install it.` };
   }
 
   return { overview, declaration, prepare, apply, setup, askAgain };
+}
+
+/**
+ * The sentence a stale question comes back with, said to the person who pressed: "Propose it again" is a step only an
+ * agent takes, and the owner read it under an add-on's question he could not ask again (25 Oct). What he can do is
+ * decline it, and whoever asked can ask again with things as they are now. Anything else in the sentence stays as it
+ * was, the part that says what was applied and kept included. An agent answering on his word keeps the sentence whole.
+ */
+export function staleToPerson(fix: string): string {
+  return fix.replace(/ ?Propose (?:it|the setting) again(?:[^.]|\.(?!\s|$))*\.(?=\s|$)/gu, ' Decline it, and it can be asked again as things are now.').replace(/^ /u, '');
 }

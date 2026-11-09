@@ -95,6 +95,7 @@
   import { spineOf } from '$lib/spine.ts';
   import { said } from '$lib/voice.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
+  import { EXIT_MOST } from '$lib/ui/panel.ts';
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import Pull from '$lib/ui/Pull.svelte';
@@ -290,6 +291,21 @@
   $effect(() => {
     if (keymapOpen) loadKeymap();
   });
+  /* THE KEYS ARE DRAWN ONLY WHILE THEIR SHEET IS OPEN, and kept through its close, so it slides away whole. Drawn into the
+     closed sheet on every page, its table, "Accept, or give the suggested answer" among its rows, was in the page under
+     every card: an agent reading the page while a question's card was still loading read the keys sheet as open over it
+     (25 Oct, Needs you), and the table's Accept was the only one there. The code is still loaded at rest, so `?` is quick. */
+  let keymapDrawn = $state(false);
+  let keymapGone: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    if (!keymapOpen) return;
+    clearTimeout(keymapGone);
+    keymapDrawn = true;
+  });
+  const keymapClosed = (): void => {
+    clearTimeout(keymapGone);
+    keymapGone = setTimeout(() => (keymapDrawn = keymapOpen), EXIT_MOST);
+  };
   /* THE FACE'S "KEYBOARD KEYS" ASKS FOR THE SHEET (`shell/frame.svelte.ts`): opened here, with this rail's `g` letters. */
   $effect(() => {
     if (!frame.keys) return;
@@ -1901,8 +1917,8 @@
   {/if}
 </svelte:head>
 
-<Sheet bind:open={keymapOpen} title={copy.keymap} subtitle={copy.keymapHint}>
-  {#if Keymap}{#key sheetSays}<Keymap />{/key}{/if}
+<Sheet bind:open={keymapOpen} title={copy.keymap} subtitle={copy.keymapHint} onclose={keymapClosed}>
+  {#if Keymap && keymapDrawn}{#key sheetSays}<Keymap />{/key}{/if}
 </Sheet>
 
 <!-- One stack, one live region, on every surface including the two that carry no shell: an action

@@ -15,7 +15,8 @@
  *     (`decide`).
  *   - a line for each list whose things fade (one with a `confirmed_on` day, as `context` finds it and never by the
  *     list's name): the ones still held true that nobody has confirmed in sixty days. Cleared by `update` with today
- *     as the day, for each that still holds.
+ *     as the day, for each that still holds, and by the list's own finished state and what it needs (`closeSaid`) for
+ *     one that does not.
  *   - a line for the skills that are behind what was learned since (`skillBearings`, which the nightly draft reads
  *     too): each with the proposal that writes its next version, so a skill changes with no model in the room.
  *   - a line a finder for the rest (`runs-empty`, `runs-stopped`, and whatever an add-on registers), told only to a
@@ -252,6 +253,9 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
     const title = longest.row.fields[decl.title];
     const said = typeof title === 'string' ? scrubbed(title) : null;
     const { one, many } = wordsOf(decl);
+    /* AND THE WAY ONE THAT NO LONGER HOLDS IS CLOSED, in the list's own states (SG290 asked for "retired", a state
+       learnings do not have, and the yes could never land). */
+    const closes = closeSaid(decl);
     lines.push({
       kind: id,
       said:
@@ -264,7 +268,7 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
             ? `${total} ${many} have not been confirmed in ${UNCONFIRMED_DAYS} days. The oldest has waited ${waited(longest.age)}.`
             : `${total} ${many} have not been confirmed in ${UNCONFIRMED_DAYS} days. The oldest has waited ${waited(longest.age)}: ${firstWords(said)}`,
       count: total,
-      clear: each(aged.map((a) => a.name), (name) => `update ${name} with ${FADES} ${today}`, `update with ${FADES} ${today}`, STALE_NAMED_MOST, total),
+      clear: `${each(aged.map((a) => a.name), (name) => `update ${name} with ${FADES} ${today}`, `update with ${FADES} ${today}`, STALE_NAMED_MOST, total)}${closes === null ? '' : `; for one that no longer holds, update it with ${closes}`}`,
     });
   }
 
@@ -428,6 +432,29 @@ const closeOf = (decl: Decl, row: Entry, because: string): Record<string, Json> 
   if (to === undefined) return null;
   const needs = (move?.requires ?? []).filter((f) => row.fields[f] === undefined || row.fields[f] === null);
   return { [decl.state]: to, ...Object.fromEntries(needs.map((f) => [f, because])) };
+};
+
+/** A state as its list says it: the label its state field gives the value, or the value in plain lower case. */
+const stateWord = (decl: Decl, value: string): string => {
+  const field = decl.fields.find((f) => f.id === decl.state) as { labels?: Readonly<Record<string, string>> } | undefined;
+  const label = field?.labels?.[value];
+  return (typeof label === 'string' && label.trim() !== '' ? label.trim() : value.replace(/[_-]+/gu, ' ')).toLowerCase();
+};
+
+/**
+ * How one of a list's things that no longer holds is closed, in the list's own words, as a call: its first finished
+ * state its state field lets a live thing move to, and what that move needs filled. `null` for a list with no way to
+ * close one. Learnings say "state superseded and why", never a state they do not have.
+ */
+const closeSaid = (decl: Decl): string | null => {
+  if (decl.state === undefined || (decl.done ?? []).length === 0) return null;
+  const field = decl.fields.find((f) => f.id === decl.state);
+  const from = typeof (field as { default?: unknown } | undefined)?.default === 'string' ? String((field as { default?: unknown }).default) : null;
+  const move = from === null ? undefined : field?.transitions?.[from];
+  const to = (decl.done ?? []).find((d) => d !== from && (move === undefined || move.to.includes(d)));
+  if (to === undefined) return null;
+  const needs = move?.requires ?? [];
+  return `${decl.state} ${to}${needs.length === 0 ? '' : ` and ${needs.join(' and ')}`}`;
 };
 
 /** A list as a sentence names its rows, from its own declaration: "Keys", and "key" (its `one`, or its name less an s). */
@@ -670,8 +697,12 @@ function strandedAsk(nameOf: (id: string) => string, g: Gathered, left: readonly
     const patch = closeOf(g.decl, g.rows.get(r.id)!, because);
     return patch === null ? [] : [{ ...at(r), patch }];
   });
+  /* AND THE ANSWER SAYS THE STATE IT MOVES TO, in the list's own word (SG290): "Retire it" over a learning that moves to
+     superseded asked for a state learnings do not have. "Retire" stays for a list whose finished state is retired. */
+  const to = g.decl.state === undefined ? [] : [...new Set(closing.map((c) => String(c.patch[g.decl.state!])))];
+  const closeLabel = to.length === 1 && !/^retired?$/iu.test(to[0]!) ? `Mark ${them} ${stateWord(g.decl, to[0]!)}` : retire;
   const options = [
-    ...(closing.length === 0 ? [] : [{ id: 'retire', label: retire, because, patches: closing }]),
+    ...(closing.length === 0 ? [] : [{ id: 'retire', label: closeLabel, because, patches: closing }]),
     { id: 'every', label: keep, because: `${them === 'it' ? 'It is' : 'They are'} still needed, so every project's sessions are handed ${them}.`, patches: left.map((r) => ({ ...at(r), patch: { [g.field.id]: null } })) },
     { id: 'leave', label: leave, because: `Nothing changes, and ${them === 'it' ? 'it stays' : 'they stay'} with the finished project.` },
   ];
