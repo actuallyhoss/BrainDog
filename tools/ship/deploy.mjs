@@ -26,7 +26,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 
 import { MARKER, ROOT, SHIP, baseEnv, expand, git, readWorkflow, runShell, secs, setupRuns, shouldRun, short, stamp } from './lib.mjs';
 
@@ -385,14 +385,39 @@ if (refusals.length === 0 || DRY) {
   }
 }
 
-/* THE STATUS GOES INTO BRAINDOG WITH EACH DEPLOY, so the loop folder on this Mac is not its only copy. The same title is
-   the visual's next version (an unchanged page writes nothing), and a failed attach is said and never turns a deploy red. */
+/* THE STATUS GOES INTO BRAINDOG WITH EACH DEPLOY, so the loop folder on this Mac is not its only copy. It is built first
+   from the newest sections of loop/NEXT.md (`status-page.mjs`), unless BRAINDOG_STATUS_PAGE names a page of its own, so
+   it is never older than the deploy. The same title is the visual's next version (an unchanged page writes nothing),
+   and a failed build or attach is said and never turns a deploy red. */
 const STATUS_PAGE = process.env.BRAINDOG_STATUS_PAGE || join(ROOT, 'loop/status/index.html');
+const STATUS_NEXT = join(ROOT, 'loop/NEXT.md');
 const STATUS_ON = process.env.BRAINDOG_STATUS_ON || 'things#21';
 const attachStatus = ['attach', STATUS_PAGE, '--on', STATUS_ON, '--title', 'Status'];
-if (!existsSync(STATUS_PAGE)) say(`  status: no page at ${relative(ROOT, STATUS_PAGE)}, so none was attached`);
+const green = !state.failed && refusals.length === 0;
+let statusReady = existsSync(STATUS_PAGE);
+let statusHeld = null;
+if (!process.env.BRAINDOG_STATUS_PAGE && existsSync(STATUS_NEXT) && (DRY || green)) {
+  try {
+    const { statusPage } = await import('./status-page.mjs');
+    const built = statusPage(readFileSync(STATUS_NEXT, 'utf8'), { sha: HEAD });
+    if (built.key !== null) statusHeld = `loop/NEXT.md line ${built.key} looks like it holds a key, so the page was neither rebuilt nor attached`;
+    else if (DRY) {
+      statusReady = true;
+      say(`  status: WOULD REBUILD ${relative(ROOT, STATUS_PAGE)} from the newest ${built.sections} sections of loop/NEXT.md`);
+    } else {
+      mkdirSync(dirname(STATUS_PAGE), { recursive: true });
+      writeFileSync(STATUS_PAGE, built.html);
+      statusReady = true;
+      say(`  status: rebuilt from the newest ${built.sections} sections of loop/NEXT.md`);
+    }
+  } catch (e) {
+    say(`  status: not rebuilt (${e instanceof Error ? e.message : String(e)})`);
+  }
+}
+if (statusHeld) say(`  status: ${statusHeld}`);
+else if (!statusReady) say(`  status: no page at ${relative(ROOT, STATUS_PAGE)}, so none was attached`);
 else if (DRY) say(`  status: WOULD RUN braindog ${attachStatus.join(' ')}`);
-else if (state.failed || refusals.length > 0) say('  status: not attached, since this deploy is not green');
+else if (!green) say('  status: not attached, since this deploy is not green');
 else {
   const a = spawnSync('braindog', attachStatus, { cwd: ROOT, encoding: 'utf8', timeout: 120_000 });
   const said = `${a.stdout ?? ''}${a.stderr ?? ''}`.split('\n').filter((l) => l.trim() !== '' && !/ExperimentalWarning|trace-warnings/.test(l));

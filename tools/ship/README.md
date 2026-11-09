@@ -48,9 +48,11 @@ health with the build held to HEAD, the kernel against this checkout's migration
 sign-in metadata, and the site. It needs no canary record (`OPS_RECORD`) and no key. A red line makes the exit 1 and
 rolls nothing back. Run it alone any time: `node tools/ship/after-deploy.mjs [--sha <commit>] [--env alpha]`.
 
-A green deploy then attaches the status page (or `BRAINDOG_STATUS_PAGE`) to the BrainDog
+A green deploy then rebuilds the status page from the newest sections of `loop/NEXT.md` (`tools/ship/status-page.mjs`,
+which also runs alone) and attaches it (or `BRAINDOG_STATUS_PAGE`, which is attached as it is) to the BrainDog
 project (`things#21`, or `BRAINDOG_STATUS_ON`) as the next version of its "Status" visual, so the loop folder is not its
-only copy. An unchanged page writes nothing, and a failed attach is said without turning the deploy red.
+only copy. An unchanged page writes nothing, a NEXT.md line that looks like a key stops it, and a failed build or attach
+is said without turning the deploy red.
 
 - `--dry-run`: every read and check, with each write (both deploys, the restore point copy, a rollback) printed
   instead of made; the deploys run wrangler's own `--dry-run` in their place.
