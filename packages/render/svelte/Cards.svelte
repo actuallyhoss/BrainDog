@@ -80,6 +80,20 @@
   const most = $derived(mostOf(block as Block & MostKeys, rows.length));
   let all = $state(false);
   const drawnCards = $derived(all ? rows : rows.slice(0, most.shown));
+  /* EACH CARD KEYED BY WHO IT IS, so a card the record added is a new element and one it dropped is taken out, which a
+     host can move in and out; by place, every card after a new one changed its words instead. A card's row carries no
+     `ref` (a card names no row a write could reach), so it is its name cell as drawn, which holds the link to its row;
+     two alike are told apart by count, and a card with no name is its place. */
+  const cardKeys = $derived.by(() => {
+    const seen = new Map<string, number>();
+    return drawnCards.map((r, n) => {
+      const name = L.name >= 0 ? (r.cells[L.name] ?? '') : '';
+      const key = r.ref ? `${r.ref.register}#${r.ref.seq}` : name !== '' ? `name:${name}` : String(n);
+      const count = seen.get(key) ?? 0;
+      seen.set(key, count + 1);
+      return count === 0 ? key : `${key}~${count}`;
+    });
+  });
 
   /* WHERE A ROW APPLIES IS A FACT THAT IS DRAWN AS A CHIP: a fact in a column the host names as a scope. */
   const scoped = (i: number): boolean => opts.scope?.columns.includes(i) ?? false;
@@ -342,7 +356,7 @@
 {:else}
   <!-- AS MANY COLUMNS AS FIT, AND NEVER MORE THAN THERE ARE CARDS (`cardsCount`), so three cards fill the row. -->
   <ul class="cards-grid" data-cards={cardsCount(drawnCards.length)}>
-    {#each drawnCards as r, n}
+    {#each drawnCards as r, n (cardKeys[n])}
       {@const mark = L.mark >= 0 ? markOf(said(r, L.mark), said(r, L.name)) : null}
       {@const markGlyph = markGlyphOf(mark)}
       {@const run = L.name >= 0 || L.who >= 0 ? runFaceOf(said(r, L.nameIsWho ? L.name : L.who), opts.runs?.[n], isQuiet(L, r.cells)) : null}

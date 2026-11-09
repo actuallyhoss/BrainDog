@@ -54,7 +54,7 @@
     timelineUnder,
   } from '../../src/timeline.ts';
   import { glyphName, glyphPath, glyphWaits } from '../../src/inline.ts';
-  import { rowAt, rowKey } from '../../src/cursor.ts';
+  import { rowAt, rowKey, rowKeys } from '../../src/cursor.ts';
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
   import Queue from '../Queue.svelte';
@@ -128,6 +128,10 @@
   const grouped = $derived(days.some((d) => d !== null));
   const nets = $derived(block.kind === 'timeline' ? timelineNets(days, details) : []);
   const rich = $derived(block.kind === 'timeline' && timelineRich(block.rows));
+  /* EACH ROW KEYED BY ITS OWN KEY (`rowKeys`), so a row the record added is a new element and one it dropped is taken out,
+     which a host can move in and out; by place, the rows under a new one each changed their words instead. A tick is
+     still held by place (`ticks` below), as it always was. */
+  const keys = $derived(rowKeys(block.rows));
 
 
   /** One listener on the list, so a row reports focus however deep the control that took it. */
@@ -233,7 +237,7 @@
   data-days={grouped ? '' : undefined}
   onfocusin={onrowfocus ? focused : undefined}
 >
-  {#each block.rows as row, i}
+  {#each block.rows as row, i (keys[i])}
     {@const rowId = rowKey(row, i)}
     {#if block.kind === 'todo'}
       {@const state = tickState(row.done, ticks.get(i))}
