@@ -10485,10 +10485,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const free = ctx.bypass !== undefined && ctx.bypass === p.person && bypassOn(p.person);
     const fix =
       args?.decide === undefined
-        ? 'A key never decides or puts off a question: the person does, on Decide in BrainDog.'
+        ? 'A person has to do it, on Decide in BrainDog: a key never decides or puts off a question.'
         : free
-          ? 'A key never decides, but the owner lets agents act without asking, so answer it with instructions: answer and option.'
-          : 'A key never decides. If the person told you their answer, give it on their word with instructions: answer, option, and said in their own words.';
+          ? 'A person has to do it on Decide, but the owner lets agents act without asking, so answer it with instructions: answer and option.'
+          : 'A person has to do it, and no key decides. If they told you their answer, give it on their word with instructions: answer, option, and said in their own words.';
     const call = given !== '' && option !== '' && args?.decide !== undefined ? `instructions ${JSON.stringify({ answer: given, option })}` : undefined;
     return { ...stop, fix, at: 'decide', ...(call === undefined ? {} : { try: call }) };
   };
