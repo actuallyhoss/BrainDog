@@ -33,6 +33,13 @@ const CHECK_AFTER_S = 86_400;
 /** How long the "Tried:" line may be, ellipsis included. */
 export const TRIED_MOST = 90;
 
+/**
+ * How much of a step the Next line says, ellipsis included: what a step could hold before a handoff took 1,000
+ * characters (`STEP_LINE` in `index.ts`), so a long step leaves the card as short as it was. The whole step is the
+ * context's `handoff.next`, and the run's own row.
+ */
+export const STEP_SHOWN = 280;
+
 /** How much of what a run says it is doing "Also here" quotes. */
 const DOING_MOST = 60;
 
@@ -250,13 +257,14 @@ const sentence = (said: string): string => {
 export function nextLines(open: LeftStep | null, last: LastHere | null, nowMs: number): string[] {
   const age = open === null ? null : secondsSince(open.at, nowMs);
   if (open !== null && age !== null && age <= STEP_DAYS * 86_400 && open.step.trim() !== '') {
+    const step = sentence(clipped(open.step, STEP_SHOWN));
     if (open.taken) {
       const took = secondsSince(open.taken.at, nowMs);
-      return [`${runName(open.taken.by)} took this${took === null ? '' : ` ${agoOf(took)}`}: ${sentence(open.step)}`];
+      return [`${runName(open.taken.by)} took this${took === null ? '' : ` ${agoOf(took)}`}: ${step}`];
     }
     const commits = typeof open.commits === 'number' && open.commits > 0 ? `, ${String(open.commits)} ${open.commits === 1 ? 'commit' : 'commits'} since` : '';
     const check = open.mine !== true || age >= CHECK_AFTER_S ? ' Check before acting.' : '';
-    const lines = [`${sentence(open.step)} Left by ${runName(open.by)} ${agoOf(age)}${commits}.${check}`];
+    const lines = [`${step} Left by ${runName(open.by)} ${agoOf(age)}${commits}.${check}`];
     const tried = (open.tried ?? []).map((t) => t.replace(/\s+/gu, ' ').trim().replace(/[.;]+$/u, '')).filter((t) => t !== '');
     if (tried.length > 0) lines.push(clipped(`Tried: ${tried.join('; ')}`, TRIED_MOST));
     return lines;

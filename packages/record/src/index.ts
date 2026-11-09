@@ -1058,6 +1058,12 @@ const KEPT = 50;
 /** The longest line a run carries, which is a note's ceiling. */
 const LINE = 280;
 /**
+ * The longest step, dead end, note or doing a run's `handoff` and `attach` take. 280 cut a step in two (2 Nov, Pups): an
+ * agent said half of what the next session needed and the rest nowhere. The card draws a step short (`STEP_SHOWN` in
+ * `same-tree.ts`), so a long one costs nobody's briefing; a branch and a commit keep `LINE`.
+ */
+const STEP_LINE = 1_000;
+/**
  * The next steps that name no step, lower case and with the punctuation gone. `handoff`'s description says "'carry on'
  * is not one": the run that reads it next learns nothing it could not have guessed.
  */
@@ -12880,14 +12886,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       .map((o) => ({ ...o.org, linked: o.own }));
   };
 
-  /** An argument that is a line of text, `undefined` when it was not sent, or the refusal saying why not. */
+  /**
+   * An argument that is a line of text, `undefined` when it was not sent, or the refusal saying why not. A run's own
+   * words (`next`, `tried`, `note`, `doing`) take `STEP_LINE`; a branch, a commit and anything else `LINE`.
+   */
   const line = (args: Record<string, unknown>, key: string): Result<string | undefined> => {
     const value = args[key];
     if (value === undefined || value === null) return ok(undefined);
     if (typeof value !== 'string' || !value.trim())
       return no('VALUE_MALFORMED', `${key} is a line of text, and this one is ${JSON.stringify(value) ?? String(value)}.`, { at: key });
     const said = value.trim();
-    if (said.length > LINE) return no('OUT_OF_BOUNDS', `${key} is at most ${LINE} characters, and this one is ${said.length}.`, { at: key });
+    const most = key === 'next' || key === 'tried' || key === 'note' || key === 'doing' ? STEP_LINE : LINE;
+    if (said.length > most) return no('OUT_OF_BOUNDS', `${key} is at most ${String(most)} characters, and this one is ${String(said.length)}.`, { at: key });
     return ok(said);
   };
 
