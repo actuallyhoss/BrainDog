@@ -95,7 +95,7 @@ Before its first call, every agent is given the same short rules:
 
 - Call `context` first. It names the run, the project, the next step and what is waiting.
 - Suggest, and let you decide in BrainDog. It asks with `propose`, and acts on its own only when you tell it to, passing on your words.
-- Write short and plain, for a phone: names, never ids, and one line where one will do.
+- Write short and plain, for a phone: say things by name, with an id only in brackets after the name, and one line where one will do.
 - Meet everyone it works with or hears of, with an email or a handle.
 - A key never goes in a row, a note or a tool call. It goes in with `braindog keys put`.
 - After a fix, a surprise or a dead end a later session would repeat, keep a learning.

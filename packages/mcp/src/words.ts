@@ -622,3 +622,57 @@ export function unsaid(fix: string, at: string | undefined): string {
   if (called !== null) return `Say which ${called[1]!} you mean${where(called[1]!)}.${called[2] ?? ''}`;
   return fix.replace(/\bundefined\b/gu, 'nothing');
 }
+
+/**
+ * An id as a sentence may say one: a list's handle (`tasks#14`), a handle the record numbers with a prefix of its own
+ * (`S42`, `SG290`, `LN3`, `D7`, `IN5`), a row's own id (a ULID with a digit in it) and a person's or a token's.
+ *
+ * A PREFIX IS THE RECORD'S OWN, NOT EVERY CAPITAL AND A NUMBER, so "Q3", "M1", "MP3", "UTF8" and "S3" (a bucket) stay
+ * words: a run is `S` and two digits or more, and `SG`, `LN`, `IN` and `D` are the prefixes the kernel and the agents
+ * pack speak. A list an add-on numbers with a prefix of its own is not looked for, so the check misses before it accuses.
+ */
+const AN_ID = String.raw`(?:[a-z][a-z0-9_]*#[1-9][0-9]*|S[1-9][0-9]{1,6}|(?:SG|LN|IN|D)[1-9][0-9]{0,6}|(?=[0-9A-HJKMNP-TV-Z]*[0-9])[0-9A-HJKMNP-TV-Z]{26}|[pt]_(?=[a-z]*[0-9A-Z])[0-9A-Za-z]+)`;
+/** One or several, each with the version a line may say beside it, `(tasks#8 v1)`, as `context`'s lanes do. */
+const IDS = String.raw`${AN_ID}(?:\s+v[1-9][0-9]*)?(?:\s*(?:,|;|&|and)\s*${AN_ID}(?:\s+v[1-9][0-9]*)?)*`;
+/** A trailing reference: ids alone in brackets, or after a dot at the end of a line, as a row's line ends on one. */
+const BRACKETED_IDS = new RegExp(String.raw`\(\s*${IDS}\s*\)|\[\s*${IDS}\s*\]|\s\u00b7\s*${IDS}\s*$`, 'gu');
+const SAID_ID = new RegExp(String.raw`\b${AN_ID}\b`, 'gu');
+/** Where a name can end, so a bracket after it is that name's reference: a word, a figure, a quote, a stop, a mark. */
+const NAME_ENDS = /[\p{L}\p{N}"'\u2019\u201d)\]?!.\u2026*_]$/u;
+
+/**
+ * THE IDS A TEXT SAYS WHERE A NAME BELONGS, each with its line, in the order it says them; none when the text says each
+ * thing by name.
+ *
+ * NAMES, NEVER IDS (the rethink's seventh pick, 16 Oct, and the instructions' third rule). A real agent still wrote "LN3
+ * says" and "tasks#14" to the owner (6 Nov), so the door check's names row holds every line a real session says to
+ * this (`tools/door-check/manners.check.mjs`).
+ *
+ * AN ID IS SAID ONLY AS ITS NAME'S TRAILING REFERENCE: in brackets after the words it names, as `named` writes one,
+ * `Fix the login (tasks#14)`, or several there, `(tasks#3, tasks#9)`; or after a dot at the end of a line. Anywhere else
+ * it stands where the name should: "LN3 says", "tasks#14 is late", "(S42) Morning tidy", "Done: S42", and a bracket with
+ * other words in it, "(see tasks#3)", is the sentence's.
+ *
+ * CODE IS NOT PROSE: a span in backticks, a quoted value and a call's braces carry what a tool takes, `handoff
+ * {done:"tasks#3"}`; an address's fragment is the address's; and a receipt's line carries the batch `undo` takes. Each
+ * is left out before the ids are looked for.
+ */
+export function spokenIds(text: string): { id: string; line: string }[] {
+  const out: { id: string; line: string }[] = [];
+  /* A FENCED BLOCK IS CODE WHOLE, an unclosed one to the end, before the text is read a line at a time. */
+  for (const line of text.replace(/```[\s\S]*?(?:```|$)/gu, '\n').split('\n')) {
+    if (/^\s*Receipt: /u.test(line)) continue;
+    let prose = line
+      .replace(/\b(?:https?:\/\/|www\.)\S+/gu, ' ')
+      .replace(/`[^`]*`/gu, ' ')
+      .replace(/\S+=\S+/gu, ' ');
+    for (let before = ''; before !== prose; ) {
+      before = prose;
+      prose = prose.replace(/\{[^{}]*\}/gu, ' ');
+    }
+    prose = prose.replace(/"[^"]*"/gu, '""').replace(/\u201c[^\u201d]*\u201d/gu, '""');
+    prose = prose.replace(BRACKETED_IDS, (ref, at: number, whole: string) => (NAME_ENDS.test(whole.slice(0, at).trimEnd()) ? ' ' : ref));
+    for (const hit of prose.matchAll(SAID_ID)) out.push({ id: hit[0], line: line.trim() });
+  }
+  return out;
+}
