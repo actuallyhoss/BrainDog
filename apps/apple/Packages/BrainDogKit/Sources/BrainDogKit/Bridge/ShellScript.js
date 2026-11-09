@@ -11,7 +11,7 @@
     }
   };
   const text = (x, most = 512) => (typeof x === 'string' ? x.slice(0, most) : '');
-  const subs = { slash: new Set(), search: new Set(), goto: new Set(), saved: new Set(), unsaved: new Set(), refresh: new Set() };
+  const subs = { slash: new Set(), search: new Set(), goto: new Set(), saved: new Set(), unsaved: new Set(), refresh: new Set(), action: new Set() };
   let readied = false;
   // THE IPHONE'S PERMISSION ASK ANSWERS (M4): native emits `pushAnswer` with 'yes' or 'no', and the page's `askPush` reads
   // it. Unanswered in a minute, it answers nothing, which the page reads as "said nothing". The Mac answers nothing at once.
