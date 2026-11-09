@@ -234,8 +234,8 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
      4.2.2 SINCE 30 October: who may be listed twice, in plainer words. 4.3.0 SINCE 2 November: people and organisations
      counted apart. 4.4.0, 4.5.0 and 4.6.0 SINCE 2 November: the roles a person may hold. 4.7.0 SINCE 3 November: a
      person's facts are fields. 4.7.1 SINCE 3 November: a person's note stops repeating them. 4.7.2 SINCE 4 November: no
-     real names in the script's comments. */
-  assert.equal(doc.version, '4.7.2');
+     real names in the script's comments. 4.8.0 SINCE 9 November: a person wears a photo in place of their letter. */
+  assert.equal(doc.version, '4.8.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');

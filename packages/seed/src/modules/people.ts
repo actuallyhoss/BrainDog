@@ -281,6 +281,10 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
        can be pointed elsewhere first. A person folded into another by a merge goes as before when nothing names them;
        when something does, accepting the merge is refused with the same sentence, which is the stranding this stops. */
     delete: 'refuse_while_referenced',
+    /* A PERSON'S PHOTO, SINCE People 4.8.0 (his word of 4 and 9 November: "same with people"): the file field their
+       picture is kept in, drawn in place of their letter wherever their face is. People wear no mark and no accent, so the
+       picture is all their identity names. */
+    identity: { picture: 'picture' },
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
       /* Optional, because a person an agent meets in a commit has no role until somebody gives one.
@@ -331,6 +335,10 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
       { id: 'titles', label: 'Roles', type: 'list', of: 'text' },
       /* ONE SHORT LINE ABOUT THEM, drawn under their name; `note` below it is everything else. */
       { id: 'about', label: 'About', type: 'text' },
+      /* THEIR PHOTO, SINCE People 4.8.0: a file the record holds, `{ sha256, mime, bytes, name }`, drawn in place of their
+         letter. An agent that finds one saves it here, and asks before replacing one already chosen. Optional, so every
+         person already written stays valid. */
+      { id: 'picture', label: 'Photo', type: 'file' },
       { id: 'nationality', label: 'Nationality', type: 'text' },
       { id: 'country', label: 'Country', type: 'text' },
       { id: 'city', label: 'City', type: 'text' },

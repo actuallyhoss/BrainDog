@@ -3947,6 +3947,25 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'portfolio@1.32.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-lane-earning
+      metric.projects-live metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track
+      metric.projects-parked metric.projects-past-aim metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      metric.readings-held
+      page.all-numbers page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.kind-offers-kpis rule.project-past-aim
+      script.kind_drafts script.kpi_backfill
+    `,
+    declares: 'bef2ebb1faa22c71',
+    history: [
+      'portfolio 1.32.0 of 9 November (pictures): `register.things` gains `picture`, a file, and names it as `identity.picture`, so a project wears its logo in place of its mark -> bef2ebb1faa22c71',
+    ],
+  },
+
   'portfolio@1.31.2': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
@@ -4532,6 +4551,22 @@ const DECLARED: Record<string, Version> = {
     declares: '51a1eb436db60ba7',
     history: [
       'People 4.7.2, rest1104 of 4 November: a comment inside `script.people_fields` named real people and companies, and every install was handed it as source. Invented now; only the source moved. -> 51a1eb436db60ba7',
+    ],
+  },
+
+  'people@4.8.0': {
+    holds: `
+      metric.organisations-clients metric.organisations-count metric.organisations-from-card-texts metric.organisations-known
+      metric.organisations-not-clients metric.people-clients metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d
+      metric.people-in-touch-90d metric.people-not-clients metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders rule.people-fields
+      script.people_fields
+    `,
+    declares: 'df4e91c778e61435',
+    history: [
+      'People 4.8.0 of 9 November (pictures): `register.people` gains `picture` (Photo), a file, and declares `identity: { picture }`, so a person wears their photo in place of their letter -> df4e91c778e61435',
     ],
   },
 

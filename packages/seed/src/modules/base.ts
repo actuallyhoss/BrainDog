@@ -29,7 +29,12 @@ export type SeedRegister = {
   /** A day field the record fills when a row enters a `done` state and empties when it leaves one. */
   finished?: string;
   fields: readonly SeedField[];
-  identity?: { mark: string; accent: string };
+  /**
+   * Its rows' identity: the text field a mark is kept in and the int field its frozen hue (13 §2.1b), and the file field
+   * a row's picture is kept in, a project's logo or a person's photo, drawn in place of the mark or the letter. People
+   * name a picture and no mark, so each part may be left out.
+   */
+  identity?: { mark?: string; accent?: string; picture?: string };
   icon?: string;
   pack?: string;
   seq_prefix?: string;

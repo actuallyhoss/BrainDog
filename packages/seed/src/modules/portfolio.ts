@@ -244,8 +244,9 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
     state: 'lane',
     pack: 'portfolio',
     // Rows of this register HAVE an identity: one mark and one accent each, chosen at create and
-    // frozen, never hand-picked and never the only signal (13 §2.1b).
-    identity: { mark: 'mark', accent: 'hue' },
+    // frozen, never hand-picked and never the only signal (13 §2.1b). AND A PICTURE SINCE portfolio 1.32.0 (his word of 4
+    // and 9 November): its logo, drawn in place of the mark wherever the project is, changed by hovering its mark.
+    identity: { mark: 'mark', accent: 'hue', picture: 'picture' },
     /* THE PROJECTS, for every register with a `scope:` field: a run is placed in the project whose
        repositories or folders it is working in, and is global anywhere else. */
     scopes: { repos: 'repos', folders: 'folders' },
@@ -328,6 +329,11 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
       { id: 'draft', label: 'Not kept yet', type: 'bool', default: false, hidden_from_agents: true },
       { id: 'mark', type: 'text', hidden_from_agents: true },
       { id: 'hue', type: 'int', hidden_from_agents: true },
+      /* ITS LOGO, SINCE portfolio 1.32.0 (his word of 4 and 9 November: "projects to be able to change their logo"): a file
+         the record holds, `{ sha256, mime, bytes, name }`, drawn in place of the mark. Not hidden from agents, since an
+         agent that finds a project's logo saves it here, and asks before replacing one already chosen. Optional, so every
+         project already written stays valid. */
+      { id: 'picture', label: 'Picture', type: 'file' },
       { id: 'note', type: 'document' },
       { id: 'repos', label: 'Repositories', type: 'list', of: 'text' },
       { id: 'folders', label: 'Folders', type: 'list', of: 'text' },
