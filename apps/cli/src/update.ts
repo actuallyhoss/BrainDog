@@ -27,13 +27,18 @@
  * was read, and a mismatch is refused, rather than an update that reports one build and installs another.
  *
  * NOT FROM A CHECKOUT. Run from the sources, `main.ts` says `dev+0000000` and the file it would replace is a source
- * file, so it refuses in one sentence. It never runs on its own at a session's start (the owner's choice): the
- * start hook only says the command is behind, and this verb is typed.
+ * file, so it refuses in one sentence. It runs on its own at a session's start only while the owner says so, with his
+ * switch in Settings > Agents (`upkeep.ts`); otherwise the start hook only says the command is behind, and this verb is typed.
+ *
+ * ONE AT A TIME ON A MACHINE. With that switch on, several sessions starting together each find the command behind, and two
+ * downloads written to the one `braindog.new.mjs` could rename half a file into place. So the swap holds a lock beside the
+ * installed file (`takeLock`) from the first download to the last profile placed, and a second update finds it held and
+ * changes nothing.
  */
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, copyFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -74,7 +79,63 @@ export interface UpdateIo {
   place?: (file: string) => Placed;
   /** The rename that swaps the download into place; `renameSync` unless a test makes it fail. */
   rename?: (from: string, to: string) => void;
+  /**
+   * Ends every read when it aborts, beside each read's own time limit: the session start's short wait (`upkeep.ts`). A read
+   * it ends changes nothing, as any read that fails.
+   */
+  signal?: AbortSignal;
+  /** Told once the new build is in place and placed again: the build it was, the build it is, and how the placing went. */
+  updated?: (was: string, now: string, placed: Placed) => void;
 }
+
+/** The file beside the installed command that says an update is under way on this machine (`takeLock`). */
+export const lockOf = (file: string): string => `${file}.updating`;
+
+/** How long a lock stands before it is taken for one an update left when it was stopped: past the slowest update's reads. */
+export const LOCK_MS = 5 * 60_000;
+
+/** Whether another update on this machine holds the lock now. A lock that cannot be read is none. */
+export function updating(file: string, now: number = Date.now()): boolean {
+  try {
+    return now - statSync(lockOf(file)).mtimeMs < LOCK_MS;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The lock, taken, with the way to let it go; `null` while another update holds it. Made with `wx`, so of two updates
+ * that reach here together exactly one makes it. One older than `LOCK_MS` was left by an update that was stopped (a
+ * session closed under it) and is taken over. A folder that cannot be written takes no lock: the download that follows
+ * cannot be written there either, and says so in its own words.
+ */
+function takeLock(file: string): (() => void) | null {
+  const at = lockOf(file);
+  for (let tries = 0; tries < 2; tries++) {
+    try {
+      writeFileSync(at, `${String(process.pid)}\n`, { flag: 'wx', mode: 0o600 });
+      return () => {
+        try {
+          rmSync(at, { force: true });
+        } catch {
+          /* Left behind, it is taken over once it is older than LOCK_MS. */
+        }
+      };
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') return () => undefined;
+      if (updating(file)) return null;
+      try {
+        rmSync(at, { force: true });
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/** What an update says when another one on this machine holds the lock. */
+export const BUSY = 'Another braindog update is running on this machine, so this one changed nothing. Run braindog update again in a minute.';
 
 /** Two builds as a person compares them: the dates when they differ, the whole builds when one day holds both. */
 export function pair(a: string, b: string): [string, string] {
@@ -97,8 +158,8 @@ export function checkLine(mine: string, served: string): string {
  * `--version` check below. So a move anywhere but https ends the read before that address is asked anything. The one
  * other address it may stay on is the one it began at, which is a test's own server on this machine.
  */
-async function reached(get: typeof fetch, url: string, ms: number): Promise<Response> {
-  const signal = AbortSignal.timeout(ms);
+async function reached(get: typeof fetch, url: string, ms: number, outer?: AbortSignal): Promise<Response> {
+  const signal = outer === undefined ? AbortSignal.timeout(ms) : AbortSignal.any([AbortSignal.timeout(ms), outer]);
   const began = new URL(url).origin;
   let at = url;
   for (let moves = 0; ; moves++) {
@@ -113,8 +174,8 @@ async function reached(get: typeof fetch, url: string, ms: number): Promise<Resp
 }
 
 /** One text file from the site, trimmed, with the reason it could not be read when it could not. */
-async function text(get: typeof fetch, url: string, ms: number): Promise<string> {
-  const res = await reached(get, url, ms);
+async function text(get: typeof fetch, url: string, ms: number, outer?: AbortSignal): Promise<string> {
+  const res = await reached(get, url, ms, outer);
   if (!res.ok) throw new Error(`it answered ${res.status}`);
   return (await res.text()).trim();
 }
@@ -145,7 +206,7 @@ export async function update(args: string[], io: UpdateIo): Promise<number> {
 
   let served: string;
   try {
-    served = await text(get, `${base}/braindog.mjs.build`, 10_000);
+    served = await text(get, `${base}/braindog.mjs.build`, 10_000, io.signal);
   } catch (e) {
     io.err(`The build that is out could not be read from ${base}/braindog.mjs.build (${reason(e)})${check ? '.' : ', so nothing changed.'}`);
     return 1;
@@ -167,7 +228,24 @@ export async function update(args: string[], io: UpdateIo): Promise<number> {
     io.err(olderLine(a, b));
     return 1;
   }
+  /* ONE AT A TIME (`takeLock`), held from the first download to the last profile placed, and let go whatever happens. */
+  const release = takeLock(io.file);
+  if (release === null) {
+    io.err(BUSY);
+    return 1;
+  }
+  try {
+    return await swapIn(io, base, get, served, older);
+  } finally {
+    release();
+  }
+}
 
+/**
+ * What `update` does once it knows the build to take and holds the lock: the download, held to its sum and its signature
+ * and asked its version, the one rename that swaps it in, and the skill and hooks placed again from the new file.
+ */
+async function swapIn(io: UpdateIo, base: string, get: typeof fetch, served: string, older: boolean): Promise<number> {
   const fresh = io.file.replace(/(\.mjs)?$/, '.new.mjs');
   const prev = `${io.file}.prev`;
   let swapped = false;
@@ -177,9 +255,9 @@ export async function update(args: string[], io: UpdateIo): Promise<number> {
     const keys = io.keys ?? RELEASE_KEYS;
     let signature = '';
     try {
-      want = (await text(get, `${base}/braindog.mjs.sha256`, 10_000)).split(/\s+/)[0] ?? '';
-      if (keys.length > 0) signature = await text(get, `${base}/braindog.mjs.sig`, 10_000).catch(() => '');
-      const res = await reached(get, `${base}/braindog.mjs`, 120_000);
+      want = (await text(get, `${base}/braindog.mjs.sha256`, 10_000, io.signal)).split(/\s+/)[0] ?? '';
+      if (keys.length > 0) signature = await text(get, `${base}/braindog.mjs.sig`, 10_000, io.signal).catch(() => '');
+      const res = await reached(get, `${base}/braindog.mjs`, 120_000, io.signal);
       if (!res.ok) throw new Error(`${base}/braindog.mjs answered ${res.status}`);
       bytes = Buffer.from(await res.arrayBuffer());
     } catch (e) {
@@ -240,6 +318,7 @@ export async function update(args: string[], io: UpdateIo): Promise<number> {
   }
 
   const placed = (io.place ?? ((file: string) => placeAgain(file, io.env, io.home ?? homedir())))(io.file);
+  io.updated?.(io.build, served, placed);
   const [was, now] = pair(io.build, served);
   const head = `Updated ${was} to ${now}, the old one kept beside it as ${basename(prev)}`;
   if (placed.failed !== null) {

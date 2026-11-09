@@ -1337,6 +1337,7 @@ export const PREF_KEYS = [
   'agents.bypass',
   'name.asked',
   'bell.opened',
+  'agents.self_update',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
@@ -1402,6 +1403,13 @@ export const BYPASS_NOTE = 'Agents act without asking';
 /** "Agents' suggestions wait apart": the owner's own switch, on unless it is `false` (`apartOn` in the kernel). */
 export const APART_PREF = 'decide.agents_apart' satisfies PrefKey;
 /**
+ * "Keep BrainDog's command line, hooks and skill up to date by itself": the owner's own switch, `true` or absent, absent is
+ * off. The context tells the command behind his key (`build.self_update`), and its start hook then updates itself to a newer
+ * signed build and places its hooks and skill again, rather than telling him to (`apps/cli/src/upkeep.ts`). His words of
+ * 22 Oct: "to run things related to braindog (with permission) autonomously". Only he turns it on, in a browser.
+ */
+export const SELF_UPDATE_PREF = 'agents.self_update' satisfies PrefKey;
+/**
  * What each key holds, key by key. `nav.order` and `nav.hidden` are addresses (`/p/money`); `nav.shape` is a side rail (`side`), a
  * bar across the top or one menu, and `rail` is the side rail as builds before the top bar led wrote it, unasked; `pen.dismissed` is the ids of what the pen offered and the person turned down
  * (`PenItem.id`, and the navigation shape's `shape:<shape>:<reason>`), newest last. `pen.suggest` absent is on.
@@ -1431,6 +1439,10 @@ export const APART_PREF = 'decide.agents_apart' satisfies PrefKey;
  * October): absent or `true`, an agent he tells to answer a question or make a change does it, sending his words as
  * `said` (`wordOf`); `false` and every such call is refused, naming the switch. On until he turns it off, and only an
  * owner in a browser sets it, so no agent turns it back on for itself.
+ *
+ * `agents.self_update` IS "KEEP BRAINDOG'S COMMAND LINE, HOOKS AND SKILL UP TO DATE BY ITSELF" in Settings > Agents
+ * (`SELF_UPDATE_PREF`): `true` and the command on each of his machines updates itself when a session starts. Absent or
+ * `false` is off, and the start says to run braindog update, as it always did. Only an owner in a browser turns it on.
  */
 export type Prefs = {
   'nav.order'?: string[];
@@ -1479,6 +1491,8 @@ export type Prefs = {
   'boards.pages'?: Record<string, PageBoard>;
   /** Whether this person was asked their name once on signing in (named it or skipped). Absent is not yet asked. */
   'name.asked'?: boolean;
+  /** Whether the command on this person's machines keeps itself, its hooks and its skill up to date (`SELF_UPDATE_PREF`). Absent is off. */
+  'agents.self_update'?: boolean;
   /**
    * WHAT THE BELL SAID THAT THIS PERSON HAS SINCE OPENED (9 Nov, his words: "if i open the page related to the
    * notification, it should automatically clear it"): each address a bell line opens, record-relative (`/r/tasks/526`,
@@ -2255,9 +2269,10 @@ export type Context = {
   card_next?: string | null;
   /**
    * The calling command's build (its `x-braindog-cli`, else what its key last said) and whether it is older than the
-   * oldest the door still works with (`Build.min_cli`). `null` for a caller that is no key.
+   * oldest the door still works with (`Build.min_cli`). `null` for a caller that is no key. `self_update` is there, `true`,
+   * only while the person behind the key lets the command keep itself up to date (`SELF_UPDATE_PREF`).
    */
-  build?: { cli: string | null; behind: boolean } | null;
+  build?: { cli: string | null; behind: boolean; self_update?: boolean } | null;
   /**
    * WHAT STOPS THIS RUN, the whole answer's first line when set (agents and MCP plan §3.2, section 0): his stop or pause,
    * by the instruction, with the line in his words. `null` while nothing does. Optional on the type only, as the four
@@ -3697,7 +3712,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const reachMovedSince = (at: string): boolean =>
     (sql.one<{ n: number }>(
       `SELECT (SELECT count(*) FROM agent_profile WHERE updated_at > ?)
-            + (SELECT count(*) FROM pref WHERE key IN ('${ON_WORD_PREF}', '${BYPASS_PREF}', 'agents.answer_in_chat') AND updated_at > ?)
+            + (SELECT count(*) FROM pref WHERE key IN ('${ON_WORD_PREF}', '${BYPASS_PREF}', 'agents.answer_in_chat', '${SELF_UPDATE_PREF}') AND updated_at > ?)
             + (SELECT count(*) FROM ladder WHERE dropped_at > ?)
             + (SELECT count(*) FROM token WHERE revoked_at > ?) AS n`,
       at,
@@ -11938,7 +11953,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const behindIn = (said: string): boolean => said.split('\n').some((line) => line.startsWith('Update ') && line.endsWith(OLDER));
     /* WHAT AN AGENT ACTING FOR A COLLEAGUE REACHES, from the lens the door merged (`acts-for.ts`). */
     const reach = key === null ? null : actsFor(ctx, kernel.catalog(), shareNamesOf(sql, kernel.catalog()), heldSharesOf(sql, ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id) ?? []);
-    const out: Context = { ...told, card: drawn.card, card_next: drawn.next, build: key === null ? null : { cli, behind: behindIn(drawn.card) }, reach };
+    /* WHETHER THE PERSON BEHIND THE KEY LETS ITS COMMAND KEEP ITSELF UP TO DATE (`SELF_UPDATE_PREF`), which the start hook
+       reads: that one row, not every pref the person keeps, since every attach and context asks. Sent only while it is
+       on, so every other answer is as it was. */
+    const upkeep =
+      ctx.principal.kind === 'token' && sql.one<{ value: string }>('SELECT value FROM pref WHERE person_id = ? AND key = ?', ctx.principal.person, SELF_UPDATE_PREF)?.value === 'true'
+        ? { self_update: true }
+        : {};
+    const out: Context = { ...told, card: drawn.card, card_next: drawn.next, build: key === null ? null : { cli, behind: behindIn(drawn.card), ...upkeep }, reach };
     /* THE OWNER'S OWN `braindog context` KEEPS THE CARD `card.ts` DRAWS, with its More line and its signs. */
     if (key === null) return out;
     /* AN AGENT'S KEY IS ANSWERED THE PLAN (`context-plan.ts`), drawn from the facts this context already holds:
@@ -11969,7 +11991,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return {
       ...out,
       card: plan.card,
-      build: { cli, behind: behindIn(plan.card) },
+      build: { cli, behind: behindIn(plan.card), ...upkeep },
       plan: planText(plan),
       plan_card: plan.card,
       plan_tokens: plan.tokens,
@@ -15787,6 +15809,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (value === 'on' && ctx.provedAt !== undefined && clock.now() - ctx.provedAt > kernel.lockAfter() * 60_000)
           return no('NEEDS_BROWSER_SESSION', 'Sign in again to let agents do everything without asking.', { at: 'proof' });
         kept = value as 'on' | 'off' | null;
+      } else if (key === SELF_UPDATE_PREF) {
+        /* "KEEP BRAINDOG'S COMMAND LINE, HOOKS AND SKILL UP TO DATE BY ITSELF" IS THE OWNER'S, IN A BROWSER: with it on, the
+           command on his machines puts in a newer build that nobody pressed for, so it is held to `admin`'s door as his
+           other switches are. AN AGENT MAY TURN IT OFF, NEVER ON, on his word or not (`agentBehind`). */
+        const owner = admin(ctx, 'let BrainDog update itself on your computers');
+        if (owner) return { ok: false as const, refusal: owner };
+        if (value !== null && typeof value !== 'boolean') return no('VALUE_MALFORMED', `${key} is true or false, or null to take it away.`, { at: 'value' });
+        if (value === true && agentBehind(ctx))
+          return no('NEEDS_BROWSER_SESSION', `Only you turn on "Keep BrainDog's command line, hooks and skill up to date by itself", in Settings > Agents.`, { at: 'principal' });
+        kept = value as boolean | null;
       } else if (value !== null && (key === 'look.contrast' || key === 'look.shot' || key === 'name.asked')) {
         if (typeof value !== 'boolean') return no('VALUE_MALFORMED', `${key} is true or false, or null to take it away.`, { at: 'value' });
         kept = value;

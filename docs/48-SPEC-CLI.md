@@ -1009,7 +1009,9 @@ profile yet; when `env apply` does, it is a program entry (§5.19).
 
 ### 5.17 · `braindog update [--check] [--older]` (`update.ts`)
 
-The command keeps itself current, and only when it is typed: the start hook says it is behind and never runs this.
+The command keeps itself current when it is typed, and at a session's start only while the owner's switch "Keep
+BrainDog's command line, hooks and skill up to date by itself" is on (Settings > Agents, `agents.self_update`; see the
+end of this section). With it off, the start hook says it is behind and never runs this.
 
 1. From a checkout (build `dev+0000000`) it refuses in one sentence: a checkout is updated with git.
 2. Reads `<base>/braindog.mjs.build` (base `https://brain.dog/cli`), one line holding the build that is out. `--check`
@@ -1025,6 +1027,18 @@ The command keeps itself current, and only when it is typed: the start hook says
 4. Copies the installed file to `braindog.mjs.prev` and renames the download over it, one atomic rename, so the
    installed name always holds a whole command. Any failure deletes the download and leaves the installed file.
 5. Runs `install --apply` to place the Agent Skill and hooks again, and says the old and new builds.
+
+Steps 3 to 5 hold a lock beside the installed file (`braindog.mjs.updating`), so two updates on one machine never swap
+at once: a second finds it held and changes nothing. A lock older than five minutes was left by an update that was
+stopped, and is taken over.
+
+**At a session's start, with the switch on** (`upkeep.ts`; the context carries it as `build.self_update`): when the
+start would say this command is behind, the hook runs this itself, its reads cut off after 4 s (sooner when the attach
+was slow), and says one line in place of "Run braindog update": what changed, or the reason it could not. A read cut
+short changes nothing, and the start says its usual line; a try that did not update waits an hour before the next
+(`~/.braindog/upkeep.json`). A start that finds another update under way, or the installed file already newer, says
+nothing of it. When the command is current, the hook runs `install --apply` for each profile that runs BrainDog's hooks
+and holds older hooks or an older skill, and says so in one line.
 
 ---
 

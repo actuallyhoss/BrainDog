@@ -1075,6 +1075,53 @@ function planAgentSkill(file: string, options: Options): Plan {
   return { lines, write: { file, had, value: text } };
 }
 
+/* ── hooks or skill older than this build ───────────────────────────────── */
+
+/** A command that runs one of BrainDog's own hooks, whichever event it is for (`isOurs` names the event). */
+const OURS_ANY = /braindog-hook\.(?:sh|ps1)["']?\s+[a-z]+\s*$/u;
+
+/** Whether a settings file runs any of BrainDog's own hooks. A file that does not read runs none. */
+function runsOurs(file: string): boolean {
+  try {
+    const settings: unknown = JSON.parse(unbom(readFileSync(file, 'utf8')));
+    const lists = isObject(settings) && isObject(settings.hooks) ? Object.values(settings.hooks) : [];
+    return lists.some(
+      (list) =>
+        Array.isArray(list) &&
+        list.some((group) => isObject(group) && Array.isArray(group.hooks) && group.hooks.some((h) => isObject(h) && typeof h.command === 'string' && OURS_ANY.test(h.command))),
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** A profile whose BrainDog hooks or Agent Skill this build would write, and which of the two. */
+export type Stale = { dir: string; hooks: boolean; skill: boolean };
+
+/**
+ * THE PROFILES WHOSE BRAINDOG HOOKS OR AGENT SKILL ARE NOT THIS BUILD'S, for the start hook's upkeep (`upkeep.ts`): of
+ * `profiles`, each that already runs one of BrainDog's hooks and whose `settings.json` or `skills/braindog/SKILL.md` a
+ * plain `install --apply` would write. IT ONLY READS. A profile that runs none of BrainDog's hooks is left as it is: it
+ * was never set up here, or they were taken out on purpose, or the plugin runs them. One whose settings do not read is
+ * left too, for `install` to say what is wrong with it when he runs it.
+ */
+export function staleProfiles(profiles: readonly string[], scripts: string): Stale[] {
+  const options: Options = { apply: false, scripts };
+  const out: Stale[] = [];
+  for (const dir of profiles) {
+    const settings = join(dir, 'settings.json');
+    if (!runsOurs(settings)) continue;
+    try {
+      const hooks = planSettings(settings, options).write !== null;
+      const skill = planAgentSkill(join(dir, 'skills', 'braindog', 'SKILL.md'), options).write !== null;
+      if (hooks || skill) out.push({ dir, hooks, skill });
+    } catch {
+      /* Not read as settings: left as it is. */
+    }
+  }
+  return out;
+}
+
 /* ── `pack install --force` and `pack uninstall --force` ───────────────────────────────────────── */
 
 /**
