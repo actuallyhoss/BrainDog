@@ -330,15 +330,14 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
     /* THE CHECK LIST'S OWN SCHEMA CARRIES THE VIEWER (`except`), so `compile` leaves out a statement somebody kept private. */
     const kept = compile(undefined, schema);
     const list = onList(check.register);
-    const row = sql.one<{ fields: string }>(
-      `SELECT fields FROM entry WHERE ${list.sql} AND deleted_at IS NULL AND (${kept.sql}) AND json_extract(fields, '${jsonPath(check.by)}') = ?
+    const text = `SELECT fields FROM entry WHERE ${list.sql} AND deleted_at IS NULL AND (${kept.sql}) AND json_extract(fields, '${jsonPath(check.by)}') = ?
          AND json_extract(fields, '${jsonPath(check.balance)}.amount') IS NOT NULL AND ${day(check.on)} ${after ? '>' : '<='} ?
-       ORDER BY ${day(check.on)} ${after ? 'ASC' : 'DESC'}, rowid ${after ? 'ASC' : 'DESC'} LIMIT 1`,
-      ...list.params,
-      ...kept.params,
-      account,
-      on,
-    );
+       ORDER BY ${day(check.on)} ${after ? 'ASC' : 'DESC'}, rowid ${after ? 'ASC' : 'DESC'} LIMIT 1`;
+    const params = [...list.params, ...kept.params, account, on];
+    /* ASKED ONCE FOR A READ (`walks`), by the statement as it is asked: every figure rolled over the accounts asked each
+       account's statement again, seven times an account on Money's page, and each ask read the ledger. */
+    const ask = () => sql.one<{ fields: string }>(text, ...params);
+    const row = ctx.walks === undefined ? ask() : ctx.walks.once(JSON.stringify(['stated', text, params]), ask);
     if (!row) return null;
     const fields = JSON.parse(row.fields) as Record<string, unknown>;
     const money = moneyOf(fields[check.balance]);
