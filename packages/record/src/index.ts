@@ -10449,6 +10449,33 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * Why `decide` refuses a key, said with the way that does answer.
+   *
+   * A KEY NEVER DECIDES (ADR-060), and "a person has to do it, signed in" was all it was told, so on 9 Nov an agent the
+   * owner had told to decline two questions pressed Decline in his own browser instead. What answers for him is
+   * `instructions` with `answer` and `option` (`wordAnswer`): on his word, his words as `said`, or on his switch to act
+   * without asking, which is his word already. The `try` is that call for the same question and option, and never
+   * carries `said`, which only he can give: sent without it, the record asks for his words unless his switch is on. A
+   * report key keeps its own sentence; a key that may not answer on a word is told so by `wordOf` there.
+   */
+  type DecideAsked = { id?: unknown; ids?: unknown; decide?: { option?: unknown } | undefined } | undefined;
+  const keyDecidesNot = (ctx: CallContext, stop: Refusal, args: DecideAsked): Refusal => {
+    const p = ctx.principal;
+    if (p.kind !== 'token' || stop.code !== 'FORBIDDEN' || reportKeyOf(ctx) !== null) return stop;
+    const given = typeof args?.id === 'string' && args.ids === undefined ? args.id.trim() : '';
+    const option = typeof args?.decide?.option === 'string' ? args.decide.option.trim() : '';
+    const free = ctx.bypass !== undefined && ctx.bypass === p.person && bypassOn(p.person);
+    const fix =
+      args?.decide === undefined
+        ? 'A key never decides or puts off a question: the person does, on Decide in BrainDog.'
+        : free
+          ? 'A key never decides, but the owner lets agents act without asking, so answer it with instructions: answer and option.'
+          : 'A key never decides. If the person told you their answer, give it on their word with instructions: answer, option, and said in their own words.';
+    const call = given !== '' && option !== '' && args?.decide !== undefined ? `instructions ${JSON.stringify({ answer: given, option })}` : undefined;
+    return { ...stop, fix, at: 'decide', ...(call === undefined ? {} : { try: call }) };
+  };
+
+  /**
    * Why `decide` refuses a person invited to named lists, said as the rule it is.
    *
    * `allows`'S SENTENCE IS FOR A CALL ABOUT THE RECORD ITSELF, AND A QUESTION IS OFTEN ABOUT HER LIST. A member invited
@@ -10458,8 +10485,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * list's questions is the owner's call and is not decided here. The sentence is said before the id is read, so a
    * question about a list she cannot see and an id that names nothing get the same words.
    */
-  const decidesNot = (ctx: CallContext, stop: Refusal): Refusal => {
+  const decidesNot = (ctx: CallContext, stop: Refusal, args?: DecideAsked): Refusal => {
     const p = ctx.principal;
+    if (p.kind === 'token') return keyDecidesNot(ctx, stop, args);
     const held = p.kind === 'person' && p.level === null && Array.isArray(ctx.registers) && ctx.registers.length > 0 ? ctx.registers : null;
     if (held === null || stop.code !== 'FORBIDDEN') return stop;
     const named = new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(held.map(listName));
@@ -16337,7 +16365,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       ctx: CallContext,
     ) {
       const stop = guard(ctx, 'decide');
-      if (stop) return { ok: false as const, refusal: decidesNot(ctx, stop) };
+      if (stop) return { ok: false as const, refusal: decidesNot(ctx, stop, args) };
       /* SEVERAL AT ONCE (`answerMany`): `ids` in place of `id`, never both. */
       if (args?.ids !== undefined) {
         if (args.id !== undefined) return no('VALUE_MALFORMED', 'Name one question in id, or several in ids, not both.', { at: 'ids' });
