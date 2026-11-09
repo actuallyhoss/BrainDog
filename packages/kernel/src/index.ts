@@ -113,7 +113,7 @@ import { leasedPushTarget, ownersPushSubs, personPushSubs, pushKindOf, pushOpenO
 import { access, invite, members, remove, type AccessLens, type Held, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
 import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, groupKept, groupShares as groupSharesOf, meOf, saysMe, sharesFor as heldSharesOf, LensCache, newListGrants, putGroup, putShare, retireGroup, revokeShare, setGroupMember, shareKept, sharesKept, sharesWaiting, type GroupKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
 import { activeAt, shareReach, type Cap as LensCapOf, type Catalog } from './lens.ts';
-import { NOBODY, narrowed, ruleOf, scopeFor, viewerOfRead, type Wheres } from './members.ts';
+import { NOBODY, narrowed, ruleOf, scopeFor, viewerOfRead, viewerOfScope, type Wheres } from './members.ts';
 import { accountStop, stopped as stoppedOf, type Suspended } from './members.ts';
 import {
   GONE as INVITE_GONE,
@@ -2789,14 +2789,19 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * sees narrowed, answers `undefined`, which `where` refuses in the words of a list that is not there, so the hop
    * says nothing of what it holds. NOT ON THE SHARED `schemaOf`, which rules and the record's other reads compile
    * against: a rule is evaluated in memory, where a hop always answers false, so it is refused at install instead.
+   * AND WITH `viewer`, A LIST A HOP GOES INTO LEAVES OUT THE ROWS KEPT FROM HER (`except`, migration 40): a `pointed`
+   * over Categories counted the Ledger entry somebody else kept private, so which of her categories came back said
+   * that a row she is not shown exists.
    */
-  const hopSchemaOf = (register: string, reads?: (register: string) => boolean): Schema | undefined =>
-    registers.has(register) && (reads?.(register) ?? true) ? { ...schemaOf(register), schemaOf: (r: string) => hopSchemaOf(r, reads) } : undefined;
-  /** The list a reader asked about, whole, with its hops held to what `reads` lets through. */
+  const hopSchemaOf = (register: string, reads?: (register: string) => boolean, viewer?: string): Schema | undefined =>
+    registers.has(register) && (reads?.(register) ?? true)
+      ? { ...schemaOf(register), ...(viewer !== undefined && anyHiddenFrom(viewer, register) ? { except: viewer } : {}), schemaOf: (r: string) => hopSchemaOf(r, reads, viewer) }
+      : undefined;
+  /** The list a reader asked about, whole, with its hops held to what `reads` lets through and to the rows `viewer` is shown. */
   const readerSchemaOf =
-    (reads?: (register: string) => boolean) =>
+    (reads?: (register: string) => boolean, viewer?: string) =>
     (register: string): Schema | null =>
-      registers.has(register) ? { ...schemaOf(register), schemaOf: (r: string) => hopSchemaOf(r, reads) } : null;
+      registers.has(register) ? { ...schemaOf(register), schemaOf: (r: string) => hopSchemaOf(r, reads, viewer) } : null;
 
   /**
    * THE FAR SIDE OF A `via`, held to what the reader may open: the linked rows of one list by id, and the one
@@ -4237,7 +4242,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /* A HOP FROM A READ GOES ONLY WHERE THE READER MAY READ (`hopSchemaOf`): the record's `reads` says no to a list
        its caller may not open or sees narrowed. A declared page's read passes no `reads`; reach checked its lists. */
-    const whole = readerSchemaOf(q.hops ?? q.reads)(q.register)!;
+    /* AND OVER THE ROWS SHE IS SHOWN THERE: the viewer her scope carries, else the reader a page's read names, so a
+       block's `pointed` never counts a row kept private from her on the list it hops into. */
+    const whole = readerSchemaOf(q.hops ?? q.reads, viewerOfScope(grant) ?? q.reader)(q.register)!;
     const schema: Schema = hidden.size === 0 ? whole : { ...whole, fields: Object.fromEntries(Object.entries(whole.fields).filter(([id]) => !hidden.has(id))) };
     const said = predicateOf(q.where, schema, q.reads === undefined ? evalContext([], undefined, q.reader) : { ...evalContext([], undefined, q.reader), reads: q.reads });
     if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
@@ -7649,9 +7656,19 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   const withViewer = (viewer: string | undefined, c: EvalContext): EvalContext => {
     if (viewer === undefined || !anyHiddenFrom(viewer)) return c;
     const inner = c.schemaOf;
+    /* AND EVERY LIST A HOP GOES INTO FROM IT (`pointed`) that holds a row kept from her, so a figure over Categories
+       never counts one for a Ledger entry kept private from her. */
+    const kept = (s: Schema, near: boolean): Schema => {
+      const hop = s.schemaOf;
+      return {
+        ...s,
+        ...(near || anyHiddenFrom(viewer, s.register) ? { except: viewer } : {}),
+        ...(hop === undefined ? {} : { schemaOf: (r: string) => ((there) => (there === undefined ? undefined : kept(there, false)))(hop(r)) }),
+      };
+    };
     return { ...c, viewer, schemaOf: (register) => {
       const s = inner(register);
-      return s === null ? null : { ...s, except: viewer };
+      return s === null ? null : kept(s, true);
     } };
   };
 
@@ -8878,7 +8895,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     tally: (q) =>
       holdAcross(factsHeld as HeldReadings<Result<{ value: Json; n: number }[]>>, JSON.stringify(['tally', q.register, q.field, q.where ?? null, viewer ?? null]), readableZone(recordTz()), clock.now(), once, () => {
         if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
-        const schema = hopSchemaOf(q.register)!;
+        /* A HOP COUNTS ONLY THE ROWS THE READER IS SHOWN ON THE LIST IT GOES INTO, as the table under the chips does. */
+        const schema = readerSchemaOf(undefined, viewer)(q.register)!;
         const said = predicateOf(q.where, schema, evalContext());
         if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
         const c = compile(said.predicate, schema);
@@ -8898,8 +8916,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        of what is added, and by the day a money amount is dated, so the page converts a sum a day and never a row. */
     whole: (q) => {
       if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
-      /* WITH THE HOP, as every other read of a page has it, so a sum over the Ledger may leave out what stays yours. */
-      const schema = hopSchemaOf(q.register)!;
+      /* WITH THE HOP, as every other read of a page has it, so a sum over the Ledger may leave out what stays yours. AND
+         OVER THE ROWS THE READER IS SHOWN ON THE LIST IT HOPS INTO, as `list` reads it for her. */
+      const schema = readerSchemaOf(undefined, viewer)(q.register)!;
       const c = compile(q.where, schema);
       if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
       const by = q.by.map(({ field, day }) => (day ? `substr(${fieldSqlIn(schema, field)}, 1, 10)` : `NULLIF(${fieldSqlIn(schema, field, 'text')}, '')`));

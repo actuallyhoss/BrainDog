@@ -387,6 +387,9 @@ export function scopeFor(wheres: Readonly<Wheres> | undefined, register: string,
   return (rule === undefined ? { [SCOPE]: viewer } : { [SCOPE]: viewer, rule }) as Json;
 }
 
+/** The viewer a read scope carries (`scopeFor`), or `undefined` for a grant that holds no private rows back. */
+export const viewerOfScope = (where: Json | undefined): string | undefined => (isScope(where) ? where[SCOPE] : undefined);
+
 /**
  * A VIEWER WHO IS NOBODY, for a read that leaves the record (a mail, a push, the written brief, what a model is sent):
  * every private row is left out of it, whoever made it, because the person it goes to is not the maker.

@@ -864,10 +864,14 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
     }
     const alias = `hop${level}`;
     const held = `json_extract(${alias}.fields, '${jsonPath(by)}')`;
-    params.push(register, ...(inner?.params ?? []));
+    /* AND NOT A ROW KEPT PRIVATE FROM WHOEVER READS (`except` on the list hopped into, kernel migration 40). The hop read
+       every live entry there, so a category came back for a Ledger entry somebody else kept to themselves, and which of
+       her own rows came back said that a row she is not shown exists. */
+    const kept = there.except === undefined ? '' : ` AND ${unprivate(`${alias}.id`)}`;
+    params.push(register, ...(inner?.params ?? []), ...(there.except === undefined ? [] : [there.except]));
     return (
       `id IN (SELECT ${held} FROM entry AS ${alias} WHERE ${alias}.register = ? AND ${alias}.deleted_at IS NULL` +
-      ` AND ${held} IS NOT NULL${inner === undefined ? '' : ` AND (${inner.sql})`})`
+      ` AND ${held} IS NOT NULL${inner === undefined ? '' : ` AND (${inner.sql})`}${kept})`
     );
   };
 

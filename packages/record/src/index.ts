@@ -7525,9 +7525,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (stop) return stop.shell ? shellOf(b, stop.refusal, false) : bare([stop.refusal]);
     const rule = kernel.scope(ctx, list);
     const reads = (other: string): boolean => readable(ctx, other) === null;
+    /* AS HER PAGE READ IT, BY HER (`reader`): a `pointed` then counts no row kept private from her on the list it hops into. */
+    const viewer = viewerOf(ctx);
     const seqs: number[] = [];
     for (let cursor: string | null | undefined; cursor !== null; ) {
-      const read = kernel.list({ register: list, ...(written.where === undefined ? {} : { where: written.where as never }), limit: 500, reads, ...(cursor ? { cursor } : {}) }, rule);
+      const read = kernel.list({ register: list, ...(written.where === undefined ? {} : { where: written.where as never }), limit: 500, reads, ...(viewer === undefined ? {} : { reader: viewer }), ...(cursor ? { cursor } : {}) }, rule);
       if (!read.ok) return bare('refusal' in read ? [{ ...read.refusal, at: 'where' }] : []);
       if (read.value.matched > NARROW_MOST) return shellOf(b, LONG, false);
       for (const row of read.value.rows) if (row.seq !== null) seqs.push(row.seq);
