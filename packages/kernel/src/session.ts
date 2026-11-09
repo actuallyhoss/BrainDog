@@ -226,19 +226,44 @@ export type Found = {
   state: string | null;
   project: string | null;
   by: 'spoken' | 'client' | 'adopted';
-  /** The run was opened by another token, so the caller may not be it. The caller is refused, never merged in. */
+  /**
+   * The run was opened by another token, so the caller may not be it. The ladder passes such a run over for a key's
+   * call and finds or opens the key's own (`findSession`), so for a key this is false; a caller handed one still
+   * refuses it, never merges in.
+   */
   foreign: boolean;
 };
+
+/**
+ * The client id a key's run is kept under for host session `id` when a run another key opened already holds `id`: the
+ * two joined by `~`, which no hint can carry (`CLIENT_ID` in the record and the CLI), so only the ladder finds a run by
+ * it. A host session that moved to another key, a profile's own or one made again, then has a run for each key.
+ */
+export const keyedClient = (id: string, token: string): string => `${id}~${token}`;
+
+/**
+ * The client id a new or re-attached run of key `token` is kept under for host session `id`: `id` while no live run
+ * holds it, else the key's own (`keyedClient`) while that is free, else `null`, and the run keeps none. `client_id` is
+ * unique, so writing one another run holds was refused, and the run opened with nobody's name on its writes.
+ */
+export function clientFor(sql: Sql, id: string, token: string | null): string | null {
+  const held = (c: string): boolean =>
+    sql.one<{ x: number }>(`SELECT 1 AS x FROM entry WHERE register = '${SESSION}' AND deleted_at IS NULL AND json_extract(fields, '$.client_id') = ?`, c) !== undefined;
+  if (!held(id)) return id;
+  if (token === null) return null;
+  const keyed = keyedClient(id, token);
+  return held(keyed) ? null : keyed;
+}
 
 /**
  * Rungs one to four of the ladder. `null` is rung five: open a run.
  *
  *   1. `spoken` names a run that exists and is not finished: that run.
- *   2. A name that matches nothing, or a finished run, is dropped and the next rung is tried. It is
- *      never recorded, so a stale `S7` in a header cannot conjure a row called `S7`.
- *   3. `client_id` matches a run in any state: that run, re-attached. A `client_id` that matches
- *      nothing is a host session the record has not met, so it opens its own run: adopting another
- *      would merge two agents working side by side in one checkout.
+ *   2. A name that matches nothing, a finished run or another key's run is dropped and the next rung is tried. It
+ *      is never recorded, so a stale `S7` in a header cannot conjure a row called `S7`.
+ *   3. `client_id` matches a run in any state: that run, re-attached, or when it is another key's, the caller's own
+ *      run kept under `keyedClient`. A `client_id` that matches nothing is a host session the record has not met, so
+ *      it opens its own run: adopting another would merge two agents working side by side in one checkout.
  *   4. With no run named, the newest run of the caller's own token that is active or idle and was
  *      heard from in the last 45 minutes: adopted, the one on the same machine and repository first,
  *      then the one on the same machine. Every write a host session makes without saying which run it
@@ -251,10 +276,13 @@ export type Found = {
  *      when it reads without an owner, as a person's view does, and only a run no token opened
  *      otherwise.
  *
- * A RUN BELONGS TO THE TOKEN THAT OPENED IT (`token_id`). Rungs 1 and 3 name a run outright, so a run
- * of another token found there comes back `foreign`, and the caller refuses it: a person's other key,
- * or another person's, never writes, hands off or attaches as that run. Rung 4 only guesses, so it
- * looks at the caller's own runs and a collision on one machine and repository opens a run instead.
+ * A RUN BELONGS TO THE TOKEN THAT OPENED IT (`token_id`), and a key's call never lands in another key's run: a person's
+ * other key, or another person's, never writes, hands off or attaches as it. Rungs 1 and 3 name a run outright, and a
+ * name that is another key's run is dropped as a finished one is, so the next rung is tried. A client id another key's
+ * run holds is that host session under the other key, and the caller's own run for it is the one kept under its
+ * `keyedClient` id, or none yet, and one opens. They refused instead (live 1 to 5 Nov): a host session whose key changed
+ * had every write refused "S895 is a run another key opened", and its start hook printed that in every session. Rung 4
+ * only guesses, so it looks at the caller's own runs and a collision on one machine and repository opens a run instead.
  * A run with no `token_id` was made from the app, for an agent to take up. One a person made is theirs, and only
  * their own keys may name it (`othersRun`, RM1); one an automation or the record made is shared: any key may name it.
  * `token` is the caller's token id; `undefined` reads without an owner, as a person's view does.
@@ -275,10 +303,16 @@ export function findSession(sql: Sql, hints: SessionHints, nowMs: number, token?
   const n = hints.spoken?.startsWith(PREFIX) ? hints.spoken.slice(PREFIX.length) : '';
   if (/^[1-9][0-9]*$/.test(n)) {
     const named = pick('spoken', 'seq = ?', Number(n));
-    if (named && !FINISHED.includes(named.state ?? '')) return named;
+    /* A CALLER WITH NO KEY ID HAS NO RUN OF ITS OWN TO BE FOUND UNDER, so it is handed the run, `foreign`, and refused. */
+    if (named && !FINISHED.includes(named.state ?? '') && (!named.foreign || typeof token !== 'string')) return named;
   }
 
-  if (hints.client_id) return pick('client', "json_extract(fields, '$.client_id') = ?", hints.client_id);
+  if (hints.client_id) {
+    const held = pick('client', "json_extract(fields, '$.client_id') = ?", hints.client_id);
+    if (held === null || !held.foreign || typeof token !== 'string') return held;
+    const own = pick('client', "json_extract(fields, '$.client_id') = ?", keyedClient(hints.client_id, token));
+    return own !== null && !own.foreign ? own : null;
+  }
 
   /* THE PREFERENCE IS AN ORDER: a caller that says where it is still joins its session's run when that run said nothing
      of where, and of two open runs the one where the caller is wins. `IS` compares a missing hint as NULL, so a remote

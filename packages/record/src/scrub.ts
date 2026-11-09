@@ -32,6 +32,25 @@ export function scrubbed(text: string): string | null {
 /** Whether the text holds nothing a model may not read, so it can go as it is. */
 export const clean = (text: string): boolean => scrubbed(text) === text.trim().split(/\s+/u).join(' ');
 
+/**
+ * The text with what reads as a key said as `[hidden]` and nothing else changed: its lines, spaces, addresses and links
+ * stay, for an agent reading a script's log (`logOf`). A word that reads as a key goes; a line that still reads as one
+ * after that, a shape spread over words such as a Bearer header, goes whole.
+ */
+export function keysHidden(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => {
+      if (!looksLikeCredential(line)) return line;
+      const kept = line
+        .split(/(\s+)/u)
+        .map((word) => (word.trim() !== '' && looksLikeCredential(word) ? '[hidden]' : word))
+        .join('');
+      return looksLikeCredential(kept) ? '[hidden]' : kept;
+    })
+    .join('\n');
+}
+
 /** An address in brackets beside a name, `Jo <jo@kiln.example>` or `Jo (jo@kiln.example)`, with the space before it. */
 const BRACKETED = /\s*[<([]\s*[^\s<>"'@()[\]]+@[^\s<>"'@()[\]]+\.[a-z]{2,}\s*[>)\]]/giu;
 

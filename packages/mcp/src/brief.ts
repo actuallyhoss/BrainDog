@@ -592,8 +592,13 @@ export function eventSaid(e: Record<string, unknown>, decl: Decl | undefined, lo
       return 'settled a question';
     case 'link':
       return `linked ${label || 'another entry'}`;
-    default:
-      return `${kind.replace(/[._]/gu, ' ')}${note ? `: ${note}` : ''}`;
+    default: {
+      /* A SCRIPT RUN SAYS ITS LOG'S FIRST LINE, which a refused run puts its why in: "its log says why" was the line, and
+         the why only in `format: full`, so an agent fixing the script read that it failed and not what failed. The
+         record sends the log only to whom it may (`logOf`), and `--redacted--` otherwise, which says nothing here. */
+      const log = isObject(e.to) && typeof e.to.log === 'string' && e.to.log !== '--redacted--' ? (e.to.log.split('\n').find((l) => l.trim() !== '') ?? '') : '';
+      return `${kind.replace(/[._]/gu, ' ')}${note ? `: ${note}` : ''}${log === '' ? '' : ` Log: ${clip(log.trim(), 160)}`}`;
+    }
   }
 }
 

@@ -1514,6 +1514,8 @@ type Turn = {
   /** The batch a write landed under, which its receipt hands to `undo`; or the question a `propose` filed, which `withdraw` takes back. */
   batch?: string | undefined;
   asks?: string;
+  /** What this answer read as another field, value or day before the record took it (`fieldsMended`), said after the answer. */
+  mended?: Mend[];
 };
 
 /**
@@ -3309,7 +3311,24 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         },
         ctx,
       );
-      return wrote(made, 'Added', ctx, turn);
+      const out = await wrote(made, 'Added', ctx, turn);
+      /* A DAY IN THE TITLE AND NONE IN THE DUE FIELD (6 Nov: "by Friday" went into a task's name and no date was set, so
+         it was due nowhere and reminded nobody): the answer says so, with the update that sets it. Read as `context`
+         reads days, in the record's own zone; a list with no due field, or a title naming no day, is told nothing. */
+      if (!made.ok || !isEntry(made.value) || out.say === undefined) return out;
+      const row = made.value;
+      if (!decls.has(row.register)) await learnPrefix(row.register, ctx);
+      const decl = decls.get(row.register);
+      const due = decl === undefined ? undefined : roleField(decl, 'due');
+      const title = decl?.title === undefined ? undefined : row.fields[decl.title];
+      if (due === undefined || (row.fields[due.id] !== undefined && row.fields[due.id] !== null) || typeof title !== 'string' || row.seq === null) return out;
+      if (!/\b(?:by|due|before|until|till|on)\s/iu.test(title)) return out;
+      const place = await peopleOf(ctx, turn);
+      const said = dueIn(title, (words) => dayInWords(words, place.now, { ...(place.zone === undefined ? {} : { zone: place.zone }), ...(place.locale === undefined ? {} : { locale: place.locale }) }));
+      if (said === null) return out;
+      const hint = `${due.label ?? due.id} is empty, though the ${decl?.one ?? 'title'} says "${said.words}". Set it: ${callOf('update', { spoken: spokenOf(row.register, row.seq), patch: { [due.id]: said.day } })}`;
+      const say = out.say;
+      return { ...out, say: (look) => `${say(look)}\n${hint}` };
     },
 
     update: async (args, ctx, turn) => {
@@ -3989,6 +4008,136 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     return { ...args, [at.key]: { ...at.fields, [at.field]: put } };
   }
 
+  /**
+   * A write's fields read whole against its list (`mendFields`), for a refusal about a field it has not got, a value its
+   * choice does not take, or a day said in words; `null` for any other refusal, a list the caller cannot read, or a call
+   * with nothing to read again. `key` is where the call keeps them: `fields`, or `patch` on `update`.
+   */
+  async function mendOf(name: string, args: Args, refusal: Refusal, ctx: C, turn: Turn): Promise<{ key: string; register: string; fields: Record<string, unknown>; mends: Mend[]; left: string[] } | null> {
+    const asDay = refusal.code === 'VALUE_MALFORMED' && refusal.fix.includes('takes a day, as YYYY-MM-DD');
+    if (refusal.code !== 'FIELD_UNKNOWN' && refusal.code !== 'ENUM_VALUE_UNKNOWN' && !asDay) return null;
+    const key = name === 'update' ? 'patch' : name === 'create' || name === 'triage' ? 'fields' : null;
+    const fields = key === null ? null : args[key];
+    if (key === null || !isObject(fields)) return null;
+    const at = name === 'update' ? await locate(args.spoken, ctx) : null;
+    const register = at === null ? args.register : at.ok ? at.value.register : undefined;
+    if (typeof register !== 'string') return null;
+    if (!decls.has(register)) await learnPrefix(register, ctx);
+    const decl = decls.get(register);
+    if (decl === undefined) return null;
+    /* A DAY IN WORDS AS THE RECORD'S OWN CLOCK, ZONE AND LOCALE READ IT (RL8), asked of `boot` only for a day to read. */
+    const place = Object.values(fields).some((v) => typeof v === 'string' && !/^\d{4}-\d{2}-\d{2}$/u.test(v.trim())) ? await peopleOf(ctx, turn) : null;
+    const day = (said: string): string | null =>
+      place === null ? null : dayInWords(said, place.now, { ...(place.zone === undefined ? {} : { zone: place.zone }), ...(place.locale === undefined ? {} : { locale: place.locale }) });
+    const read = mendFields(fields, decl, (field) => moneyChoice(register, field), day);
+    return { key, register, ...read };
+  }
+
+  /**
+   * THE WRITE SENT AGAIN WITH EVERY FIELD IT GOT WRONG READ AT ONCE, when every one of them is sure (`fieldMeant`,
+   * `choiceMeant`, a day read): `due` as `by`, `project` as the link that places a row, `High` as `high`. Each was a
+   * refusal of its own and a try of its own, so an agent paid a call a field. Nothing is written by the refused call, so
+   * sending it again writes once, and the answer says what was read as what (`turn.mended`). A guess or a field nothing
+   * reads as leaves the call refused, with every one named (`fieldsFor`). `null` is nothing to send.
+   */
+  async function fieldsMended(name: string, args: Args, refusal: Refusal, ctx: C, turn: Turn): Promise<Args | null> {
+    const read = await mendOf(name, args, refusal, ctx, turn);
+    if (read === null || read.mends.length === 0 || read.left.length > 0 || read.mends.some((m) => !m.sure)) return null;
+    turn.mended = [...(turn.mended ?? []), ...read.mends];
+    return { ...args, [read.key]: read.fields };
+  }
+
+  /**
+   * A `list` read again with its `where` in the list's own words, when the record refused a field it has not got or a
+   * choice it does not take and every one of them is sure (`fieldMeant`, `choiceMeant`): `{"field":"project"}` on tasks
+   * is its Project link, `"status is open"` its Status, `"is": "High"` the value `high`. A read, so sending it again costs
+   * nothing; a guess stays a refusal with its `try` (`tryFor`). `null` is nothing to send.
+   */
+  async function whereMended(args: Args, refusal: Refusal, ctx: C, turn: Turn): Promise<Args | null> {
+    if ((refusal.code !== 'FIELD_UNKNOWN' && refusal.code !== 'ENUM_VALUE_UNKNOWN') || typeof args.register !== 'string') return null;
+    if (!isObject(args.where) && typeof args.where !== 'string') return null;
+    if (!decls.has(args.register)) await learnPrefix(args.register, ctx);
+    const decl = decls.get(args.register);
+    if (decl === undefined) return null;
+    /* WHAT A where MAY NAME: the list's fields and the record's own five, which the refusal lists as `allowed`. */
+    const named = new Set([...decl.fields.map((f) => f.id), ...OWN_KEYS, ...(refusal.code === 'FIELD_UNKNOWN' ? (refusal.allowed ?? []).map(String) : [])]);
+    const mends: Mend[] = [];
+    let unsure = false;
+    if (typeof args.where === 'string') {
+      /* A SENTENCE: the word the record could not read, where a condition starts, as the field's own id. */
+      const wrong = refusal.code === 'FIELD_UNKNOWN' && typeof refusal.at === 'string' ? refusal.at : '';
+      const meant = wrong === '' || named.has(wrong) ? null : fieldMeant(wrong, decl);
+      if (meant === null || !meant.sure) return null;
+      const escaped = wrong.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+      const where = args.where.replace(new RegExp(`(^|,\\s*)${escaped}(?=\\s)`, 'u'), `$1${meant.id}`);
+      if (where === args.where) return null;
+      turn.mended = [...(turn.mended ?? []), { said: wrong, meant: meant.id, sure: true }];
+      return { ...args, where };
+    }
+    const fieldOf = (id: string): Field | undefined => decl.fields.find((f) => f.id === id);
+    const mend = (node: unknown): unknown => {
+      if (Array.isArray(node)) return node.map(mend);
+      if (!isObject(node)) return node;
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(node)) out[k] = k === 'all' || k === 'any' || k === 'none' ? mend(v) : v;
+      if (typeof node.field !== 'string') return out;
+      let id = node.field;
+      if (!named.has(id)) {
+        const meant = fieldMeant(id, decl);
+        if (meant === null || !meant.sure) {
+          unsure = true;
+          return out;
+        }
+        mends.push({ said: id, meant: meant.id, sure: true });
+        id = meant.id;
+        out.field = id;
+      }
+      const f = fieldOf(id);
+      if (f === undefined || (f.type !== 'enum' && !(f.type === 'list' && f.of === 'enum'))) return out;
+      const value = (x: unknown): unknown => {
+        if (typeof x !== 'string') return x;
+        const meant = choiceMeant(x, f, moneyChoice(args.register, id));
+        /* NOTHING READS AS IT: the record says so again, in its words. A GUESS: its `try` is `tryFor`'s. */
+        if (meant === null) return x;
+        if (!meant.sure) {
+          unsure = true;
+          return x;
+        }
+        if (meant.value !== x) mends.push({ said: x, meant: meant.value, sure: true });
+        return meant.value;
+      };
+      for (const k of ['is', 'eq', 'not', 'in', 'not_in']) if (k in out) out[k] = Array.isArray(out[k]) ? (out[k] as unknown[]).map(value) : value(out[k]);
+      return out;
+    };
+    const where = mend(args.where);
+    if (unsure || mends.length === 0) return null;
+    turn.mended = [...(turn.mended ?? []), ...mends];
+    return { ...args, where };
+  }
+
+  /**
+   * A refused write that names every field it got wrong, each with what it reads as, and the call with all of them as
+   * its `try`, where `fieldsMended` would not send it alone: a guess among them, or a field nothing reads as, which is
+   * named and leaves no `try`. A refusal it has nothing to add to stays as it came.
+   */
+  async function fieldsFor(name: string, args: Args, refusal: Refusal, ctx: C, turn: Turn): Promise<Refusal> {
+    const read = await mendOf(name, args, refusal, ctx, turn);
+    /* WHAT THIS ANSWER ALREADY READ, said too, since the call it hands back is not quite the call that was sent. */
+    const before = turn.mended === undefined || turn.mended.length === 0 ? '' : ` Read ${readAs(turn.mended)}.`;
+    /* THE FIELD THE RECORD'S OWN SENTENCE NAMES IS NOT NAMED TWICE. */
+    const unnamed = read === null ? [] : read.left.filter((l) => l !== refusal.at);
+    if (read === null || (read.mends.length === 0 && unnamed.length === 0)) return before === '' ? refusal : ({ ...refusal, fix: `${refusal.fix}${before}` } as Refusal);
+    const list = decls.get(read.register)?.name ?? read.register;
+    const parts = [
+      ...(read.mends.length === 0 ? [] : [`Send ${mendsSaid(read.mends)}.`]),
+      ...(unnamed.length === 0 ? [] : [`Nothing on ${list} reads as ${new Intl.ListFormat('en-GB', { type: 'disjunction' }).format(unnamed)}.`]),
+    ];
+    const fix = `${refusal.fix} ${parts.join(' ')}${before}`;
+    const call = read.left.length === 0 ? callOf(name, { ...args, [read.key]: read.fields }) : undefined;
+    const { try: _was, ...kept } = refusal as Refusal & { try?: string };
+    return taught({ ...kept, fix } as Refusal, call);
+  }
+
   async function refFor(name: string, args: Args, refusal: Refusal, ctx: C, turn: Turn): Promise<Refusal> {
     const at = refAt(name, args, refusal);
     if (at === null) return refusal;
@@ -4039,6 +4188,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * nothing more than a missing one. No call is handed where the title field was sent as well: one value would go.
    */
   async function titleFor(name: string, args: Args, refusal: Refusal, ctx: C): Promise<Refusal> {
+    /* A REFUSAL `fieldsFor` ALREADY MENDED WHOLE keeps its `try`, which carries the title with every other field. */
+    if ((refusal as { try?: unknown }).try !== undefined) return refusal;
     if (refusal.code !== 'FIELD_UNKNOWN' || (refusal.at !== 'title' && refusal.at !== 'name')) return refusal;
     const key = name === 'update' ? 'patch' : name === 'create' || name === 'triage' ? 'fields' : null;
     const fields = key === null ? null : args[key];
@@ -4111,12 +4262,22 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
        there. With the caller's own context, never `asked`'s hint, and never waited on. */
     beatOn(surface, ctx);
     let done = await tool(sent, asked, turn);
-    /* A REF NAMED BY THE ONE ROW CALLED THAT IS TAKEN AS THAT ROW (`refByName`), a field at a time, at most three. */
+    /* A REF NAMED BY THE ONE ROW CALLED THAT IS TAKEN AS THAT ROW (`refByName`), a field at a time, and EVERY FIELD,
+       CHOICE AND DAY IT SURELY MEANT READ AT ONCE (`fieldsMended`), at most three sends in all. */
     for (let hop = 0; hop < 3 && refused(done.result) && (name === 'create' || name === 'update' || name === 'triage'); hop++) {
-      const again = await refByName(name, sent, done.result.refusal, ctx, turn);
+      const again = (await refByName(name, sent, done.result.refusal, ctx, turn)) ?? (await fieldsMended(name, sent, done.result.refusal, ctx, turn));
       if (again === null) break;
       sent = again;
       done = await tool(sent, asked, turn);
+    }
+    /* AND A list WHOSE where NAMES A FIELD BY ITS LABEL OR A WORD FOR IT, or a choice in another case, read once more
+       with the field's own id and value (`whereMended`): `where project` on tasks was refused, and `thing` was right. */
+    if (refused(done.result) && name === 'list') {
+      const again = await whereMended(sent, done.result.refusal, ctx, turn);
+      if (again !== null) {
+        sent = again;
+        done = await tool(sent, asked, turn);
+      }
     }
     let result = done.result;
     /* THE FIREWALL BEFORE A WORD IS WRITTEN: a field hidden from the caller still on a row of
@@ -4133,6 +4294,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       }
     }
     if (refused(result)) {
+      /* EVERY FIELD THE WRITE GOT WRONG, NAMED IN ONE REFUSAL with the call that mends them all (`fieldsFor`). */
+      const fielded = await fieldsFor(name, sent, result.refusal, ctx, turn);
+      if (fielded !== result.refusal) result = { ok: false, refusal: fielded };
       /* THE LIST'S TITLE FIRST: `name` is otherwise handed the field spelled most like it, which is rarely the title. */
       const titled = await titleFor(name, sent, result.refusal, ctx);
       if (titled !== result.refusal) result = { ok: false, refusal: titled };
@@ -4171,7 +4335,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const receiptOn = (line: string): string | null =>
       RECEIPTED.has(name) || (name === 'act' && sent.call !== 'undoOwn' && (turn.batch !== undefined || turn.asks !== undefined || surface.calls?.().find((r) => r.name === sent.call)?.writes === true)) ? line : null;
     if (full || walled || !done.say) return receipted(said(result), receiptOn(receiptOf(name, '', turn, value)), null);
-    const body = done.say(await lookOf(ctx, turn, done.names));
+    /* AND WHAT IT READ AS ANOTHER FIELD, VALUE OR DAY (`fieldsMended`), so the agent sends the list's own words next time. */
+    const read = turn.mended === undefined || turn.mended.length === 0 ? '' : `\nRead ${readAs(turn.mended)}.`;
+    const body = `${done.say(await lookOf(ctx, turn, done.names))}${read}`;
     return receipted(said(result, body), receiptOn(receiptOf(name, body, turn, value)), receiptOf(name, body, turn, value, true));
   };
 
@@ -4830,6 +4996,181 @@ export function enumMeant(said: string, allowed: readonly string[]): string | nu
   /* NEITHER SPELLING NOR MEANING FINDS ONE: no guess. The refusal lists the values (RL4). */
   return null;
 }
+
+/** A key or a word as it is compared with a field's id or label: camel case parted, lower case, `_` and `-` as spaces. */
+const folded = (said: string): string =>
+  said
+    .replace(/([a-z0-9])([A-Z])/gu, '$1 $2')
+    .toLowerCase()
+    .replace(/[\s_-]+/gu, ' ')
+    .trim();
+
+/** A part a field plays in its list's declaration, which an agent names in words of its own. */
+type Role = 'title' | 'state' | 'due' | 'project' | 'text' | 'person';
+
+/**
+ * The words agents send for a part a list declares, in `folded` form (live 26 Oct to 3 Nov: `title`, `due`, `project`
+ * and `where project` on tasks, each refused alone). By the part, never by a list's own field ids, so a list declared
+ * tomorrow is read the same way: its title and state, the field marked `deadline`, the one that says where a row applies
+ * (`scope`), its one long text and its one link to people.
+ */
+const ROLE_WORDS: readonly (readonly [Role, readonly string[]])[] = [
+  ['title', ['title', 'name', 'subject', 'summary', 'heading']],
+  ['state', ['status', 'state', 'stage', 'phase']],
+  ['due', ['due', 'due date', 'duedate', 'due on', 'due by', 'due at', 'date due', 'deadline', 'by date']],
+  ['project', ['project', 'project id', 'projects', 'proj']],
+  ['text', ['notes', 'note', 'description', 'details', 'body', 'content', 'text', 'desc']],
+  ['person', ['assignee', 'assigned', 'assigned to', 'assignee id', 'owner', 'who']],
+];
+
+/** The record's own keys a write may carry or is refused by name for, which are never read as another field. */
+const OWN_KEYS: ReadonlySet<string> = new Set(['deleted_at', 'id', 'seq', 'version', 'created_at', 'updated_at', 'register', 'spoken']);
+
+/** The fields a write can name: not retired, and not worked out by the record. */
+const writable = (decl: Decl): Field[] => decl.fields.filter((f) => f.retired !== true && (f as { derived?: unknown }).derived !== true);
+
+/** The one field of `decl` that plays `role`, or `undefined` where none does or several do. */
+function roleField(decl: Decl, role: Role): Field | undefined {
+  const live = writable(decl);
+  const one = (found: Field[]): Field | undefined => (found.length === 1 ? found[0] : undefined);
+  switch (role) {
+    case 'title':
+      return live.find((f) => f.id === decl.title);
+    case 'state':
+      return live.find((f) => f.id === decl.state);
+    case 'due':
+      return one(live.filter((f) => f.deadline === true));
+    case 'project':
+      return one(live.filter((f) => f.scope !== undefined && f.scope !== null && (f.type === 'ref' || f.type === 'list')));
+    case 'text':
+      return one(live.filter((f) => f.type === 'document'));
+    case 'person':
+      return one(live.filter((f) => f.to === 'people' && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref'))));
+  }
+}
+
+/**
+ * The field a key the list does not have most likely means, or `null`: its id or label in another case or spelling
+ * (`Due`, `due_date`, `assigned_to`) or a word for a part the list declares (`project`, `status`), which are sure; else
+ * the one spelled most like it, which is a guess.
+ */
+export function fieldMeant(key: string, decl: Decl): { id: string; sure: boolean } | null {
+  const live = writable(decl);
+  const word = folded(key);
+  if (word === '') return null;
+  const named = live.find((f) => folded(f.id) === word) ?? live.find((f) => typeof f.label === 'string' && folded(f.label) === word);
+  if (named !== undefined) return { id: named.id, sure: true };
+  for (const [role, words] of ROLE_WORDS) {
+    const f = words.includes(word) ? roleField(decl, role) : undefined;
+    if (f !== undefined) return { id: f.id, sure: true };
+  }
+  const spelt = closest(key, live.map((f) => ({ id: f.id, ...(typeof f.label === 'string' ? { name: f.label } : {}) })));
+  return spelt === null ? null : { id: spelt, sure: false };
+}
+
+/**
+ * The value a choice most likely means, or `null`: one it takes, or its label, in another case (`High`, `To check`),
+ * which is sure; else one by spelling or meaning (`enumMeant`), a guess, and never for a money choice (RL4).
+ */
+export function choiceMeant(said: string, f: Field, money: boolean): { value: string; sure: boolean } | null {
+  const values = (f.values ?? []).filter((v): v is string => typeof v === 'string');
+  if (values.includes(said)) return { value: said, sure: true };
+  const word = folded(said);
+  const same = values.find((v) => folded(v) === word) ?? values.find((v) => typeof f.labels?.[v] === 'string' && folded(f.labels[v]) === word);
+  if (same !== undefined) return { value: same, sure: true };
+  if (money) return null;
+  const meant = enumMeant(said, values);
+  return meant === null ? null : { value: meant, sure: false };
+}
+
+/** One key or value of a call read as another: what was said and what it was read as. */
+export type Mend = { said: string; meant: string; sure: boolean };
+
+/**
+ * A write's fields with every key the list has no field for moved to the field it most likely means, every choice read
+ * as a value it takes, and every day said in words as its date (`day`), ALL AT ONCE. The record refuses the first wrong
+ * field it meets, so an agent sending `title`, `due` and `priority: "High"` was refused three times, a field a call
+ * (26 Oct to 3 Nov). `left` names what nothing reads as; a key whose field the call already sent is left too, since one
+ * value would go.
+ */
+export function mendFields(
+  fields: Record<string, unknown>,
+  decl: Decl,
+  money: (field: string) => boolean,
+  day: (said: string) => string | null,
+): { fields: Record<string, unknown>; mends: Mend[]; left: string[] } {
+  const known = new Map(writable(decl).map((f) => [f.id, f]));
+  const out: Record<string, unknown> = {};
+  const mends: Mend[] = [];
+  const left: string[] = [];
+  const moved: { key: string; to: string; value: unknown; sure: boolean }[] = [];
+  for (const [key, value] of Object.entries(fields)) {
+    if (known.has(key) || key.startsWith('_') || OWN_KEYS.has(key)) {
+      out[key] = value;
+      continue;
+    }
+    const meant = fieldMeant(key, decl);
+    if (meant === null) {
+      left.push(key);
+      out[key] = value;
+    } else moved.push({ key, to: meant.id, value, sure: meant.sure });
+  }
+  for (const m of moved) {
+    if (Object.hasOwn(fields, m.to) || moved.some((o) => o !== m && o.to === m.to)) {
+      left.push(m.key);
+      out[m.key] = m.value;
+      continue;
+    }
+    out[m.to] = m.value;
+    mends.push({ said: m.key, meant: m.to, sure: m.sure });
+  }
+  const one = (f: Field, key: string, v: unknown, at: string): unknown => {
+    if (f.type === 'enum' || (f.type === 'list' && f.of === 'enum')) {
+      if (typeof v !== 'string') return v;
+      const meant = choiceMeant(v, f, money(key));
+      if (meant === null) left.push(`${v} for ${at}`);
+      else if (meant.value !== v) mends.push({ said: v, meant: meant.value, sure: meant.sure });
+      return meant?.value ?? v;
+    }
+    if ((f.type === 'day' || (f.type === 'list' && f.of === 'day')) && typeof v === 'string' && !/^\d{4}-\d{2}-\d{2}$/u.test(v.trim())) {
+      const read = day(v);
+      if (read !== null) mends.push({ said: v, meant: read, sure: true });
+      return read ?? v;
+    }
+    return v;
+  };
+  for (const [key, value] of Object.entries(out)) {
+    const f = known.get(key);
+    if (f === undefined || value === null || value === undefined) continue;
+    out[key] = Array.isArray(value) && f.type === 'list' ? value.map((v) => one(f, key, v, key)) : one(f, key, value, key);
+  }
+  return { fields: out, mends, left };
+}
+
+/**
+ * The day a title says a thing is due, "by Friday", "due 14 Nov", "before next Tuesday", as its words and the day
+ * `read` takes them for (`dayInWords` on the record's clock), or `null` where it names none. Up to three words after the
+ * word that says when are read, the longest reading first, so "by next Friday" is next Friday and not Friday; "now" is
+ * no day anything is due by.
+ */
+export function dueIn(text: string, read: (words: string) => string | null): { words: string; day: string } | null {
+  for (const m of text.matchAll(/\b(by|due|before|until|till|on)\s+([^\s,;:()]+(?:\s+[^\s,;:()]+){0,2})/giu)) {
+    const after = m[2]!.split(/\s+/u);
+    for (let n = after.length; n >= 1; n--) {
+      const words = after.slice(0, n).join(' ').replace(/[.!?]+$/u, '');
+      if (words === '' || words.toLowerCase() === 'now') continue;
+      const day = read(words);
+      if (day !== null) return { words: `${m[1]!} ${words}`, day };
+    }
+  }
+  return null;
+}
+
+/** Mends said as a person reads them, "what for title and high for High", joined with "and". */
+const mendsSaid = (mends: readonly Mend[]): string => new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(mends.map((m) => `${m.meant} for ${m.said}`));
+
+/** Mends said the other way round, "title as what and High as high", for what an answer already read. */
+const readAs = (mends: readonly Mend[]): string => new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(mends.map((m) => `${m.said} as ${m.meant}`));
 
 /**
  * The question a refused write would have been, as the call that asks it: a change to a row as a rowset on it, a new

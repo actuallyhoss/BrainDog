@@ -432,18 +432,44 @@ function random(run: string): boolean {
 }
 
 /**
+ * A Google file's id: `1` and then base64url, 33 long for a Drive file or folder and 44 for a Doc, a Sheet, a Slides
+ * deck or a Form, standing as a word of its own (nothing of a key's alphabet either side of it).
+ */
+const GOOGLE_ID = /(?<![A-Za-z0-9+/=_-])1(?:[A-Za-z0-9_-]{43}|[A-Za-z0-9_-]{32})(?![A-Za-z0-9+/=_-])/gu;
+const GOOGLE_ALONE = /^1(?:[A-Za-z0-9_-]{43}|[A-Za-z0-9_-]{32})$/u;
+
+/** The words that say a text is about a Google file, read with `_` and `-` as spaces so `sheet_id` says it. */
+const GOOGLE_SAID = /\b(?:google|g?sheets?|spreadsheets?|gdocs?|drive|slides)\b/iu;
+
+/**
+ * A text with the Google file ids in it taken out, where a key's random run would otherwise read one: the whole text
+ * when it is one id alone, or each id in a text that says it is about a Google file. Anything else as it came.
+ *
+ * A SHEET'S ID WAS REFUSED AS A KEY (27 Oct): its 44 characters mix cases and digits as a key's do, and only inside a
+ * link (`unlinked`) was it let through. Alone, or in "the roster is Google Sheet <id>", it is the id a person copies out
+ * of the address bar, as a bare 32-hex string is a Notion page's (`KEY_SHAPES`). Every issuer's shape above is still
+ * read first, so this lets through no key that names its kind, only a run of exactly this shape where a Google file is
+ * what the words are about.
+ */
+function googleless(text: string): string {
+  if (GOOGLE_ALONE.test(text.trim())) return '';
+  return GOOGLE_SAID.test(text.replace(/[_-]+/gu, ' ')) ? text.replace(GOOGLE_ID, ' ') : text;
+}
+
+/**
  * Whether a text holds what looks like a key: a known issuer's shape, or a long random token.
  *
  * LET THROUGH ON PURPOSE: a hex digest or a git hash of any length, a ULID, a UUID and the record's
  * own ids, none of which mixes cases; a run under 64 characters in a link's path, or in a query value
- * whose name does not say secret, which is a document's id; and anything under 32 characters. A long base64 value that is not secret, such as a
+ * whose name does not say secret, which is a document's id; a Google file's id alone or where the text says it is one
+ * (`googleless`); and anything under 32 characters. A long base64 value that is not secret, such as a
  * public key or a wallet address, is refused with the keys, because it cannot be told apart from one.
  */
 export function looksLikeCredential(text: string): boolean {
   const seen = text.replace(INVISIBLE, '');
   if (KEY_SHAPES.some((shape) => shape.test(seen))) return true;
   if (basicCredential(seen)) return true;
-  for (const [run] of unlinked(seen).matchAll(KEY_RUN)) if (random(run)) return true;
+  for (const [run] of unlinked(googleless(seen)).matchAll(KEY_RUN)) if (random(run)) return true;
   return false;
 }
 

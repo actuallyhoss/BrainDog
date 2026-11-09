@@ -50,7 +50,7 @@ import { NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, ra
 import { bellNever, bellWorthy, runFailed } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
-import { JOINED_AT, PUSH_KINDS, SAID_MOST, mayOf, openInstructions, shareMeOf, tokenOfRun, type Instr, type Profile, type Stop } from '@braindog/kernel';
+import { JOINED_AT, PUSH_KINDS, SAID_MOST, clientFor, mayOf, openInstructions, shareMeOf, tokenOfRun, type Instr, type Profile, type Stop } from '@braindog/kernel';
 import { OWN_RUN, nameMid, personNamed, stopLine, toldOf, toldTo, type Told } from './methods/instructions.ts';
 import { saysOf } from './methods/agent-profile.ts';
 import type { Grant, InvitationRow } from '@braindog/kernel';
@@ -224,7 +224,7 @@ import {
   type HeadlinesAsked,
   type SlashHeadline,
 } from './headlines.ts';
-import { nameOnly, scrubbed, spokenName } from './scrub.ts';
+import { keysHidden, nameOnly, scrubbed, spokenName } from './scrub.ts';
 import { lookRefusedKey, noteRefusal, refusedFor, rehearse } from './compose-rehearse.ts';
 import { BINNED, binOwnRows, ownLists as packLists, rehearseMove, type Binned } from './addon-data.ts';
 import { composeLooks, groupListsOf, keepLook as keepLookOf, keptBy, lookAnswerMost, lookBasis, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
@@ -1058,6 +1058,12 @@ const unwound = <T>(fn: () => Result<T>): Result<T> => {
 const KEPT = 50;
 /** The longest line a run carries, which is a note's ceiling. */
 const LINE = 280;
+/**
+ * The longest step, dead end, note or doing a run's `handoff` and `attach` take. 280 cut a step in two (2 Nov, Pups): an
+ * agent said half of what the next session needed and the rest nowhere. The card draws a step short (`STEP_SHOWN` in
+ * `same-tree.ts`), so a long one costs nobody's briefing; a branch and a commit keep `LINE`.
+ */
+const STEP_LINE = 1_000;
 /**
  * The next steps that name no step, lower case and with the punctuation gone. `handoff`'s description says "'carry on'
  * is not one": the run that reads it next learns nothing it could not have guessed.
@@ -10063,6 +10069,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `admin` is the door that resumes the script, so a token, even the owner's, never reads it; an owner another owner
    * held to `append` on Money is not shown it either, and one held lower on a list the script never touched is.
    *
+   * BUT HIS OWN AGENTS DO WHILE HIS SWITCH IS ON (`hisAgent`, the owner's word of 1 Nov, "handle everything through the
+   * mcp"): a refused run said "its log says why" and the why went only to his browser, so an agent fixing the script
+   * could not see what failed (6 Nov, Mercury). Still only where it reads every list the script touched, and with every
+   * word that reads as a key hidden (`keysHidden`): a key's value is never an agent's to read, switch or not.
+   *
    * `--redacted--` AND NOT AN ABSENT FIELD, for the ledger's reason: "recorded and withheld" is not "nothing was said".
    *
    * A RUN FROM BEFORE `to_v.lists` WAS KEPT names no lists, and is read as touching all of them, so it goes to an owner
@@ -10073,7 +10084,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (to === null || typeof to !== 'object' || Array.isArray(to) || !('log' in to)) return line;
     const lists = Array.isArray(to.lists) ? to.lists.filter((l): l is string => typeof l === 'string') : null;
     const reads = lists === null ? readsEveryList(ctx) : lists.every((list) => readable(ctx, list) === null);
-    return admin(ctx) === null && reads ? line : { ...line, to: { ...to, log: '--redacted--' } };
+    if (!reads || (admin(ctx) !== null && !hisAgent(ctx))) return { ...line, to: { ...to, log: '--redacted--' } };
+    return ctx.principal.kind === 'token' && typeof to.log === 'string' ? { ...line, to: { ...to, log: keysHidden(to.log) } } : line;
+  };
+
+  /**
+   * Whether a key is one of the owner's own agents while his switch to act without asking is on: his key, he owns the
+   * record now and the switch is on, and it is no job's or report's key, which run for an automation and are nobody's
+   * agent. For what an agent reads, not what it writes, so any of his keys that reads the lists counts.
+   */
+  const hisAgent = (ctx: CallContext): boolean => {
+    const p = ctx.principal;
+    if (p.kind !== 'token' || !bypassOn(p.person) || reportKeyOf(ctx) !== null) return false;
+    const label = sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', p.id)?.label ?? '';
+    return !label.startsWith('job:') && !label.startsWith('report:');
   };
 
   /* A BATCH IS WHAT ONE STATEMENT READS, AND THE CAP IS WHAT ONE CALL WILL WALK. A caller who may see one register of a
@@ -10505,6 +10529,33 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * Why `decide` refuses a key, said with the way that does answer.
+   *
+   * A KEY NEVER DECIDES (ADR-060), and "a person has to do it, signed in" was all it was told, so on 9 Nov an agent the
+   * owner had told to decline two questions pressed Decline in his own browser instead. What answers for him is
+   * `instructions` with `answer` and `option` (`wordAnswer`): on his word, his words as `said`, or on his switch to act
+   * without asking, which is his word already. The `try` is that call for the same question and option, and never
+   * carries `said`, which only he can give: sent without it, the record asks for his words unless his switch is on. A
+   * report key keeps its own sentence; a key that may not answer on a word is told so by `wordOf` there.
+   */
+  type DecideAsked = { id?: unknown; ids?: unknown; decide?: { option?: unknown } | undefined } | undefined;
+  const keyDecidesNot = (ctx: CallContext, stop: Refusal, args: DecideAsked): Refusal => {
+    const p = ctx.principal;
+    if (p.kind !== 'token' || stop.code !== 'FORBIDDEN' || reportKeyOf(ctx) !== null) return stop;
+    const given = typeof args?.id === 'string' && args.ids === undefined ? args.id.trim() : '';
+    const option = typeof args?.decide?.option === 'string' ? args.decide.option.trim() : '';
+    const free = ctx.bypass !== undefined && ctx.bypass === p.person && bypassOn(p.person);
+    const fix =
+      args?.decide === undefined
+        ? 'A person has to do it, on Decide in BrainDog: a key never decides or puts off a question.'
+        : free
+          ? 'A person has to do it on Decide, but the owner lets agents act without asking, so answer it with instructions: answer and option.'
+          : 'A person has to do it, and no key decides. If they told you their answer, give it on their word with instructions: answer, option, and said in their own words.';
+    const call = given !== '' && option !== '' && args?.decide !== undefined ? `instructions ${JSON.stringify({ answer: given, option })}` : undefined;
+    return { ...stop, fix, at: 'decide', ...(call === undefined ? {} : { try: call }) };
+  };
+
+  /**
    * Why `decide` refuses a person invited to named lists, said as the rule it is.
    *
    * `allows`'S SENTENCE IS FOR A CALL ABOUT THE RECORD ITSELF, AND A QUESTION IS OFTEN ABOUT HER LIST. A member invited
@@ -10514,8 +10565,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * list's questions is the owner's call and is not decided here. The sentence is said before the id is read, so a
    * question about a list she cannot see and an id that names nothing get the same words.
    */
-  const decidesNot = (ctx: CallContext, stop: Refusal): Refusal => {
+  const decidesNot = (ctx: CallContext, stop: Refusal, args?: DecideAsked): Refusal => {
     const p = ctx.principal;
+    if (p.kind === 'token') return keyDecidesNot(ctx, stop, args);
     const held = p.kind === 'person' && p.level === null && Array.isArray(ctx.registers) && ctx.registers.length > 0 ? ctx.registers : null;
     if (held === null || stop.code !== 'FORBIDDEN') return stop;
     const named = new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(held.map(listName));
@@ -13002,14 +13054,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       .map((o) => ({ ...o.org, linked: o.own }));
   };
 
-  /** An argument that is a line of text, `undefined` when it was not sent, or the refusal saying why not. */
+  /**
+   * An argument that is a line of text, `undefined` when it was not sent, or the refusal saying why not. A run's own
+   * words (`next`, `tried`, `note`, `doing`) take `STEP_LINE`; a branch, a commit and anything else `LINE`.
+   */
   const line = (args: Record<string, unknown>, key: string): Result<string | undefined> => {
     const value = args[key];
     if (value === undefined || value === null) return ok(undefined);
     if (typeof value !== 'string' || !value.trim())
       return no('VALUE_MALFORMED', `${key} is a line of text, and this one is ${JSON.stringify(value) ?? String(value)}.`, { at: key });
     const said = value.trim();
-    if (said.length > LINE) return no('OUT_OF_BOUNDS', `${key} is at most ${LINE} characters, and this one is ${said.length}.`, { at: key });
+    const most = key === 'next' || key === 'tried' || key === 'note' || key === 'doing' ? STEP_LINE : LINE;
+    if (said.length > most) return no('OUT_OF_BOUNDS', `${key} is at most ${String(most)} characters, and this one is ${String(said.length)}.`, { at: key });
     return ok(said);
   };
 
@@ -15860,7 +15916,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           /* `other` SAYS NOTHING ABOUT WHO THE RUN IS, so it never writes over a kind the run already has: a client that
              names no agent re-attaching a Claude run left it a nameless one. */
           if (patch.agent === 'other' && typeof run.fields.agent === 'string' && run.fields.agent !== 'other') delete patch.agent;
-          if (hints.client_id !== undefined && run.fields.client_id === undefined) patch.client_id = hints.client_id;
+          /* AND ITS CLIENT ID AS THE LADDER KEEPS ONE (`clientFor`): one another key's run holds is kept under this key's own,
+             so the attach is never refused for a host session that changed keys. */
+          const client = hints.client_id === undefined || run.fields.client_id !== undefined ? null : clientFor(sql, hints.client_id, ctx.principal.id);
+          if (client !== null) patch.client_id = client;
           if (REVIVED.includes(run.state ?? '')) patch.state = 'active';
           const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}`, within: sight.added(ctx, SESSION) });
           if (!out.ok) return out as Result<never>;
@@ -16451,7 +16510,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       ctx: CallContext,
     ) {
       const stop = guard(ctx, 'decide');
-      if (stop) return { ok: false as const, refusal: decidesNot(ctx, stop) };
+      if (stop) return { ok: false as const, refusal: decidesNot(ctx, stop, args) };
       /* SEVERAL AT ONCE (`answerMany`): `ids` in place of `id`, never both. */
       if (args?.ids !== undefined) {
         if (args.id !== undefined) return no('VALUE_MALFORMED', 'Name one question in id, or several in ids, not both.', { at: 'ids' });
