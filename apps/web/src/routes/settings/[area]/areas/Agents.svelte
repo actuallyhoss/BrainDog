@@ -49,6 +49,8 @@
   import OnWord from '$lib/agents/OnWord.svelte';
   import Bypass from '$lib/agents/Bypass.svelte';
   import Apart from '$lib/agents/Apart.svelte';
+  import SelfUpdate from '$lib/agents/SelfUpdate.svelte';
+  import { selfUpdateWords } from '$lib/agents/self-update.ts';
   import { page } from '$app/state';
   import { lineOf as appLineOf, madeByOther, partsOf } from '$lib/record/apps.ts';
   import { foldedAdds, planOf, revoke, words as keychainWords, type Plan } from '$lib/record/keychain.ts';
@@ -798,6 +800,14 @@
     </div>
   </Tile>
 
+  <!-- BRAINDOG ITSELF KEPT CURRENT ON HIS COMPUTERS (`SelfUpdate.svelte`), its own tile under Answering, since it is about
+       the command line, its hooks and its skill, and not about what agents answer. Off until he turns it on. -->
+  <Tile icon="refresh" title={selfUpdateWords.tile} data-wide data-part="self-update">
+    <div class="answering">
+      <SelfUpdate prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+    </div>
+  </Tile>
+
   <!-- THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, in a tile of its own that says what it is:
        its lists and pages by name and its figures as one count, so the offer fits on a phone's screen. -->
   {#if offer}
@@ -1464,7 +1474,7 @@
   }
 
   /* THE ANSWERING SWITCHES, ONE LIST: each row's own padding, a hairline between (`settings.css`), and no gap of the
-     tile's on top of that, which stood each row 28px from the next. */
+     tile's on top of that, which stood each row 28px from the next. The Updates tile's one switch sits the same way. */
   .answering {
     display: flex;
     flex-direction: column;
