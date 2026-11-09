@@ -11335,7 +11335,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return kept;
   };
 
-  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'zone' | 'me' | 'pages' | 'pagesByRow' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
+  const shellFor = (ctx: CallContext, used: unknown = usedNow()): Pick<Boot, 'record' | 'currency' | 'money' | 'zone' | 'me' | 'pages' | 'pagesByRow' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
@@ -11475,7 +11475,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          they turned it off. A reader held to some lists is offered nothing, because every item is a page over a list. */
       pen:
         person !== null && readsEveryList(ctx) && prefs['pen.suggest'] !== false
-          ? quietFor(penHeld, JSON.stringify([readerKey(ctx), prefs['pen.dismissed'] ?? null, usedNow()]), () => penFor({
+          ? quietFor(penHeld, JSON.stringify([readerKey(ctx), prefs['pen.dismissed'] ?? null, used]), () => penFor({
               kernel,
               reads: (list) => readable(ctx, list) === null,
               pages: every,
@@ -13267,7 +13267,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const who = person(ctx);
       const standing = who === null ? null : [kernel.prefsOf(who), sql.all('SELECT register, level, row_where FROM member WHERE person_id = ?', who)];
       let made = false;
-      const [answer, look, looks] = heldFor(bootHeld, JSON.stringify([caller, standing, usedNow()]), () => kernel.transaction(() => {
+      /* HOW MUCH THE RECORD HAS BEEN USED, read once for the key and for the pen inside it (`usedNow`). */
+      const used = usedNow();
+      const [answer, look, looks] = heldFor(bootHeld, JSON.stringify([caller, standing, used]), () => kernel.transaction(() => {
         made = true;
         const out: Boot['registers'] = [];
         /* THE KERNEL'S OWN LISTS SAY SO (`kernel: true`), by their declaration, so no screen leaves them out by a name. */
@@ -13314,7 +13316,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           }
           out.push({ id, name: decl.name, count: countNow(ctx, id), ...(open === undefined ? {} : { open }), icon: typeof icon === 'string' && icon !== '' ? icon : null, ...(own.has(id) ? { kernel: true as const } : {}), ...(packOf.has(id) ? { pack: packOf.get(id)! } : {}) });
         }
-        const shell = shellFor(ctx);
+        const shell = shellFor(ctx, used);
         const waits = waitsFor(ctx);
         const answered: Omit<Boot, 'theme' | 'looks'> = {
           registers: out,
