@@ -18,7 +18,8 @@
   import { passkeysSaid } from '$lib/ui/signing-in.ts';
   import { PEOPLE } from '$lib/who.ts';
   import { createClient } from '@braindog/client';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
+  import { dbl } from '$lib/ui/dbl.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -178,6 +179,16 @@
     nameRefusal = '';
     nameSaid = '';
     renaming = true;
+  }
+
+  /** A NAME DOUBLE-CLICKED (`lib/ui/dbl.ts`) opens its form as its button does, with the caret in the box. */
+  function typeIn(start: () => void, box: string): void {
+    start();
+    void tick().then(() => {
+      const el = document.getElementById(box) as HTMLInputElement | null;
+      el?.focus();
+      el?.select();
+    });
   }
 
   async function saveName(e: SubmitEvent): Promise<void> {
@@ -374,7 +385,7 @@
     <div class="person">
       <span class="person-face"><Face name={faceName} you size="l" /></span>
       <div class="person-words">
-        <p class="person-name">{myName ?? copy.identityNoName}</p>
+        <p class="person-name" {@attach !signedOut && !renaming && (s.hostAuth?.me || s.hostAuth?.open) ? dbl(() => typeIn(startRename, 'identity-name')) : null}>{myName ?? copy.identityNoName}</p>
         <!-- NO NAME YET, AND THE WAY TO ONE RIGHT THERE (G3): the "?" face was the first thing read, its fix a row below. -->
         {#if myName === null && !renaming && !signedOut && (s.hostAuth?.me || s.hostAuth?.open)}
           <button type="button" class="add-name tap" onclick={startRename}>{identityWords.addName}</button>
@@ -491,7 +502,7 @@
                   </div>
                 </form>
               {:else}
-                <span class="fact-value">{name}</span>
+                <span class="fact-value" {@attach dbl(() => typeIn(() => startKeyRename(k), 'identity-key-name'))}>{name}</span>
                 <span class="fact-do">
                   <Button weight="bare" onclick={() => startKeyRename(k)} aria-label={copy.identityRenamePasskeyOf(name)}>{copy.identityRenamePasskey}</Button>
                 </span>

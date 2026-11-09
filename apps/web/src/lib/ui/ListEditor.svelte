@@ -12,7 +12,7 @@
   AT 390 IT IS A BOTTOM SHEET (`Sheet.svelte`), one field per row, the kind a native select, and every control 44px tall.
 -->
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { apiBase } from '$lib/at.ts';
   import { labelOf } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
@@ -34,6 +34,7 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import Retype from '$lib/ui/Retype.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { dbl } from '$lib/ui/dbl.ts';
 
   let {
     open = $bindable(false),
@@ -169,6 +170,18 @@
     renameFix = null;
   }
 
+  /** A FIELD'S NAME DOUBLE-CLICKED (`lib/ui/dbl.ts`): its Rename, with the caret in the box. */
+  const renamesField = (id: string, was: string) =>
+    dbl((from) => {
+      const row = from.closest('.fe-row');
+      startRename(id, was);
+      void tick().then(() => {
+        const box = row?.querySelector<HTMLInputElement>('.fe-rename input');
+        box?.focus();
+        box?.select();
+      });
+    });
+
   async function rename(e: SubmitEvent) {
     e.preventDefault();
     if (renamingBusy || register === null || renaming === null) return;
@@ -284,7 +297,7 @@
                 </span>
               </form>
             {:else}
-              <span class="fe-name">{said}</span>
+              <span class="fe-name" {@attach renamesField(f.id, said)}>{said}</span>
               <span class="fe-kind">{decl?.title === f.id ? sheetWords.titleField : kindSaid(f, listName)}</span>
               <span class="fe-acts">
                 <Button weight="quiet" aria-label={`${sheetWords.rename} ${said}`} onclick={() => startRename(f.id, said)}>{sheetWords.rename}</Button>
