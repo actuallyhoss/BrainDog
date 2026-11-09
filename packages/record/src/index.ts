@@ -223,7 +223,7 @@ import {
   type HeadlinesAsked,
   type SlashHeadline,
 } from './headlines.ts';
-import { nameOnly, scrubbed, spokenName } from './scrub.ts';
+import { keysHidden, nameOnly, scrubbed, spokenName } from './scrub.ts';
 import { lookRefusedKey, noteRefusal, refusedFor, rehearse } from './compose-rehearse.ts';
 import { BINNED, binOwnRows, ownLists as packLists, rehearseMove, type Binned } from './addon-data.ts';
 import { composeLooks, groupListsOf, keepLook as keepLookOf, keptBy, lookAnswerMost, lookBasis, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
@@ -10014,6 +10014,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `admin` is the door that resumes the script, so a token, even the owner's, never reads it; an owner another owner
    * held to `append` on Money is not shown it either, and one held lower on a list the script never touched is.
    *
+   * BUT HIS OWN AGENTS DO WHILE HIS SWITCH IS ON (`hisAgent`, the owner's word of 1 Nov, "handle everything through the
+   * mcp"): a refused run said "its log says why" and the why went only to his browser, so an agent fixing the script
+   * could not see what failed (6 Nov, Mercury). Still only where it reads every list the script touched, and with every
+   * word that reads as a key hidden (`keysHidden`): a key's value is never an agent's to read, switch or not.
+   *
    * `--redacted--` AND NOT AN ABSENT FIELD, for the ledger's reason: "recorded and withheld" is not "nothing was said".
    *
    * A RUN FROM BEFORE `to_v.lists` WAS KEPT names no lists, and is read as touching all of them, so it goes to an owner
@@ -10024,7 +10029,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (to === null || typeof to !== 'object' || Array.isArray(to) || !('log' in to)) return line;
     const lists = Array.isArray(to.lists) ? to.lists.filter((l): l is string => typeof l === 'string') : null;
     const reads = lists === null ? readsEveryList(ctx) : lists.every((list) => readable(ctx, list) === null);
-    return admin(ctx) === null && reads ? line : { ...line, to: { ...to, log: '--redacted--' } };
+    if (!reads || (admin(ctx) !== null && !hisAgent(ctx))) return { ...line, to: { ...to, log: '--redacted--' } };
+    return ctx.principal.kind === 'token' && typeof to.log === 'string' ? { ...line, to: { ...to, log: keysHidden(to.log) } } : line;
+  };
+
+  /**
+   * Whether a key is one of the owner's own agents while his switch to act without asking is on: his key, he owns the
+   * record now and the switch is on, and it is no job's or report's key, which run for an automation and are nobody's
+   * agent. For what an agent reads, not what it writes, so any of his keys that reads the lists counts.
+   */
+  const hisAgent = (ctx: CallContext): boolean => {
+    const p = ctx.principal;
+    if (p.kind !== 'token' || !bypassOn(p.person) || reportKeyOf(ctx) !== null) return false;
+    const label = sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', p.id)?.label ?? '';
+    return !label.startsWith('job:') && !label.startsWith('report:');
   };
 
   /* A BATCH IS WHAT ONE STATEMENT READS, AND THE CAP IS WHAT ONE CALL WILL WALK. A caller who may see one register of a
