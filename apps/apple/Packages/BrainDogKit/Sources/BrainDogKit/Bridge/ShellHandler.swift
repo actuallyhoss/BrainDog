@@ -24,6 +24,10 @@ nonisolated public enum ShellAsk: Sendable, Equatable {
     case modal(Bool)
     /// The look the person chose in BrainDog (`data-scheme`): "light", "dark", or "" for the device's own.
     case scheme(String)
+    /// The page's reads have landed after a `refresh` (the pull's spinner goes then, not on a timer).
+    case settled
+    /// The page's own buttons, handed to the native bar (`head-actions.ts`): `[{ id, label, icon, primary }]`.
+    case actions(JSONValue)
 }
 
 /// The kind of shell a web view is in, which the web reads as `kind` and decides its frame by.
@@ -101,6 +105,11 @@ public final class ShellBridge: NSObject, WKScriptMessageHandler {
             hear(.visit(path: text("path"), mode: text("mode")))
         case "modal":
             hear(.modal(a["open"] as? Bool ?? false))
+        case "settled":
+            hear(.settled)
+        case "actions":
+            if let list = a["list"], let data = try? JSONSerialization.data(withJSONObject: list, options: [.fragmentsAllowed]),
+               let value = try? JSONDecoder().decode(JSONValue.self, from: data) { hear(.actions(value)) }
         case "drag":
             hear(.drag)
         case "zoom":

@@ -44,6 +44,19 @@ public enum Calls {
         _ = try await Client.shared.auth("/auth/switch", ["slug": .string(slug)], as: JSONValue.self)
     }
 
+    /// Whether this person runs the host (`GET /account/ops/me`, the question the web's sidebar asks before it draws
+    /// Admin): true or false as the host said, nil when it could not be asked, so a kept answer stands.
+    public static func isOperator() async -> Bool? {
+        do {
+            let said = try await Client.shared.get("/account/ops/me", as: JSONValue.self)
+            return said["operator"] == .bool(true)
+        } catch .failed(let status) where status == 404 {
+            return false
+        } catch {
+            return nil
+        }
+    }
+
     // MARK: Needs you
 
     /// What waits on the reader and what was put off, as Needs you's own body reads them (`previewPage`, writing nothing).

@@ -76,6 +76,9 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
+        # THE READ IN THE BACKGROUND (`Refresh` in iOS/Doors.swift): iOS wakes the app now and then to read what waits.
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [dog.brain.app.refresh]
         ITSAppUsesNonExemptEncryption: false
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen:

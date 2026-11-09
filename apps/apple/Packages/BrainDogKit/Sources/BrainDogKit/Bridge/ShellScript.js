@@ -56,6 +56,16 @@
       }
     },
     visit: (path, opts) => post('visit', { path: text(path), mode: text(opts && opts.mode, 16) || 'push' }),
+    // The reads a `refresh` started have landed: the iPhone's pull spinner goes now.
+    settled: () => post('settled'),
+    // The page's own buttons, drawn in the iPhone's bar; a press there comes back as `emit('action', id)`.
+    actions: (list) => {
+      try {
+        post('actions', { list: JSON.parse(JSON.stringify(Array.isArray(list) ? list.slice(0, 4) : [])) });
+      } catch (_) {
+        /* Something that is not plain data: nothing native could draw from it. */
+      }
+    },
     // Called by the app (a menu, a key, a pull, a deep link); the web never calls it.
     emit(event, arg) {
       if (event === 'pushAnswer') {

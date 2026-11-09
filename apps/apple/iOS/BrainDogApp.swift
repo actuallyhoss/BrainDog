@@ -44,21 +44,29 @@ struct BrainDogApp: App {
             guard Session.shared.signedIn else { return }
             switch now {
             case .active:
+                let away = awayAt.map { Date().timeIntervalSince($0) } ?? 0
                 /* THE SESSION ROTATES HERE AND ONLY HERE, once a day (plan 3.6), and what waits is read again. */
                 Task {
                     await Session.shared.refreshIfDue()
                     if was == .background { await AppModel.shared.needs.read() }
                 }
                 /* BACK AFTER HALF AN HOUR: the tabs take any change the web named meanwhile (M23's settle rule). */
-                if let awayAt, Date().timeIntervalSince(awayAt) >= 30 * 60 { AppModel.shared.settlePlaces() }
+                if away >= 30 * 60 { AppModel.shared.settlePlaces() }
+                /* AND THE PAGES READ AGAIN AS HE LOOKS, the one in front first, keeping what they show until it lands. */
+                if was == .background || away > 0 { AppModel.shared.cameForward(after: away) }
                 awayAt = nil
             case .inactive where was == .active:
                 /* THE LAUNCH PICTURE: Today as it is now, laid over Today at the next cold start until it has drawn. */
                 Task { await AppModel.shared.keepLaunchPicture() }
             case .background:
                 awayAt = awayAt ?? Date()
-                /* AND THE WIDGETS GET WHAT IS TRUE NOW, as the app goes (plan 3.10). */
-                Task { await GlanceStore.refresh() }
+                /* AND THE WIDGETS GET WHAT IS TRUE NOW, as the app goes (plan 3.10); the page in front keeps its look in
+                   case iOS ends it meanwhile, and the next read in the background is asked for (`Refresh`). */
+                Task {
+                    await AppModel.shared.wentAway()
+                    await GlanceStore.refresh()
+                }
+                Refresh.schedule()
             default:
                 break
             }

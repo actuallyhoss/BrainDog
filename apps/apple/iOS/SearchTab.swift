@@ -85,11 +85,15 @@ struct SearchView: View {
             by[nav.section, default: []].append((nav.order ?? 0, Spot(id: "/p/\(page.slug)", label: page.title, icon: page.icon, detail: nil)))
         }
         var out = order.sorted().map { name in (name: name, spots: (by[name] ?? []).sorted { $0.0 < $1.0 }.map(\.1)) }
-        let more = [
+        var more = [
             Spot(id: "/audit", label: Words.activity, icon: "activity", detail: nil),
             Spot(id: "/agents", label: "Agents", icon: "session", detail: nil),
             Spot(id: "/plugins", label: "Plugins", icon: "packs", detail: nil),
         ]
+        /* THE OWNER'S USAGE AND THE OPERATOR'S ADMIN, as the web's sidebar foot holds them (`AppFrame.svelte` `foot`): the
+           phone's Menu had both, and the app had no way to either. */
+        if app.boot?.level == .owner { more.append(Spot(id: "/usage", label: Words.usage, icon: "observe", detail: nil)) }
+        if app.isOperator { more.append(Spot(id: "/admin", label: Words.admin, icon: "lock", detail: nil)) }
         out.append((name: Words.more, spots: more))
         return out
     }

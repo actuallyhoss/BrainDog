@@ -1,3 +1,4 @@
+import BackgroundTasks
 import BrainDogKit
 import CoreSpotlight
 import SwiftUI
@@ -15,6 +16,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.setNotificationCategories(Push.categories)
+        Refresh.register()
         return true
     }
 
@@ -163,5 +165,37 @@ enum Spotlight {
     static func continued(_ activity: NSUserActivity) {
         guard let path = (activity.userInfo?[CSSearchableItemActivityIdentifier] as? String).flatMap(WebGate.appPath) else { return }
         AppModel.shared.open(path)
+    }
+}
+
+/// The read in the background (`BGAppRefreshTask`): when iOS gives the app a moment, most often shortly before he usually
+/// opens it, what waits, the glance and `boot` are read and kept, so the badge, the widgets and Needs you are current
+/// and the record has its answers worked out when he opens the app. Asked again each time the app goes away.
+@MainActor
+enum Refresh {
+    static let id = "dog.brain.app.refresh"
+
+    static func register() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: id, using: .main) { task in
+            guard let task = task as? BGAppRefreshTask else { return task.setTaskCompleted(success: false) }
+            MainActor.assumeIsolated { run(task) }
+        }
+    }
+
+    static func schedule() {
+        guard Session.shared.signedIn else { return }
+        let ask = BGAppRefreshTaskRequest(identifier: id)
+        ask.earliestBeginDate = Date(timeIntervalSinceNow: 20 * 60)
+        try? BGTaskScheduler.shared.submit(ask)
+    }
+
+    private static func run(_ task: BGAppRefreshTask) {
+        schedule()
+        let work = Task { @MainActor in
+            guard Session.shared.signedIn else { return task.setTaskCompleted(success: true) }
+            await AppModel.shared.readAway()
+            task.setTaskCompleted(success: !Task.isCancelled)
+        }
+        task.expirationHandler = { work.cancel() }
     }
 }

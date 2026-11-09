@@ -83,6 +83,8 @@ public enum Words {
     public static let places = "Places"
     public static let lists = "Lists"
     public static let more = "More"
+    public static let usage = "Usage"
+    public static let admin = "Admin"
     public static func entries(_ n: Int) -> String { n == 1 ? "1 entry" : "\(n.formatted()) entries" }
     public static func nothingFound(_ q: String) -> String { "Nothing in your BrainDog matches \u{201C}\(q)\u{201D}." }
     public static let nothingFoundNext = "Try fewer words, or a name as it is written."

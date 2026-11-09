@@ -160,7 +160,12 @@ struct WebPage: View {
             .navigationTitle(screen.title ?? (root ? stack.place.label : ""))
             .modifier(ScreenBar(root: root, title: screen.title ?? (root ? stack.place.label : "")))
             .toolbar {
-                if root { RootTools(stack: stack) }
+                /* THE PAGE'S OWN BUTTONS ARE THE BAR'S (`head-actions.ts`): they stood in a row of their own under it. */
+                if root {
+                    RootTools(stack: stack, screen: screen)
+                } else if !screen.actions.isEmpty {
+                    PageActions(screen: screen)
+                }
             }
     }
 }
@@ -279,9 +284,15 @@ struct SwipeBack: UIViewControllerRepresentable {
 /// ops page keeps its controls in one glass cluster at the top right.
 struct RootTools: ToolbarContent {
     let stack: Stack
+    /// The root's web screen, whose own buttons go before the bell; nil for a native root.
+    var screen: WebScreen? = nil
     @State private var app = AppModel.shared
 
     var body: some ToolbarContent {
+        if let screen, !screen.actions.isEmpty {
+            PageActions(screen: screen)
+            ToolbarSpacer(.fixed, placement: .topBarTrailing)
+        }
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button {
                 app.push("/audit", on: stack)
@@ -346,4 +357,56 @@ struct Browser: UIViewControllerRepresentable {
         return safari
     }
     func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
+}
+
+/// The page's own buttons in the bar: the primary one (add) in red on its own, the rest together in one glass capsule,
+/// each pressed in the page as if it had been pressed there (`WebScreen.press`).
+struct PageActions: ToolbarContent {
+    let screen: WebScreen
+
+    private var primary: WebScreen.PageAction? { screen.actions.first { $0.primary == true } }
+    private var rest: [WebScreen.PageAction] { screen.actions.filter { $0.primary != true } }
+
+    var body: some ToolbarContent {
+        if !rest.isEmpty {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                ForEach(rest) { action in
+                    Button {
+                        Haptic.press.play()
+                        screen.press(action)
+                    } label: {
+                        PageActionLabel(action: action).foregroundStyle(Palette.ink2)
+                    }
+                    .accessibilityLabel(action.label)
+                }
+            }
+        }
+        if let primary {
+            if !rest.isEmpty { ToolbarSpacer(.fixed, placement: .topBarTrailing) }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Haptic.press.play()
+                    screen.press(primary)
+                } label: {
+                    PageActionLabel(action: primary).foregroundStyle(Palette.onRed)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(Palette.red)
+                .accessibilityLabel(primary.label)
+            }
+        }
+    }
+}
+
+/// An action's glyph, the web's own by name, or its word where it has none.
+struct PageActionLabel: View {
+    let action: WebScreen.PageAction
+
+    var body: some View {
+        if let icon = action.icon, !icon.isEmpty {
+            Glyph.named(icon).image.resizable().frame(width: 22, height: 22)
+        } else {
+            Text(action.label).font(Typeface.control).lineLimit(1)
+        }
+    }
 }

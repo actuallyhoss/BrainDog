@@ -32,6 +32,16 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     public private(set) var places: JSONValue?
     /// A sheet of the page's own is open (the iPhone), so the tab bar steps aside.
     public private(set) var modal = false
+    /// The page's own buttons (add, share, more), drawn in the native bar rather than in a row of their own under it.
+    public private(set) var actions: [PageAction] = []
+
+    /// One of the page's buttons as the page hands it over: pressed in the bar, clicked in the page (`press`).
+    public struct PageAction: Decodable, Hashable, Identifiable, Sendable {
+        public let id: String
+        public let label: String
+        public let icon: String?
+        public let primary: Bool?
+    }
     /// The first load could not reach the server, and nothing kept could stand in.
     public private(set) var offline = false
     /// The picture over the page until it has drawn: the last Today at launch, a sleeping screen's last look.
@@ -45,6 +55,11 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     #if os(iOS)
     public private(set) var restsAtTop = true
     @ObservationIgnored private var topWatch: NSKeyValueObservation?
+    /// How the page looked when the app last went away, for the cover if iOS ends its page meanwhile (`keepLook`).
+    @ObservationIgnored private var lastLook: UIImage?
+    /// The pull's spinner while its read is out: it stops when the page says the read has landed (`settled`).
+    @ObservationIgnored private weak var pulling: UIRefreshControl?
+    @ObservationIgnored private var pulledAt = Date.distantPast
     #endif
     /// A file the page handed over (an export, a backup, an attachment's Download), saved where the app can share it.
     @ObservationIgnored public var onFile: ((URL) -> Void)?
@@ -72,6 +87,9 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         /* APP-BOUND DOMAINS (plan 3.2): the service worker runs in the app only on its own domains, which is what keeps
            the shell and the 7-day read copy offline, as in the PWA. The seed on this Mac (a Debug build) is not one. */
         config.limitsNavigationsToAppBoundDomains = !Server.isLocal
+        /* A SCREEN OFF THE WINDOW STILL LOADS: the tabs warm behind Today and the pool's next screen boots unseen, and the
+           default (suspend) held each at its first request until it was shown, so a first tap met a cold boot. */
+        config.preferences.inactiveSchedulingPolicy = .throttle
         #endif
         let controller = WKUserContentController()
         controller.addUserScript(ShellBridge.script(kind: kind, inset: kind == .mac ? MacBar.room : 0, textScale: Self.textScale))
@@ -109,11 +127,16 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         /* NO LINK PREVIEW: a long press on a row of the app is not a web page's link. */
         webView.allowsLinkPreview = false
         webView.pageZoom = Self.textScale
-        /* WHETHER THE PAGE RESTS AT ITS TOP, for the tab bar (`Shell`): told only when it changes, never per frame. */
+        /* WHETHER THE PAGE RESTS AT ITS TOP, for the tab bar (`Shell`): told only when it changes, never per frame. IT LEAVES
+           THE TOP PAST 24 AND COMES BACK AT 1, and a page no taller than the screen (a skeleton, a short list) always rests:
+           a drag or a bounce near the top flipped it on every frame, and each flip redrew the tab bar under the finger. */
         topWatch = webView.scrollView.observe(\.contentOffset, options: [.new]) { [weak self] scroll, _ in
-            let top = scroll.contentOffset.y <= 1
+            let y = scroll.contentOffset.y
+            let tall = scroll.contentSize.height > scroll.bounds.height + 48
             MainActor.assumeIsolated {
-                if self?.restsAtTop != top { self?.restsAtTop = top }
+                guard let self else { return }
+                let top = !tall || (self.restsAtTop ? y < 24 : y <= 1)
+                if self.restsAtTop != top { self.restsAtTop = top }
             }
         }
         let refresh = UIRefreshControl()
@@ -144,6 +167,7 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     /// Covered again until its next page has drawn: a warm screen handed out for a new address (`WebPool`).
     func moving(to path: String) {
         title = nil
+        actions = []
         ready = false
         go(path)
         uncoverLater(after: .seconds(1.2))
@@ -159,6 +183,11 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         } else {
             webView.reload()
         }
+    }
+
+    /// One of the page's buttons, pressed in the native bar: the page clicks its own.
+    public func press(_ action: PageAction) {
+        emit("action", action.id)
     }
 
     /// Tell the page something (`slash`, `search`, `goto`, `refresh`, `saved`, `unsaved`).
@@ -194,6 +223,7 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         asleep = true
         loaded = false
         ready = false
+        actions = []
         webView.loadHTMLString("", baseURL: nil)
     }
 
@@ -201,6 +231,16 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     public func wake() {
         guard asleep else { return }
         Task { await load() }
+    }
+
+    /// The app is going away: how this page looks now, kept in case iOS ends its page while the app is in the background.
+    public func keepLook() async {
+        lastLook = await picture()
+    }
+
+    /// Back, and the page lived: the picture is not needed.
+    public func forgetLook() {
+        lastLook = nil
     }
     #endif
 
@@ -234,6 +274,14 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
             onAsk?(ask)
         case .modal(let open):
             withAnimation(.easeOut(duration: 0.2)) { modal = open }
+        case .settled:
+            #if os(iOS)
+            endPull()
+            #endif
+            onAsk?(ask)
+        case .actions(let list):
+            let next = Array((list.decoded(as: [PageAction].self) ?? []).prefix(4))
+            if next != actions { actions = next }
         case .scheme(let v):
             Look.shared.heard(v)
         case .haptic(let kind):
@@ -270,11 +318,26 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     #endif
 
     #if os(iOS)
+    /* THE SPINNER STAYS WHILE THE READ IS OUT, and goes when the page says it has landed (`settled`), so what a pull
+       brings in arrives as the spinner goes, not a second after it. Six seconds at most, for a page that never says. */
     @objc private func pulled(_ control: UIRefreshControl) {
         Haptic.select.play()
+        pulling = control
+        pulledAt = Date()
         if offline { reload() } else { emit("refresh") }
+        Task { @MainActor [weak self, weak control] in
+            try? await Task.sleep(for: .seconds(6))
+            if self?.pulling === control { self?.endPull() }
+        }
+    }
+
+    private func endPull() {
+        guard let control = pulling else { return }
+        pulling = nil
+        /* NEVER A FLICKER: a read that landed at once still shows the spinner a moment. */
+        let wait = max(0, 0.45 - Date().timeIntervalSince(pulledAt))
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(700))
+            if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
             control.endRefreshing()
         }
     }
@@ -414,7 +477,16 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     }
 
     public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        /* iOS ENDS A PAGE WHILE THE APP IS AWAY, to free memory: it comes back covered by how it last looked until it has
+           drawn again, never as a blank board and then its skeleton. */
+        #if os(iOS)
+        if let look = lastLook { cover = look }
+        lastLook = nil
+        #endif
+        ready = false
+        actions = []
         webView.reload()
+        uncoverLater()
     }
 
     /// Dynamic Type as the web view's page zoom: 1.0 at Large, up to 1.35 (plan 3.2, `textScale`).

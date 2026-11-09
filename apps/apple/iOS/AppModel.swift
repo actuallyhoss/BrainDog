@@ -161,6 +161,9 @@ final class AppModel {
                        comes too late: the app is suspended before WebKit answers, and the next launch opens on nothing. */
                     screen.onDrawn = { [weak self] in
                         Task { @MainActor in
+                            /* THE OTHER TABS LOAD BEHIND TODAY ONCE IT HAS DRAWN, so a first tap on Money is a page that is
+                               there, not a cold boot behind a blank board. */
+                            self?.warmTabs()
                             try? await Task.sleep(for: .seconds(1.5))
                             await self?.keepLaunchPicture()
                         }
@@ -178,6 +181,51 @@ final class AppModel {
     func stack(_ href: String) -> Stack? { href == "search" ? search : stacks[href] }
     var current: Stack? { stack(selected) }
 
+    /// Whether he runs this host (`GET /account/ops/me`): Admin is listed in Search, as the web's sidebar lists it.
+    private(set) var isOperator = UserDefaults.standard.bool(forKey: AppModel.operatorKey)
+    static let operatorKey = "shell.operator"
+
+    @ObservationIgnored private var warming = false
+
+    /// Load every tab's page behind the one in front, one at a time, each once the last has drawn (or two seconds on), so
+    /// they never all ask the record at once; and warm the pool for the first link pressed.
+    func warmTabs() {
+        guard !warming else { return }
+        warming = true
+        WebPool.shared.prepare()
+        Task { @MainActor in
+            for place in places where !place.native && place.href != Place.today.href {
+                guard let screen = stacks[place.href]?.root, !screen.ready else { continue }
+                await screen.load()
+                for _ in 0..<20 where !screen.ready { try? await Task.sleep(for: .milliseconds(100)) }
+            }
+        }
+    }
+
+    /// Back in front: the pages lived, so their kept looks go. NO PAGE IS TOLD TO READ AGAIN: each asks the record's version
+    /// as it becomes visible and re-reads quietly only when something moved (`live.svelte.ts`); a forced read made Today
+    /// draw itself afresh, a second of the record's time on a lived-in record, on every return.
+    func cameForward(after away: TimeInterval) {
+        for stack in stacks.values { for screen in stack.screens { screen.forgetLook() } }
+    }
+
+    /// The read in the background (`Refresh`): what waits, `boot` and the glance, kept for the badge, the widgets and the
+    /// next launch. No page is asked: a web view does not run while the app is away.
+    func readAway() async {
+        await needs.read()
+        if let (boot, _) = try? await Calls.boot() {
+            took(boot)
+            Kept.save(boot, as: "boot")
+            if !needs.known { badge = boot.counts?.decide ?? 0 }
+        }
+        await GlanceStore.refresh()
+    }
+
+    /// Going away: the page in front keeps its look, in case iOS ends it while the app is in the background.
+    func wentAway() async {
+        await current?.top?.keepLook()
+    }
+
     /// Hear what a screen asks of the app.
     func bind(_ screen: WebScreen, in stack: Stack) {
         screen.onAsk = { [weak self, weak stack, weak screen] ask in self?.heard(ask, in: stack, from: screen) }
@@ -190,7 +238,9 @@ final class AppModel {
         case .visit(let path, _):
             visit(path, from: stack)
         case .places(let tabs):
-            takePlaces(tabs)
+            /* ONLY A TAB'S OWN PAGE NAMES THE TABS: a pushed page that was not there (an old link, a refused one) said "Today"
+               alone, and the next launch drew two tabs. */
+            if let screen, screen === stack?.root { takePlaces(tabs) }
         case .share(let url, let title):
             sharing = Sharing(items: title.map { [url, $0] as [Any] } ?? [url])
         case .tell(let prefill):
@@ -215,7 +265,7 @@ final class AppModel {
                 let given = await askPush()
                 screen?.emit("pushAnswer", given ? "yes" : "no")
             }
-        case .notify, .ready, .haptic, .signedOut, .title, .drag, .titleBarDoubleClick, .scheme, .modal:
+        case .notify, .ready, .haptic, .signedOut, .title, .drag, .titleBarDoubleClick, .scheme, .modal, .settled, .actions:
             /* A notification from the page would ring twice beside the record's push; the rest the screen answered. */
             break
         }
@@ -225,7 +275,8 @@ final class AppModel {
     private func takePlaces(_ tabs: JSONValue) {
         guard let all = tabs.decoded(as: [Place].self) else { return }
         var four = Array(all.filter { $0.key != "menu" && !$0.href.isEmpty }.prefix(4))
-        if four.isEmpty { return }
+        /* A RECORD'S TABS START WITH TODAY: a set without it came from a page outside the record. */
+        if four.isEmpty || !four.contains(where: { $0.href == Place.today.href }) { return }
         if !four.contains(where: \.native) {
             four = Array(four.prefix(3))
             four.insert(Place.needs, at: min(1, four.count))
@@ -319,8 +370,21 @@ final class AppModel {
     /// `boot`, the lists' declarations for Tell, and Needs you, read at launch and again whenever the app comes forward.
     func load() async {
         WebPool.shared.prepare(after: .seconds(2))
+        /* TODAY FIRST: the record answers one request at a time, and these went out before Today's page had asked, so
+           Today waited behind them. They go once Today has drawn, or two and a half seconds on; what they fill in was
+           drawn from what was kept meanwhile. */
+        if let today = stacks[Place.today.href]?.root {
+            for _ in 0..<25 where !today.ready { try? await Task.sleep(for: .milliseconds(100)) }
+        }
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.needs.read() }
+            group.addTask {
+                guard let yes = await Calls.isOperator() else { return }
+                await MainActor.run {
+                    self.isOperator = yes
+                    UserDefaults.standard.set(yes, forKey: Self.operatorKey)
+                }
+            }
             group.addTask {
                 /* OFFLINE TELL STILL READS WHAT IS TYPED, against what was kept, and only the press says it cannot send. */
                 guard let (boot, raw) = try? await Calls.boot() else {
@@ -373,6 +437,7 @@ final class AppModel {
     /// Another BrainDog opened on this session: every screen and every read starts again on it.
     func reopened() async {
         WebPool.shared.drain()
+        warming = false
         stacks = [:]
         search.popToRoot()
         boot = nil
@@ -392,6 +457,9 @@ final class AppModel {
         UserDefaults.standard.removeObject(forKey: Self.placesKey)
         UserDefaults.standard.removeObject(forKey: Self.nextPlacesKey)
         UserDefaults.standard.removeObject(forKey: "tell.draft")
+        UserDefaults.standard.removeObject(forKey: Self.operatorKey)
+        isOperator = false
+        warming = false
         Spotlight.forget()
         tell.forgetKnown()
         Handoff.advertise(path: nil, title: nil)
