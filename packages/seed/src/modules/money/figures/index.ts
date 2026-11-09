@@ -18,7 +18,7 @@ import { BUDGET_PAGE_FIGURES } from './budgets2.ts';
 import { HEALTH_FIGURES } from './health.ts';
 import { INSTALMENTS_FIGURES, LATE_PART_FIGURES } from './instalments.ts';
 import { PAYEE_FIGURES } from './payees.ts';
-import { NEXT_PART_FIGURES, PLAN_FIGURES, PLAN_PAGE_FIGURES, PLANS_FIGURES } from './plans.ts';
+import { LAST_PART_FIGURES, NEXT_PART_FIGURES, PLAN_FIGURES, PLAN_PAGE_FIGURES, PLANS_FIGURES } from './plans.ts';
 import { RUNWAY_FIGURES } from './runway.ts';
 import { SIGNS_FIGURES } from './signs.ts';
 import { SPEND_VS_LAST_FIGURES, SPENDING_FIGURES } from './spending.ts';
@@ -102,6 +102,10 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   /* ONE CATEGORY OR ONE PAYEE BY WEEK, SINCE money-core 3.32.0: what a widget made by saying "by week" draws. LAST, so
      every figure above keeps its place in the document. */
   ...WEEKLY_FIGURES,
+
+  /* THE DAY EACH PLAN ENDS, SINCE money-core 3.40.0: what Instalments says beside a plan's next part. LAST, so every
+     figure above keeps its place in the document. */
+  ...LAST_PART_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

@@ -1042,12 +1042,16 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   `register.organisations` the same as Logo, drawn on the payments that name it too (the payee logos Cash Fish
  *   shows). All optional and none hidden from agents, since an agent that finds a logo or a photo saves it. One field
  *   added to each list and nothing taken away, so a minor step that goes in quietly and keeps every row.
+ * - money-core 3.40.0 (1 Nov page plan, M23: "say one row per plan ... last 9 Jul 2027"): `metric.installments-last-due-by-plan`,
+ *   the latest day among each plan's open parts, declared last, and Instalments (`page.money-forecast`, `page.money`) reads
+ *   it as a sixth cell, so each plan's track says the day it ends beside its next part. One id added and nothing taken
+ *   away, so a minor step that goes in quietly and keeps every row.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.32.0',
   people: '4.8.0',
-  'money-core': '3.39.0',
+  'money-core': '3.40.0',
   estate: '2.8.1',
   work: '1.26.2',
 };

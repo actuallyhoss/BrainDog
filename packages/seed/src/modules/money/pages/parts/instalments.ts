@@ -16,7 +16,10 @@ export const INSTALMENTS: Record<string, unknown>[] = [
 
        THE THREE AFTER THEM SAY WHAT IS NEXT UNDER EACH BAR, "Next £1,875 on 3 Sep": the day of the earliest open part, what
        is left to pay and what is left once that part is paid, the amount being the second less the third. They fill and
-       fill toward nothing, so a host that reads two cells draws the tracks as it did (`page-live.ts` `nextPart`). */
+       fill toward nothing, so a host that reads two cells draws the tracks as it did (`page-live.ts` `nextPart`).
+
+       AND THE LAST, SINCE money-core 3.40.0 (1 Nov, M23): the day of the latest part still open, so each plan's one track
+       says when it is paid off beside what is next ("Next $208 on 9 Dec, the last on 9 Aug 2027"). */
     kind: 'progress',
     heading: 'Instalments',
     icon: 'credit-card',
@@ -27,6 +30,7 @@ export const INSTALMENTS: Record<string, unknown>[] = [
       { metric: 'installments-next-due-by-plan', label: 'Next due' },
       { metric: 'installments-left-by-plan', label: 'Left' },
       { metric: 'installments-after-next-by-plan', label: 'Left after' },
+      { metric: 'installments-last-due-by-plan', label: 'Last due' },
     ],
     when: { metric: 'installments-left', gt: 0 },
     empty: 'Nothing is being paid in parts.',
