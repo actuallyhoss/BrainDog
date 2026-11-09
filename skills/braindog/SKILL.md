@@ -59,7 +59,8 @@ The prompts `/braindog:start`, `/braindog:wrap` and `/braindog:ask` say these st
 
 ## Pages you made
 
-An audit, a plan, a design or a before and after goes on the thing it is about, so the person sees it inside BrainDog.
+An audit, a plan, a report, a design or a before and after goes on the task or decision it is about (the project when
+nothing narrower fits), so the person sees it inside BrainDog and not only in a file on disk.
 
 - From a shell: `braindog attach page.html --on "<task, project, or SG5>"`. The pictures the page names beside it go
   up with it. The answer ends with the line that takes it back.
