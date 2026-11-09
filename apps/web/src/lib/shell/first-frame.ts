@@ -11,6 +11,7 @@
  *
  * A PAGE WITH NOTHING KEPT draws the shape a typical record's page has (`first-traces.json`, its own chunk).
  */
+import { inIosApp } from '../shell.ts';
 import { firstTrace } from './first-trace-key.ts';
 
 type FrameDoor = {
@@ -47,6 +48,9 @@ let readTimer: ReturnType<typeof setTimeout> | undefined;
 let outlineTimer: ReturnType<typeof setTimeout> | undefined;
 let queued = false;
 
+/** How far the outline has scrolled off: in the app it goes with the document, so its points are read from the viewport by this. */
+const up = (): number => (inIosApp ? scrollY : 0);
+
 const px = (v: string): number => Number.parseFloat(v) || 0;
 
 /** A wait still standing, the frame itself, or the page's bare box: none of them is the page having landed. */
@@ -54,14 +58,14 @@ const notPage = (el: Element): boolean => el.matches('main#main, html, body, #ff
 
 /** Whether words or a picture of the page are at this point. A wrapper with nothing of its own there is not the page yet. */
 function wordsAt(x: number, y: number): boolean {
-  const el = document.elementFromPoint(x, y);
+  const el = document.elementFromPoint(x, y - up());
   if (el === null || notPage(el)) return false;
   return el.matches('svg, svg *, img, input, textarea, select, button') || [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim() !== '');
 }
 
 /** Whether a solid surface of the page is at this point: a tile that has landed, which hides its outline. */
 function tileAt(x: number, y: number): boolean {
-  let el = document.elementFromPoint(x, y);
+  let el = document.elementFromPoint(x, y - up());
   if (el === null || notPage(el)) return false;
   for (; el !== null && !el.matches('main#main'); el = el.parentElement) {
     const c = getComputedStyle(el).backgroundColor;
@@ -94,10 +98,14 @@ function landed(): boolean {
   const tiles = document.querySelectorAll<HTMLElement>('#ff .ff0');
   if (tiles.length === 0) return document.querySelector('#ff .ffg') === null;
   let over = 0;
+  let seen = 0;
   for (const t of tiles) {
+    /* A TILE SCROLLED OUT OF VIEW HAS NOTHING TO BE READ AT. */
+    if (inIosApp && px(t.style.top) - up() > innerHeight) continue;
+    seen++;
     if (tileAt(px(t.style.left) + Math.min(px(t.style.width) / 2, 24), px(t.style.top) + Math.min(px(t.style.height) / 2, 24))) over++;
   }
-  return over * 2 >= tiles.length;
+  return seen === 0 || over * 2 >= seen;
 }
 
 function settle(address: string): void {

@@ -17,6 +17,8 @@
  * LOADED AT REST, never on the way to the first screen (`first-frame.ts`), and it writes nothing to the page.
  */
 
+import { inIosApp } from '../shell.ts';
+
 export const VERSION = 1;
 
 /** What a row draws: a tile, a filled box, words (strong, plain, quiet), a hairline, a glyph, the lit row. */
@@ -183,7 +185,7 @@ export function traceNow(): Trace | null {
   const fold = innerHeight;
   const rows: Row[] = [];
   const ink = getComputedStyle(main).color;
-  for (const k of main.children) walk(k, { rows, x0: box.left, dy: main.scrollTop, fold, ink, chrome: false }, { l: box.left, r: box.right }, true);
+  for (const k of main.children) walk(k, { rows, x0: box.left, dy: inIosApp ? scrollY : main.scrollTop, fold, ink, chrome: false }, { l: box.left, r: box.right }, true);
 
   /* THE SIDEBAR OR THE TAB BAR AS IT STOOD HERE, foot rows counted from the foot so another window's height still holds. */
   const edge: Row[] = [];
