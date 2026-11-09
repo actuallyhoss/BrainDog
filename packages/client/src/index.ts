@@ -525,11 +525,12 @@ export type Context = {
   /**
    * The briefing as one card, at most 150 words, and its Next line alone for a compaction (`card.ts` in
    * `@braindog/record`), with the calling command's build and whether it is older than the host's oldest. Optional, so an
-   * older host that sends none of them still types.
+   * older host that sends none of them still types. `self_update` is `true` only while the person behind the key lets the
+   * command keep itself up to date (Settings > Agents), which the start hook reads.
    */
   card?: string;
   card_next?: string | null;
-  build?: { cli: string | null; behind: boolean } | null;
+  build?: { cli: string | null; behind: boolean; self_update?: boolean } | null;
 };
 
 /** Who else works in the caller's tree, as `context` says it. See `AlsoHere` in `@braindog/record`. */
