@@ -148,6 +148,20 @@
      the first page that holds it; a later page with the same line is its name alone. */
   const FIRST_PAGES = 4;
   let allPages = $state(false);
+  /* ON A PHONE, NONE UNTIL ASKED (1 Nov, T36): the answer stood 1,750 tall at 390, the build's tile already saying how many
+     pages it makes, and these rows under it were the last screen of it. The bar and the count stay; the pages open on a
+     press. Read at once, so a phone never draws four rows and takes them away, and followed while mounted. */
+  const PHONE = '(width < 640px)';
+  let narrow = $state(typeof matchMedia === 'function' && matchMedia(PHONE).matches);
+  $effect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const phone = matchMedia(PHONE);
+    const follow = () => (narrow = phone.matches);
+    follow();
+    phone.addEventListener('change', follow);
+    return () => phone.removeEventListener('change', follow);
+  });
+  const first = $derived(narrow ? 0 : FIRST_PAGES);
   const saidOnce = $derived.by(() => {
     const seen = new Set<string>();
     const first = new Set<string>();
@@ -176,34 +190,36 @@
       <Stacked parts={places} subject={firstRun.minePages} />
     {/if}
     {#if drawn && drawn.length > 0}
-      <ul class="pages">
-        {#each drawn.slice(0, allPages ? drawn.length : FIRST_PAGES) as p, i (p.slug)}
-          {@const where = sectionOf(p)}
-          {@const line = saidOnce.has(p.slug) ? lines.get(p.slug) : (lines.has(p.slug) ? '' : undefined)}
-          <li>
-            {#if line === undefined}
-              <button type="button" class="card" aria-label={words.openPage(p.got.page.page.title)} onclick={() => (shown = i)}>
-                <IconWell name={where ? 'doc' : 'home'} size="l" />
-                <span class="card-main">
-                  <span class="card-title">{p.got.page.page.title}</span>
-                  <span class="card-where">{where ?? `${firstRun.mineHome}, ${said.opensFirst}`}</span>
-                </span>
-                <Icon name="arrow" size="m" />
-              </button>
-            {:else}
-              <!-- NOTHING OF THEIRS REACHES IT: its name and what it will hold, and nothing to open. -->
-              <div class="rail-row">
-                <IconWell name={where ? 'doc' : 'home'} size="l" />
-                <span class="card-main">
-                  <span class="card-title">{p.got.page.page.title}</span>
-                  {#if line}<span class="card-holds">{line}</span>{/if}
-                </span>
-              </div>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-      {#if !allPages && drawn.length > FIRST_PAGES}<button type="button" class="more-pages tap" onclick={() => (allPages = true)}>{words.morePages(drawn.length - FIRST_PAGES)}</button>{/if}
+      {#if allPages || first > 0}
+        <ul class="pages">
+          {#each drawn.slice(0, allPages ? drawn.length : first) as p, i (p.slug)}
+            {@const where = sectionOf(p)}
+            {@const line = saidOnce.has(p.slug) ? lines.get(p.slug) : (lines.has(p.slug) ? '' : undefined)}
+            <li>
+              {#if line === undefined}
+                <button type="button" class="card" aria-label={words.openPage(p.got.page.page.title)} onclick={() => (shown = i)}>
+                  <IconWell name={where ? 'doc' : 'home'} size="l" />
+                  <span class="card-main">
+                    <span class="card-title">{p.got.page.page.title}</span>
+                    <span class="card-where">{where ?? `${firstRun.mineHome}, ${said.opensFirst}`}</span>
+                  </span>
+                  <Icon name="arrow" size="m" />
+                </button>
+              {:else}
+                <!-- NOTHING OF THEIRS REACHES IT: its name and what it will hold, and nothing to open. -->
+                <div class="rail-row">
+                  <IconWell name={where ? 'doc' : 'home'} size="l" />
+                  <span class="card-main">
+                    <span class="card-title">{p.got.page.page.title}</span>
+                    {#if line}<span class="card-holds">{line}</span>{/if}
+                  </span>
+                </div>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      {#if !allPages && drawn.length > first}<button type="button" class="more-pages tap" onclick={() => (allPages = true)}>{first === 0 ? words.showPages : words.morePages(drawn.length - first)}</button>{/if}
       <p class="reading">{said.pagesIn(total, places.length)}</p>
     {:else}
       <ul class="pages">

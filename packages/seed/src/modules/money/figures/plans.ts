@@ -308,3 +308,23 @@ export const NEXT_PART_FIGURES: Record<string, SeedMetric> = {
     ...ONCE,
   },
 };
+
+/**
+ * THE DAY EACH PLAN ENDS, SINCE money-core 3.40.0 (1 Nov, M23: "say one row per plan ... last 9 Jul 2027"): the latest day
+ * among its parts still open, which Instalments says beside what is next, so a plan's one track says when it is paid
+ * off. Only what goes out, as the rest of the tile. Its own export, declared last in Money (`figures/index.ts`), so every
+ * figure a record already holds keeps its place in the document.
+ */
+export const LAST_PART_FIGURES: Record<string, SeedMetric> = {
+  'installments-last-due-by-plan': {
+    metric: 'installments-last-due-by-plan',
+    name: 'Last part due, by plan',
+    source: 'register.installments',
+    where: 'state is open, direction is out',
+    value: { max: 'due' },
+    group_by: 'plan',
+    format: 'day',
+    target: { gte: 0 },
+    ...ONCE,
+  },
+};

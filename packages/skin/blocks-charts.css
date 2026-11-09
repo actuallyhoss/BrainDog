@@ -1157,6 +1157,13 @@
     text-align: end;
   }
 
+  /* A NOTE WITH NOTHING LEFT BESIDE IT TAKES THE ROW'S WIDTH (1 Nov, M23): in the figure's column, "Next $208 on 9 Dec,
+     the last on 9 Jul 2027" widened that column and pressed the plan's name to "Lap…" on a phone. These are the rows
+     whose `left` is not drawn (above). */
+  .progress:not([data-form='budget']) > .progress-row:not([data-intent]) > .progress-note {
+    grid-column: 1 / -1;
+  }
+
 
   .progress-empty {
     color: var(--ink-3);

@@ -4878,12 +4878,14 @@ function prefixHolder(self: string, prefix: string, installed?: Known): { who: s
  *               (`partsKeysFault`, `row-parts.ts`): one payment over three categories.
  *   `on_delete` `unlink`, on a `ref` or a `list<ref>`: a link the record drew itself (a mail's sender), cleared when the
  *               row it names is deleted rather than keeping it (`ON_DELETE`, `referenced.ts`; `unlinkKeysFault`).
+ *   `lead`      `true`: one of the facts a row's page puts first, in the list's order, ahead of the rest (1 Nov, L19). The
+ *               app's row page reads it; a write never does. A list that marks none leads with what the app knows of it.
  */
 const FIELD_KEYS = [
   'id', 'type', 'of', 'values', 'required', 'index', 'unique', 'immutable', 'default', 'retired',
   'redact', 'transitions', 'remind', 'repeat', 'scope', 'min', 'max', 'required_when', 'by',
   'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'derive', 'labels', 'currency_from', 'currency_fixed', 'when',
-  'hidden_from_agents', 'parts_of', 'on_delete',
+  'hidden_from_agents', 'parts_of', 'on_delete', 'lead',
 ] as const;
 
 /**
@@ -5879,6 +5881,12 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
       const fault = keyFault(`${id}.${f.id}`, key, FIELD_KEYS, FIELD_UNBUILT, f.id);
       if (fault) return fault;
     }
+
+    /* `lead:` IS A YES OR A NO: the facts a row's page puts first (L19). A word there would read as yes to one reader and
+       as nothing to another. */
+    const lead = (raw as { lead?: unknown }).lead;
+    if (lead !== undefined && typeof lead !== 'boolean')
+      return bad('DECLARATION_INVALID', `${id}.${f.id}'s lead is true or false: true puts the field among the first facts on a row's page.`, f.id);
 
     /* `labels:` NAMES VALUES THE ENUM DECLARES, and nothing else. A label for a value the enum does not
        hold is a word the screen never shows, and a label that reads as another value would make

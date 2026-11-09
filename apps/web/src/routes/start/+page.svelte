@@ -975,6 +975,19 @@
   /* A FILE STILL BEING READ HOLDS THE PRESS, so no tile on screen is left out of what it writes. */
   const ready = $derived(proposal !== null && !busy && !nothing && !(asksCurrency && currency === null) && !brought.some((b) => b.mapping === null));
 
+  /**
+   * THE LAST TILE HAS LANDED BEFORE THE MADE SCREEN COMES (1 Nov, T39): on a quick record the call answered 600 ms after
+   * the press and the made screen cut the last part's tile off at a third of its rise. Each tile's own rise
+   * (`data-forming`, `app.css`) is waited for, never a timer of its own, and at most `most` milliseconds, so a rise held
+   * paused while the screen changes holds nothing. Under reduced motion there is no rise to wait for.
+   */
+  async function tilesLanded(most = 900): Promise<void> {
+    if (typeof document === 'undefined') return;
+    const rising = [...document.querySelectorAll<HTMLElement>('.watched [data-forming]')].flatMap((el) => el.getAnimations()).filter((a) => a.playState !== 'finished');
+    if (rising.length === 0) return;
+    await Promise.race([Promise.all(rising.map((a) => a.finished.catch(() => undefined))), new Promise((done) => setTimeout(done, most))]);
+  }
+
   async function make() {
     if (!proposal || !ready) return;
     /* WHAT THE PRESS MAKES IS WHAT WAS ON SCREEN WHEN IT LANDED, read once here, before the first call goes out.
@@ -1028,7 +1041,9 @@
          that failed some other way (a draft, a file, the whole call) has no tile to say it on, so it is said in the
          conversation as it always was. */
       const refused = out.refused ?? [];
-      watched = refused.length > 0 ? { parts: tiles, held: watched?.held ?? [], answer: refused } : null;
+      /* ALL OF IT WENT IN: the tiles stay, each saying Made by the call's own answer, until the made screen takes their
+         place (T39), so nothing else is drawn between the two. */
+      watched = refused.length > 0 ? { parts: tiles, held: watched?.held ?? [], answer: refused } : out.failed.length === 0 ? { parts: tiles, held: watched?.held ?? [], answer: [] } : null;
       if (out.nav) pref.write({ nav: out.nav });
       /* THE SHELL READS THE RECORD AGAIN, so the rail shows the new pages and speaks in the new voice. */
       (await import('$lib/record/boot-live.ts')).forget();
@@ -1046,7 +1061,9 @@
         const todos = [...todo, ...todosOf(chatTurns, clients, todo, crew)].slice(0, 3);
         const forDrafts = chatTurns.length > 0 ? draftsSaid(chatTurns, todos) : sentence;
         madeSaid = forDrafts.trim() === '' ? null : saidMade(forDrafts, asked.proposal.rows, asked.proposal.usecase);
+        await tilesLanded();
         made = true;
+        watched = null;
         globalThis.scrollTo?.({ top: 0 });
         return;
       }
@@ -1218,7 +1235,7 @@
            refused a part, its tile says why and the way back is one button. -->
       <div class="watched">
         <Making parts={watched.parts} states={makingStates(watched.parts, watched.held, watched.answer)} />
-        {#if watched.answer}
+        {#if watched.answer && watched.answer.length > 0}
           <div class="actions">
             <Button weight="primary" onclick={() => (watched = null)}>{making.back}</Button>
           </div>

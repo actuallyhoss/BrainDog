@@ -385,9 +385,11 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     ...list(d.newly_required).map((r) => row(name(text(r.id)), words.required(text(r.field), count(r.rows)))),
     ...list(d.renames).map((r) => row(words.renamed(name(text(r.from)), name(text(r.to))))),
     ...list(d.misreads).map((r) => row(name(text(r.id)), words.misread(name(text(r.reader)), text(r.where)))),
-    /* A LIST THIS PLAN ADDS ARRIVES EMPTY, AS EVERY NEW LIST DOES, so that warning is said only of a list already here. */
+    /* "ARRIVES EMPTY" IS NEVER SAID HERE. A list this plan adds arrives empty, as every new list does, and one already here
+       keeps its rows: Goals' update said "money_goals arrives empty, so nothing on a page that reads it will draw" of a
+       list holding a goal, in its id (9 Nov, G18). It is the plan's note to whoever wrote the add-on, about its examples. */
     ...list(d.warnings)
-      .filter((w) => !(/arrives empty/u.test(text(w.say)) && list(d.adds).some((a) => text(a.id) === text(w.at))))
+      .filter((w) => !/arrives empty/u.test(text(w.say)))
       .map((w) => row(text(w.say))),
     ...removals.map((r) => row(name(`register.${text(r.retire)}`), text(r.line))),
   ];

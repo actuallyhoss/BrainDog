@@ -1109,6 +1109,8 @@ export type RegisterDecl = {
     deadline?: boolean;
     /** The list's own bookkeeping: left out of an agent's short answers, kept in `format: full` and the app. */
     hidden_from_agents?: boolean;
+    /** One of the facts a row's page puts first, in the list's order (the app's row page reads it). */
+    lead?: boolean;
   })[];
   /** The enum field mirrored onto `entry.state`, when the register has one. */
   state?: string;

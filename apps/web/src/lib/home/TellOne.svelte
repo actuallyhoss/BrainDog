@@ -21,8 +21,19 @@
   box for a bank's text (`bank`, AH10). The keyboard adds from the field with Cmd or Ctrl and Enter, and the field keeps
   the focus after a press, so the next thing is typed straight away (AH20).
 -->
+<script module lang="ts">
+  /**
+   * WHERE "THAT BECOMES" SAID EACH LINE AS THE ADD LANDED (1 Nov, T9), by its place among the lines added: the "Just added"
+   * line, in this card or in the slim line that takes the card's place, glides each of its lines up from there, so what
+   * it became folds into what was added instead of vanishing a frame before the receipt is drawn. Read for a moment only.
+   */
+  let folding: { at: number; rects: readonly (DOMRect | null)[] } | null = null;
+  /** How long after the add a "Just added" line drawn is still the one those lines fold into. */
+  const FOLD_MS = 1_000;
+</script>
+
 <script lang="ts">
-  import { arrive, lineIn } from '$lib/motion/index.ts';
+  import { arrive, calm, lineIn, ms, play, still } from '$lib/motion/index.ts';
   import { createClient } from '@braindog/client';
   import { invalidateAll } from '$app/navigation';
 
@@ -124,6 +135,37 @@
   let typed = $state('');
   let sending = $state(false);
 
+  /* ── what it becomes, folding into what was added (T9) ── */
+  let becomes = $state<HTMLUListElement | undefined>(undefined);
+  const foldFresh = (): boolean => folding !== null && performance.now() - folding.at < FOLD_MS;
+
+  /** Where the lines that went were said in the preview drawn (`shown`, by their places `at`), kept for "Just added". */
+  function foldFrom(shown: readonly TellRow[], at: readonly number[]): void {
+    folding = null;
+    if (shown !== rows || !becomes || calm() || still()) return;
+    const said = [...becomes.querySelectorAll<HTMLElement>(':scope > .tell-one-line .tell-one-said')];
+    folding = { at: performance.now(), rects: at.map((i) => said[i]?.getBoundingClientRect() ?? null) };
+  }
+
+  /** The `i`th line "Just added" draws, glided from where the preview said it, on the spring, while the add is fresh. */
+  const foldIn =
+    (i: number) =>
+    (el: HTMLElement): void => {
+      const from = foldFresh() ? folding?.rects[i] : null;
+      if (!from) return;
+      const to = el.getBoundingClientRect();
+      const [dx, dy] = [from.left - to.left, from.top - to.top];
+      if (Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5) return;
+      play(el, { transform: [`translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`, 'none'] }, { duration: ms('--form-settle', 380) });
+    };
+
+  /* THE LINE RISES IN, unless what it says is folding up into it from the preview, which is its arrival: then only its
+     "Just added" fades in where it stands. */
+  const lastIn = (node: Element) => (foldFresh() ? { duration: 0 } : arrive(node, { rise: 6, from: 1 }));
+  const labelIn = (el: HTMLElement): void => {
+    if (foldFresh()) play(el, { opacity: [0, 1] }, { duration: ms('--form-in', 320) });
+  };
+
   /* THE UNDO'S MACHINERY COMES WITH THE FIRST PRESS, not with Today: `run` and the receipt's Undo behind it are only ever
      asked by an Add, so a cold open no longer waits for them. Warmed when the field takes the focus, which every press
      here follows, so the press itself does not wait; a failed load is asked again on the next press. */
@@ -210,6 +252,8 @@
           .filter((line) => line !== '')
           .join('. '),
       settle: () => {
+        /* MEASURED BEFORE THE FIELD EMPTIES, while the preview still stands where the reader saw it (T9). */
+        foldFrom(shown, at);
         typed = '';
         void reread();
         onadded?.(lines);
@@ -304,6 +348,8 @@
               settle: () => void reread(),
             },
       settle: (value) => {
+        /* NOTHING OF THE PREVIEW WENT, so nothing folds into what this says it kept. */
+        folding = null;
         typed = '';
         void reread();
         if (value.wrote > 0) onadded?.([...wrote.keys()].map((one) => ({ said: `${one.name}, ${one.line.charAt(0).toLowerCase()}${one.line.slice(1)}`, list: listName(one.register), href: `/r/${one.register}/${one.seq}` })));
@@ -329,6 +375,7 @@
         ...press,
         said: c.done,
         settle: () => {
+          folding = null;
           typed = '';
           numbered = null;
           asking = '';
@@ -551,7 +598,7 @@
       <!-- WHAT IT BECOMES rises in under the words, and each line it adds opens as it is read (`$lib/motion`). -->
       <div class="tell-one-becomes" aria-live="polite" in:arrive={{ rise: 6, from: 1 }}>
         <p class="tell-one-quiet">{say.becomes}</p>
-        <ul class="tell-one-lines">
+        <ul class="tell-one-lines" bind:this={becomes}>
           {#each rows as row, i (i)}
             <li class="tell-one-line" data-forming="told" in:lineIn>
               <IconWell name={iconOf(row)} />
@@ -637,10 +684,11 @@
     <p class="tell-one-quiet">{say.notYet} {ready.length > 1 ? say.undoAll(ready.length) : ready.length === 1 ? say.undoOne : say.undoAny}</p>
   {/if}
   {#if last.length > 0 && typed.trim() === ''}
-    <!-- WHAT WAS LAST ADDED, AND WHERE IT WENT, the same before and after a reload (AH23). -->
-    <p class="tell-one-quiet tell-one-last" in:arrive={{ rise: 6, from: 1 }}>
-      <span>{say.justAdded}:</span>
-      {#each last as line, i (i)}<span class="tell-one-was">{line.said}, <a href={at(line.href)}>{say.inList(line.list)}</a>{i < last.length - 1 ? ';' : ''}</span>{/each}
+    <!-- WHAT WAS LAST ADDED, AND WHERE IT WENT, the same before and after a reload (AH23). Just after an add, each line
+         glides up from where "That becomes" said it (T9). -->
+    <p class="tell-one-quiet tell-one-last" in:lastIn>
+      <span {@attach labelIn}>{say.justAdded}:</span>
+      {#each last as line, i (i)}<span class="tell-one-was" {@attach foldIn(i)}>{line.said}, <a href={at(line.href)}>{say.inList(line.list)}</a>{i < last.length - 1 ? ';' : ''}</span>{/each}
     </p>
   {/if}
 </Tile>
