@@ -16,6 +16,8 @@
   keyboard's row, the receipts and every write.
 -->
 <script lang="ts">
+  /* A DOUBLE CLICK ON A CARD RENAMES ITS ROW, on the page the card opens (`things/rename.ts`). */
+  import { renames } from '$lib/things/rename.ts';
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { valueSaid } from '$lib/voice.ts';
@@ -161,7 +163,7 @@
       over = null;
     }}
   >
-    <a class="bcard-open" href={at(`/r/${register}/${e.seq}`)} draggable="false">
+    <a class="bcard-open" href={at(`/r/${register}/${e.seq}`)} draggable="false" {@attach renames(`/r/${register}/${e.seq}`)}>
       <span class="bcard-title" dir="auto">
         {#if fresh.has(e.seq)}<span class="fresh" data-fresh={e.seq} aria-hidden="true"></span>{/if}
         {#if faced}<span class="bcard-face"><Face name={title ?? ''} kind="person" size="s" /></span>{/if}
