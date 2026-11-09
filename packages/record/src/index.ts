@@ -47,6 +47,7 @@ import { boardStepsOn, stepsOf, type BoardBody, type BoardStep } from './board-s
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { ContactArgs, ContactMet, EraseReport, EraseRequest } from '@braindog/kernel';
 import { NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
+import { bellNever, bellWorthy, runFailed } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
 import { JOINED_AT, PUSH_KINDS, SAID_MOST, mayOf, openInstructions, shareMeOf, tokenOfRun, type Instr, type Profile, type Stop } from '@braindog/kernel';
@@ -1329,6 +1330,7 @@ export const PREF_KEYS = [
   'push.off',
   'agents.bypass',
   'name.asked',
+  'bell.opened',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
@@ -1471,7 +1473,45 @@ export type Prefs = {
   'boards.pages'?: Record<string, PageBoard>;
   /** Whether this person was asked their name once on signing in (named it or skipped). Absent is not yet asked. */
   'name.asked'?: boolean;
+  /**
+   * WHAT THE BELL SAID THAT THIS PERSON HAS SINCE OPENED (9 Nov, his words: "if i open the page related to the
+   * notification, it should automatically clear it"): each address a bell line opens, record-relative (`/r/tasks/526`,
+   * `/decide/SG12`), to the time of the newest line read there by opening it. A line at or before that time is read on
+   * every device they open the record on. The newest `BELL_OPENED_MOST`, merged and never replaced (`openedKept`).
+   */
+  'bell.opened'?: Record<string, string>;
 };
+
+/** The most addresses `bell.opened` keeps, the oldest let go first: more than the forty new lines a bell holds. */
+export const BELL_OPENED_MOST = 100;
+
+/** Why a `bell.opened` value cannot be kept, or `null` when it can. */
+export function openedFault(value: unknown): string | null {
+  const said = `bell.opened maps each address a bell line opens, starting with /, to the time of the newest line read there, at most ${BELL_OPENED_MOST} of them, or null to take it away.`;
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return said;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > BELL_OPENED_MOST) return said;
+  for (const [address, at] of entries)
+    if (!address.startsWith('/') || address.length > 300 || typeof at !== 'string' || at.length > 40 || !Number.isFinite(Date.parse(at))) return said;
+  return null;
+}
+
+/**
+ * What `bell.opened` keeps once `sent` is heard: each address at the newest time either says, and the newest
+ * `BELL_OPENED_MOST` of them. MERGED, NOT REPLACED, unlike every other key: a phone and a laptop each send what they
+ * opened, and the one that sent last would otherwise take back what the other had cleared.
+ */
+export function openedKept(was: unknown, sent: Readonly<Record<string, string>>): Record<string, string> {
+  const out = new Map<string, string>();
+  const take = (address: string, at: unknown): void => {
+    if (typeof at !== 'string' || !Number.isFinite(Date.parse(at))) return;
+    const had = out.get(address);
+    if (had === undefined || Date.parse(at) > Date.parse(had)) out.set(address, at);
+  };
+  if (was !== null && typeof was === 'object' && !Array.isArray(was)) for (const [address, at] of Object.entries(was as Record<string, unknown>)) take(address, at);
+  for (const [address, at] of Object.entries(sent)) take(address, at);
+  return Object.fromEntries([...out].sort((a, b) => Date.parse(b[1]) - Date.parse(a[1])).slice(0, BELL_OPENED_MOST));
+}
 
 /** One page laid out as a board: its widgets by key, in order, at their sizes, less the ones taken off. */
 export type PageBoard = { order: string[]; sizes: Record<string, string>; hidden?: string[]; phone?: { order?: string[]; sizes?: Record<string, string>; hidden?: string[] } };
@@ -1688,6 +1728,12 @@ export type Boot = {
   /** What changed since the caller last read, exactly as `whatsNew` answers with no cursor. */
   whatsNew: WhatsNew;
   /**
+   * WHAT THE BELL SAYS IS NEW, AND ALL IT SAYS (9 Nov): of what changed since the caller last read, only what wants them,
+   * cut as `whatsNew` is (`newsCut`). Rules and scripts at work, rows arriving and a run keeping its own row are in
+   * `whatsNew` and Activity, and never here, so they never count on the badge.
+   */
+  bell: Bell;
+  /**
    * Each person on the record by name, by id, for saying who did what, and only for a caller who may read the membership
    * list (the owner) or the People list. Names only: no address, no level. Absent for anybody else.
    */
@@ -1853,6 +1899,13 @@ type Walked = EventLine & { rowid: number };
  * `byWho` counts the lines answered by who wrote them (`update-pass.ts`), here and on `recentHistory`'s page alike.
  */
 export type WhatsNew = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean; byWho: ByWho };
+
+/**
+ * `boot`'s `bell`: what the bell says is new, the lines since the read mark that want the reader (`bellWorthy` in the
+ * kernel), newest first and at most forty. `sinceCapped` says there are more of them than these, or that the walk for
+ * them stopped before the mark.
+ */
+export type Bell = { events: EventLine[]; sinceCapped: boolean };
 
 /** `recentHistory`: one page of the log, newest first, and the cursor for the page below it. */
 export type HistoryPage = { events: EventLine[]; cursor: Cursor | null; byWho: ByWho };
@@ -10050,6 +10103,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * Walk the log down from `before`, no lower than `floor`, keeping what the caller may see, until `want` are kept.
    * `next` is where a further walk would start, and `null` once nothing is left above the floor.
+   *
+   * `skip` leaves a line as the log keeps it, before its row is read; `shows` leaves one once it is (the bell's, which
+   * reads a row's list). `most` is how many lines one call walks at most, `WALK` unless the caller asks for fewer.
    */
   const walk = (
     ctx: CallContext,
@@ -10059,6 +10115,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     setups = false,
     skip?: (e: LogLine) => boolean,
     folds = false,
+    shows?: (line: Walked) => boolean,
+    most = WALK,
   ): { lines: Walked[]; next: number | null } => {
     const lines: Walked[] = [];
     /* AND A PASS OF BRAINDOG'S OWN UPDATE AS ONE LINE WITH ITS STEPS UNDER IT (`update-pass.ts`), before the setup is
@@ -10085,17 +10143,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     };
     let at = before;
     let walked = 0;
-    while (walked < WALK) {
+    while (walked < most) {
       const batch = kernel.eventsBefore(at, BATCH);
-      /* WHICH ROWS THE BATCH IS ABOUT, AND WHICH SHE IS SHOWN, ASKED ONCE FOR THE BATCH. */
-      const seen = sight.lines(ctx, batch);
+      /* WHICH ROWS THE BATCH IS ABOUT, AND WHICH SHE IS SHOWN, ASKED ONCE FOR THE BATCH, and not at all for a batch whose
+         every line is skipped, which the bell's walk past a morning of rules running mostly is. */
+      let seen: LineSight | null = null;
       for (const e of batch) {
         if (e.rowid < floor) return done(null);
         walked += 1;
         at = e.rowid;
         if (skip?.(e)) continue;
+        seen ??= sight.lines(ctx, batch);
         const line = lineOf(ctx, e, seen);
-        if (line) keep(line);
+        if (line && (shows === undefined || shows(line))) keep(line);
         if (lines.length >= want) return done(at);
       }
       if (batch.length < BATCH) return done(null);
@@ -10892,7 +10952,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * and its lists to the first `NEWS_ITEMS`, as a line draws them (scope 2026-10-24, boot under 30 KB). A note written whole is a line of its own on the bell
    * and on Today, never its text; on his record six notes' text was 26 KB of every `boot`. `whatsNew` still says them whole.
    */
-  const newsCut = (news: WhatsNew): WhatsNew => {
+  const newsCut = <N extends { events: EventLine[] }>(news: N): N => {
     /* AND INSIDE A VALUE THAT HOLDS OTHERS, as a new row's line says its fields and a visual its forty pictures: a list
        keeps its first `NEWS_ITEMS`, each cut the same way. */
     const cut = (v: unknown): unknown => {
@@ -10973,6 +11033,64 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       upTo: events[0] ? pointAt(ctx, events[0]) : null,
       sinceCapped: next !== null || lines.length > NEWS,
       byWho: byWhoOf(events, reader),
+    };
+  };
+
+  /**
+   * WHAT THE BELL WALKS THE LOG BY (9 Nov, his words: "all the match, extract, read should only show in audit but not as a
+   * real notification"): `bellWorthy` in the kernel, less the reader's own lines, the record's bookkeeping and the notices
+   * they muted, as `whatsNew` leaves those.
+   *
+   * `skip` IS ASKED OF A LINE BEFORE ITS ROW IS READ, so a run that went through and whatever a rule, a script or a door
+   * wrote cost the walk nothing past the log's own read (`bellNever`). `shows` is asked once the line says its list,
+   * with whether it is about the reader (`youOf`), since that is what an agent's line is judged by.
+   *
+   * A RUN THAT DID NOT GO THROUGH IS SAID ONCE A DAY FOR EACH RULE, SCRIPT OR DOOR, its newest: in the first days of
+   * November his rule that finds what a payment paid failed 423 times, and a bell of the newest forty would have held
+   * that rule and nothing else. Stateful for one walk, so each walk makes its own.
+   */
+  const bellSift = (ctx: CallContext): { skip: (e: LogLine) => boolean; shows: (line: Walked) => boolean; yours: (line: EventLine) => 'assigned' | 'mentioned' | null } => {
+    const reader = readerOf(ctx);
+    const muted = mutesOf(ctx);
+    const yours = youOf(ctx);
+    const done = (list: string): readonly string[] | undefined => {
+      const said = kernel.register(list)?.done;
+      return Array.isArray(said) ? said.filter((d): d is string => typeof d === 'string') : undefined;
+    };
+    const failed = new Set<string>();
+    return {
+      yours,
+      skip: (e) => e.actor === reader || bellNever(e) || kernel.bookkeeping(e) || (muted.size > 0 && mutedFor(e, muted)),
+      shows: (line) => {
+        const you = yours(line);
+        if (!bellWorthy(you === null ? line : { ...line, you }, done)) return false;
+        if (!runFailed(line)) return true;
+        const key = `${line.actor}\u0001${line.ts.slice(0, 10)}`;
+        if (failed.has(key)) return false;
+        failed.add(key);
+        return true;
+      },
+    };
+  };
+
+  /** How many lines the bell is told are new, and how far back one walk for them goes. */
+  const BELL = 40;
+  const BELL_WALK = 3_000;
+
+  /**
+   * WHAT THE BELL SAYS IS NEW: the lines since the reader's read mark that are the bell's (`bellSift`), newest first and at
+   * most `BELL`, walked no further than `BELL_WALK` lines down, which on his record is two days of rules running. Its own
+   * walk and not `whatsNew` cut down: `whatsNew`'s sixty were two hours of his record, fifty-odd of them rules and
+   * scripts at work, so a colleague's comment from the morning had fallen out of it, and Today reads every one of the
+   * sixty for what landed. The badge counts these.
+   */
+  const bellFor = (ctx: CallContext): Bell => {
+    const { skip, shows, yours } = bellSift(ctx);
+    const { lines, next } = walk(ctx, null, kernel.unreadFrom(readerOf(ctx)), BELL + 1, false, skip, false, shows, BELL_WALK);
+    const events = lines.slice(0, BELL);
+    return {
+      events: withSettling(sql, events).map((line) => shown(ctx, ((you) => (you === null ? line : { ...line, you }))(yours(line)))),
+      sinceCapped: next !== null || lines.length > BELL,
     };
   };
 
@@ -11335,7 +11453,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return kept;
   };
 
-  const shellFor = (ctx: CallContext, used: unknown = usedNow()): Pick<Boot, 'record' | 'currency' | 'money' | 'zone' | 'me' | 'pages' | 'pagesByRow' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
+  const shellFor = (ctx: CallContext, used: unknown = usedNow()): Pick<Boot, 'record' | 'currency' | 'money' | 'zone' | 'me' | 'pages' | 'pagesByRow' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'bell' | 'names' | 'places' | 'computed'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
@@ -11488,6 +11606,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           : [],
       /* WITH EACH LINE'S LONG WORDS CUT (`newsCut`): a note's whole text was 26 KB of his `boot`'s 49 KB of news. */
       whatsNew: newsCut(newsFor(ctx)),
+      /* AND THE BELL'S OWN, cut the same way: the few lines of it that want the reader. */
+      bell: newsCut(bellFor(ctx)),
       ...((names) => (names === null ? {} : { names }))(namesFor(ctx)),
     };
   };
@@ -15383,7 +15503,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * `nav.hidden`, the pages taken out of it; `nav.shape`, a rail, a bar or a menu; `pen.suggest`, whether the holding
      * pen offers anything; `pen.dismissed`, what it offered and they turned down; `home.page`, the page the app opens on;
      * `nav.labels`, their own names for pages; `notify.muted`, the rules whose notices they do not want; the five `look.*` and `look.shot`,
-     * how the app looks to them. `null` takes a key away. `boot` answers them on `me.prefs`.
+     * how the app looks to them; `bell.opened`, the bell's lines they have read by opening what each is about, which is
+     * merged into what is kept and never replaces it (`openedKept`). `null` takes a key away. `boot` answers them on `me.prefs`.
      *
      * A PERSON, NOT A TOKEN, and not an event, for the reasons a read mark is neither: it is about somebody's own
      * screen, and it is not the record's history. Any level may, since it changes nothing anybody else sees.
@@ -15593,6 +15714,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const fault = boardsFault(value);
         if (fault) return no('VALUE_MALFORMED', fault, { at: 'value' });
         kept = value as Record<string, PageBoard>;
+      } else if (value !== null && key === 'bell.opened') {
+        const fault = openedFault(value);
+        if (fault) return no('VALUE_MALFORMED', fault, { at: 'value' });
+        kept = openedKept((kernel.prefsOf(self) as Prefs)['bell.opened'], value as Record<string, string>);
       } else if (value !== null && key === 'packs.known_keys') {
         const entries = typeof value === 'object' && !Array.isArray(value) ? Object.entries(value as Record<string, unknown>) : null;
         if (!entries || entries.length > 200 || !entries.every(([k, v]) => k.length > 0 && k.length <= 300 && texts(v, 8, (s) => /^[0-9a-f]{16}$/u.test(s))))
@@ -18865,7 +18990,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * `cursor` IS TAKEN AS GIVEN, a `Cursor` or not, as the MCP surface hands it on, and `cursorOf` is what checks it.
      */
-    async recentHistory(args: { cursor?: unknown; limit?: number; everything?: boolean } | undefined, ctx: CallContext): Promise<Result<HistoryPage>> {
+    async recentHistory(args: { cursor?: unknown; limit?: number; everything?: boolean; bell?: boolean } | undefined, ctx: CallContext): Promise<Result<HistoryPage>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const cursor = args?.cursor === undefined ? null : await cursorOf(ctx, args.cursor, 'cursor');
@@ -18877,8 +19002,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const all: unknown = args?.everything;
       if (all !== undefined && all !== true && all !== false && all !== 'true' && all !== 'false')
         return no('VALUE_MALFORMED', "everything is true or false. True also returns the runs the sweep closed and agents' last-seen stamps.", { at: 'everything' });
+      /* THE BELL'S OWN LINES, READ OR NOT (9 Nov): what it draws a step quieter under what is new, by the rule its new
+         lines are walked by (`bellSift`), the reader's own left out. Activity never asks it, and reads every line. */
+      const bell: unknown = args?.bell;
+      if (bell !== undefined && bell !== true && bell !== false && bell !== 'true' && bell !== 'false')
+        return no('VALUE_MALFORMED', 'bell is true or false. True answers only the lines the bell holds: what wants you, and never rules, scripts and doors at work.', { at: 'bell' });
+      const sift = bell === true || bell === 'true' ? bellSift(ctx) : null;
       const limit = Math.min(Math.max(1, asked ?? 50), 200);
-      const { lines, next } = walk(ctx, cursor, 1, limit + 1, false, all === true || all === 'true' ? undefined : (e) => kernel.bookkeeping(e), true);
+      const { lines, next } =
+        sift === null
+          ? walk(ctx, cursor, 1, limit + 1, false, all === true || all === 'true' ? undefined : (e) => kernel.bookkeeping(e), true)
+          : walk(ctx, cursor, 1, limit + 1, false, sift.skip, false, sift.shows, BELL_WALK);
       const events = lines.slice(0, limit);
       /* A PASS ENDS THE PAGE ON ITS OLDEST STEP, so the page below starts under the whole pass and never says it twice. */
       const end = events.at(-1);

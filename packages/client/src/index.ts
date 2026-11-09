@@ -186,6 +186,11 @@ export type Boot = {
   pen?: Answer<'boot'>['pen'];
   /** What changed since the caller last read, as `whatsNew` answers. */
   whatsNew?: WhatsNew;
+  /**
+   * What the bell says is new: the lines since the caller last read that want them, never rules, scripts and doors at
+   * work. See `Bell` in `@braindog/record`. Absent from a host older than the field, whose bell reads `whatsNew`.
+   */
+  bell?: Bell;
   /** The record's installed look, as the record's Boot.theme: each scheme's custom properties without the `--`; null for the house look; absent from an older host. */
   theme?: { light: Record<string, string>; dark: Record<string, string> } | null;
   /** The looks the record holds, its own and those an add-on brought, which the theme chooser offers; absent from an older host. */
@@ -311,6 +316,9 @@ export type Cursor = number | string;
 /** `whatsNew`: newest first, at most sixty. `upTo` is what `markRead` takes to mark all of them read. */
 export type WhatsNew = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean; byWho?: ByWho };
 
+/** `boot`'s `bell`: what the bell says is new, newest first, at most forty. */
+export type Bell = { events: EventLine[]; sinceCapped: boolean };
+
 /** The keys of a line `boot` leaves out when they are `null` (`newsCut` in `@braindog/record`). */
 const NEWS_SPARE = ['target', 'field', 'from', 'to', 'note', 'batch', 'register', 'seq', 'title'] as const;
 /** The keys a line of `boot`'s leaves out where the line before it about the same target said the same. */
@@ -339,11 +347,18 @@ export function linesFilled(lines: readonly EventLine[]): EventLine[] {
   });
 }
 
-/** `boot` with its news filled (`linesFilled`), which is the shape every reader of it reads. */
+/** `boot` with its news and its bell filled (`linesFilled`), which is the shape every reader of it reads. */
 export function bootFilled(boot: Boot): Boot {
   /* AN ANSWER THAT IS NOT A BOOT IS ANSWERED AS IT CAME, as `call` answers every other. */
-  const news = typeof boot === 'object' && boot !== null ? boot.whatsNew : undefined;
-  return news && Array.isArray(news.events) ? { ...boot, whatsNew: { ...news, events: linesFilled(news.events) } } : boot;
+  if (typeof boot !== 'object' || boot === null) return boot;
+  const news = boot.whatsNew && Array.isArray(boot.whatsNew.events) ? boot.whatsNew : null;
+  const bell = boot.bell && Array.isArray(boot.bell.events) ? boot.bell : null;
+  if (news === null && bell === null) return boot;
+  return {
+    ...boot,
+    ...(news === null ? {} : { whatsNew: { ...news, events: linesFilled(news.events) } }),
+    ...(bell === null ? {} : { bell: { ...bell, events: linesFilled(bell.events) } }),
+  };
 }
 
 /** `recentHistory`: one page, newest first, and the cursor for the page below it. */
@@ -2848,7 +2863,7 @@ export function createClient(options: ClientOptions) {
      * asks for the record's own bookkeeping too: the sweep writing quiet runs off, and an agent's stamps of when it saw
      * a tool.
      */
-    recentHistory: (args: { cursor?: Cursor | null; limit?: number; everything?: boolean } = {}) =>
+    recentHistory: (args: { cursor?: Cursor | null; limit?: number; everything?: boolean; bell?: boolean } = {}) =>
       call<HistoryPage>('recentHistory', args as Record<string, unknown>),
     /**
      * The arrivals in one state, newest first: left out, what waits; `matched` what was filed, `ignored` what was
