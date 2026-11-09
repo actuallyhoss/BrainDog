@@ -15,7 +15,10 @@ import { fromLegacy, pathOnly, split } from './at.ts';
  * `saved` / `unsaved` name a download that did or did not land in Downloads. `refresh` is the native pull to refresh:
  * the screen reads again (`reread` in `data/live.svelte.ts`).
  */
-export type ShellEvent = 'slash' | 'search' | 'goto' | 'saved' | 'unsaved' | 'refresh';
+export type ShellEvent = 'slash' | 'search' | 'goto' | 'saved' | 'unsaved' | 'refresh' | 'action';
+
+/** One of the head's buttons as the native bar takes it (`handOver` in `shell/head-actions.ts`). */
+export type ShellAction = { id: string; label: string; icon: string | null; primary: boolean };
 
 /** Which shell draws the page: none, the Tauri desktop app (no `kind`), or one of the native apps. */
 export type ShellKind = 'web' | 'desktop' | 'mac' | 'ios';
@@ -54,6 +57,8 @@ interface Shell {
   title?(name: string, sub?: string): void;
   /** The tabs the web would draw, for the native tab bar. */
   places?(tabs: readonly ShellPlace[]): void;
+  /** The head's buttons for the native bar, at most four, or none to clear. */
+  actions?(list: readonly ShellAction[]): void;
   /** Native pushes a screen for this address instead of the page moving in place (the iPhone's stacks). */
   visit?(path: string, opts: { mode: VisitMode }): void;
 }
@@ -114,7 +119,7 @@ export function openOutside(url: string, opts: { here?: boolean } = {}): void {
 }
 
 /** Hear things locally where there is no shell (a browser notification's click), so `goto` works in both. */
-const local: Record<ShellEvent, Set<(arg?: string) => void>> = { slash: new Set(), search: new Set(), goto: new Set(), saved: new Set(), unsaved: new Set(), refresh: new Set() };
+const local: Record<ShellEvent, Set<(arg?: string) => void>> = { slash: new Set(), search: new Set(), goto: new Set(), saved: new Set(), unsaved: new Set(), refresh: new Set(), action: new Set() };
 
 /**
  * A notification: the shell's, else a web one only if already granted (never asks here). `goto` is the app's address a
