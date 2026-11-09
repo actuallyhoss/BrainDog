@@ -23,7 +23,7 @@
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 
-import { approvalLines, egressOf, keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
+import { approvalLines, egressOf, keyNamed, runnerCannotOpen, scriptKeysHost, type Egress } from './actions.ts';
 import { agentOf, kindsOfProposal, ownerIn, recordReader, rungOf, shapeIn, stampOf, tokenOfRun, type KindReader } from './change-kind.ts';
 import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
@@ -3916,8 +3916,17 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
          to that host, so a later action cannot send it anywhere else. `pinHost` writes only when the entry names no host. */
       if ((row.body_kind === 'change' || row.body_kind === 'pattern') && Array.isArray(body.egress))
         for (const e of body.egress as unknown[]) {
-          const line = isMap(e) ? (e as { key?: unknown; host?: unknown }) : null;
-          if (line !== null && typeof line.key === 'string' && typeof line.host === 'string') pinHost(deps.sql, line.key, line.host, deps.nowMs, actor);
+          const line = isMap(e) ? (e as { key?: unknown; host?: unknown; channel?: unknown; ingest?: unknown }) : null;
+          if (line === null || typeof line.key !== 'string' || typeof line.host !== 'string') continue;
+          /* A SCRIPT'S LINE NAMES ITS FIRST HOST AND ITS KEYS JOINED, so each of its keys is held to the one host it calls,
+             and none when it calls several, since nothing says which of them gets which key (`scriptKeysHost`). */
+          if (line.channel === 'script') {
+            const script = declared(install).find((d) => d.kind === 'script' && isMap(d.body) && d.body.script === line.ingest);
+            const to = script === undefined ? null : scriptKeysHost(script.body as { egress?: unknown });
+            if (to !== null) for (const label of labelsSent(e, install)) pinHost(deps.sql, label, to, deps.nowMs, actor);
+            continue;
+          }
+          pinHost(deps.sql, line.key, line.host, deps.nowMs, actor);
         }
     }
 

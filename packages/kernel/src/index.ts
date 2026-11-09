@@ -869,7 +869,7 @@ export {
   type ScriptUnrun,
   type Scripted,
 } from './script-run.ts';
-export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEY_OPENED_UNATTENDED, KEY_OPENED_UNATTENDED_PASSPHRASE, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, grantChosen, heldHost, hostOpened, keyOutOfScope, keyScopeOf, originsOf, reserveFor, type KeyOutOfScope } from './actions.ts';
+export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEY_OPENED_UNATTENDED, KEY_OPENED_UNATTENDED_PASSPHRASE, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, grantChosen, heldHost, hostOpened, keyOutOfScope, keyScopeOf, originsOf, reserveFor, scriptKeysHost, type KeyOutOfScope } from './actions.ts';
 export { pinHost } from './keychain.ts';
 import { pinHost as holdKeyToHost } from './keychain.ts';
 /* RUN NOW (`nudge.ts`): an action's waiting run moved to now, at most once a minute an action and twenty an hour a record. */

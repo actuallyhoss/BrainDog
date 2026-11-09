@@ -43,7 +43,7 @@ export { migrateDue, readMigrate, type Migrates, type PackMigrate } from './migr
 export { USES_MOST, usesFault, usesFilled, usesOf, usesSaid, type Use } from './uses.ts';
 import { namerOf, writesLine, writesOf, type Writes } from './calls-out-writes.ts';
 export { holdsIn, holdsOf, resolveWhen, settleWhen, type Waiting } from './when.ts';
-import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, intervalMs, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, intervalMs, jcs, misread, readConfig, rowRegisterOf, scriptKeysHost, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
@@ -4236,8 +4236,19 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
          that cannot write one skips it, and the install goes on. */
       /* WHAT THE LINE PROMISED, "This key will be sent to X only from now on", in the press that approved it. Decide's
          `change` and `pattern` did this and an install did not, so the entry kept its words and the next add-on could carry
-         the key elsewhere. A script's line makes no such promise: a key that names no host goes nowhere from a script. */
+         the key elsewhere. */
       for (const c of diff.calls_out) if (c.change !== 'same' && c.channel !== 'script' && c.grant !== null && c.host !== null) host.pinKey?.(c.grant, c.host);
+      /* AND A SCRIPT THAT CALLS ONE HOST SENDS EVERY KEY THERE, so each of its keys is held to that host as a call's key
+         is (`scriptKeysHost`); one that calls several holds none, since nothing says which host gets which key. A key
+         whose entry said words ("Mercury, the company bank") went in cleanly under the Mercury plugin and every run was
+         then refused (`keyRefused`). Read from the filled script, so the key a setting names (`{{config:grant}}`) is the one
+         held, and at every install of it, since the key a setting names can change while its line reads the same. */
+      for (const d of filled.declarations) {
+        if (d.kind !== 'script' || !isObject(d.body)) continue;
+        const to = scriptKeysHost(d.body);
+        const keys = Array.isArray(d.body.keys) ? d.body.keys.filter((k): k is string => typeof k === 'string' && k.trim() !== '') : [];
+        if (to !== null) for (const label of keys) host.pinKey?.(label, to);
+      }
       let skillsGiven = 0;
       for (const skill of filled.manifest.skills ?? []) if (host.giveSkill?.(skill, pack.manifest.pack) === true) skillsGiven += 1;
 

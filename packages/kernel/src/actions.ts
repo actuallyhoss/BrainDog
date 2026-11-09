@@ -1816,6 +1816,21 @@ export function egressOf(
 type ScriptHeader = { script: string; title?: unknown; runs?: { every?: unknown; door?: unknown; rule?: unknown }; egress?: unknown; keys?: unknown; reads?: unknown };
 
 /**
+ * The one host every key of a script goes to: its egress names one host, so a key it sends can go nowhere else. `null`
+ * when it names none, several, or an origin that does not read as a host.
+ *
+ * WHAT ITS APPROVAL HOLDS ITS KEYS TO (`pinHost`), as a `call`'s approval holds its one key to its one host. Nothing did
+ * for a script: a key whose entry said words ("Mercury, the company bank") went in cleanly under the Mercury plugin, and
+ * the host then refused every run (`keyRefused`), since nothing tied the words to the one host the script calls. With two
+ * hosts nothing says which one gets which key, so nothing is pinned and the line says where each key's entry points.
+ */
+export function scriptKeysHost(d: { egress?: unknown }): string | null {
+  const hosts = (Array.isArray(d.egress) ? d.egress : []).map((o) => heldHost(o));
+  if (hosts.length === 0 || hosts.some((h) => h === null)) return null;
+  return new Set(hosts).size === 1 ? hosts[0]! : null;
+}
+
+/**
  * A script's egress, from its header, or `null` when it fetches from nowhere.
  *
  * ONE LINE FOR EVERY ORIGIN, NOT ONE PER ORIGIN, because the thing approved is the script: its origins, its keys and its
@@ -1854,8 +1869,16 @@ function scriptEgress(d: ScriptHeader, opensOf?: (label: string) => string | nul
      this script never calls, every fetch with the key is refused at run time and the script pauses after its third, so
      the line says that instead of printing the words as though they were a destination. */
   const called = new Set(origins.map((o) => hostOpened(o)).filter((h): h is string => h !== null));
+  /* A ONE-HOST SCRIPT'S KEY WHOSE ENTRY NAMES NO HOST GOES TO THAT HOST, because the approval holds it there
+     (`scriptKeysHost`), so the line names the host and says it as a call's line does. */
+  const pin = scriptKeysHost(d);
+  const pinned: string[] = [];
   const to = (label: string): string => {
     const opens = opensOf?.(label)?.trim();
+    if (pin !== null && opens !== undefined && heldHost(opens) === null) {
+      pinned.push(label);
+      return pin;
+    }
     if (!opens) return 'the host its keychain entry opens';
     const host = hostOpened(opens);
     return host !== null && called.has(host) ? host : `no host it calls (its keychain entry opens ${JSON.stringify(opens)}), so every fetch with it is refused`;
@@ -1864,7 +1887,11 @@ function scriptEgress(d: ScriptHeader, opensOf?: (label: string) => string | nul
   /* SAID BY ITS TITLE, the words its install sheet names it by ("Read the next events from your calendar"), and its
      lists as words: `calendar_poll reads events` was a line of code on the sheet. A script with no title is "This script". */
   const title = typeof d.title === 'string' && d.title.trim() !== '' ? `“${d.title.trim()}”` : 'This script';
-  const key_line = reads.length > 0 ? `${title} reads ${joinedList(reads.map((r) => r.replace(/_/gu, ' ')))} and may send what it reads to ${joinedList(hosts)}.` : null;
+  const said = [
+    ...(reads.length > 0 ? [`${title} reads ${joinedList(reads.map((r) => r.replace(/_/gu, ' ')))} and may send what it reads to ${joinedList(hosts)}.`] : []),
+    ...(pinned.length === 0 ? [] : [`${pinned.length === 1 ? 'This key' : 'These keys'} will be sent to ${pin} only from now on.`]),
+  ];
+  const key_line = said.length === 0 ? null : said.join(' ');
 
   return {
     ingest: d.script,
