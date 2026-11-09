@@ -43,6 +43,7 @@
   import { settled } from '../ui/panel.ts';
   import { frame } from './frame.svelte.ts';
   import type SentTrayView from '../send/SentTray.svelte';
+  import { dismiss, lineIn, pop as popIn } from '$lib/motion/index.ts';
 
   /** A list's own glyph, as its declaration gives it, for a line that opens it (`kindOf`). */
   const glyphOf = (list: string): IconName | undefined => {
@@ -135,6 +136,23 @@
   /* ONE LINE A THING: what is new and what was read before can both carry it, said by two names for one person. */
   const forYou = $derived(told.filter((l, i) => l.you !== undefined && told.findIndex((o) => o.you !== undefined && o.href === l.href && o.at === l.at) === i).slice(0, 8));
   const days = $derived(bellDays(told.filter((l) => l.you === undefined), new Date(now)));
+
+  /**
+   * EACH LINE KEYED BY WHAT IT SAYS AND WHEN (the record growing, 9 Nov): a line that comes in while the bell is open rises
+   * into its day and wears the arrival wash, and one that goes lets go, its room opening and closing so the rest glide
+   * (`lineIn`, `dismiss`). No `animate:flip` beside them: the lines never trade places, and a flip measured before the new
+   * line's room is shut played the rest from a line too low, so they jumped up over it first. Keyed by place, every line
+   * under a new one changed its words instead. Two alike are told apart by count.
+   */
+  const keyed = <L extends BellLine>(lines: readonly L[]): { l: L; key: string }[] => {
+    const seen = new Map<string, number>();
+    return lines.map((l) => {
+      const k = `${l.at}|${l.href}|${l.text}`;
+      const n = seen.get(k) ?? 0;
+      seen.set(k, n + 1);
+      return { l, key: n === 0 ? k : `${k}#${n}` };
+    });
+  };
 
   let open = $state(false);
   /** On the page, which is longer than open: from the opening to the end of its close. */
@@ -274,9 +292,9 @@
       <section class="bell-day" aria-labelledby="{uid}-you">
         <div class="bell-day-row"><h3 class="bell-day-head" id="{uid}-you">{words.forYou}</h3></div>
         <ul class="bell-lines">
-          {#each forYou as l, i (i)}
+          {#each keyed(forYou) as { l, key } (key)}
             {@const isNew = l.old !== true && unread(l)}
-            <li>
+            <li in:lineIn out:dismiss>
               <a class="bell-row" data-bell-item data-unread={isNew ? '' : undefined} data-you="" href={at(l.href)}>
                 <span class="bell-new" aria-hidden="true"></span>
                 <span class="bell-kind" aria-hidden="true"><Icon name={l.you === 'mentioned' ? 'ask' : 'user-check'} size="m" /></span>
@@ -313,9 +331,9 @@
           {#if inSheet && k === 0 && fresh > 0}<button type="button" class="bell-mark" onclick={() => void markRead()}>{words.markAll}</button>{/if}
         </div>
         <ul class="bell-lines">
-          {#each d.lines as l, i (i)}
+          {#each keyed(d.lines) as { l, key } (key)}
             {@const isNew = l.old !== true && unread(l)}
-            <li>
+            <li in:lineIn out:dismiss>
               <a class="bell-row" data-bell-item data-unread={isNew ? '' : undefined} href={at(l.href)}>
                 <span class="bell-new" aria-hidden="true"></span>
                 <span class="bell-kind" aria-hidden="true"><Icon name={kindOf(l.href, l.tone, glyphOf)} size="m" /></span>
@@ -365,7 +383,8 @@
   >
     <span class="bell-face">
       <Icon name="bell" size={phone ? 'l' : 'm'} />
-      {#if fresh > 0}<span class="bell-count num" aria-hidden="true">{fresh > 9 ? '9+' : fresh}</span>{/if}
+      <!-- THE BADGE COMES ON WITH A SWELL (`popIn`), and swells again as the count goes up (`count.ts`). -->
+      {#if fresh > 0}<span class="bell-count num" aria-hidden="true" in:popIn>{fresh > 9 ? '9+' : fresh}</span>{/if}
     </span>
   </button>
 
