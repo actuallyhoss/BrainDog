@@ -4564,9 +4564,10 @@ const DECLARED: Record<string, Version> = {
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders rule.people-fields
       script.people_fields
     `,
-    declares: 'df4e91c778e61435',
+    declares: '886094da04a0c5eb',
     history: [
       'People 4.8.0 of 9 November (pictures): `register.people` gains `picture` (Photo), a file, and declares `identity: { picture }`, so a person wears their photo in place of their letter -> df4e91c778e61435',
+      'People 4.8.0 again before it shipped: `register.organisations` gains `picture` (Logo), a file, and declares `identity: { picture }`, so an organisation wears its logo, on the payments that name it too -> 886094da04a0c5eb',
     ],
   },
 

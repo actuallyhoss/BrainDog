@@ -3,7 +3,7 @@
   "version": "4.8.0",
   "title": "People",
   "summary": "Clients, contractors and accountants, the organisations they are with, and where each one was seen.",
-  "changes": "A person can wear a photo in place of their letter: hover their face to change it, and an agent that finds one saves it.",
+  "changes": "A person can wear a photo in place of their letter, and an organisation its logo: hover either to change it, and an agent that finds one saves it.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -137,6 +137,7 @@
         "retired": "retired_on"
       },
       "delete": "refuse_while_referenced",
+      "identity": { "picture": "picture" },
       "fields": [
         { "id": "name", "label": "Organisation", "type": "text", "required": true, "search": true },
         {
@@ -156,6 +157,7 @@
           "index": true
         },
         { "id": "domain", "label": "Website", "type": "text", "index": true },
+        { "id": "picture", "label": "Logo", "type": "file" },
         { "id": "keys", "label": "Known by", "type": "list", "of": "text" },
         {
           "id": "projects",

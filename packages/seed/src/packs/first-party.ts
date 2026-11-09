@@ -1038,9 +1038,10 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   on the profile picture, as well as setting a picture/logo. same with people", and 9 Nov: "i want projects to be able
  *   to change their logo, set profile pictures, etc. same with people"): `register.things` gains `picture`, a file, and
  *   names it as `identity.picture`, so a project's logo is drawn in place of its mark; `register.people` gains `picture`
- *   (Photo) and declares `identity: { picture }`, so a person's photo is drawn in place of their letter. Both optional
- *   and neither hidden from agents, since an agent that finds a logo or a photo saves it. One field added to each and
- *   nothing taken away, so a minor step that goes in quietly and keeps every row.
+ *   (Photo) and declares `identity: { picture }`, so a person's photo is drawn in place of their letter; and
+ *   `register.organisations` the same as Logo, drawn on the payments that name it too (the payee logos Cash Fish
+ *   shows). All optional and none hidden from agents, since an agent that finds a logo or a photo saves it. One field
+ *   added to each list and nothing taken away, so a minor step that goes in quietly and keeps every row.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',

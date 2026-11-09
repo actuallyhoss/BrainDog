@@ -412,6 +412,9 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
     org: { name: 'name', keys: 'keys', kind: 'kind', domain: 'domain', merged_into: 'merged_into', met: 'met', projects: 'projects', retired: 'retired_on' },
     /* A PERSON OR A PAYMENT NAMES ITS ORGANISATION, so it is not deleted out from under them, as a person is not. */
     delete: 'refuse_while_referenced',
+    /* ITS LOGO, SINCE People 4.8.0, as a person's photo and a project's logo: the file field it is drawn by, in place of
+       its letter, here and on every payment that names it. */
+    identity: { picture: 'picture' },
     fields: [
       { id: 'name', label: 'Organisation', type: 'text', required: true, search: true },
       /* WHAT IT IS TO YOU, which is what decides how it is met: a bank's alert, a shop's receipt, a client's mail. A
@@ -427,6 +430,9 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
       },
       /* THE ADDRESS ITS MAIL COMES FROM, `halden.example`, and never a public one such as a free mail service. */
       { id: 'domain', label: 'Website', type: 'text', index: true },
+      /* ITS LOGO, SINCE People 4.8.0: a file the record holds, drawn in place of its letter. An agent that finds one saves
+         it, and asks before replacing one already chosen. Optional, so every organisation already written stays valid. */
+      { id: 'picture', label: 'Logo', type: 'file' },
       { id: 'keys', label: 'Known by', type: 'list', of: 'text' },
       { id: 'projects', label: 'Projects', type: 'list', of: 'ref', to: 'things', scope: { links: true } },
       /* WHERE IT WAS SEEN, one dated line each with where: the evidence a match was made on. */

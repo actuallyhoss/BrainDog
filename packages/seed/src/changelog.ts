@@ -152,7 +152,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
-    { version: '4.8.0', notes: 'A person can wear a photo in place of their letter: hover their face to change it, and an agent that finds one saves it.' },
+    { version: '4.8.0', notes: 'A person can wear a photo in place of their letter, and an organisation its logo, shown on its payments too: hover either to change it, and an agent that finds one saves it.' },
     { version: '4.7.2', notes: 'A note inside the people-fields script no longer carries real names. Nothing you see changes.' },
     {
       version: '4.7.1',
