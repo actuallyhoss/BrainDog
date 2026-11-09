@@ -54,6 +54,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
+  import { LONG_AT, LONG_STEP, longFoldOf, longWords } from '$lib/page/fold.ts';
   import { CapLine } from 'braindog-render/svelte';
   import BindBlock from '$lib/ui/BindBlock.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -635,6 +636,8 @@
     owed = false;
     capture = '';
     editing = null;
+    /* AND A NEW ANSWER STARTS AT THIRTY ROWS AGAIN (`longFold`). */
+    longShown = LONG_AT;
   });
 
   /**
@@ -1578,6 +1581,8 @@
     void rowsAsCards();
     /* AND WHICH OF THE THREE LAYOUTS IS DRAWN, since the board and the cards end in a sentinel of their own. */
     void view;
+    /* AND WHETHER A LONG ANSWER IS FOLDED, which draws no sentinel until every row in hand is shown (`longFold`). */
+    void longFold;
     const el = body?.querySelector('.sentinel');
     if (!el) return;
     /* THE ROOT IS THE APP'S SCROLLER, NOT THE VIEWPORT. `+layout.svelte` makes `#main` "the ONE
@@ -1602,6 +1607,36 @@
     const f = wayField(decl) ? amountField(decl) : undefined;
     return f ? columns.findIndex((c) => c.field === f.id) : -1;
   });
+  /**
+   * A LONG LIST, THIRTY ROWS AT A TIME (1 Nov, M43): the Ledger's own list stood 7,000px tall at a desk and 10,000 on a
+   * phone, all 154 lines at once, while its page (`/p/money-ledger`) showed thirty and "Show 30 more" (`page/fold.ts`).
+   * The table and the phone's cards now do the same over the rows in hand: thirty, thirty more a press, and once every
+   * row in hand is shown the next page is read as it always was, at the sentinel. A row the keyboard or the open row's
+   * walk reaches past the fold opens the fold to it. The groups, the board and the cards at a desk stay whole.
+   */
+  let longShown = $state(LONG_AT);
+  const longFold = $derived(view !== 'groups' && (rowsAsCards() || view === 'table') ? longFoldOf('table', drawn, longShown) : null);
+  /* OPEN TO `n` ROWS, AND FOR GOOD ONCE THAT IS EVERY ROW IN HAND: the pages after it come in at the sentinel, whole, as
+     they always did, so a reader who opened the list is never asked to press again for each thirty of a long one. */
+  const openTo = (n: number): void => void (longShown = n + 5 >= drawn ? DOM_CAP : n);
+  $effect(() => {
+    const at = focus.row;
+    if (untrack(() => longFold !== null && at >= longShown)) openTo((Math.floor(at / LONG_STEP) + 1) * LONG_STEP);
+  });
+
+  /** "Show 30 more": the next thirty under the last row read, and the focus on the first of them, as on a page. */
+  async function longer(): Promise<void> {
+    const from = longShown;
+    openTo(longShown + LONG_STEP);
+    await tick();
+    if (rowsAsCards()) body?.querySelectorAll<HTMLElement>('.cards > li')[from]?.querySelector<HTMLElement>('a[href], button')?.focus();
+    else {
+      focus = { row: from, col: focus.col };
+      const cell = body?.querySelector(`.tr[aria-rowindex="${from + 2}"]`)?.children[focus.col];
+      if (cell instanceof HTMLElement) cell.focus();
+    }
+  }
+
   const rows = $derived.by(() => {
     const drawn = toRows(id, result.entries.slice(0, DOM_CAP), columns, now, result.names ?? undefined);
     const shown = result.entries;
@@ -1619,6 +1654,8 @@
       };
     });
   });
+  /* THE TABLE'S ROWS UNDER A FOLD (`longFold`): the same array when there is none. */
+  const tableRows = $derived(longFold ? rows.slice(0, longFold.shown) : rows);
 
   /**
    * WHAT A READER CAN ORDER THE LIST BY. What each direction is called is `wayOf` (`parts/list.ts`).
@@ -3635,13 +3672,13 @@
     {:else if rowsAsCards()}
       <ListCards
         register={id}
-        entries={result.entries.slice(0, DOM_CAP)}
+        entries={result.entries.slice(0, longFold ? longFold.shown : DOM_CAP)}
         {now}
         names={result.names ?? undefined}
         {selected}
         arrived={cardsArrived}
         {decl}
-        more={cursor !== null && loaded < DOM_CAP}
+        more={!longFold && cursor !== null && loaded < DOM_CAP}
         {receiptFor}
         {openCardMenu}
       />
@@ -3650,7 +3687,7 @@
         register={id}
         {decl}
         {columns}
-        rows={arrived.size === 0 ? rows : rows.map((r) => (arrived.has(r.key) ? { ...r, arrived: true } : r))}
+        rows={arrived.size === 0 ? tableRows : tableRows.map((r) => (arrived.has(r.key) ? { ...r, arrived: true } : r))}
         total={rowCount}
         {sort}
         {now}
@@ -3664,7 +3701,7 @@
         bind:editTicked
         {fresh}
         names={result.names ?? undefined}
-        onmore={cursor === null ? undefined : more}
+        onmore={cursor === null || longFold ? undefined : more}
         onsort={result.entries.length < 2 ? undefined : sortBy}
         onheadmenu={(field, point) => {
           headMenu = { field, at: { x: point.x, y: point.y, height: point.height } };
@@ -3714,7 +3751,10 @@
       list is still paging, so a line drawn from it vanished in exactly the state it was written for. A sorted list the
       record stopped says so the same way.
     -->
-    {#if loaded >= DOM_CAP || truncated}
+    {#if longFold}
+      <!-- THE NEXT THIRTY, as a page's long list says it (`page/fold.ts`): a control the list's width, not a footnote. -->
+      <button type="button" class="list-more tap" onclick={() => void longer()}>{longWords(longFold.more)}</button>
+    {:else if loaded >= DOM_CAP || truncated}
       <CapLine shown={drawn} total={result.matched} />
     {:else if cursor !== null && drawn < result.matched}
       <p class="cap-line" role="status">{shownSaid(drawn, result.matched)}</p>
@@ -3828,6 +3868,44 @@
 
   /* EVERY OTHER RULE THIS SCREEN DRAWS IS IN THE PART THAT DRAWS ITS MARKUP (`parts/`), because a
      `<style>` block styles only what its own file writes. What is left here is the page's frame. */
+
+  /* "SHOW 30 MORE" UNDER A LONG LIST (M43), drawn as a page's long list draws it (`BlockSlot.svelte`): the list's width,
+     the quiet fill, the control's height and a whole thumb on a phone, so it reads as where the list stops. A press is a
+     fill change. */
+  .list-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    margin-block-start: var(--sp-3);
+    padding: 0 var(--sp-4);
+    border: 0;
+    border-radius: var(--r-pill, var(--r-ctl));
+    background: var(--soft-fill, var(--tile-2));
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background-color var(--d-press, 70ms) ease-out;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .list-more:hover {
+      background: var(--soft-fill-hover, var(--hover));
+    }
+  }
+
+  .list-more:active {
+    background: var(--rule);
+  }
+
+  @media (pointer: coarse) {
+    .list-more {
+      min-block-size: 44px;
+    }
+  }
 
   /* THE ROOM THE DOCKED PANEL TAKES, less the gutter the head and the list already keep at their end, so the list's
      edge stands 12 from the panel. It moves with the panel's own slide, over `--d-panel` on the sheet curve. */
