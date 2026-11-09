@@ -13342,11 +13342,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return [answered, themeInstalled(ctx), looksOf(kernel.declarations().filter((d) => d.kind === 'theme'))] as const;
       }), 16);
       /* A HELD ANSWER GOES OUT WITH WHAT THE CLOCK ALONE MOVES WORKED OUT NOW: the runs at work, how long each has run and
-         been quiet, and how many questions are late. Held now across a page opened, it would otherwise say a run's age
-         as it was when it was worked out; these few reads are what every other part of it saves. */
+         been quiet, and the questions waiting, a question put off coming back at its time, with how many are late. Held now
+         across a page opened, it would otherwise say a run's age as it was when it was worked out; these few reads are
+         what every other part of it saves. */
       const out = structuredClone(answer);
       if (!made) {
-        const moving = kernel.transaction(() => ({ sessions: readable(ctx, SESSION) ? [] : live(ctx), waits: waitsFor(ctx), working: workingFor(ctx) }));
+        const moving = kernel.transaction(() => ({ sessions: readable(ctx, SESSION) ? [] : live(ctx), waiting: waitingFor(ctx), waits: waitsFor(ctx), working: workingFor(ctx) }));
         Object.assign(out, moving, { counts: { ...out.counts, decide: moving.waits.questions, inbox: moving.waits.inbox } });
       }
       return ok({ ...out, now: new Date(clock.now()).toISOString(), theme: look === null ? null : await themeDrawn(look), looks: structuredClone(looks) });
