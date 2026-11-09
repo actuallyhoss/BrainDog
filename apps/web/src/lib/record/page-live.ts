@@ -1561,24 +1561,63 @@ const END_TYPES: ReadonlySet<string> = new Set(['money', 'int', 'count', 'decima
  * A PLAN THE FIGURES CANNOT SAY IT FOR SAYS LESS, NEVER A GUESS: with no day it says nothing, and with no amount (the
  * script that writes what is left after each part has not reached this plan) it says the day alone. The year is left
  * off a day in this year. Returns the sentence for a plan's key, or `''`.
+ *
+ * AND THE DAY THE PLAN ENDS, where the tile reads a fourth figure, the latest open part's day (money-core 3.40.0; 1 Nov,
+ * M23: "say one row per plan ... last 9 Jul 2027"): "Next $208 on 9 Dec, the last on 9 Aug 2027". Not where the next
+ * part is the last one, whose day the sentence has said already.
  */
 function nextPart(cells: readonly { reading?: { value?: unknown; unit?: unknown; groups?: { key: string; value: number | null }[] } | null }[], now: number): (key: string) => string {
-  const [days, left, after] = cells.map((c) => new Map((c.reading?.groups ?? []).map((g) => [String(g.key), g.value])));
+  const [days, left, after, last] = cells.map((c) => new Map((c.reading?.groups ?? []).map((g) => [String(g.key), g.value])));
   const unit = cells[1]?.reading?.unit;
   if (!days || !left || !after) return () => '';
+  const dayOf = (n: unknown): string | null => (typeof n === 'number' && Number.isFinite(n) ? new Date(n * 86_400_000).toISOString().slice(0, 10) : null);
   return (key) => {
-    const at = days.get(key);
-    if (typeof at !== 'number' || !Number.isFinite(at)) return '';
-    const iso = new Date(at * 86_400_000).toISOString().slice(0, 10);
+    const iso = dayOf(days.get(key));
+    if (iso === null) return '';
     const on = dateSaid(iso, now);
     const l = left.get(key);
     const a = after.get(key);
     const part = typeof l === 'number' && typeof a === 'number' && l > a && typeof unit === 'string' && /^[A-Z]{3}$/u.test(unit) ? moneyWhole(l - a, unit, homeCurrency()) : null;
+    const end = dayOf(last?.get(key));
+    const ends = end !== null && end > iso ? `, the last on ${dateSaid(end, now)}` : '';
     /* A PART WHOSE DAY HAS GONE IS LATE, in Today's words and the danger colour: "Next EGP
        467,915 on 13 Oct" stood in grey under a plan nine days after that day. Today is the reader's day at `now`. */
     const today = recordToday(now);
-    if (iso < today) return `${part ? `${part.text} ` : ''}{{bad:${lateSaid(iso, today)}}}, due ${on}`;
-    return part ? `Next ${part.text} on ${on}` : `Next on ${on}`;
+    if (iso < today) return `${part ? `${part.text} ` : ''}{{bad:${lateSaid(iso, today)}}}, due ${on}${ends}`;
+    return part ? `Next ${part.text} on ${on}${ends}` : `Next on ${on}${ends}`;
+  };
+}
+
+/**
+ * THE ROW A TRACK IS, WHERE A PROGRESS COUNTS PARTS BY THE NAME THEY SHARE (1 Nov, M23: "and link the plan"): Instalments
+ * counts each plan's parts by the name in `installments.plan`, and the plan itself is the row of Plans by that name,
+ * whose page lists every part. By the list and field the figure groups by, as the record declares the figure.
+ */
+const TRACKS_OF: Readonly<Record<string, string>> = { 'installments.plan': 'plans' };
+
+/** The list whose rows a progress block's tracks are (`TRACKS_OF`), or `null`. */
+function tracksTarget(b: Answered): string | null {
+  const metric = b.kind === 'progress' ? b.cells?.[0]?.metric : undefined;
+  const figure = typeof metric === 'string' ? METRICS[metric] : undefined;
+  if (!figure || typeof figure.group_by !== 'string' || !figure.source.startsWith('register.')) return null;
+  return TRACKS_OF[`${figure.source.slice('register.'.length)}.${figure.group_by}`] ?? null;
+}
+
+/**
+ * Each track's name as a link to its row's page, found by its title in the walk of that list; the name alone where no
+ * row is called that, or where the name holds a bracket a link would break on.
+ */
+function trackLinks(b: Answered, refs: ReadonlyMap<string, RefMap>): (key: string, name: string) => string {
+  const to = tracksTarget(b);
+  const map = to === null ? undefined : refs.get(to);
+  if (to === null || !map) return (_key, name) => name;
+  /* BY THE NAME AS A PERSON READS IT, case and spaces aside: an import wrote a plan's name in small letters on its parts. */
+  const fold = (t: string): string => t.trim().toLowerCase();
+  const seqOf = new Map<string, number>();
+  for (const [seq, title] of map.titleOf) if (!seqOf.has(fold(title))) seqOf.set(fold(title), seq);
+  return (key, name) => {
+    const seq = seqOf.get(fold(key));
+    return seq === undefined || /[[\]()]/u.test(name) ? name : `[${name}](/r/${to}/${seq})`;
   };
 }
 
@@ -1929,11 +1968,14 @@ export function blockOf(
      AND WHAT WAS LEFT OUT IS EVERY PLAN NOT DRAWN, the ones past the record's own cap on a figure's parts among them
      (`more` on the second figure, which is the one that names every plan): `total` less `shown` is what the page says.
      A figure that was refused, or that came with no parts at all, falls through to the tiles below, which say why. */
-  if (kind === 'progress' && (b.cells?.length === 2 || b.cells?.length === 5) && readings?.length === b.cells.length && readings.every((c) => Array.isArray(c.reading?.groups))) {
+  if (kind === 'progress' && (b.cells?.length === 2 || b.cells?.length === 5 || b.cells?.length === 6) && readings?.length === b.cells.length && readings.every((c) => Array.isArray(c.reading?.groups))) {
     const [first, second] = readings.map((c) => c.reading!.groups!);
     const done = new Map(first!.map((g) => [String(g.key), typeof g.value === 'number' ? g.value : 0]));
-    /* WHAT EACH TRACK SAYS UNDER ITS BAR, from the three figures after the two counts when the tile reads them. */
+    /* WHAT EACH TRACK SAYS UNDER ITS BAR, from the three figures after the two counts when the tile reads them, and the
+       day it ends from a fourth (money-core 3.40.0). */
     const next = nextPart(readings.slice(2), now);
+    /* AND EACH PLAN'S NAME OPENS ITS PAGE (M23). */
+    const linked = trackLinks(b, refs);
     /* A PLAN TYPED ALL IN SMALL LETTERS IS NAMED WITH A CAPITAL: an import wrote each
        plan's name in small letters on its parts, and the tile said it so while Needs you and the plan's own row started
        it with a capital. A name typed with a capital anywhere is kept as typed, "iPad" among them. */
@@ -1942,7 +1984,8 @@ export function blockOf(
     const open = (p: (typeof plans)[number]): boolean => p.paid < p.parts;
     const tracks = [...plans.filter(open), ...plans.filter((p) => !open(p))].slice(0, 6).map((p) => {
       const said = open(p) ? next(p.key) : '';
-      return { cells: said ? [p.name, String(p.paid), String(p.parts), said] : [p.name, String(p.paid), String(p.parts)] };
+      const name = linked(p.key, p.name);
+      return { cells: said ? [name, String(p.paid), String(p.parts), said] : [name, String(p.paid), String(p.parts)] };
     });
     const past = readings[1]!.reading!.more;
     return { ...shell, authored: tracks, shown: tracks.length, total: plans.length + (typeof past === 'number' && past > 0 ? past : 0) };
@@ -2935,6 +2978,11 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         const by = b.refusals?.length || partsNamed(b) ? null : groupedBy(b);
         if (!by) continue;
         const target = partsTarget(b);
+        if (target) wanted.add(target);
+      }
+      /* A TRACK THAT IS A ROW OF ANOTHER LIST (`tracksTarget`, Instalments' plans) is linked to it, so that list is walked. */
+      for (const b of blocks) {
+        const target = b.refusals?.length ? null : tracksTarget(b);
         if (target) wanted.add(target);
       }
       /* WHO IS READING, for a feed that names the reader as You: the shell's own `boot`, kept, so it costs no call. */
