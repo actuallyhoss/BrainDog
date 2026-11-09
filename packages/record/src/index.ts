@@ -17530,17 +17530,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * the phone's arrangement) on Done, or one step at once from a widget's menu; each lands on the page as the record
      * holds it now, so a draft an agent added meanwhile stays, and a step is refused only when its widget is gone
      * (`board-steps.ts`). A page not kept yet (Today, drawn from what the record holds) is kept from `base` on its first
-     * edit, so Add to Today works on every record. The owner's, as `setDeclaration` is. Answers the version written and
-     * the body before it, `null` where there was none, which Undo puts back.
+     * edit, so Add to Today works on every record. The owner's, as `setDeclaration` is: his session, and his own agent
+     * while he lets agents do everything without asking (`admin`, `agentFor`). Answers the version written and the body
+     * before it, `null` where there was none, which Undo puts back.
      */
     async boardSteps(args: { page?: unknown; version?: unknown; steps?: unknown; base?: unknown; put?: unknown } | undefined, ctx: CallContext) {
       /* DATA, SO THE LADDER FIRST (30 §10): a caller who reads nothing of the record arranges nothing, a report key
-         included. The owner's session is asked below for anything but a member's own Today. */
+         included. The owner's door is asked below for anything but a member's own Today: his session, or his own agent
+         on his switch or his word, as every owner's door admits one (`admin`). */
       const asked = guard(ctx, 'read');
       if (asked) return { ok: false as const, refusal: asked };
       const said = (args ?? {}) as Record<string, unknown>;
       /* A MEMBER ARRANGES THEIR OWN TODAY (W8), kept as theirs: Today alone, and nothing anybody else opens. Everybody
-         else is asked what they always were, the owner's session. */
+         else is asked what they always were, the owner's door. */
       const member = said.page === 'home' ? ownTodayFor(ctx) : null;
       if (member === null) {
         const stop = admin(ctx, 'arrange a board');

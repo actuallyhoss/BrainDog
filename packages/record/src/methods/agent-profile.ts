@@ -41,9 +41,13 @@ export const ON_WORD = 'On their word, passed as said, only money, keys, new way
 /**
  * What a key may do while its owner's "Let agents do everything without asking" is on (`agents.bypass`, `bypassOf` in
  * `index.ts`): the May line `context` says, so the agent acts instead of asking, and knows what still waits.
+ *
+ * TODAY AND THE PAGES ARE NAMED (9 Nov): the record has let his agent arrange a board on his switch since 2 Nov, but
+ * this line never said so, and on 8 Nov his agent arranged Today through his own browser, having read that boards were
+ * his session's.
  */
 export const BYPASS_SAYS =
-  "The owner lets you do everything without asking: write, delete, money, settings, plugins, automations, sharing, the team, making keys, imports and exports land at once, each logged with your name and undoable. Still theirs in BrainDog: giving the BrainDog away, deleting it, erasing a person for good, reading a key's value, paying, and letting agents do more. This holds after reading things from outside BrainDog too, and such a change says so beside it.";
+  "The owner lets you do everything without asking: write, delete, money, settings, plugins, automations, arranging Today and pages, sharing, the team, making keys, imports and exports land at once, each logged with your name and undoable. Still theirs in BrainDog: giving the BrainDog away, deleting it, erasing a person for good, reading a key's value, paying, and letting agents do more. This holds after reading things from outside BrainDog too, and such a change says so beside it.";
 
 /**
  * The one sentence a row's ceiling, lists and projects come to: "Writes Tasks and Learnings; money, keys and deletes are

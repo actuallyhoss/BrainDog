@@ -1370,7 +1370,7 @@ const FIXED: readonly Resource[] = [
   resource('understand', 'What BrainDog would link and ask next, in names. Read before meet.'),
   resource('handoffs', 'The next steps runs left and nobody has taken, newest first, each with the app that left it and its project.'),
   resource('briefing', 'What matters here now: what is late, what is due, what stopped and what waits, a line each.'),
-  resource('widgets', 'Every widget Today can hold, by name, and which Today shows. Suggest one with propose, body_kind widget, body {said} or {block,size}, question your reason: it lands on Today as a draft.'),
+  resource('widgets', 'Every widget Today can hold, by name, and which Today shows. Suggest one with propose, body_kind widget, body {said} or {block,size}, question your reason: it lands on Today as a draft. While the owner lets agents do everything without asking, act boardSteps arranges Today itself.'),
   resource('exceptions', 'What stopped: what went quiet or has not run, the longest first, each in a sentence.'),
   resource('stale', 'What went stale where you stand, each with the one call that clears it.'),
   /* THE DESCRIPTION IS THE TEST FOR RECORDING ONE (`docs/32-PARITY.md`), said where a session looks before it
