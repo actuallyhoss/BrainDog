@@ -130,8 +130,13 @@ export type BindGrantArgs = {
    *
    * THE AAD NAMES BOTH, so bytes stored under any other id or version would never open. A bind that
    * would do that is refused, or answered as a conflict when another deposit moved the grant first.
+   *
+   * `wrapping` IS THE NONCE OF THE DATA KEY'S WRAPPING THE HOST WAS HANDED TO SEAL UNDER. Putting the passphrase on
+   * replaces the record key (`rewrapRecordKey`), and a deposit sealed while that change was under way would otherwise
+   * bind bytes only the old key opens: kept, and opened by nothing the record holds. Every wrapping draws a fresh nonce,
+   * so a nonce that is no longer the row's is answered as a conflict and the caller seals again.
    */
-  sealed_for?: { id: string; version: number };
+  sealed_for?: { id: string; version: number; wrapping?: Uint8Array };
 };
 
 export type KeychainDeps = {
@@ -202,6 +207,9 @@ export function bindGrant(
   const sealed = args.sealed_for;
   if (sealed !== undefined && (!ID.test(sealed.id) || !Number.isInteger(sealed.version) || sealed.version < 1))
     return no<GrantRow>('VALUE_MALFORMED', 'The bytes were sealed for a grant id and version BrainDog cannot hold.', { at: 'sealed_for' });
+  /* AN `ArrayBuffer` TOO, because that is what the Durable Object's SQLite hands back for the nonce a deposit read. */
+  if (sealed?.wrapping !== undefined && !((sealed.wrapping as unknown) instanceof Uint8Array || (sealed.wrapping as unknown) instanceof ArrayBuffer))
+    return no<GrantRow>('VALUE_MALFORMED', 'The bytes name the key wrapping they were sealed under by its nonce, as bytes.', { at: 'sealed_for' });
   /* Sealed for a fresh grant while another deposit gave the row one: that deposit arrived first. */
   if (sealed !== undefined && args.id !== undefined && sealed.id !== args.id)
     return clash<GrantRow>(0, { id: args.id }, 'system');
@@ -229,6 +237,12 @@ export function bindGrant(
       const next = rotating ? (now ? now.version + 1 : 0) : now ? 0 : 1;
       if (next !== sealed.version && (now || !rotating)) {
         const by = sql.one<{ actor: string }>('SELECT actor FROM event WHERE target = ? ORDER BY rowid DESC LIMIT 1', `grant:${id}`);
+        return clash<GrantRow>(now?.version ?? 0, { id, version: now?.version ?? 0 }, by?.actor ?? 'system');
+      }
+      /* SEALED UNDER A KEY THE RECORD NO LONGER HOLDS. The passphrase went on while the host sealed, and that replaces the
+         record key: these bytes would open under nothing the record keeps. A conflict, so the caller seals again. */
+      if (sealed.wrapping !== undefined && !sql.one('SELECT 1 AS x FROM vault_key WHERE purpose = ? AND nonce = ?', args.sealed_under ?? 'record', sealed.wrapping)) {
+        const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target_kind = 'vault_key' ORDER BY rowid DESC LIMIT 1");
         return clash<GrantRow>(now?.version ?? 0, { id, version: now?.version ?? 0 }, by?.actor ?? 'system');
       }
     }
@@ -789,16 +803,48 @@ export type RecordWrapping = {
   beside: string | null;
 };
 
+/** One sealed value as `openGrant` would hand it out: the bytes, their nonce, and the additional data they open with. */
+export type SealedValue = { ciphertext: Uint8Array; nonce: Uint8Array; aad: string };
+
+/**
+ * One grant whose bytes the record key may have sealed, handed to the host that replaces the key.
+ *
+ * `current` IS THE VALUE IN USE, when the record key sealed it (`sealed_under = 'record'`); a connector's is sealed under
+ * the connector key, which no passphrase reaches, and is `null` here. `prev` IS THE ONE PRIOR VERSION, whichever key
+ * sealed it, because `sealed_under` moves with the bytes: a key turned into a connector's can still hold a prior version
+ * the record key sealed. The host re-seals what the old key opens and leaves the rest. `label` is for the one sentence
+ * that names a key the old key does not open; `sealed_under` is for the compare-and-set, and the host does not read it.
+ */
+export type SealedUnderRecord = {
+  id: string;
+  label: string;
+  version: number;
+  sealed_under: 'record' | 'connector';
+  current: SealedValue | null;
+  prev: SealedValue | null;
+};
+
+/** What a host hands back for one grant: its value and its prior version sealed again under the new key, each `null` when left as it was. */
+export type Resealed = {
+  id: string;
+  current: { ciphertext: Uint8Array; nonce: Uint8Array } | null;
+  prev: { ciphertext: Uint8Array; nonce: Uint8Array } | null;
+};
+
 /**
  * One re-wrap of the record's key, as a host made it: under a key derived from the passphrase, with the salt it was
  * derived with, or back under a root key, with that key's id.
+ *
+ * PUTTING THE PASSPHRASE ON MAKES A NEW KEY (`rewrapRecordKey`), so that change carries every value the old key sealed,
+ * sealed again under the new one (`resealed`). Absent reads as none, which is right only for a keychain with nothing in
+ * it, and `rewrapRecordKey` refuses it anywhere else. Taking it off keeps the key, and carries nothing.
  *
  * THE SAME TWO SHAPES `packages/host/src/passphrase.ts` BUILDS, written out again here because the kernel may not
  * import the host. The step reaches the record's method through `withKeychainPassphrase`, which types it loosely, so no
  * compiler holds the two copies together: `rewrapRecordKey` checks every field it writes before it writes it.
  */
 export type WrappingChange =
-  | { to: 'passphrase'; wrapped: Uint8Array; nonce: Uint8Array; salt: Uint8Array }
+  | { to: 'passphrase'; wrapped: Uint8Array; nonce: Uint8Array; salt: Uint8Array; resealed?: readonly Resealed[] }
   | { to: 'kek'; wrapped: Uint8Array; nonce: Uint8Array; kek_id: string };
 
 /** PBKDF2's salt, `12 §6`: sixteen random bytes, held in `vault_key.salt` beside the one wrapping it salts. */
@@ -853,19 +899,102 @@ const bytesOf = (x: unknown, length?: number): boolean =>
   x instanceof Uint8Array && x.length > 0 && (length === undefined || x.length === length);
 
 /**
- * Swap the record key's one wrapping for the one a host made, in one transaction with one `grant.rotate` event.
+ * Every value the record key may have sealed, for a host about to replace that key: each live grant's value when the
+ * record key sealed it, and each live grant's one prior version, with the additional data each opens with.
+ *
+ * THE ADDITIONAL DATA IS `openGrant`'S, `record ‖ grant ‖ version`, and the prior version's names the version before,
+ * which is the one it was sealed at: a rotation moves the bytes across and counts up by one (`bindGrant`, `keepRotated`).
+ * A revoked grant holds no bytes (`revokeGrant`), and a value without its nonce opens nowhere, so neither is here.
+ */
+export function sealedUnderRecord(sql: Sql, recordId: string | null): SealedUnderRecord[] {
+  const aad = (id: string, version: number): string => `${recordId ?? 'self'}\u001f${id}\u001f${version}`;
+  return sql
+    .all<{
+      id: string;
+      label: string;
+      version: number;
+      sealed_under: 'record' | 'connector';
+      ciphertext: Uint8Array | null;
+      nonce: Uint8Array | null;
+      prev_ciphertext: Uint8Array | null;
+      prev_nonce: Uint8Array | null;
+    }>(
+      `SELECT id, label, version, sealed_under, ciphertext, nonce, prev_ciphertext, prev_nonce FROM grant
+        WHERE revoked_at IS NULL
+          AND ((sealed_under = 'record' AND ciphertext IS NOT NULL AND nonce IS NOT NULL)
+            OR (prev_ciphertext IS NOT NULL AND prev_nonce IS NOT NULL))
+        ORDER BY id`,
+    )
+    .map((row) => ({
+      id: row.id,
+      label: row.label,
+      version: Number(row.version),
+      sealed_under: row.sealed_under,
+      current:
+        row.sealed_under === 'record' && row.ciphertext !== null && row.nonce !== null
+          ? { ciphertext: row.ciphertext, nonce: row.nonce, aad: aad(row.id, Number(row.version)) }
+          : null,
+      prev:
+        row.prev_ciphertext !== null && row.prev_nonce !== null
+          ? { ciphertext: row.prev_ciphertext, nonce: row.prev_nonce, aad: aad(row.id, Number(row.version) - 1) }
+          : null,
+    }));
+}
+
+/** The live grants whose value the record key sealed: what a new record key must have sealed again, every one. */
+const RECORD_SEALED = "SELECT count(*) AS n FROM grant WHERE revoked_at IS NULL AND sealed_under = 'record' AND ciphertext IS NOT NULL AND nonce IS NOT NULL";
+
+/** A host's re-sealed values, checked against what it was handed, or the sentence saying what is wrong with them. */
+function resealedOf(change: unknown, sealed: readonly SealedUnderRecord[]): Resealed[] | string {
+  const given = (change as { resealed?: unknown }).resealed ?? [];
+  if (!Array.isArray(given)) return 'The keys sealed again under the new key come as a list.';
+  const handed = new Map(sealed.map((one) => [one.id, one]));
+  const seen = new Set<string>();
+  const pair = (x: unknown): boolean => {
+    const p = x as { ciphertext?: unknown; nonce?: unknown };
+    return typeof x === 'object' && x !== null && bytesOf(p.ciphertext) && bytesOf(p.nonce);
+  };
+  for (const one of given as unknown[]) {
+    const r = one as Partial<Resealed>;
+    const was = typeof r?.id === 'string' ? handed.get(r.id) : undefined;
+    if (was === undefined || seen.has(was.id)) return 'Each key sealed again is one the host was handed, once.';
+    if (r.current !== null && (was.current === null || !pair(r.current))) return 'A key sealed again carries its bytes and their nonce, and only for a value the old key sealed.';
+    if (r.prev !== null && (was.prev === null || !pair(r.prev))) return 'A prior version sealed again carries its bytes and their nonce, and only where there was one.';
+    seen.add(was.id);
+  }
+  /* EVERY VALUE THE OLD KEY SEALED, OR NONE IS WRITTEN: one left behind would open under nothing the record keeps. */
+  const again = new Set((given as Resealed[]).filter((r) => r.current !== null).map((r) => r.id));
+  if (sealed.some((one) => one.current !== null && !again.has(one.id))) return 'The host did not seal every key again under the new key.';
+  return given as Resealed[];
+}
+
+/**
+ * Swap the record key's one wrapping for the one a host made, in one transaction with one `grant.rotate` event, and
+ * when the passphrase goes on, every value the old key sealed for the same values sealed under the new one.
  *
  * EXACTLY ONE WRAPPING, BEFORE AND AFTER (`12 §6`, "the optional second factor"). The row the root key could open is
  * overwritten by the row only the passphrase opens, in the statement that writes it, so from the commit on there is
  * no copy in the record that the operator's key opens. Taking the passphrase off is the same statement the other way.
+ *
+ * PUTTING IT ON IS A NEW KEY, NOT ONLY A NEW WRAPPING. A copy of the record taken before (a nightly copy, a restore point,
+ * an export) holds the old key wrapped under the root key, and with that key every value sealed after the change would
+ * open, if it were the same key. So the host makes a new key, opens every value in `sealed` under the old one and seals
+ * it again under the new, and hands back the new key wrapped under the passphrase with the values (`resealed`). They are
+ * written here with the wrapping or not at all: from the commit on, nothing in the record opens under the old key, and
+ * nothing sealed afterwards ever will. Taking the passphrase off keeps the key it was put on with, wrapped again under
+ * the root key, so it carries no values; changing the passphrase is taking it off and putting it on, which is a new key.
  *
  * A COMPARE-AND-SET ON THE VERY WRAPPING THE HOST WAS HANDED, inside the transaction that sets it: how it was wrapped
  * and the nonce it was wrapped with (`heldNonce`, from `recordWrapping`). The host re-wrapped the key it was handed
  * and awaited its own crypto in between, so a second change that landed first leaves the row as that change left it,
  * and this one is answered as a conflict to be asked again. The nonce is in the compare because every wrapping draws a
  * new one: a slow change made against an old passphrase would otherwise still see `wrapped_by = 'passphrase'` after
- * that passphrase was taken off and a new one put on, and take the new one off. The key itself never changes, only its
- * wrapping, so no credential is re-sealed (`api/keys.ts` says the same of a root key rotation).
+ * that passphrase was taken off and a new one put on, and take the new one off.
+ *
+ * AND ONE ON EVERY VALUE, for the same await. Each is written only while its grant is still at the version, the key and
+ * the nonce it was handed at, and once they are written no value of the record key's may be left that this change did
+ * not seal: a key put away, replaced or revoked while the host worked is a conflict, and nothing is written. A deposit
+ * that sealed under the old key and binds after this commits is the other half, refused by its own `sealed_for`.
  */
 export function rewrapRecordKey(
   sql: Sql,
@@ -873,6 +1002,7 @@ export function rewrapRecordKey(
   change: WrappingChange,
   heldNonce: Uint8Array,
   transaction: <T>(fn: () => T) => T,
+  sealed: readonly SealedUnderRecord[] = [],
 ): Result<{ wrapped_by: 'kek' | 'passphrase' }> {
   type Done = { wrapped_by: 'kek' | 'passphrase' };
   if (!bytesOf(change.wrapped) || !bytesOf(change.nonce))
@@ -881,6 +1011,12 @@ export function rewrapRecordKey(
     return no<Done>('VALUE_MALFORMED', `A key wrapped under a passphrase carries the ${PASSPHRASE_SALT_BYTES}-byte salt it was derived with.`, { at: 'salt' });
   if (change.to === 'kek' && (typeof change.kek_id !== 'string' || change.kek_id === ''))
     return no<Done>('VALUE_MALFORMED', 'A key wrapped under a root key names that key by its id.', { at: 'kek_id' });
+  /* TAKING IT OFF KEEPS THE KEY. Values sealed again under some other key, written beside a wrapping of this one, would
+     open under nothing the record holds, so a change that carries them is refused rather than half applied. */
+  if (change.to === 'kek' && (change as { resealed?: unknown }).resealed !== undefined)
+    return no<Done>('VALUE_MALFORMED', 'Taking the passphrase off keeps the key it was put on with, so nothing is sealed again.', { at: 'resealed' });
+  const resealed = change.to === 'passphrase' ? resealedOf(change, sealed) : [];
+  if (typeof resealed === 'string') return no<Done>('VALUE_MALFORMED', `${resealed} Nothing was changed.`, { at: 'resealed' });
 
   const from = change.to === 'passphrase' ? 'kek' : 'passphrase';
   const at = instant(deps.nowMs);
@@ -903,15 +1039,62 @@ export function rewrapRecordKey(
       const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = 'vault_key:record' ORDER BY rowid DESC LIMIT 1");
       return clash<Done>(0, { wrapped_by: now?.wrapped_by ?? null }, by?.actor ?? 'system');
     }
-    /* A KIND THAT EXISTS: `grant.rotate`, on the record key, saying which wrapping it left and which it went to. The
-       salt and the bytes are not in it, because the event log is read by more people than the keychain is. */
+
+    if (change.to === 'passphrase') {
+      /* A KEY THAT MOVED WHILE THE HOST WORKED is somebody else's change, and the one who made it is named. */
+      const raced = (): Result<Done> => {
+        const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target_kind = 'grant' ORDER BY rowid DESC LIMIT 1");
+        return clash<Done>(0, { wrapped_by: from }, by?.actor ?? 'system');
+      };
+      const handed = new Map(sealed.map((one) => [one.id, one]));
+      for (const r of resealed) {
+        const was = handed.get(r.id);
+        if (was === undefined) return raced();
+        const sets: string[] = [];
+        const values: Uint8Array[] = [];
+        const held: Uint8Array[] = [];
+        let compare = '';
+        if (r.current !== null && was.current !== null) {
+          sets.push('ciphertext = ?', 'nonce = ?');
+          values.push(r.current.ciphertext, r.current.nonce);
+          compare += ' AND nonce = ?';
+          held.push(was.current.nonce);
+        }
+        if (r.prev !== null && was.prev !== null) {
+          sets.push('prev_ciphertext = ?', 'prev_nonce = ?');
+          values.push(r.prev.ciphertext, r.prev.nonce);
+          compare += ' AND prev_nonce = ?';
+          held.push(was.prev.nonce);
+        }
+        if (sets.length === 0) continue;
+        const hit = sql.all<{ id: string }>(
+          `UPDATE grant SET ${sets.join(', ')}
+            WHERE id = ? AND version = ? AND sealed_under = ? AND revoked_at IS NULL${compare}
+            RETURNING id`,
+          ...values,
+          was.id,
+          was.version,
+          was.sealed_under,
+          ...held,
+        );
+        if (hit.length === 0) return raced();
+      }
+      /* NONE OF THE OLD KEY'S LEFT: as many live values sealed under the record key as this change sealed again. */
+      const left = Number(sql.one<{ n: number }>(RECORD_SEALED)?.n ?? 0);
+      if (left !== resealed.filter((r) => r.current !== null).length) return raced();
+    }
+
+    /* A KIND THAT EXISTS: `grant.rotate`, on the record key, saying which wrapping it left and which it went to, and
+       when the key is new, how many keys were sealed again under it. The salt, the bytes and the keys' names are not in
+       it, because the event log is read by more people than the keychain is. */
     sql.exec(
-      "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v) VALUES (?, ?, ?, 'grant.rotate', 'vault_key:record', 'vault_key', 'wrapped_by', ?, ?)",
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note) VALUES (?, ?, ?, 'grant.rotate', 'vault_key:record', 'vault_key', 'wrapped_by', ?, ?, ?)",
       deps.mint(),
       at,
       deps.actor,
       from,
       change.to,
+      change.to === 'passphrase' ? `a new key, ${resealed.length} sealed again` : null,
     );
     return ok<Done>({ wrapped_by: change.to });
   });

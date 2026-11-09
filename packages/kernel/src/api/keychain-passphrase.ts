@@ -14,6 +14,10 @@
  * A WRONG PASSPHRASE IS COUNTED BEFORE IT IS COMPARED (`passphraseStrike`), `PASSPHRASE_TRIES` to a window and then a
  * wait of `PASSPHRASE_WAIT_MS` (`keychain.ts`), as sign-in counts. Putting a passphrase on compares nothing, so it is not counted; taking one off and opening the
  * keychain with one each compare it.
+ *
+ * PUTTING ONE ON HANDS THE STEP EVERY VALUE THE RECORD KEY SEALED (`sealedUnderRecord`), because the step makes a new key
+ * and seals them all again under it (`rewrapRecordKey` says why). The values are sealed bytes, as `openGrant` hands them
+ * out, and what comes back is sealed bytes too.
  */
 
 import type { Result } from '@braindog/ports';
@@ -26,15 +30,21 @@ import {
   passphraseStrike,
   recordWrapping,
   rewrapRecordKey,
+  sealedUnderRecord,
   type RecordWrapping,
+  type SealedUnderRecord,
   type WrappingChange,
 } from '../keychain.ts';
+import { recordIdentity } from '../provision.ts';
 
 /** Whether the record key is behind a passphrase, once a change or an unlock has answered. */
 export type KeychainPassphrase = { on: boolean };
 
-/** A host's re-wrap of the record key: under the passphrase it was given, or back under a root key once that opens it. */
-export type PassphraseRewrap = (held: RecordWrapping) => Promise<Result<WrappingChange>>;
+/**
+ * A host's re-wrap of the record key: a new key under the passphrase it was given, with `sealed` sealed again under it,
+ * or the same key back under a root key once the passphrase opens it, when `sealed` is empty.
+ */
+export type PassphraseRewrap = (held: RecordWrapping, sealed: readonly SealedUnderRecord[]) => Promise<Result<WrappingChange>>;
 
 /**
  * A host's try of the passphrase it was given against the record key: `true` when it opened the key, `false` when it
@@ -74,9 +84,11 @@ export function extension(parts: KernelParts) {
         const wait = passphraseStrike(sql, parts.clock.now());
         if (wait !== null) return locked(wait);
       }
+      /* READ WITH THE WRAPPING AND BEFORE THE AWAIT, so the step is handed one moment of the keychain. */
+      const sealed = to === 'passphrase' ? sealedUnderRecord(sql, recordIdentity(sql)?.id ?? null) : [];
       let out: Result<WrappingChange>;
       try {
-        out = await rewrap(held);
+        out = await rewrap(held, sealed);
       } catch (e) {
         if (compares) passphraseRefund(sql);
         throw e;
@@ -90,7 +102,7 @@ export function extension(parts: KernelParts) {
       if (compares) passphraseCleared(sql);
       if (out.value.to !== to)
         return no('VALUE_MALFORMED', 'The host re-wrapped this BrainDog’s key the other way from the one asked, so nothing was changed.', { at: 'passphrase' });
-      const done = rewrapRecordKey(sql, { mint: parts.mint, nowMs: parts.clock.now(), actor }, out.value, held.nonce, parts.transaction);
+      const done = rewrapRecordKey(sql, { mint: parts.mint, nowMs: parts.clock.now(), actor }, out.value, held.nonce, parts.transaction, sealed);
       return done.ok ? ok({ on: done.value.wrapped_by === 'passphrase' }) : done;
     },
 
