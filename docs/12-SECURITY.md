@@ -354,13 +354,22 @@ A record may set a **keychain password**, distinct from login.
 > *and* by the passphrase, **either wrapping opens it**, so the operator's KEK still decrypts the
 > Keychain. The honesty table below would have been false.
 
-**The mechanism, corrected: enabling a passphrase RE-WRAPS and destroys.** The DEK is unwrapped with
-the KEK once, re-wrapped under a key derived by **PBKDF2-SHA-256, 600,000 iterations, a 16-byte salt** — WebCrypto has no
-Argon2, and HKDF is not a passphrase KDF: an earlier draft's `HKDF(passphrase, salt)` would have left the
-wrap in an exported backup brute-forceable at wire speed — and **the KEK-wrapped copy is overwritten
-and zeroised in the same transaction.** From that point there is exactly one wrapping of the DEK and
-the operator does not hold its key. Disabling the passphrase is the same operation in reverse and
-requires the passphrase.
+**The mechanism, corrected: enabling a passphrase REPLACES the DEK, re-seals, and destroys.** The old
+DEK is unwrapped with the KEK once, a new 32-byte DEK is made, every credential sealed under the old one
+is opened and sealed again under the new one, and only the new DEK is wrapped, under a key derived by
+**PBKDF2-SHA-256, 600,000 iterations, a 16-byte salt** — WebCrypto has no Argon2, and HKDF is not a
+passphrase KDF: an earlier draft's `HKDF(passphrase, salt)` would have left the wrap in an exported
+backup brute-forceable at wire speed — and **the KEK-wrapped copy of the old DEK is overwritten and
+zeroised in the same transaction.** From that point there is exactly one wrapping of the DEK and the
+operator does not hold its key.
+
+> **An earlier build re-wrapped the same DEK** (audit finding M2, 9 November 2026). Every copy of the
+> record taken before the passphrase went on held that DEK under the KEK, so with the KEK it opened every
+> credential deposited *afterwards* too, for as long as the copy was kept. A new DEK is what makes a
+> pre-passphrase copy open only what existed when it was taken.
+
+Disabling the passphrase requires the passphrase and wraps the same DEK back under the KEK. Changing
+it is disabling with the old one and enabling with the new one, so every new passphrase brings a new DEK.
 
 Decrypting any key a person deposited then requires the passphrase in-session. A connector's keys are
 not among them: they are sealed under the connector DEK, which stays on the KEK because a scheduled run
@@ -401,6 +410,16 @@ handed wrapped bytes and a salt and never the passphrase or a key. The details:
   field `wrapped_by`, from one wrapping to the other, and never the salt or the bytes. A root key
   rotation (`rewrapKeys`) leaves a passphrase row alone. Taking the passphrase off wraps the DEK under
   the root key the record's other keys are under while the host still holds it.
+- **The re-seal is in the same transaction** (`rewrapRecordKey`). The record hands the host every
+  value the record DEK sealed (each live grant sealed `record`, and every live grant's one prior
+  version, since `sealed_under` moves with the bytes), with the AAD `openGrant` would give it; the host
+  seals each again under the new DEK with a fresh nonce and the same AAD. Each grant is written only
+  while it is at the version and nonce it was handed at, and once they are written no value sealed
+  under the old DEK may be left: a key put away, replaced or revoked meanwhile makes the whole change a
+  conflict, and nothing is written. A value in use that the old DEK does not open refuses the change,
+  naming the key. A deposit sealed under the old DEK that binds after the change is a conflict too
+  (`sealed_for.wrapping`), and a key door holding a DEK a passphrase opened uses it only for the
+  wrapping it was opened from (`unlockedFor`). The connector DEK and its credentials are not touched.
 - **The key doors take it.** While the passphrase is on, `/api/keys/put` and `/api/keys/open` carry
   `passphrase` in their body; without it the answer is `REQUIRED_MISSING` at `passphrase`. The record's
   INTERNAL `unlockVault` puts rule 2's gate first and then calls the host's step, and the DEK that step
@@ -411,8 +430,10 @@ handed wrapped bytes and a salt and never the passphrase or a key. The details:
   and is not counted; taking it off and every key opened or put with it are.
 - **Export, the nightly copy and a restore carry the passphrase's wrapping and its salt**, sealed, so a
   record restored from its own file opens with the same passphrase. What the passphrase cannot reach is
-  a copy made before it was turned on: that copy still holds the wrapping the KEK opens, for as long as
-  it is kept, and a statement cannot reach what the database engine keeps of a page it has freed.
+  a copy made before it was turned on: that copy still holds the old DEK under the wrapping the KEK
+  opens, and with it the credentials as they were when it was taken, for as long as it is kept; a
+  statement cannot reach what the database engine keeps of a page it has freed. Nothing sealed after
+  the passphrase went on opens under that old DEK.
 
 ### What a grant row holds
 
@@ -756,10 +777,11 @@ being silent, and the bind screen says the same thing in words at the moment the
 attached.
 
 **2 · "We cannot read it" is true after thirty days, not immediately.**
-Enabling the passphrase re-wraps the DEK and zeroises the KEK-wrapped copy in one transaction. But
-the platform keeps **30 days of point-in-time recovery** ([01-ARCHITECTURE](01-ARCHITECTURE.md) §2)
-and §8 ships **30 days of sealed backups** — both of which span the re-wrap. An operator who
-restored to a bookmark from before it would hold a KEK-wrapped DEK again.
+Enabling the passphrase replaces the DEK, re-seals every credential under the new one and zeroises the
+KEK-wrapped copy in one transaction. But the platform keeps **30 days of point-in-time recovery**
+([01-ARCHITECTURE](01-ARCHITECTURE.md) §2) and §8 ships **30 days of sealed backups** — both of which
+span the change. An operator who restored to a bookmark from before it would hold the old DEK under the
+KEK again, and with it every credential as it stood then; never one deposited or replaced afterwards.
 
 That is not a flaw to fix; a 30-day recovery window is why the product can survive a mistake, and
 regulators accept backups being *beyond use* pending rotation. **It is a flaw to leave unstated in a

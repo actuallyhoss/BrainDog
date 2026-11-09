@@ -144,11 +144,13 @@ key opens, never the key**: encryption runs in the host, never in the record. In
   fail to decrypt. `aad = utf8(record_id) ‖ 0x1F ‖ utf8(grant_id) ‖ 0x1F ‖ utf8(String(version))`;
   the wrapped DEK is bound to `utf8(record_id) ‖ 0x1F ‖ utf8(purpose)`. A missing or reordered
   binding is in scope even without a working decrypt behind it.
-- The **passphrase re-wrap**. Enabling a keychain password must unwrap under the KEK, re-wrap under
+- The **passphrase re-wrap**. Enabling a keychain password must unwrap under the KEK, make a new DEK,
+  re-seal every credential under it, wrap only the new DEK under
   `PBKDF2-SHA-256, 600,000 iterations, 16-byte salt`, and **overwrite and zeroise the KEK-wrapped
   copy in the same transaction**. If both wrappings survive, either opens the DEK and the honesty
-  table in `12 §7` becomes false. That is the exact bug class this section exists for, and it was in
-  an earlier draft of the design.
+  table in `12 §7` becomes false; if the old DEK survives as the record's key, any copy taken before
+  opens what is sealed after. That is the exact bug class this section exists for: the first was in an
+  earlier draft of the design, and the second in builds until November 2026.
 - **Rotation**: the two slots (`KEK` / `KEK_PREV`), `kek_id` telling rows apart mid-walk, and a
   `WRONG_KEY` judged against `vault_key`'s own `kek_id` rather than guessed from the row.
 - **Plaintext reaching a sink.** A credential in a log line, a telemetry blob, a push payload, a
