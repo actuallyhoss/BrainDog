@@ -37,6 +37,7 @@ const held = new WeakMap<Element, Held>();
 /**
  * `{@attach dbl(edit)}`: a double click on the node, or on what it holds that is no control of its own, calls `edit`.
  * `can` says whether it changes now, asked as the first press lands; `through` names the controls inside it that open it.
+ * The node wears `data-dbl`, so a walk of the screen can find what a double click may change.
  */
 export function dbl(edit: Edit, { can, through }: { can?: (from: Element) => boolean; through?: string } = {}) {
   return (node: HTMLElement) => {
