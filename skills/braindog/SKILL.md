@@ -37,8 +37,9 @@ platform's handle (`discord`, `discord_id`, `github`, `x`, `instagram`, `linkedi
 (`terms`) and the paperwork still open. The note is for what no field holds. To move facts already in people's notes
 into their fields, run `act {call: "automationRun", args: {rule: "people-fields"}}`: it asks the owner once a person.
 
-When you find a project's logo or a person's photo, save it as their picture: `braindog picture "<project or person>"
-<file or https link>`. One already there is the owner's to replace, so that asks him.
+When you find a project's or a company's logo or a person's photo, save it as their picture: `braindog picture
+"<project, organisation or person>" <file or https link>`, with `--said "<his words>"` when he asked for it. One
+already there is the owner's to replace, so that asks him.
 
 ## What the person told you
 
