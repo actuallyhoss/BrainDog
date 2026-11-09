@@ -36,7 +36,7 @@ import { behindLine, doctorLine, installedBuild } from './behind.ts';
 import { serveBridge, SIGNAL_EXIT_MS } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
 import { mark } from './hook-trace.ts';
-import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, hookWork, parentOf, unreachable } from './hooks.ts';
+import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, hookWork, parentOf, unreachable, type Upkeep } from './hooks.ts';
 import { hookBeat } from './beat.ts';
 import { codexSession, INBOX_ENTRY, notifyHook, runHook, watchHook } from './inbox-file.ts';
 import { statusline, statusOut } from './statusline.ts';
@@ -78,6 +78,7 @@ import { agentTokenFromKey, setup } from './setup.ts';
 import { tools } from './tools.ts';
 import { tokenCommand } from './token.ts';
 import { update } from './update.ts';
+import { upkeep } from './upkeep.ts';
 import { verify } from './verify.ts';
 
 /* Synchronous, so the line is out before `exit`: a write to a pipe on Windows is asynchronous, and
@@ -1052,9 +1053,10 @@ async function hook(args: string[]): Promise<void> {
   /* THE HOOK SCRIPTS BESIDE THE COMMAND, WRITTEN AT A START TOO (door audit D36): the Claude Code plugin hands its prompt,
      tool, stop and beat hooks to them (`plugins/claude-code/hooks/run.sh`), and a machine that added the plugin and
      never ran setup had none, so only its start and end ever ran. Three small files, the build's own. */
+  let scripts: string | null = null;
   if (which === 'start' && more.length === 0) {
     try {
-      hookScripts();
+      scripts = hookScripts();
     } catch {
       /* A folder that cannot be written keeps the plugin's start and end, as before. */
     }
@@ -1136,6 +1138,14 @@ async function hook(args: string[]): Promise<void> {
     said = true;
     held = text;
   };
+  /* HIS SWITCH, "KEEP BRAINDOG'S COMMAND LINE, HOOKS AND SKILL UP TO DATE BY ITSELF" (`upkeep.ts`), run by the start hook
+     once the attach says it is on. A start it handled says its line and not the build address's "Run braindog update". */
+  let upkept = false;
+  const keepCurrent: Upkeep = async (owed) => {
+    const done = await upkeep({ ...owed, file: fileURLToPath(import.meta.url), released: released(), env: process.env, home: homedir(), scripts });
+    upkept = done.handled;
+    return done;
+  };
   try {
     let stdin = '';
     try {
@@ -1146,7 +1156,7 @@ async function hook(args: string[]): Promise<void> {
     /* THE END HOOK OUTLIVES THE WINDOW. Closing a terminal sends SIGHUP to it as well, and it died having written `seen` and
        not sent `end`. It leaves by itself at `HOOK_MS`, set above, whatever happens. */
     if (which === 'end') for (const signal of ['SIGHUP', 'SIGTERM', 'SIGINT'] as const) process.on(signal, () => undefined);
-    const io = { env: process.env, stdin, cwd: process.cwd(), write };
+    const io = { env: process.env, stdin, cwd: process.cwd(), write, upkeep: keepCurrent };
     await (which === 'start' ? hookStart(io) : which === 'beat' ? hookBeat(io) : hookEnd(io));
   } catch {
     /* The error could quote anything, so the start hook says only that it failed. */
@@ -1156,7 +1166,7 @@ async function hook(args: string[]): Promise<void> {
   if (held !== null) {
     const behind = await behindAsked;
     mark('behind');
-    flush([which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null, behind, doctored].filter((line): line is string => line !== null).join('\n') || null);
+    flush([which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null, upkept ? null : behind, doctored].filter((line): line is string => line !== null).join('\n') || null);
   }
   /* SETUP SYNC'S PUSH, IN THE BACKGROUND, after the hook's own work and never waited for (`startPush`): when a session
      ends, and on the day's first start, on a machine that has joined. It reads one file and starts one process. */

@@ -16,7 +16,8 @@
  * says what is wrong with the login itself.
  *
  * IT NEVER UPDATES. Replacing the command under a session that has started is the person's to choose (planner-39), so
- * this only says `braindog update`.
+ * this only says `braindog update`. His switch in Settings > Agents is that choice made once: with it on, the start hook
+ * updates instead (`upkeep.ts`), and this line is not said beside what it did.
  */
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';

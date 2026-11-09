@@ -32,16 +32,24 @@ import { markTurn, seedInbox, toldAtStart, TURN_KEEP_MS, turnOf } from './inbox-
 import { cliBuild, git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
 import type { AgentIo } from './skills.ts';
 import { startOffer, startOwed, startWork, topOf, WORK_MS, WORK_STEP_MS } from './session-start.ts';
+import { NOT_KEPT, UPKEEP_MS, UPKEEP_ROOM_MS, upkeepOn, type Upkept } from './upkeep.ts';
 
 type Env = Record<string, string | undefined>;
+
+/**
+ * His switch "Keep BrainDog's command line, hooks and skill up to date by itself" at work (`upkeep.ts`): handed this
+ * command's build, whether the start would tell him it is behind, and when its reads must end, it answers what to say.
+ */
+export type Upkeep = (owed: { build: string; behind: boolean; deadline: number }) => Promise<Upkept>;
 
 /**
  * What a hook needs from its process, passed in so a test can hold all of it. `device` is the name this machine goes
  * by, when a test gives one; otherwise it is worked out (`deviceName`). `began` is when the hook began, in epoch
  * milliseconds, for a caller that is not its own process; without it the start hook counts from its process's start.
  * `work` takes the start work the hook leaves for after the card; without it a detached process does it (`spawnWork`).
+ * `upkeep` is run while his switch is on (`main.ts` hands the real one); without it the start only says it is behind.
  */
-export type Io = { env: Env; stdin: string; cwd: string; write: (text: string) => void; home?: string; device?: string; began?: number; build?: string; work?: (job: WorkJob) => void };
+export type Io = { env: Env; stdin: string; cwd: string; write: (text: string) => void; home?: string; device?: string; began?: number; build?: string; work?: (job: WorkJob) => void; upkeep?: Upkeep };
 
 /** The start hook's whole budget: git, then `attach`, well inside the twenty seconds Claude Code gives it. */
 export const HOOK_MS = 8_000;
@@ -402,14 +410,34 @@ const dayName = (day: string): string => {
  */
 export function staleLine(build: string, c: Context | undefined, hostBuild: string | null, host: string, already = false): string | null {
   const mine = buildDay(build);
-  if (mine === null || already) return null;
+  if (mine === null || already || !behindNow(build, c, hostBuild)) return null;
   const theirs = buildDay(hostBuild);
   const newer = theirs !== null && theirs > mine;
-  const below = (c as { build?: { behind?: unknown } | null } | undefined)?.build?.behind === true;
-  if (!newer && !below) return null;
   if (cardOf(c)?.some((line) => /braindog update/u.test(line))) return null;
   return `Your BrainDog command line is out of date (built ${dayName(mine)}${newer ? `, ${host} is on ${dayName(theirs)}` : ''}). Run braindog update, then start a new session.`;
 }
+
+/**
+ * Whether this command is behind, from what the start already holds: built on a day before the host's build, or older
+ * than the oldest the host works with, as the attach's own context says (`build.behind`). A checkout's build is never
+ * behind. What `staleLine` says, before it asks whether anything else says it already; the upkeep reads it too.
+ */
+export function behindNow(build: string, c: Context | undefined, hostBuild: string | null): boolean {
+  const mine = buildDay(build);
+  if (mine === null) return false;
+  const theirs = buildDay(hostBuild);
+  return (theirs !== null && theirs > mine) || (c as { build?: { behind?: unknown } | null } | undefined)?.build?.behind === true;
+}
+
+/**
+ * The card without the line telling him to run braindog update (the record's Update line), once the upkeep has dealt
+ * with what it says: updated the command, found it current, or said in its own line why it could not.
+ */
+export const withoutUpdate = (card: string): string =>
+  card
+    .split('\n')
+    .filter((line) => !(/^Update\s/u.test(line) && /braindog update/u.test(line)))
+    .join('\n');
 
 /** The host's build as this machine last heard it: the bridge's door cache, else the build address's kept answer. */
 function hostBuildOf(home: string, key: string): string | null {
@@ -671,6 +699,26 @@ export async function hookStart(io: Io): Promise<void> {
     /* QUIET ONLY WHEN THE RECORD AGREES it is the run the file remembered, so a resume the record placed elsewhere is told. */
     if (soon && before.host === to.key && before.spoken === run.spoken) return seed([]);
 
+    const home = io.home ?? homedir();
+    const build = io.build ?? cliBuild();
+    /*
+     * HIS SWITCH, "KEEP BRAINDOG'S COMMAND LINE, HOOKS AND SKILL UP TO DATE BY ITSELF" (`upkeep.ts`), as the attach's own
+     * context says it. Begun here, beside the reads that draw the card, and waited for only where the card is written, so
+     * an update costs the start no more than its own few seconds, and never past the hook's budget: its reads end at
+     * `UPKEEP_MS`, or sooner when the attach was slow. Only a session that begins, as the start work, and never a
+     * subagent, which starts inside a window whose own start already did it.
+     */
+    const upkeeping =
+      io.upkeep !== undefined && !child && (event.source === 'startup' || event.source === 'resume') && upkeepOn(run.context)
+        ? io
+            .upkeep({
+              build,
+              behind: behindNow(build, run.context, hostBuildOf(home, to.key)) || behindSaysIt(home, to.key, build),
+              deadline: Math.min(Date.now() + UPKEEP_MS, began + ms - UPKEEP_ROOM_MS),
+            })
+            .catch(() => NOT_KEPT)
+        : null;
+
     /* The same step as the last start here: counted already, before the attach. */
     const kept = guessed !== null && handed === guessed;
     const moved = kept ? early : await movedSince(event.cwd, handed, at.head);
@@ -702,8 +750,6 @@ export async function hookStart(io: Io): Promise<void> {
     }
     const where: Where = { repo: at.repo, host: at.host, device, agent: 'Claude Code' };
     /* FIRST, ABOVE THE CARD, as the lapse is: what to do before the work, in the words of the card's own Update line. */
-    const home = io.home ?? homedir();
-    const build = io.build ?? cliBuild();
     const stale = staleLine(build, shown.context, hostBuildOf(home, to.key), hostName(to.key), behindSaysIt(home, to.key, build));
     const card = briefing(shown, where, moved);
     /* A SUBAGENT WORKS FOR A RUN THAT ALREADY HOLDS THE CARD, so it is told one line, which run it is and where. */
@@ -719,7 +765,12 @@ export async function hookStart(io: Io): Promise<void> {
     seed(ids);
     /* NO YES TO COPY THIS MACHINE'S SKILLS YET (`skills-consent.ts`): said once, under the card, with the command that asks. */
     const offer = run.context !== undefined && (event.source === 'startup' || event.source === 'resume') ? startOffer(io, to, run.context) : null;
-    io.write(`${stale === null ? '' : `${stale}\n`}${above.length === 0 ? '' : `${above.join('\n')}\n`}${card}${offer === null ? '' : `\n${offer}`}`);
+    /* WHAT THE UPKEEP DID, IN PLACE OF EVERY LINE THAT SAYS TO RUN BRAINDOG UPDATE: the one above the card and the card's
+       own Update line. Cut short by its deadline, it handled nothing, and the start says what it always said. */
+    const upkept = upkeeping === null ? NOT_KEPT : await upkeeping;
+    if (upkeeping !== null) mark('upkeep');
+    const top = upkept.handled ? upkept.said : stale;
+    io.write(`${top === null ? '' : `${top}\n`}${above.length === 0 ? '' : `${above.join('\n')}\n`}${upkept.handled ? withoutUpdate(card) : card}${offer === null ? '' : `\n${offer}`}`);
     mark('card');
     /*
      * THE START WORK, AFTER THE CARD AND NEVER WAITED FOR. The skills sync and the tools scan held
