@@ -78,6 +78,8 @@
   const unfiledHint = UNFILED_HINT;
   import { at } from '../at.ts';
   import { TIMELINE_BETWEEN, UNFILED_HINT, timelineTitle } from 'braindog-render';
+  import { dbl } from '$lib/ui/dbl.ts';
+  import { renamable, renameAt } from '$lib/things/rename.ts';
 
   let {
     columns,
@@ -136,6 +138,16 @@
     return out;
   });
   const afterLabel = $derived(plan.after >= 0 ? (columns[plan.after]?.label ?? '') : '');
+
+  /**
+   * A LINE DOUBLE-CLICKED (`lib/ui/dbl.ts`) opens on the row's page with what was pressed open to change: its amount, its
+   * category by the chip, its name anywhere else, as a cell of the table these cards stand for does.
+   */
+  const fieldAt = (from: Element): string | undefined => {
+    const i = from.closest('.lc-amount') ? plan.amount : from.closest('.lc-chip') ? (plan.chip >= 0 ? plan.chip : plan.category) : -1;
+    return i >= 0 ? columns[i]?.field : undefined;
+  };
+  const changes = (href: string) => dbl((from) => renameAt(href, fieldAt(from)), { can: () => renamable(href) });
   /* A CHIP ONLY WHERE THE TABLE SAYS A CATEGORY: with none, a "?" on every line read as "not filed". */
   const chipped = $derived(plan.chip >= 0 || plan.category >= 0);
 </script>
@@ -149,7 +161,7 @@
           {@const look = l.between ? { glyph: 'repeat', slot: 'slate' } : looks.category(l.category)}
           <!-- A PAYMENT LANDING opens its line and rises into it; one taken away closes (`$lib/motion`). -->
           <li in:lineIn out:dismiss animate:flip={springy()}>
-            <svelte:element this={l.href ? 'a' : 'div'} class="lc-line" href={l.href ? at(l.href) : undefined} data-intent={l.tone} data-chipless={chipped ? undefined : ''}>
+            <svelte:element this={l.href ? 'a' : 'div'} class="lc-line" href={l.href ? at(l.href) : undefined} data-intent={l.tone} data-chipless={chipped ? undefined : ''} {@attach l.href ? changes(l.href) : null}>
               {#if chipped}
                 <span class="item-chip lc-chip" data-slot={look?.slot ?? undefined} data-unfiled={look ? undefined : ''} title={look ? undefined : unfiledHint} aria-hidden="true"
                   >{#if look}<Icon name={look.glyph as IconName} size="s" />{:else}?{/if}</span
