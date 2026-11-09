@@ -9222,8 +9222,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * WHAT THE PEN IS MADE FROM (`penStamp`), which is `quietStamp` less the questions: the pen reads no question but the
    * pages Slash asked for (`slashAsked`), so a question answered on the phone weighed every page and list again, half of
    * `boot` after an answer. Beside the newest line about neither a question nor a run, those asks as they stand, and the
-   * newest day a person wrote on, since the pen counts the days a person used the record (`usedIn`) and an answer can be
-   * the first of a day. Walked once per line, as `quietStamp` is.
+   * newest day a person wrote on, since the pen reads how a person has used the record (`usedIn`) and an answer can be
+   * their first write. Walked once per line, as `quietStamp` is.
    */
   let penSeen: { top: number; id: string; quiet: number; day: string | null } | null = null;
   const PEN_QUIET = "('grant', 'inbox_raw', 'suggestion', 'decision')";
@@ -13343,8 +13343,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }), 16);
       /* A HELD ANSWER GOES OUT WITH WHAT THE CLOCK ALONE MOVES WORKED OUT NOW: the runs at work, how long each has run and
          been quiet, and the questions waiting, a question put off coming back at its time, with how many are late. Held now
-         across a page opened, it would otherwise say a run's age as it was when it was worked out; these few reads are
-         what every other part of it saves. */
+         across a page opened, it would otherwise say a run's age as it was when it was worked out. These few reads are
+         cheap beside the rest, which stays held. */
       const out = structuredClone(answer);
       if (!made) {
         const moving = kernel.transaction(() => ({ sessions: readable(ctx, SESSION) ? [] : live(ctx), waiting: waitingFor(ctx), waits: waitsFor(ctx), working: workingFor(ctx) }));
