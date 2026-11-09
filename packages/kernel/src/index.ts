@@ -162,6 +162,8 @@ import {
   sweepStale,
   settleAbout,
   settleOne,
+  settleCannot,
+  cannotApplyOf,
   takeBack,
   PASSED_NOTE,
   apartIds,
@@ -9905,6 +9907,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (!out.ok && !('defer' in verdict)) {
       const why = transaction(() => settleOne(governDeps(), id, clock.now()));
       if (why !== null) return no<Decided>(codeOf(out), `${why} It is off Needs you now.`, { at: 'id' });
+      /* AND ONE WHOSE ROW ITS LIST WILL NEVER TAKE AS ASKED IS CLOSED, SAYING WHY ONCE (`settleCannot`): a value, a field
+         or a move the list refuses whoever presses and whenever, so it is not left to be refused at every press and put
+         back by its asker every night (SG242). Its cause remembers it, and the very same ask is not filed again. */
+      const never = cannotApplyOf(out);
+      if (never !== null && 'refusal' in out) {
+        const line = transaction(() => settleCannot(governDeps(), id, out.refusal, never, clock.now()));
+        if (line !== null) return no<Decided>(codeOf(out), `${line} It is off Needs you now.`, { at: 'id' });
+      }
     }
     /* AND AN ANSWER THAT DELETED OR MERGED ROWS TAKES BACK THE OTHER OPEN QUESTIONS ABOUT THEM THAT NO LONGER APPLY: a
        second "same person?" card about two people one card already merged. */
