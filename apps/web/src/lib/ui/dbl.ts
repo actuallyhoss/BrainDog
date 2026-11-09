@@ -19,12 +19,14 @@
  * screen listens for a double click of its own.
  */
 
+import { navigating } from '$app/state';
+
 /** What a double click does, handed the element the first press landed on: a node over many rows finds its row there. */
 export type Edit = (from: Element) => unknown;
 
 type Held = {
   edit: Edit;
-  /** Whether the node changes this time, asked as the first click lands: `false` leaves the press to the browser. */
+  /** Whether the node changes this time, asked as the first press lands: `false` leaves it to the node round it. */
   can: ((from: Element) => boolean) | null;
   /** Controls inside the node that open it, and so are its own (a row's title button), not a control of their own. */
   through: string | null;
@@ -34,7 +36,7 @@ const held = new WeakMap<Element, Held>();
 
 /**
  * `{@attach dbl(edit)}`: a double click on the node, or on what it holds that is no control of its own, calls `edit`.
- * `can` says whether it changes now, asked as the first click lands; `through` names the controls inside it that open it.
+ * `can` says whether it changes now, asked as the first press lands; `through` names the controls inside it that open it.
  */
 export function dbl(edit: Edit, { can, through }: { can?: (from: Element) => boolean; through?: string } = {}) {
   return (node: HTMLElement) => {
@@ -57,16 +59,17 @@ const CONTROL = `a[href], button, summary, label, [role="button"], [role="checkb
  */
 const PICTURE = '.face, .agent-face, .well, .p-mark, .name-well, .name-icon, [data-picture]';
 
-/** The node a press on `el` asks to change, and what it says, or null where the press is the browser's or a control's. */
+/**
+ * The node a press on `el` asks to change, and what it says, or null where the press is the browser's or a control's.
+ * THE NEAREST NODE THAT CHANGES NOW: one that does not (`can`) leaves the press to the node round it, so a widget's name
+ * on Today is Today's to change though it is drawn inside a page whose rows change themselves.
+ */
 function heldAt(el: Element): { node: Element; h: Held } | null {
   if (el.closest(TYPED) || el.closest(PICTURE)) return null;
   let control: Element | null = null;
   for (let at: Element | null = el; at; at = at.parentElement) {
     const h = held.get(at);
-    if (h) {
-      if (control && !(h.through && control.matches(h.through))) return null;
-      return h.can && !h.can(el) ? null : { node: at, h };
-    }
+    if (h && (!control || (h.through !== null && control.matches(h.through))) && (!h.can || h.can(el))) return { node: at, h };
     if (!control && at.matches(CONTROL)) control = at;
   }
   return null;
@@ -80,12 +83,29 @@ const TAP_MS = 500;
 const TAP_PX = 12;
 const TWICE_MS = 350;
 const TWICE_PX = 28;
+/** How long a change waits on the page its first press set off for. */
+const LANDS_MS = 12_000;
+
+/**
+ * THE CHANGE WAITS FOR THE PAGE THE FIRST PRESS SET OFF FOR (a thread on Slash opens at its own address): a box opened
+ * while the move was still on its way lost its caret as the page landed, and closed, so it opens on the page that stays.
+ */
+function landed(go: () => unknown): void {
+  const until = performance.now() + LANDS_MS;
+  const step = (): void => {
+    if (navigating.to === null || performance.now() > until) void go();
+    else requestAnimationFrame(step);
+  };
+  /* A FRAME FIRST, so a move the first press set off has begun. */
+  requestAnimationFrame(step);
+}
 
 /**
  * THE SHELL'S LISTENERS, installed once. Returns the function that takes them away.
  *
- *   - A POINTER'S DOUBLE CLICK: the first `click` says what it landed on, its second press selects nothing, its second
- *     `click` is eaten, and `dblclick` changes what the first landed on.
+ *   - A POINTER'S DOUBLE CLICK: the first press and its `click` say what they landed on, the second press selects
+ *     nothing, the second `click` is eaten, and `dblclick` changes what the first landed on. The press says it too
+ *     because a rail row goes on the way down and drops the click its lift sends (`motion/press.ts`).
  *   - A THUMB'S DOUBLE TAP, two taps close together, heard by their lifts: what the first tap landed on changes at the
  *     second's, so it does not wait on a phone's own word for a double tap, which WebKit does not always send. The click
  *     the second tap makes is eaten. The page has no double-tap zoom to fight (`touch-action: manipulation`, `app.css`),
@@ -113,6 +133,14 @@ export function watchDoubles(): () => void {
     return got && el ? () => got.h.edit(el) : null;
   };
 
+  /** The first press of a pair, or its click: what it landed on, ready for the second. */
+  function arm(e: MouseEvent) {
+    armed = null;
+    if (e.detail !== 1 || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const go = goOf(e.target);
+    if (go) armed = { go, at: e.timeStamp, x: e.clientX, y: e.clientY };
+  }
+
   function click(e: MouseEvent) {
     /* A CLICK A SCREEN MADE ITSELF (`el.click()`) IS NO PRESS: it neither starts a pair nor ends one. */
     if (!e.isTrusted) return;
@@ -122,15 +150,17 @@ export function watchDoubles(): () => void {
       if (paired(e)) eat(e);
       return;
     }
-    armed = null;
-    if (e.detail !== 1 || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    const go = goOf(e.target);
-    if (go) armed = { go, at: e.timeStamp, x: e.clientX, y: e.clientY };
+    arm(e);
   }
 
-  /* THE SECOND PRESS SELECTS NO WORD AND MOVES NO FOCUS, where the pair changes something. */
+  /* THE FIRST PRESS ARMS AS ITS CLICK DOES; THE SECOND SELECTS NO WORD AND MOVES NO FOCUS, where the pair changes something. */
   function press(e: MouseEvent) {
-    if (e.detail >= 2 && paired(e)) e.preventDefault();
+    if (!e.isTrusted || e.timeStamp <= eatUntil) return;
+    if (e.detail >= 2) {
+      if (paired(e)) e.preventDefault();
+      return;
+    }
+    arm(e);
   }
 
   function double(e: MouseEvent) {
@@ -139,7 +169,7 @@ export function watchDoubles(): () => void {
     armed = null;
     e.preventDefault();
     e.stopPropagation();
-    go();
+    landed(go);
   }
 
   function pointerDown(e: PointerEvent) {
@@ -158,7 +188,7 @@ export function watchDoubles(): () => void {
       if (!first.go) return;
       armed = null;
       eatUntil = e.timeStamp + 600;
-      first.go();
+      landed(first.go);
       return;
     }
     tap = { at: e.timeStamp, x: e.clientX, y: e.clientY, go: goOf(e.target) };
