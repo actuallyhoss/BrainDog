@@ -127,6 +127,13 @@ export type Schema = {
    */
   except?: string | undefined;
   /**
+   * EVERY ROW OF THIS LIST KEPT FROM WHOEVER READS, when what each row says is worked out from rows kept private from
+   * them (the kernel's nightly `snapshots`, whole-record totals). A `compile` against it is still checked and matches no
+   * row, so a figure over the list reads it empty, as `list` answers it; a hop into it finds nothing, and a field read
+   * through a link into it reads as null.
+   */
+  withheld?: true | undefined;
+  /**
    * WHICH BACKEND, `34 §1.11`'s own word. Absent means `entry`, which is every register.
    *
    * IT EXISTS SO THAT "EXACTLY THESE FIELDS" CAN BE TRUE. `34 §1.9` says an ingest `match:` may name
@@ -790,7 +797,10 @@ const elementSql = (value: unknown, put: (v: string | number) => string): string
  */
 export function compile(where: Predicate | undefined, schema: Schema): Compiled {
   const c = compileAt(where, schema, 1);
-  if (schema.except === undefined || c.bad.length || schema.subject === 'inbox_raw') return c;
+  if (c.bad.length || schema.subject === 'inbox_raw') return c;
+  /* A LIST WHOSE EVERY ROW IS KEPT FROM WHOEVER READS (`withheld`): the question is still checked, and no row meets it. */
+  if (schema.withheld === true) return { sql: '0', params: [], bad: [] };
+  if (schema.except === undefined) return c;
   return { sql: `(${c.sql}) AND ${unprivate()}`, params: [...c.params, schema.except], bad: [] };
 }
 
@@ -867,8 +877,9 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
     /* AND NOT A ROW KEPT PRIVATE FROM WHOEVER READS (`except` on the list hopped into, kernel migration 40). The hop read
        every live entry there, so a category came back for a Ledger entry somebody else kept to themselves, and which of
        her own rows came back said that a row she is not shown exists. */
-    const kept = there.except === undefined ? '' : ` AND ${unprivate(`${alias}.id`)}`;
-    params.push(register, ...(inner?.params ?? []), ...(there.except === undefined ? [] : [there.except]));
+    /* AND NOTHING AT ALL FROM A LIST WHOSE EVERY ROW IS KEPT FROM THEM (`withheld`). */
+    const kept = there.withheld === true ? ' AND 0' : there.except === undefined ? '' : ` AND ${unprivate(`${alias}.id`)}`;
+    params.push(register, ...(inner?.params ?? []), ...(there.withheld === true || there.except === undefined ? [] : [there.except]));
     return (
       `id IN (SELECT ${held} FROM entry AS ${alias} WHERE ${alias}.register = ? AND ${alias}.deleted_at IS NULL` +
       ` AND ${held} IS NOT NULL${inner === undefined ? '' : ` AND (${inner.sql})`}${kept})`
@@ -900,7 +911,8 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
     const type = schema.fields[field]?.type ?? 'text';
     const bare: Schema = { register: link.to, fields: { [via.field]: { type, ...(schema.fields[field]?.values ? { values: schema.fields[field]!.values } : {}) } } };
     const there = schema.schemaOf!(link.to);
-    const far = there && (there.subject ?? 'entry') === 'entry' ? there : undefined;
+    /* AND A LIST WHOSE EVERY ROW IS KEPT FROM THEM (`withheld`), as one they may not read. */
+    const far = there && (there.subject ?? 'entry') === 'entry' && there.withheld !== true ? there : undefined;
     let missing = false;
     try {
       missing = evaluate(asked, {}, far ?? bare);
