@@ -1,7 +1,10 @@
 <!--
-  WHICH BOOK MONEY IS SHOWING: "Everything", then each book the record keeps (Personal, and each business), as one row
-  of links over Money's home and each book's own page. A record kept in one book draws nothing, so a person who never
-  made a second book never sees the word.
+  WHICH BOOK MONEY IS SHOWING: each book the record keeps (Personal, then each business), as one row of links over each
+  book's own page. A record kept in one book draws nothing.
+
+  NO "EVERYTHING", SINCE 9 NOV (the owner: "i nede the personal page to show first and then quartz. i dont want
+  evereything page"): Money's home added a company's money to a person's own. With two books or more, Money's home opens
+  the first book in its place (`replaceState`, so Back does not land on it again).
 
   LINKS, NOT A FILTER: each book already has its own page (`money-book`, one per row of `books`), and Money's home is
   everything. So the row is a `nav` of addresses, and the back button walks it as a person would expect.
@@ -20,6 +23,8 @@
 
 <script lang="ts">
 
+  import { goto } from '$app/navigation';
+
   import { at } from '../at.ts';
   import { readBooks, takeBooks } from './books.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
@@ -29,6 +34,15 @@
 
   // svelte-ignore state_referenced_locally
   let books = $state<Book[]>(kept.get(`${base} ${book.list}`) ?? []);
+
+  /* ON MONEY'S HOME WITH TWO BOOKS OR MORE, THE FIRST BOOK IN ITS PLACE. */
+  function leaveHome() {
+    if (on === null && books.length >= 2) void goto(at(`/r/${book.list}/${books[0]!.seq}`), { replaceState: true });
+  }
+
+  /* AT ONCE WHEN THE BOOKS ARE ALREADY KNOWN from the last read, before they are read again. */
+  // svelte-ignore state_referenced_locally
+  leaveHome();
 
   $effect(() => {
     let gone = false;
@@ -45,6 +59,7 @@
             return { seq: r.seq as number, name: typeof name === 'string' && name.trim() ? name.trim() : `Book ${r.seq}` };
           });
         kept.set(key, books);
+        leaveHome();
       })
       .catch(() => undefined);
     return () => {
@@ -56,7 +71,6 @@
 {#if books.length >= 2}
   <div class="book-scope">
     <Segmented tag="nav" aria-label="Which book" full>
-      <a class="segment" href={at('/p/money')} data-on={on === null ? '' : undefined} aria-current={on === null ? 'page' : undefined}>Everything</a>
       {#each books as b (b.seq)}
         <a class="segment" href={at(`/r/${book.list}/${b.seq}`)} data-on={on === b.seq ? '' : undefined} aria-current={on === b.seq ? 'page' : undefined}>{b.name}</a>
       {/each}

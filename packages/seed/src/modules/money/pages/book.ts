@@ -53,61 +53,9 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       when: { metric: 'book-accounts:{{name}}', is: 0 },
       body: 'No account in {{name}} yet. Add one, and where its cash is heading is drawn here.',
     },
-    /* NO "WHAT YOU HAVE" TILE, SINCE money-core 3.34.0 (next-money, M32): it said the book's cash, and Cash ahead beside
-       it says the same from today, so "$6,830" stood three times in one row. Cash ahead is the book's hero now, the
-       whole row. */
-    {
-      /* THIS BOOK'S WALK, FROM THIS BOOK'S CASH, over this book's bills, repeating lines, instalments and money on its
-         way (`BOOK_LEGS`). No `sell`: what a record holds to sell is filed in no book. */
-      kind: 'forecast',
-      heading: 'Cash ahead',
-      icon: 'chart-line',
-      span: 12,
-      source: 'forecast.runway',
-      opening: { metric: 'book-cash:{{name}}' },
-      from: BOOK_LEGS,
-      /* TWELVE WEEKS FIRST, SINCE money-core 3.27.0, as Money's own Cash ahead (ten from 3.17.0): it opened on a
-         year, a span nobody plans a book by. A year and every other length is one press away. */
-      horizon: 84,
-      /* FIVE YEARS AND TO THE END, SINCE money-core 3.10.0, as Money's own Cash ahead: a load walks two years and a
-         longer length is walked when a reader picks it. */
-      horizons: [84, 180, 365, 730, 1825, 'last'],
-      axis: 'fit',
-      knobs: ['horizon', 'late', 'spend', 'count', 'grow', 'drift'],
-      late: 'days-late-in',
-      under: 30,
-      empty: 'Nothing dated ahead yet.',
-      /* ONLY ONCE THE BOOK HOLDS AN ACCOUNT, SINCE money-core 3.36.0 (empty states, 2 Nov): with none the walk opened on
-         nought and drew twelve weeks of £0 that "stays above zero to 25 Jan 2027". The Accounts tile under it says what
-         an account brings, and Add an account under that is the way in. */
-      when: { metric: 'book-accounts:{{name}}', gt: 0 },
-    },
-    {
-      /* THIS BOOK'S MONTH IN ONE ROW: what came in, what went out and what is left, each read once a
-         book as `book-cash` is (`figures/books.ts`). UNDER THE CASH AND ITS WALK AND NOT BETWEEN THEM: the two are one
-         row of twelve, and a tile of twelve set between them would leave the cash alone on a line.
-
-         ONLY WHILE THE MONTH HAS MONEY IN IT. A block's `when:` reads one figure, and `book-net-month` is read over the
-         entries of both halves, so it holds an amount while either does, a net of nought in a currency among them. A
-         book with nothing earned or spent this month would say three noughts, which is no news. */
-      kind: 'stat',
-      heading: 'This month',
-      icon: 'coins',
-      span: 12,
-      cells: [
-        { metric: 'book-in-month:{{name}}', label: 'In this month' },
-        { metric: 'book-out-month:{{name}}', label: 'Out this month' },
-        { metric: 'book-net-month:{{name}}', label: 'Net' },
-      ],
-      /* ONLY WHILE SOMETHING CAME IN OR WENT OUT, SINCE money-core 3.35.0 (leftovers 2 Nov, 2): `book-net-month` over no
-         entries reads nought in the book's own currency, which is an amount, so a book with a currency and a quiet month
-         said "$0, $0, $0", and one whose lines were filed in no book said the same under a month of spending. */
-      when: { any: [{ metric: 'book-in-month:{{name}}', gt: 0 }, { metric: 'book-out-month:{{name}}', gt: 0 }] },
-    },
-    ...owedRow(declared),
-    /* NO "LASTS THE YEAR ON WHAT IS DUE." TILE UNDER THE CHART, SINCE money-core 3.34.0 (next-money, M33): Cash ahead's
-       own summary says how far it stays above nought, so the tile said it a second time. */
-    ...monthsChart(declared),
+    /* BALANCES AND SPENDING FIRST, THEN WHERE THE CASH IS HEADING, SINCE money-core 3.39.0 (9 Nov, the owner: "i want
+       to be able to see balances, spendage first before seeing the cash ahead forecast"). The book's accounts, its month
+       in and out, and where the month's money went lead; Cash ahead follows them. */
     {
       /* THE WHOLE ROW, SINCE money-core 3.35.0 (leftovers 2 Nov, 1), with Add an account the quiet line under it: at eight
          twelfths beside a capture of four, the capture was laid on a row of its own under the chart, a field alone in a
@@ -139,6 +87,76 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       register: 'accounts',
       where: 'book is {{spoken}}',
     },
+    {
+      /* THIS BOOK'S MONTH IN ONE ROW: what came in, what went out and what is left, each read once a
+         book as `book-cash` is (`figures/books.ts`). UNDER THE CASH AND ITS WALK AND NOT BETWEEN THEM: the two are one
+         row of twelve, and a tile of twelve set between them would leave the cash alone on a line.
+
+         ONLY WHILE THE MONTH HAS MONEY IN IT. A block's `when:` reads one figure, and `book-net-month` is read over the
+         entries of both halves, so it holds an amount while either does, a net of nought in a currency among them. A
+         book with nothing earned or spent this month would say three noughts, which is no news. */
+      kind: 'stat',
+      heading: 'This month',
+      icon: 'coins',
+      span: 12,
+      cells: [
+        { metric: 'book-in-month:{{name}}', label: 'In this month' },
+        { metric: 'book-out-month:{{name}}', label: 'Out this month' },
+        { metric: 'book-net-month:{{name}}', label: 'Net' },
+      ],
+      /* ONLY WHILE SOMETHING CAME IN OR WENT OUT, SINCE money-core 3.35.0 (leftovers 2 Nov, 2): `book-net-month` over no
+         entries reads nought in the book's own currency, which is an amount, so a book with a currency and a quiet month
+         said "$0, $0, $0", and one whose lines were filed in no book said the same under a month of spending. */
+      when: { any: [{ metric: 'book-in-month:{{name}}', gt: 0 }, { metric: 'book-out-month:{{name}}', gt: 0 }] },
+    },
+    {
+      kind: 'split',
+      heading: "Where this month's money went",
+      donut: true,
+      icon: 'chart-pie',
+      span: 12,
+      source: 'register.transactions',
+      where: 'state is cleared, transfer is false, stays is not true, corrects is not true, direction is out, on at least bom, book is {{name}}',
+      columns: [{ field: 'category' }, { field: 'amount' }],
+      limit: 6,
+      unset: 'Uncategorised',
+      /* ONLY WHILE SOMETHING LEFT THE BOOK THIS MONTH, SINCE money-core 3.8.0, over the split's own clauses: a book whose
+         last payment was last month drew a track with no parts under this heading. */
+      when: { metric: 'book-spent-month:{{name}}', gt: 0 },
+    },
+    /* NO "WHAT YOU HAVE" TILE, SINCE money-core 3.34.0 (next-money, M32): it said the book's cash, and Cash ahead beside
+       it says the same from today, so "$6,830" stood three times in one row. Cash ahead is the book's hero now, the
+       whole row. */
+    {
+      /* THIS BOOK'S WALK, FROM THIS BOOK'S CASH, over this book's bills, repeating lines, instalments and money on its
+         way (`BOOK_LEGS`). No `sell`: what a record holds to sell is filed in no book. */
+      kind: 'forecast',
+      heading: 'Cash ahead',
+      icon: 'chart-line',
+      span: 12,
+      source: 'forecast.runway',
+      opening: { metric: 'book-cash:{{name}}' },
+      from: BOOK_LEGS,
+      /* TWELVE WEEKS FIRST, SINCE money-core 3.27.0, as Money's own Cash ahead (ten from 3.17.0): it opened on a
+         year, a span nobody plans a book by. A year and every other length is one press away. */
+      horizon: 84,
+      /* FIVE YEARS AND TO THE END, SINCE money-core 3.10.0, as Money's own Cash ahead: a load walks two years and a
+         longer length is walked when a reader picks it. */
+      horizons: [84, 180, 365, 730, 1825, 'last'],
+      axis: 'fit',
+      knobs: ['horizon', 'late', 'spend', 'count', 'grow', 'drift'],
+      late: 'days-late-in',
+      under: 30,
+      empty: 'Nothing dated ahead yet.',
+      /* ONLY ONCE THE BOOK HOLDS AN ACCOUNT, SINCE money-core 3.36.0 (empty states, 2 Nov): with none the walk opened on
+         nought and drew twelve weeks of £0 that "stays above zero to 25 Jan 2027". The Accounts tile under it says what
+         an account brings, and Add an account under that is the way in. */
+      when: { metric: 'book-accounts:{{name}}', gt: 0 },
+    },
+    ...owedRow(declared),
+    /* NO "LASTS THE YEAR ON WHAT IS DUE." TILE UNDER THE CHART, SINCE money-core 3.34.0 (next-money, M33): Cash ahead's
+       own summary says how far it stays above nought, so the tile said it a second time. */
+    ...monthsChart(declared),
     {
       /* THE MONTH AHEAD AND WHAT MOVED ARE FOLDED SHUT, SINCE money-core 3.4.0, as they are on Money: above the fold the
          book says what it has, how long it lasts and which accounts hold it. */
@@ -172,21 +190,6 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       from: BOOK_LEGS,
       horizon: 30,
       empty: 'Nothing in the next 30 days.',
-    },
-    {
-      kind: 'split',
-      heading: "Where this month's money went",
-      donut: true,
-      icon: 'chart-pie',
-      span: 12,
-      source: 'register.transactions',
-      where: 'state is cleared, transfer is false, stays is not true, corrects is not true, direction is out, on at least bom, book is {{name}}',
-      columns: [{ field: 'category' }, { field: 'amount' }],
-      limit: 6,
-      unset: 'Uncategorised',
-      /* ONLY WHILE SOMETHING LEFT THE BOOK THIS MONTH, SINCE money-core 3.8.0, over the split's own clauses: a book whose
-         last payment was last month drew a track with no parts under this heading. */
-      when: { metric: 'book-spent-month:{{name}}', gt: 0 },
     },
     {
       kind: 'timeline',

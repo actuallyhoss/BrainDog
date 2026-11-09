@@ -1039,7 +1039,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.31.2',
   people: '4.7.2',
-  'money-core': '3.38.9',
+  'money-core': '3.39.0',
   estate: '2.8.1',
   work: '1.26.2',
 };

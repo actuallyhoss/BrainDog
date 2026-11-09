@@ -16,9 +16,13 @@ export const BOOKS_MOST = 12;
 
 const key = (base: string, book: SideList): string => `${base} books ${book.list}`;
 
-/** The record's `list` of the books, in name order, as the row reads it; `ahead` when asked before the row draws. */
+/**
+ * The record's `list` of the books, IN THE ORDER THEY WERE MADE, as the row reads it; `ahead` when asked before the row
+ * draws. The first book a person makes is their own money (Personal), and a business comes after it: name order put
+ * an "Acme" before Personal (9 Nov, the owner: "i need the personal page to show first and then quartz").
+ */
 export const readBooks = (base: string, book: SideList, ahead = false) =>
-  createClient({ base, ...(ahead ? { ahead } : {}) }).list({ register: book.list, limit: BOOKS_MOST, order: [{ field: book.title, dir: 'asc' }] });
+  createClient({ base, ...(ahead ? { ahead } : {}) }).list({ register: book.list, limit: BOOKS_MOST, order: [{ field: 'seq', dir: 'asc' }] });
 
 /** Ask the books now, for the row to take when it draws. */
 export function askBooks(base: string, book: SideList): void {
