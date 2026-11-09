@@ -157,6 +157,12 @@ export const RUN_JOB_WAIT_MS = DAY_MS;
  */
 export const RUN_JOB_LOOK_MS = 5 * 60_000;
 /**
+ * How long a run may wait at a `script` step whose script rules have started their most for the day, from when the
+ * run started: a week. Past it the run stops there, failed, since a backlog that a week of turns has not cleared is
+ * more than the ceiling can carry and somebody should hear of it once per run, not wait on it for ever.
+ */
+export const SCRIPT_HOLD_MS = 7 * DAY_MS;
+/**
  * How a job's end reads to the steps after it (`JOB_ENDS` in `jobs.ts`): the three words the contract names. Every
  * other end (refused, limit, interrupted, cancelled) is `error` to a condition, and the step's own row keeps which it
  * was.
@@ -1547,6 +1553,15 @@ export function advance(deps: FlowDeps, id: string): number | null {
         /* THE RUN'S LIVE ROW AND NOT ONE A DELETE LEFT, so a call about a deleted row sends nothing of it: `queueCall`
            refuses a call that sends fields when there is no row to send them from. */
         const queued = deps.call(ingest, { rule: run.rule, entry: subject, run: id, step: i });
+        /* A CALL AT ITS MOST FOR THE DAY ENDS THE RUN CANCELLED, NOT FAILED. `queueCall` meters it as held, which is not
+           a failure, and tells the owner once that day; failed, each run past the hundredth was one more on
+           `automations-failed` for the ceiling doing what it says. It is not made later, as its sentence says, since
+           a change to many rows is not to become that many posts. */
+        if (queued.outcome === 'held') {
+          finish(deps, { ...run, step: i }, 'cancelled', queued.say, vars);
+          record(deps, id, i, 'call', 'skipped', null);
+          return null;
+        }
         if (queued.outcome !== 'queued' || queued.job === undefined) return fail(i, 'call', queued.say);
         record(deps, id, i, 'call', 'waiting', queued.job);
         deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept, unsent, sealedVars), id);
@@ -1646,6 +1661,19 @@ export function advance(deps: FlowDeps, id: string): number | null {
           finish(deps, { ...run, step: i }, 'cancelled', started.say, vars);
           record(deps, id, i, op.verb, 'skipped', null);
           return null;
+        }
+        /* A SCRIPT AT ITS MOST FOR THE DAY PARKS THE RUN HERE until the day turns, as a `wait` does, with the sentence
+           on the run's row; the wake takes this step again and the count has started over. Only past `SCRIPT_HOLD_MS`
+           from the run's start does it fail, saying so. */
+        if (!started.ok && started.until !== undefined) {
+          const since = Date.parse(deps.sql.one<{ at: string }>('SELECT started_at AS at FROM automation_run WHERE id = ?', id)?.at ?? '');
+          if (Number.isFinite(since) && started.until - since > SCRIPT_HOLD_MS) {
+            const name = String((step.script as { id?: unknown }).id ?? '');
+            return fail(i, op.verb, `rule.${run.rule} waited a week at step ${i + 1} for script.${name}, and each day rules had started it ${RULE_CALLS_PER_DAY} times, the most a day, before this run's turn, so the run stopped there without it; the steps before it were taken.`);
+          }
+          record(deps, id, i, op.verb, 'waiting', null);
+          deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ?, say = ? WHERE id = ?", i, pack(vars, kept, unsent, sealedVars), started.say, id);
+          return started.until;
         }
         if (!started.ok) return fail(i, op.verb, started.say);
         /* THE JOB ID TAKES THE NAME OFF WHATEVER IT HELD, as an answer does in `answerStep`. Left in `kept` and
@@ -1843,7 +1871,7 @@ function startScript(
   n: number,
   row: Entry | null,
   by: RunFill,
-): { ok: true; job: string } | { ok: false; say: string; paused?: true } {
+): { ok: true; job: string } | { ok: false; say: string; paused?: true; until?: number } {
   const spec = step.script as { id?: unknown; input?: unknown };
   const name = typeof spec?.id === 'string' ? spec.id : '';
   const found = deps.sql.one<{ version: number; body: string }>(
@@ -1897,7 +1925,13 @@ function startScript(
      nothing counted them, so a bulk change to many rows could start as many sandboxes. Counted by the UTC day, as a
      call is (`queueCall`),
      over the jobs a rule's `script` step queued, which are the ones a step row answers; a clock's run and a door's are
-     the script's own and are not counted here. A job shared by two steps (above) is one run and counted once. */
+     the script's own and are not counted here. A job shared by two steps (above) is one run and counted once.
+
+     THE CEILING HOLDS THE RUN UNTIL THE DAY TURNS, `until` the next midnight UTC when the count starts again, and
+     queues nothing now: the step waits and is taken again then. It said "nothing was queued" and failed the run, and
+     the rows it was started for were never looked at: measured, about five hundred Ledger lines written in one go on 6
+     November failed 423 runs of `payment-matches` and 398 of `posted-replaced`, matchers that send nothing anywhere,
+     all of them red on `automations-failed` for a ceiling doing what it says. */
   const day = instant(deps.nowMs).slice(0, 10);
   const today =
     deps.sql.one<{ n: number }>(
@@ -1909,7 +1943,8 @@ function startScript(
   if (today >= RULE_CALLS_PER_DAY)
     return {
       ok: false,
-      say: `rule.${rule} starts script.${name} at step ${n + 1}, and rules have started script.${name} ${RULE_CALLS_PER_DAY} times today, the most a day. Nothing was queued, and rules can start it again tomorrow; the steps before it were taken.`,
+      until: Date.parse(`${day}T00:00:00.000Z`) + DAY_MS,
+      say: `rule.${rule} starts script.${name} at step ${n + 1}, and rules have started script.${name} ${RULE_CALLS_PER_DAY} times today, the most a day, so the run waits there and starts it after midnight UTC; the steps before it were taken.`,
     };
   return { ok: true, job: enqueue(deps.sql, deps.mint, deps.nowMs, 'script.run', { script: name, version: found.version, input }) };
 }
