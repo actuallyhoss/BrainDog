@@ -202,7 +202,10 @@
     if (host.panelOpen && row && !entry) host.close();
   });
 
-  /** The caret in the words, or in the box of the field it was opened on, once the panel has drawn: a frame later it may still be opening. */
+  /**
+   * The caret in the words, or in the box of the field it was opened on, once the panel has drawn: a frame later it may
+   * still be opening.
+   */
   async function caret() {
     await tick();
     requestAnimationFrame(() => {

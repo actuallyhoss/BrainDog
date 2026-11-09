@@ -154,7 +154,8 @@ export function watchDoubles(): () => void {
     arm(e);
   }
 
-  /* THE FIRST PRESS ARMS AS ITS CLICK DOES; THE SECOND SELECTS NO WORD AND MOVES NO FOCUS, where the pair changes something. */
+  /* THE FIRST PRESS ARMS AS ITS CLICK DOES; THE SECOND SELECTS NO WORD AND MOVES NO FOCUS, where the pair changes
+     something. */
   function press(e: MouseEvent) {
     if (!e.isTrusted || e.timeStamp <= eatUntil) return;
     if (e.detail >= 2) {
