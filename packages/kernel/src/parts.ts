@@ -32,6 +32,12 @@ export type ListQuery = {
   /** Who is reading, for a `where` that says `someone else` (a task's Owner is not someone else). Set by a page's read. */
   reader?: string | undefined;
   /**
+   * Who is reading, for the rows kept from them on other lists: a hop, a filter read through a link and a field worked
+   * out through one leave those rows out. The caller sets it from who asked, never from what they sent. Absent, the
+   * viewer the grant's scope carries is asked, then `reader`.
+   */
+  viewer?: string | undefined;
+  /**
    * Structured, or as the sentence a person and an agent write.
    *
    * BOTH FORMS OR IT IS TWO LANGUAGES. `direction is owed to me, state is open` is what goes in a

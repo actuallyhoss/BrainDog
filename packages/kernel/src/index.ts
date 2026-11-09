@@ -29,7 +29,7 @@ import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { renameDeclarations } from './migrations/0016_slash.ts';
-import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, unprivateLine, type Compiled, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, unprivate, unprivateLine, type Compiled, type Predicate, type Schema } from '@braindog/where';
 import {
   disablePack as disableDeclaredPack,
   enablePack as enableDeclaredPack,
@@ -2867,17 +2867,21 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * or `reads` without it): a list outside it, or one she sees narrowed, answers nothing, so every link into it derives
    * null rather than a value from a row she cannot open. A deleted row is gone, and derives null too. Absent is the
    * record's own sight, every live row.
+   * AND `viewer` IS WHO READS: a linked row kept private from her (migration 40), or a night kept from her
+   * (`nightsKept`), is one she cannot open either, so the link derives null and never what that row holds.
    */
   const sightOf =
-    (reads?: (register: string) => boolean): DeriveResolve =>
+    (reads?: (register: string) => boolean, viewer?: string): DeriveResolve =>
     (register, ids, field) => {
-      if (ids.length === 0 || (reads !== undefined && !reads(register))) return new Map();
+      if (ids.length === 0 || (reads !== undefined && !reads(register)) || (register === NIGHT_REGISTER && nightsKept(viewer))) return new Map();
+      const kept = viewer !== undefined && anyHiddenFrom(viewer, register);
       /* THE IDS AS ONE JSON ARRAY, read with `json_each`, because a Durable Object refuses a statement past a hundred
          bound values and a page is up to five hundred rows (`param-sweep.test.ts`). */
       const found = sql.all<{ id: string; fields: string }>(
-        'SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND id IN (SELECT value FROM json_each(?))',
+        `SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND id IN (SELECT value FROM json_each(?))${kept ? ` AND ${unprivate()}` : ''}`,
         register,
         JSON.stringify(ids),
+        ...(kept ? [viewer] : []),
       );
       return new Map(found.map((r) => [r.id, ((JSON.parse(r.fields) as Record<string, Json>)[field] ?? null) as Json]));
     };
@@ -2887,10 +2891,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * doors out (`get` as the record hands it, a page of `list`), never inside the write path, which reads a row to
    * change it and must see what is stored. A list with no derived field hands the row back as it is.
    */
-  const readOut = (entry: Entry | null, reads?: (register: string) => boolean): Entry | null => {
+  const readOut = (entry: Entry | null, reads?: (register: string) => boolean, viewer?: string): Entry | null => {
     const decl = entry === null ? undefined : registers.get(entry.register);
     if (entry === null || decl === undefined || !decl.fields.some((f) => f.derived === true && f.derive !== undefined)) return entry;
-    return withDerived([entry], decl.fields, sightOf(reads))[0]!;
+    return withDerived([entry], decl.fields, sightOf(reads, viewer))[0]!;
   };
 
   /**
@@ -4301,7 +4305,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        its caller may not open or sees narrowed. A declared page's read passes no `reads`; reach checked its lists. */
     /* AND OVER THE ROWS SHE IS SHOWN THERE: the viewer her scope carries, else the reader a page's read names, so a
        block's `pointed` never counts a row kept private from her on the list it hops into. */
-    const whole = readerSchemaOf(q.hops ?? q.reads, viewerOfScope(grant) ?? q.reader)(q.register)!;
+    const viewer = q.viewer ?? viewerOfScope(grant) ?? q.reader;
+    const whole = readerSchemaOf(q.hops ?? q.reads, viewer)(q.register)!;
     const schema: Schema = hidden.size === 0 ? whole : { ...whole, fields: Object.fromEntries(Object.entries(whole.fields).filter(([id]) => !hidden.has(id))) };
     const said = predicateOf(q.where, schema, q.reads === undefined ? evalContext([], undefined, q.reader) : { ...evalContext([], undefined, q.reader), reads: q.reads });
     if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
@@ -4542,7 +4547,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* THE PAGE LEAVES WITH ITS WORKED-OUT FIELDS FILLED, after the cursor's row is chosen, and a `via` read
        through the reader's own sight: the lists she reads whole, as a hop from her filter is held. */
     const decl = registers.get(q.register)!;
-    const out = decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf(q.hops ?? q.reads)) : rows;
+    /* A FIELD READ THROUGH A LINK, AS THE READER IS SHOWN THE LINKED ROW (`sightOf`): one kept private from her derives null. */
+    const out = decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf(q.hops ?? q.reads, viewer)) : rows;
     /* AND A SORTED ANSWER HANDS BACK ITS OWN KIND OF CURSOR: the last row's value under each sort key, read by the
        same expressions the ORDER BY used, so the next page compares like with like. */
     const paging = !(more && last)
@@ -8576,7 +8582,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         ...(q.limit ? { limit: q.limit } : {}),
         ...(q.order?.length ? { order: q.order } : {}),
         ...(q.cursor ? { cursor: q.cursor } : {}),
-        ...(viewer === undefined ? {} : { reader: viewer }),
+        ...(viewer === undefined ? {} : { reader: viewer, viewer }),
       }, readScope(undefined, q.register, viewer));
       return out.ok ? ok({ rows: out.value.rows, matched: out.value.matched, cursor: out.value.cursor }) : out;
     },
@@ -14166,17 +14172,17 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * caller's sight for a `via`, the lists she reads whole; absent is the record's own. The closure's `get`, which the
      * write path reads a row through, stays the stored row.
      */
-    get: (ref: string | { register: string; seq: number }, opts: { includeDeleted?: boolean; reads?: (register: string) => boolean } = {}): Entry | null =>
-      readOut(get(ref, opts), opts.reads),
+    get: (ref: string | { register: string; seq: number }, opts: { includeDeleted?: boolean; reads?: (register: string) => boolean; viewer?: string | undefined } = {}): Entry | null =>
+      readOut(get(ref, opts), opts.reads, opts.viewer),
     /**
      * Many rows by id at once, each answered as `get` answers it: one statement per 500 ids where `get` asked one a row.
      * A ref that is spoken (`S4`, `tasks#3`) is asked through `get` itself, so it means what it always meant.
      */
-    getEach: (refs: readonly string[], opts: { includeDeleted?: boolean } = {}): Map<string, Entry | null> => {
+    getEach: (refs: readonly string[], opts: { includeDeleted?: boolean; viewer?: string | undefined } = {}): Map<string, Entry | null> => {
       const out = new Map<string, Entry | null>();
       const ids: string[] = [];
       for (const ref of new Set(refs)) {
-        if (parseSpoken(ref) ?? prefixed(ref)) out.set(ref, readOut(get(ref, opts)));
+        if (parseSpoken(ref) ?? prefixed(ref)) out.set(ref, readOut(get(ref, opts), undefined, opts.viewer));
         else ids.push(ref);
       }
       for (let i = 0; i < ids.length; i += 500) {
@@ -14194,7 +14200,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const read = new Map<string, Entry>();
         for (const [register, rows] of by) {
           const decl = registers.get(register);
-          const made = decl !== undefined && decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf()) : rows;
+          const made = decl !== undefined && decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf(undefined, opts.viewer)) : rows;
           for (const entry of made) read.set(entry.id, entry);
         }
         for (const entry of entries) out.set(entry.id, read.get(entry.id) ?? null);

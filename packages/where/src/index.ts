@@ -927,8 +927,12 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
     }
     const alias = `via${level}`;
     const held = fieldSql(via.ref, 'ref');
-    const live = `SELECT ${alias}.id FROM entry AS ${alias} WHERE ${alias}.register = ? AND ${alias}.deleted_at IS NULL`;
-    params.push(link.to, ...inner.params, link.to);
+    /* A LINKED ROW KEPT PRIVATE FROM WHOEVER READS (`except` on the far list) IS NO ROW TO THEM: the link reads as null,
+       as the derived value is shown to them, and never as what the row they are not shown holds. */
+    const kept = far.except === undefined ? '' : ` AND ${unprivate(`${alias}.id`)}`;
+    const live = `SELECT ${alias}.id FROM entry AS ${alias} WHERE ${alias}.register = ? AND ${alias}.deleted_at IS NULL${kept}`;
+    const one = far.except === undefined ? [link.to] : [link.to, far.except];
+    params.push(...one, ...inner.params, ...one);
     return `(CASE WHEN ${held} IN (${live} AND (${inner.sql})) THEN 1 WHEN ${held} IN (${live}) THEN 0 ELSE ${missing ? 1 : 0} END = 1)`;
   };
 
