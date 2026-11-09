@@ -9219,12 +9219,56 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * WHAT THE PEN IS MADE FROM (`penStamp`), which is `quietStamp` less the questions: the pen reads no question but the
+   * pages Slash asked for (`slashAsked`), so a question answered on the phone weighed every page and list again, half of
+   * `boot` after an answer. Beside the newest line about neither a question nor a run, those asks as they stand, and the
+   * newest day a person wrote on, since the pen counts the days a person used the record (`usedIn`) and an answer can be
+   * the first of a day. Walked once per line, as `quietStamp` is.
+   */
+  let penSeen: { top: number; id: string; quiet: number; day: string | null } | null = null;
+  const PEN_QUIET = "('grant', 'inbox_raw', 'suggestion', 'decision')";
+  /* THE NEWEST DAY A PERSON WROTE ON, of the whole log by its index on who wrote, or of the lines after `after` by the log's
+     own order (`+actor` keeps SQLite from walking every line a person ever wrote to find the few new ones). */
+  const personDay = (after?: number): string | null =>
+    (after === undefined
+      ? sql.one<{ d: string | null }>("SELECT max(substr(ts, 1, 10)) AS d FROM event WHERE actor >= 'p_' AND actor < 'p`'")
+      : sql.one<{ d: string | null }>("SELECT max(substr(ts, 1, 10)) AS d FROM event WHERE rowid > ? AND +actor >= 'p_' AND +actor < 'p`'", after)
+    )?.d ?? null;
+  const penStamp = (): string => {
+    const head = sql.one<{ r: number; id: string }>('SELECT rowid AS r, id FROM event ORDER BY rowid DESC LIMIT 1');
+    const top = Number(head?.r ?? 0);
+    const id = head?.id ?? '';
+    if (penSeen === null) penSeen = { top, id, quiet: top, day: personDay() };
+    else if (top !== penSeen.top || id !== penSeen.id) {
+      const was = penSeen;
+      const still = was.top !== 0 && top > was.top && sql.one<{ id: string }>('SELECT id FROM event WHERE rowid = ?', was.top)?.id === was.id;
+      if (!still) penSeen = { top, id, quiet: top, day: personDay() };
+      else {
+        const moved = sql.one<{ m: number | null }>(
+          `SELECT max(e.rowid) AS m FROM event e WHERE e.rowid > ? AND coalesce(e.target_kind, '') NOT IN ${PEN_QUIET}
+             AND NOT (e.target LIKE 'entry:%' AND EXISTS (SELECT 1 FROM entry n WHERE n.id = substr(e.target, 7) AND n.register = ?))`,
+          was.top,
+          SESSION,
+        )?.m;
+        const day = personDay(was.top);
+        penSeen = { top, id, quiet: moved === null || moved === undefined ? was.quiet : Number(moved), day: day !== null && (was.day === null || day > was.day) ? day : was.day };
+      }
+    }
+    const at = sql.one<Record<string, unknown>>(
+      `SELECT (SELECT max(rowid) FROM declaration) AS d, (SELECT group_concat(id || ':' || coalesce(disabled_at, ''), ',') FROM pack) AS p,
+              (SELECT group_concat(rowid || ':' || status || ':' || coalesce(resolved_as, '') || ':' || length(body), ',') FROM suggestion WHERE opened_by = ? AND body_kind = 'arrange') AS a`,
+      SLASH,
+    );
+    return JSON.stringify([penSeen.quiet, penSeen.day, at?.d ?? null, at?.p ?? null, at?.a ?? null]);
+  };
+
+  /**
    * A FACT ABOUT THE QUESTIONS, HELD WHILE NOTHING BUT THE RUNS HAS MOVED (`quietStamp`), for up to `QUIET_HELD_MS`: the
    * open questions and what each weighs move with a question or a row, never with a run's heartbeat, and the clock moves
    * them only at a day's edge (a question put off to a day). Every other fact is held by `heldFor`.
    */
-  const quietFor = <T>(store: Map<string, Held<T>>, key: string, make: () => T, most = 32): T => {
-    const version = quietStamp();
+  const quietFor = <T>(store: Map<string, Held<T>>, key: string, make: () => T, most = 32, at: () => string = quietStamp): T => {
+    const version = at();
     const now = clock.now();
     const was = store.get(key);
     if (was !== undefined && was.version === version && was.at <= now && now - was.at < QUIET_HELD_MS && new Date(was.at).toISOString().slice(0, 10) === new Date(now).toISOString().slice(0, 10)) return was.value;
@@ -11440,7 +11484,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               held: kernel.heldFacts(),
               /* THE WORDS THE SPEAKING USE CASE GIVES A LIST, so the week offer says Jobs where the rail does (offer-labels-60). */
               labels: ((v) => labelsOf(v.values, Object.fromEntries(Object.entries(v.labels).map(([k, label]) => [k, { label }]))))(voiceFor(ctx)),
-            })).map(penSent)
+            }), 32, penStamp).map(penSent)
           : [],
       /* WITH EACH LINE'S LONG WORDS CUT (`newsCut`): a note's whole text was 26 KB of his `boot`'s 49 KB of news. */
       whatsNew: newsCut(newsFor(ctx)),
