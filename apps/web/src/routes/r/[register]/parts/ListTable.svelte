@@ -936,6 +936,11 @@
     background: none;
   }
 
+  /* A VALUE A DOUBLE CLICK OPENS WHERE NO PENCIL IS DRAWN (a saved view): only a node for the press, drawn as nothing. */
+  .cell-opens {
+    display: contents;
+  }
+
   /**
    * THE CELL IS THE BOX, AND THE PENCIL FLOATS OVER IT.
    *
@@ -951,11 +956,6 @@
    * ONE cell while a pointer is on it. None of these reflows the COLUMN under the cursor: the
    * column is a grid track and its width is set by the header.
    */
-  /* A VALUE A DOUBLE CLICK OPENS WHERE NO PENCIL IS DRAWN (a saved view): only a node for the press, drawn as nothing. */
-  .cell-opens {
-    display: contents;
-  }
-
   .cell-said {
     position: relative;
     display: block;
