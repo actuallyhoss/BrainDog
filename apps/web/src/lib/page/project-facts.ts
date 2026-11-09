@@ -12,7 +12,7 @@
 import { article } from '../copy/english.ts';
 import { nextSplit } from './next-split.ts';
 import { cadenceOf, feedAgeOf } from './feed-age.ts';
-import { isForecast } from '../home/card-kpi.ts';
+import { isForecast, monthKindOf } from '../home/card-kpi.ts';
 import { ago, dayChip, daysBetween, endedAs, trailOf } from '../home/projects-board.ts';
 import { laneInLine } from '../shell/side.ts';
 import { AGENT_NAMES } from '../record/names.ts';
@@ -32,6 +32,8 @@ export type FactKpi = {
   measure: string;
   unit: string;
   every: string | null;
+  /** Its shape as the record answers it: money kept a month as a `level` is a standing rate, secured (`monthKindOf`). */
+  kind?: string | null | undefined;
   headline: boolean;
   points: readonly KpiAt[];
   latest: KpiAt | null;
@@ -326,7 +328,12 @@ export function heroFactsOf(f: FactsIn, numbers: Numbers): HeroFacts {
   if (late.length === 1) facts.push(`${quoted(late[0]!.title)} was due ${dayChip(late[0]!.by!)} and is ${lateSaid(daysBetween(late[0]!.by!, f.today))}.`);
   else if (late.length > 1) facts.push(`${late.length} tasks on ${f.name} are late, ${quoted(late[0]!.title)} by ${plural(daysBetween(late[0]!.by!, f.today), 'day', 'days')}.`);
   const money = f.lane === 'earning' ? moneyKpiOf(f.kpis) : null;
-  if (money) {
+  /* A SECURED RATE IS SAID AS ONE, AND THE LAST 30 DAYS AS THEMSELVES (9 Nov, `monthKindOf`), as Projects' earning tile
+     says them: a salary's one reading was "brought in" the month it was typed, and a month's name stood over thirty days. */
+  const shape = money ? monthKindOf(money.kpi) : null;
+  if (money && shape === 'secured') facts.push(`${f.name} brings in ${f.format(money.now.minor, money.now.currency)} a month, secured.`);
+  else if (money && shape === 'last30') facts.push(`${f.name} brought in ${f.format(money.now.minor, money.now.currency)} in the last 30 days.`);
+  else if (money) {
     const month = MONTHS[Number(money.at.slice(5, 7)) - 1];
     const prevMonth = MONTHS[(Number(money.at.slice(5, 7)) + 10) % 12];
     let moved = '';
@@ -435,12 +442,15 @@ export function sideOf(f: FactsIn, numbers: Numbers): SideTile {
     if (m) {
       const month = SHORT[Number(m.at.slice(5, 7)) - 1];
       const age = Math.max(0, daysBetween(m.at, f.today));
-      const stale = age > 45 ? `${age} days old` : null;
+      /* A SECURED RATE A MONTH, NEVER DAYS OLD, AND THE LAST 30 DAYS SAID AS THEMSELVES (9 Nov, `monthKindOf`), as the
+         earning tile on Projects says them. */
+      const shape = monthKindOf(m.kpi);
+      const stale = shape !== 'secured' && age > 45 ? `${age} days old` : null;
       const kept = out && out.currency === m.now.currency ? m.now.minor - out.minor : null;
       return {
         kind: 'money',
         figure: f.format(m.now.minor, m.now.currency),
-        sub: `in ${month}`,
+        sub: shape === 'secured' ? 'a month, secured' : shape === 'last30' ? 'in the last 30 days' : `in ${month}`,
         stale,
         bars: m.points.slice(-13),
         lines: [

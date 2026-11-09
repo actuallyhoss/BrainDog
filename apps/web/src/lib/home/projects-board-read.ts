@@ -99,6 +99,8 @@ function kpiOf(a: KpiAnswered, format: (minor: number, currency: string) => stri
     figure: card?.figure ?? '',
     money: latest ? amountOf(latest.amount) : null,
     every: a.every ?? null,
+    /* ITS SHAPE, which says a money `level` kept a month is a standing rate, secured (9 Nov, `monthKindOf`). */
+    kind: a.kind ?? null,
     latestAt: latest?.at ? String(latest.at) : null,
     points: pts.slice(-24),
     move: card?.move?.said ?? null,

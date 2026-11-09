@@ -45,6 +45,32 @@ export type KpiAnswered = KpiInput & { thing?: string | undefined; project?: str
  */
 export const isForecast = (name: string): boolean => /\ba year out\b|:\s*(bear|base|bull)\b|\b(forecast|projected|projection|outlook|scenario)\b/iu.test(name);
 
+/** A name that says its figure is the thirty days to its newest reading: "Revenue, last 30 days". */
+const LAST_30 = /\blast\s+(?:30|thirty)\s+days\b/iu;
+
+/**
+ * WHAT A MONEY KEY NUMBER SAYS OF A MONTH, SINCE 9 NOV (the owner, of Projects' earning a month: a secured income, a
+ * salary under contract, should show its month at once, and a revenue fed daily its last 30 days). One reading for the
+ * earning tile on Projects, a project's row there, its card on Today and its own page, so each says one figure one way:
+ *
+ * - `last30`: its name says "last 30 days" (a revenue fed daily): the thirty days to its newest reading are the month,
+ *   counted while that reading is fresh, as a month made is.
+ * - `secured`: kept a month (`every` 1m, or its name says month) and its shape is `level`, a standing rate such as a salary
+ *   under contract: it counts from its newest reading however old that is, and is never said to be stale.
+ * - `made`: any other kept a month: what came in the month its newest reading was made in.
+ *
+ * `null` for one that says no month. Whether it is money is for the reader to ask, as each holds money its own way.
+ */
+export type MonthKind = 'last30' | 'secured' | 'made';
+export function monthKindOf(k: { name: string; kind?: string | null | undefined; every?: string | null | undefined }): MonthKind | null {
+  if (LAST_30.test(k.name)) return 'last30';
+  if (k.every !== '1m' && !/month/iu.test(k.name)) return null;
+  return k.kind === 'level' ? 'secured' : 'made';
+}
+
+/** Money kept a month at a standing rate (`monthKindOf`): its unit is a currency code, as the record answers it. */
+const securedMoney = (a: KpiAnswered): boolean => /^[A-Z]{3}$/u.test(a.unit ?? '') && monthKindOf(a) === 'secured';
+
 /**
  * One key number as a card draws it, or `null` when nothing has arrived for it: a number with no value is no figure,
  * and the card then says what it says without one.
@@ -52,7 +78,12 @@ export const isForecast = (name: string): boolean => /\ba year out\b|:\s*(bear|b
 export function cardKpiOf(a: KpiAnswered, opts: { home?: string | null; now?: number } = {}): CardKpi | null {
   const v = kpiView(a, opts);
   if (!v.figure) return null;
-  const stale = v.stale ? v.stale.said : null;
+  /* A SECURED RATE IS NEVER STALE (`monthKindOf`, 9 Nov): a salary under contract is what it says until it changes, so its
+     card says no "Not updated since" over the figure Projects counts as secured, and its sentence leaves it out too. */
+  const standing = !!v.stale && securedMoney(a);
+  const stale = v.stale && !standing ? v.stale.said : null;
+  const tail = v.stale ? `, ${v.stale.said}` : '';
+  const sentence = standing && v.sentence.endsWith(tail) ? v.sentence.slice(0, -tail.length) : v.sentence;
   const drawn = v.chart && (v.chart.form === 'line' || v.chart.form === 'area') && v.chart.line !== '' ? v.chart : null;
   return {
     key: v.key,
@@ -63,7 +94,7 @@ export function cardKpiOf(a: KpiAnswered, opts: { home?: string | null; now?: nu
     move: !stale && v.change ? { said: `${v.change.said} ${v.change.against}`.trim(), tone: v.change.tone } : null,
     stale,
     line: drawn ? { line: drawn.line, area: drawn.area, end: drawn.end, partial: drawn.partial } : null,
-    sentence: v.sentence,
+    sentence,
   };
 }
 

@@ -20,7 +20,7 @@
 import { nextSplit } from '../page/next-split.ts';
 import { cadenceOf, feedAgeOf, measureStale, type FeedMeasure } from '../page/feed-age.ts';
 import { EARNING_LANE, LANES_DEFAULT, inPlayOf, laneInLine, laneSaid, shownName, type Lanes } from '../shell/side.ts';
-import { isForecast } from './card-kpi.ts';
+import { isForecast, monthKindOf, type MonthKind } from './card-kpi.ts';
 import { counted, names } from './phrase.ts';
 import { article } from '../copy/english.ts';
 import { exponentOf } from 'braindog-render';
@@ -80,6 +80,8 @@ export type BoardKpi = {
   /** The newest value as money in minor units, where it is money. */
   money: { minor: number; currency: string } | null;
   every: string | null;
+  /** Its shape as the record answers it (`level`, `flow`): money kept a month as a `level` is a standing rate, secured (`monthKindOf`). */
+  kind?: string | null | undefined;
   latestAt: string | null;
   points: readonly number[];
   move: string | null;
@@ -350,6 +352,8 @@ const monthlyOf = (minor: number, every: string): number | null => {
 };
 /** How old a month's money may be and still be added into what the projects earn a month. */
 const EARN_FRESH_DAYS = 45;
+/** What a money key number says of a month (`monthKindOf`), or `null` where it is not money or says no month. */
+const monthOfMoney = (k: BoardKpi | null): MonthKind | null => (k?.money ? monthKindOf(k) : null);
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function factsOf(input: BoardInput): Facts[] {
@@ -392,7 +396,9 @@ function factsOf(input: BoardInput): Facts[] {
        "sent no numbers for 89 days" on Projects, the age of its August revenue, while its own page said 31. */
     const feed = feedAgeOf(measuresOf(ks, readings.get(p.seq) ?? []), today);
     const kpiAge = kpi?.latestAt ? Math.max(0, daysBetween(kpi.latestAt.slice(0, 10), today)) : 0;
-    const kpiStale = !!kpi?.latestAt && measureStale({ newest: kpi.latestAt, every: kpiEvery(kpi) }, today);
+    /* A SECURED RATE IS NEVER STALE (9 Nov, `monthKindOf`): the figure its row says is the one the earning tile counts as
+       secured, so the row does not call it days old beside it. */
+    const kpiStale = !!kpi?.latestAt && monthOfMoney(kpi) !== 'secured' && measureStale({ newest: kpi.latestAt, every: kpiEvery(kpi) }, today);
     const rs = (runs.get(p.seq) ?? []).slice().sort((a, b) => b.at.localeCompare(a.at));
     const ms = (moves.get(p.seq) ?? []).map((m) => m.at).sort();
     /* THE NAME DRAWN IS THE ONE THE SIDEBAR SAYS (Q31 of 29 October): "mara-site" stood as a slug on Projects while the
@@ -437,8 +443,12 @@ function chipOf(f: Facts, today: string): Chip {
 function numberOf(f: Facts): NumberCell {
   const k = f.kpi;
   if (k && k.readings > 0) {
-    /* ONE SHORT LINE: how old the figure itself is once it is past its cadence, else how it moved, else what it counts. */
-    const sub = f.kpiStale ? `${f.kpiAge} days old` : (k.move ?? (monthOrAge(k) !== '' ? `${k.name}, ${monthOrAge(k)}` : k.name));
+    /* ONE SHORT LINE: how old the figure itself is once it is past its cadence, else how it moved, else what it counts.
+       A SECURED RATE SAYS SO IN THE MONTH'S PLACE, as the earning tile beside it does, and thirty days named in the name
+       say no month after it (9 Nov, `monthKindOf`). */
+    const shape = monthOfMoney(k);
+    const when = shape === 'secured' ? 'secured' : shape === 'last30' ? '' : monthOrAge(k);
+    const sub = f.kpiStale ? `${f.kpiAge} days old` : (k.move ?? (when !== '' ? `${k.name}, ${when}` : k.name));
     return { kind: 'kpi', figure: k.figure, sub, stale: f.kpiStale, points: k.points };
   }
   if (k?.aim) return { kind: 'aim', said: 'Not measured yet', sub: `aim ${k.aim.said}${k.aim.by ? ` by ${k.aim.by}` : ''}` };
@@ -493,18 +503,25 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
      * in last month, its headline monthly key number, while that reading is fresh. Only where it keeps none, or the
      * reading is older than `EARN_FRESH_DAYS`, does what repeats stand in, said as repeating; a planned payout beside a
      * real month under one "a month" read as two different earnings.
+     *
+     * A SECURED RATE AND THE LAST 30 DAYS, SINCE 9 NOV (the owner: a secured income shows its month at once, and a revenue
+     * fed daily its last 30 days), read by `monthKindOf` as the row and Today's card read them. A salary under contract,
+     * a money `level` kept a month, counts from its newest reading however old, is never stale and says "secured"; it
+     * waited on a fresh reading, or stood aside for what repeats. A number named for the last 30 days counts as the month
+     * and says so, under the same 45 days as a month made.
      */
     const rec = input.recurring.filter((r) => projectOf(r.project, input.projects)?.seq === f.p.seq);
     const live = rec.filter((r) => r.state !== 'ended');
     const k = f.kpi;
-    const monthly = !!k?.money && (k.every === '1m' || /month/iu.test(k.name));
-    const age = monthly && k!.latestAt ? daysBetween(k!.latestAt.slice(0, 10), input.today) : 0;
-    const old = monthly && age > EARN_FRESH_DAYS;
-    if (monthly && (!old || live.length === 0)) {
+    const shape = monthOfMoney(k);
+    const age = shape !== null && k!.latestAt ? daysBetween(k!.latestAt.slice(0, 10), input.today) : 0;
+    const old = shape !== null && shape !== 'secured' && age > EARN_FRESH_DAYS;
+    if (shape !== null && (!old || live.length === 0)) {
       const when = k!.latestAt ? MONTH_SHORT[Number(k!.latestAt.slice(5, 7)) - 1]! : '';
       /* A MONTH'S MONEY OLDER THAN 45 DAYS IS SAID AND NOT ADDED (Q7 of 29 October): August's revenue read as this month's
          and made "about $152,000 a year". The line stays, saying how old it is and that the total leaves it out. */
-      const status = old ? `${when}, ${age} days old, not in the total` : f.kpiStale ? `made in ${when}, ${f.kpiAge} days old` : `made in ${when}`;
+      const made = shape === 'last30' ? 'last 30 days' : `made in ${when}`;
+      const status = shape === 'secured' ? 'secured' : old ? `${shape === 'last30' ? made : when}, ${age} days old, not in the total` : f.kpiStale ? `${made}, ${f.kpiAge} days old` : made;
       lines.push({ name: f.p.name, hue: f.p.hue, minor: k!.money!.minor, said: input.format(k!.money!.minor, k!.money!.currency), status, warn: f.kpiStale || old, left: old, href: f.p.href, currency: k!.money!.currency });
       continue;
     }

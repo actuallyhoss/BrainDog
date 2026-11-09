@@ -368,6 +368,7 @@ export class ShapeHold {
         measure: a.name,
         unit: a.unit ?? '',
         every: a.every ?? null,
+        kind: a.kind ?? null,
         headline: a.headline === true,
         points: a.points,
         latest: a.latest ?? a.points.at(-1) ?? null,
