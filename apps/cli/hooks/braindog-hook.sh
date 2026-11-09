@@ -62,10 +62,21 @@ case "$which" in
     cfg="${XDG_CONFIG_HOME:-}"
     [ -z "$cfg" ] && [ -n "${APPDATA:-}" ] && cfg=$(cygpath -u "$APPDATA" 2>/dev/null || printf %s "$APPDATA")
     cfg="${cfg:-$HOME/.config}"
+    # THE SESSION'S TURN (inbox-file.ts, turnPath): `work` from his prompt, `rest` once a turn ends with no hook holding
+    # it open, so the next start here can tell a window closed at rest from one that died at work. The shell's own
+    # printf into the file, so no program starts. A subagent's stop is not the session's.
+    turn="$cfg/braindog/sessions/${id}.turn"
+    [ "$which" = prompt ] && { printf 'work\n' > "$turn"; } 2>/dev/null
     flags="$cfg/braindog/sessions/${id}.inbox.flags"
     words=''
     [ -f "$flags" ] && IFS= read -r words < "$flags"
-    case " $words " in *" $which "*) ;; *) exit 0 ;; esac
+    case " $words " in
+      *" $which "*) ;;
+      *)
+        case "$which:$raw" in stop:*'"agent_id"'*) ;; stop:*) { printf 'rest\n' > "$turn"; } 2>/dev/null ;; esac
+        exit 0
+        ;;
+    esac
     # AN ANSWER MADE READY BEFORE THE HOOK RAN (inbox-file.ts, writeReady), younger than the two minutes a file is
     # good for: printed with cat, the state and flags after it put in place with mv, and no Node started, so a hook with
     # something to say costs what one with nothing does. A subagent, a turn a Stop hook already continued, and a tool
