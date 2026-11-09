@@ -167,6 +167,8 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
           body: said(o.because),
           ...(o.recommended === true ? { recommended: true } : {}),
           ...(hardOption(o) ? { hard: true } : {}),
+          /* AN OPTION THAT ASKS FOR WORDS (`govern.ts`): "A person" opens a line, "Who is Hussam to you?". */
+          ...(typeof o.asks === 'string' && o.asks.trim() !== '' ? { asks: said(o.asks) } : {}),
         }))
       : [
           { key: 'accept', title: copy.acceptIt, body: '' },

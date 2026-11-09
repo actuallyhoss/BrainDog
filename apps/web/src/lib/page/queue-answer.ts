@@ -192,7 +192,8 @@ function fileCell(file: unknown): string {
 
 /** One way to answer, in the words a reader sees, with what it is where it says. */
 /** `hard` is an answer that cannot be taken back once picked (the record's mark on the option): said on its own button, given to no key. */
-export type Way = { key: string; label: string; because: string; recommended: boolean; shows: Visual | null; hard: boolean };
+/** `asks` is the line an option opens for words before it is sent ("Who is Hussam to you?"), when it asks for any. */
+export type Way = { key: string; label: string; because: string; recommended: boolean; shows: Visual | null; hard: boolean; asks?: string };
 
 /**
  * The ways to answer a question, in the record's order.
@@ -224,6 +225,7 @@ export function waysOf(q: Pick<QueueQuestion, 'options'>, file?: FileAt): Way[] 
     recommended: o.recommended,
     shows: visualOf(o.shows, file),
     hard: o.hard === true,
+    ...(typeof o.asks === 'string' && o.asks !== '' ? { asks: spoken(saidOf(o.asks)) } : {}),
   }));
 }
 

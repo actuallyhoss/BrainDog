@@ -555,7 +555,7 @@ export type Question = {
    * `hard` IS SET ON AN OPTION THAT CANNOT BE TAKEN BACK ONCE PICKED (the kernel's `optionCost`, the record's
    * `option_costs`). It is the option that is hard and not the question: its own button says so, and no key gives it.
    */
-  options: readonly { key: string; title: string; body: string; recommended?: boolean; hard?: boolean }[];
+  options: readonly { key: string; title: string; body: string; recommended?: boolean; hard?: boolean; asks?: string }[];
   /** Why it is being asked: the reasoning whoever opened it wrote down with it. Absent when they wrote none. */
   context?: string;
   /** Who is named to decide it, a person id; null for nobody, absent from a record older than the column. */

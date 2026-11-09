@@ -8011,6 +8011,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           ...(hard ? { hard: true as const } : {}),
           ...(said ? { said } : {}),
           ...(files ? { files } : {}),
+          /* AN OPTION THAT ASKS FOR WORDS SAYS ITS QUESTION, so the card opens that line on the press (`govern.ts`). */
+          ...(typeof (one as { asks?: unknown }).asks === 'string' && (one as { asks: string }).asks.trim() !== '' ? { asks: (one as { asks: string }).asks.trim() } : {}),
         },
       ];
     });

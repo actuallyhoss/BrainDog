@@ -304,6 +304,7 @@ export type { EngineLedger, EngineLedgerRead } from './methods/engine-readings.t
 export { SEALED_FILE_MOST, SEALED_NAME, SEALED_PART_MOST, sealedName, type SealedStore } from './methods/sealed.ts';
 export type { AttachVisualArgs, PictureNamed, SettleVisualArgs, VisualAttached, VisualListed, VisualRead, VisualSettled, VisualStore } from './methods/visuals.ts';
 export { noteFacts } from '@braindog/seed/packs/note-facts';
+import { noteFacts as noteFactsOf } from '@braindog/seed/packs/note-facts';
 export { AGENT_ROLES, AGENT_LIST_FALLBACK, agentLists, fadeDays, fadeOf, listFor, noListSaid, type AgentRole } from './agent-lists.ts';
 import { fadeDays, fadeOf, listFor } from './agent-lists.ts';
 import { placesOf as railPlaces, type AddonNav, type Place } from './places.ts';
@@ -5585,7 +5586,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      asked; a choice kept without them places nothing (`placesOf`). */
   type UnderstoodChoice =
     | { kind: 'service-project'; service: string; projects: Record<string, string> }
-    | { kind: 'run-project'; place: string; projects: Record<string, string>; wheres?: string[] };
+    | { kind: 'run-project'; place: string; projects: Record<string, string>; wheres?: string[] }
+    | { kind: 'organisation'; name: string; key: string; projects?: undefined };
 
   /**
    * Where a run worked, whole, as one key: its remote by the kernel's own reading (`remote:github.com/sam/kiln`), or the
@@ -5715,8 +5717,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const title = orgs === null ? undefined : kernel.register(orgs.register)?.title;
         if (orgs === null || title === undefined || looksLikeCredential(one.name)) return [];
         const key = one.key.slice('organisation:'.length);
-        const row: Record<string, unknown> = { [title]: one.name, ...(orgs.fields.keys === undefined || !key.includes(':') ? {} : { [orgs.fields.keys]: [key] }) };
-        return [{ draft: draft(one.question, 'rowset', { register: orgs.register, rows: [row] }), choice: null }];
+        /* THREE ANSWERS AND NOT TWO (9 Nov, the owner, on "Is Hussam Mohamed Abdel Wahab a company?": "obviously it's
+           not a company ... i want to be able to inform it that it's a person, matter of fact he's my father"). A name
+           a bank prints on a transfer is a person as often as a company, and Decline left him nowhere to say so. "A
+           person" asks who they are (`asks`, `govern.ts`), and his words are filed on them in People
+           (`understoodAnswer`), whose name the walk then never asks about again (`isPerson` in `backfill.ts`). */
+        const people = kernel.meetsList() !== null;
+        const options = [
+          { id: 'company', label: 'A company', because: `${one.name} is added to Organisations, and its payments are linked to it.` },
+          ...(people
+            ? [{ id: 'person', label: 'A person', asks: `Who is ${one.name} to you?`, because: `${one.name} is added to People with what you say, and is not asked about again.` }]
+            : []),
+          { id: 'none', label: 'Neither', because: 'Nothing is added, and this is not asked again.' },
+        ];
+        const about = aboutOf(one.name);
+        return [
+          {
+            draft: draft(one.question.replace(/^Is (.+?) a company you pay or are paid by\?/u, 'Who is $1, a company or a person?'), 'options', { ...(about === '' ? {} : { about }), options }),
+            choice: { kind: 'organisation', name: one.name, key },
+          },
+        ];
       }
       case 'project-remote': {
         const home = projectsList();
@@ -5763,6 +5783,73 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * "WHO IS HUSSAM, A COMPANY OR A PERSON?" ANSWERED. A company is added to Organisations with the bank's key, as the yes
+   * to the old question did, and the next walk links its payments. A person is added to People, or found there by name,
+   * with the bank's spelling among the names they are known by, so the walk reads their transfers as a person's and never
+   * asks again; and what the owner said about them is read for fields (`noteFacts`: "my father" is To you: Parent,
+   * "CPO of Kiln" a role), the rest kept as their note. Neither does nothing: the no is the question's own.
+   */
+  const understoodParty = (held: Extract<UnderstoodChoice, { kind: 'organisation' }>, option: string, actor: string, said?: string): void => {
+    if (option === 'company') {
+      const orgs = orgsList();
+      const title = orgs === null ? undefined : kernel.register(orgs.register)?.title;
+      if (orgs === null || title === undefined) return;
+      const keys = orgs.fields.keys === undefined || !held.key.includes(':') ? {} : { [orgs.fields.keys]: [held.key] };
+      kernel.create(orgs.register, { [title]: held.name, ...keys } as Patch, { actor, note: 'said to be a company on Decide' } as never);
+      return;
+    }
+    if (option !== 'person') return;
+    const people = kernel.meetsList();
+    if (people === null) return;
+    const f = people.fields as Record<string, string | undefined>;
+    const decl = kernel.register(people.register);
+    const has = (id: string | undefined): id is string => id !== undefined && decl?.fields.some((x) => x.id === id && x.retired !== true) === true;
+    /* WHAT HE SAID, AS A NOTE IS READ: "He's my father." is "my father", and "managing partner at Vertex Law" a role. */
+    const words = (said ?? '')
+      .split(/(?<=[.!?;])\s+|\n+/u)
+      .map((x) => x.trim().replace(/^(?:he|she|they|this|that|it)(?:'s|’s| is| are|'re|’re)\s+/iu, '').replace(/^\w/u, (c) => c.toUpperCase()))
+      .filter((x) => x !== '')
+      .map((x) => (/[.!?]$/u.test(x) ? x : `${x}.`))
+      .join(' ');
+    const sameName = (v: unknown): boolean => typeof v === 'string' && (nameOnly(v) ?? v).toLowerCase() === held.name.toLowerCase();
+    const found = sql
+      .all<{ id: string; version: number; fields: string }>('SELECT id, version, fields FROM entry WHERE register = ? AND deleted_at IS NULL', people.register)
+      .map((r) => ({ ...r, fields: JSON.parse(r.fields) as Record<string, JsonValue> }))
+      .find((r) => sameName(r.fields[f.name!]) || (has(f.aliases) && Array.isArray(r.fields[f.aliases]) && (r.fields[f.aliases] as unknown[]).some(sameName)));
+    const row: Record<string, JsonValue> = found?.fields ?? { [f.name!]: held.name };
+    const read = words === '' ? null : (noteFactsOf(words, row, false) as { patch: Record<string, JsonValue> } | null);
+    const patch: Record<string, JsonValue> = { ...(read?.patch ?? {}) };
+    /* "MATTER OF FACT HE'S MY FATHER": a kin word after "my" anywhere in what he said, which a note's reading takes only
+       as a sentence of its own. Never over what their row already says. */
+    const kin = /\b(?:my|our)\s+(wife|husband|partner|girlfriend|boyfriend|father|mother|dad|mum|mom|brother|sister|son|daughter|cousin|aunt|uncle|friend|mentor)\b/iu.exec(words);
+    if (kin !== null && patch.relation === undefined && has('relation') && (row.relation === undefined || row.relation === null || row.relation === '')) {
+      const of: Record<string, string> = { girlfriend: 'partner', boyfriend: 'partner', father: 'parent', mother: 'parent', dad: 'parent', mum: 'parent', mom: 'parent', brother: 'sibling', sister: 'sibling', son: 'child', daughter: 'child', cousin: 'family', aunt: 'family', uncle: 'family' };
+      const word = kin[1]!.toLowerCase();
+      patch.relation = of[word] ?? word;
+    }
+    /* WHAT NO FIELD TOOK IS KEPT IN THEIR NOTE, after what it already says, in his words. */
+    const left = read === null ? words : typeof read.patch.note === 'string' ? read.patch.note : read.patch.note === undefined ? '' : words;
+    delete patch.note;
+    if (has('note') && left.trim() !== '') {
+      const before = typeof row.note === 'string' ? row.note.trim() : '';
+      patch.note = before === '' ? left.trim() : `${before}\n\n${left.trim()}`;
+    }
+    if (has(f.keys) && held.key.includes(':')) {
+      const keys = Array.isArray(row[f.keys]) ? (row[f.keys] as unknown[]).filter((k): k is string => typeof k === 'string') : [];
+      if (!keys.includes(held.key)) patch[f.keys] = [...keys, held.key];
+    }
+    if (found) {
+      if (!sameName(row[f.name!]) && has(f.aliases)) {
+        const aliases = Array.isArray(row[f.aliases]) ? (row[f.aliases] as unknown[]).filter((k): k is string => typeof k === 'string') : [];
+        patch[f.aliases] = [...aliases, held.name];
+      }
+      if (Object.keys(patch).length > 0) kernel.update(people.register, found.id, patch as Patch, { actor, version: found.version, note: 'said to be a person on Decide' } as never);
+      return;
+    }
+    kernel.create(people.register, { [f.name!]: held.name, ...patch } as Patch, { actor, note: 'said to be a person on Decide' } as never);
+  };
+
+  /**
    * A choice the nightly walk asked, answered: link the service to the project picked, or place every run in that
    * repository that no project holds yet in it. Anything else is not the walk's, and `Neither` does nothing but answer it.
    *
@@ -5775,10 +5862,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * A RUN THAT HAS GONE QUIET, as the walk's own slice, since a run still working places itself on its next call and a
    * write here would make that call a conflict.
    */
-  const understoodAnswer = (id: string, option: string, actor: string): void => {
+  const understoodAnswer = (id: string, option: string, actor: string, said?: string): void => {
     const held = kernel.prefsOf(UNDERSTAND_ASKED)[id] as UnderstoodChoice | undefined;
     if (held === undefined) return;
     kernel.setPref(UNDERSTAND_ASKED, id, null);
+    if (held.kind === 'organisation') return understoodParty(held, option, actor, said);
     const project = held.projects?.[option];
     const home = projectsList();
     const row = project === undefined ? null : kernel.get(project);
@@ -10389,7 +10477,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       /* WHAT ONE ANSWER COUNTS AFTERWARDS, each member counted as its own answer. */
       if (m.out.ok && m.out.value.settled === undefined) ladderAnswered(m.id, verdict.option, true);
-      understoodAnswer(m.id, verdict.option, actor);
+      understoodAnswer(m.id, verdict.option, actor, reason);
       firstPartyAnswered(m.id, verdict.option);
       decided.push({ id: nameOf(ctx, 'suggestion', m.id) ?? given, decision: said.value.decision });
     }
@@ -16308,7 +16396,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (out.ok && !('defer' in verdict) && out.value.settled === undefined)
         ladderAnswered(String(args.id), 'decide' in verdict ? verdict.decide.option : 'declined', !('decide' in verdict) || verdict.decide.rows === undefined);
       /* AND A CHOICE THE NIGHTLY WALK ASKED IS CARRIED OUT (`understoodAnswer`), or let go when it was dismissed. */
-      if (out.ok && !('defer' in verdict)) understoodAnswer(String(args.id), 'decide' in verdict ? verdict.decide.option : 'none', actorOf(ctx));
+      if (out.ok && !('defer' in verdict))
+        understoodAnswer(String(args.id), 'decide' in verdict ? verdict.decide.option : 'none', actorOf(ctx), 'decide' in verdict ? verdict.decide.reason : undefined);
       /* AN UPDATE QUESTION'S NO IS KEPT FOR ITS VERSION (`firstPartyAnswered`), and the self question's pick is marked (`selfAnswered`). */
       if (out.ok && !('defer' in verdict)) {
         firstPartyAnswered(String(args.id), 'decide' in verdict ? verdict.decide.option : null);

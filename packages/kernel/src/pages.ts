@@ -750,6 +750,8 @@ export type QueueOption = {
   recommended: boolean;
   shows?: Shows;
   hard?: true;
+  /** The line this option opens for words before it is sent ("Who is Hussam to you?"): its answer carries them as its reason. */
+  asks?: string;
   /**
    * WHAT THIS OPTION DOES TO ROWS, IN NAMES ("every open card draws what its options change"), on an option that
    * carries its own patches: the list, how many rows, and the value each field it sets moves them to, a link by the

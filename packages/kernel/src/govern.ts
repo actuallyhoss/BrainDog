@@ -3702,6 +3702,13 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
      the failure 20 §3 warns of, and cost a round trip on every answer. A light question a rule or Slash opened (band
      `call`, `weigh.ts`) is decided for its option's own reason; any other says plainly that no reason was given, so
      nobody later reads a reason into it. A reason is offered after a decline or an edit, and never demanded. */
+  /* AN OPTION THAT ASKS FOR WORDS (`asks`) IS ANSWERED WITH THEM: "A person" on "Is Hussam a company?" asks who they
+     are, and the answer is what is filed about them. Without the words it is refused at `reason`, with the option's own
+     question as the fix, which is what opens the card's line (`decide-write.ts` `wants: 'reason'`). */
+  if (row.body_kind === 'options' && !reason?.trim()) {
+    const picked = listOf(parse(row.body)?.options).find((o) => isMap(o) && o.id === option) as { asks?: unknown } | undefined;
+    if (typeof picked?.asks === 'string' && picked.asks.trim() !== '') return no<Decided>('REQUIRED_MISSING', picked.asks.trim(), { at: 'reason' });
+  }
   if (!reason?.trim()) reason = oneAnswer(deps, id, row.body_kind, row.body, option) ?? NO_REASON;
   if (!option?.trim()) return no<Decided>('REQUIRED_MISSING', 'A decision names what was chosen.', { at: 'option' });
 

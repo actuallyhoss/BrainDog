@@ -510,6 +510,12 @@
       chosen = way;
       return reveal();
     }
+    /* AN ANSWER THAT ASKS FOR WORDS OPENS ITS LINE FIRST ("Who is Hussam to you?"), and Send gives both. */
+    if (way.asks) {
+      chosen = way;
+      void morph(() => (phase = 'asking')).then(() => tick()).then(reveal);
+      return;
+    }
     void answer(way);
   }
 
@@ -958,7 +964,7 @@
       {/if}
       {#if phase === 'asking' && chosen}
         <form class="qa-reason" onsubmit={submit}>
-          <label class="qa-label" for="{uid}-why">{queueWords.why}</label>
+          <label class="qa-label" for="{uid}-why">{chosen.asks || queueWords.why}</label>
           <div class="qa-line">
             <span class="field field-lg qa-field">
               <input id="{uid}-why" class="field-input qa-input" type="text" autocomplete="off" enterkeyhint="send" required bind:value={reason} bind:this={field} {onkeydown} />
