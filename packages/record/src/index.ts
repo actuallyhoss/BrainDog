@@ -1584,6 +1584,11 @@ export type Boot = {
      * address's first letter as Signing in draws it, never the "Y" of "You". A person only.
      */
     email?: string;
+    /**
+     * The hash of the owner's own photo, the picture his row in People holds (its `identity.picture`), so the apps draw
+     * his face on their bar and not his first letter. The owner only, and absent while his row holds none.
+     */
+    picture?: string;
     level: HeldLevel | null;
     /**
      * The level the caller holds on each list, by id: a grant naming the list, else the record-wide level, and no key for
@@ -9112,6 +9117,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return typeof note === 'string' && note.trim() !== '' ? `${note.trim()} (${line})` : line;
   };
 
+  /**
+   * WHY AN AGENT'S WRITE WOULD REPLACE A PICTURE ALREADY CHOSEN, or `null` (his rule from FanPad Ops, 4 November, and his
+   * word of 9 November): an agent that finds a project's logo or a person's photo saves it as the row's picture where
+   * there is none, and one that would replace or take off a picture already there asks him instead, as one question on
+   * Decide (`askInstead`). The picture is the file field the list names as `identity.picture`. On his word (`said`), or
+   * while he lets his agents do everything without asking (`bypass`), it lands as any other write would. A person's own
+   * write is never held here: `callerOf` answers only for an agent's key.
+   */
+  const pictureKept = (ctx: CallContext, register: string, patch: unknown, self: Entry): string | null => {
+    const caller = callerOf(ctx);
+    if (caller === null || caller.bypass === true) return null;
+    const field = (kernel.register(register) as { identity?: { picture?: unknown } } | undefined)?.identity?.picture;
+    if (typeof field !== 'string' || patch === null || typeof patch !== 'object' || Array.isArray(patch) || !Object.hasOwn(patch, field)) return null;
+    const sha = (v: unknown): string | null =>
+      v !== null && typeof v === 'object' && !Array.isArray(v) && typeof (v as { sha256?: unknown }).sha256 === 'string' ? (v as { sha256: string }).sha256 : null;
+    const held = sha(self.fields[field]);
+    if (held === null || sha((patch as Record<string, unknown>)[field]) === held) return null;
+    return 'This already has a picture, and an agent replaces one only when the owner says so.';
+  };
+
   const keptOnLadder = (rung: { caller: Caller; gate: Gate } | null, out: Result<Entry>): Result<Entry | Asked> => {
     if (!out.ok || !rung?.gate.write) return out;
     trust.kept(rung.caller.token, rung.gate.kinds, ladderNames(rung.caller.token));
@@ -11433,6 +11458,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         /* AND A PERSON THE RECORD HOLDS NO NAME FOR IS THE FIRST LETTER OF THEIR ADDRESS, as Signing in draws them. */
         ...(p.kind === 'person' && person !== null && (myName === null || myName.trim() === '')
           ? ((email) => (typeof email === 'string' && email.trim() !== '' ? { email: email.trim() } : {}))(sql.one<{ email: string | null }>('SELECT email FROM person WHERE id = ?', person)?.email)
+          : {}),
+        /* AND THE OWNER'S OWN PHOTO, where the list `meet` writes keeps pictures and the row marked `self` holds one: one
+           read of one row, found by what the list declares (`meets.self`, `identity.picture`), never by its name. */
+        ...(p.kind === 'person' && p.level === 'owner'
+          ? ((meets) => {
+              const self = (meets?.fields as Record<string, string | undefined> | undefined)?.self;
+              const decl = meets ? kernel.register(meets.register) : undefined;
+              const field = (decl as { identity?: { picture?: unknown } } | undefined)?.identity?.picture;
+              if (!meets || !decl || self === undefined || typeof field !== 'string' || readable(ctx, meets.register)) return {};
+              if (!decl.fields.some((f) => f.id === field && f.type === 'file')) return {};
+              const got = kernel.list({ register: meets.register, where: { field: self, is: true } as Predicate, limit: 1 });
+              const held = got.ok ? (got.value.rows[0]?.fields[field] as { sha256?: unknown } | null | undefined) : undefined;
+              const sha = held !== null && typeof held === 'object' ? held.sha256 : undefined;
+              return typeof sha === 'string' && /^[0-9a-f]{64}$/u.test(sha) ? { picture: sha } : {};
+            })(kernel.meetsList())
           : {}),
         level: p.kind === 'person' || p.kind === 'token' ? p.level : null,
         levels: levelsOf(ctx),
@@ -13792,8 +13832,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND ON HIS WORD IT LANDS WHERE IT WOULD HAVE ASKED (`onWordWrite`), as `create`. */
       const word = self === null ? null : onWordWrite(ctx, args.said, rung, args.note);
       if (word !== null && !word.ok) return word as Result<never>;
-      const note = bypassNoted(rung, word === null ? args.note : word.value);
-      if (rung && self && !rung.gate.write && word === null) {
+      /* A PICTURE ALREADY CHOSEN IS HIS TO REPLACE (`pictureKept`): an agent asks, unless it carries his word. */
+      const pictured = self === null || word !== null ? null : pictureKept(ctx, args.register, args.patch, self);
+      const pictureWord = pictured !== null && args.said !== undefined && args.said !== null ? wordOf(ctx, args.said) : null;
+      if (pictureWord !== null && !pictureWord.ok) return pictureWord as Result<never>;
+      const keeps = pictured !== null && pictureWord === null;
+      const said = pictureWord?.ok ? `On ${nameMid(pictureWord.value.byName)}'s word: "${pictureWord.value.said}"` : null;
+      const note = bypassNoted(rung, word === null ? (said === null ? args.note : typeof args.note === 'string' && args.note.trim() !== '' ? `${args.note.trim()} (${said})` : said) : word.value);
+      if (self && word === null && (keeps || (rung && !rung.gate.write))) {
         const refused = wouldRefuse((w) =>
           offRegister(
             args.register,
@@ -13807,7 +13853,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ),
         );
         if (refused) return refused;
-        return tail(askInstead(ctx, args.register, { at: `${args.register}#${args.seq}`, version: args.version ?? self.version, patch: args.patch }, self, rung.gate.why, rung.gate.outside === true));
+        const why = rung && !rung.gate.write ? rung.gate.why : (pictured ?? '');
+        return tail(askInstead(ctx, args.register, { at: `${args.register}#${args.seq}`, version: args.version ?? self.version, patch: args.patch }, self, why, rung !== null && !rung.gate.write && rung.gate.outside === true));
       }
       /* THE ROW IT ANSWERS IS HER VIEW OF IT: a field hidden from her is not in it, though she moved the row on. */
       const written = keptOnLadder(
