@@ -30,6 +30,7 @@
   import ItemMenu from '$lib/ui/ItemMenu.svelte';
   import { rowIn, rowOut } from '$lib/ui/motion.ts';
   import { ownMenu } from '$lib/ui/context-menu.ts';
+  import { renames } from '$lib/things/rename.ts';
   import { families, familyOn, familySaid, familyWords } from './hub-family.ts';
   import type { HubRow } from './hub.ts';
 
@@ -105,7 +106,7 @@
   <IconWell name={r.icon ?? 'refresh'} size="l" />
   <span class="line-main">
     {#if linked && r.path}
-      <a class="line-title name open tap" href={at(r.path)}>{r.name}</a>
+      <a class="line-title name open tap" href={at(r.path)} {@attach renames(r.path)}>{r.name}</a>
     {:else}
       <span class="line-title name">{r.name}</span>
     {/if}
@@ -134,7 +135,7 @@
       >
     </div>
   {:else if r.path}
-    <a class="row tap line line-tall" href={at(r.path)}>{@render body(r, false)}</a>
+    <a class="row tap line line-tall" href={at(r.path)} {@attach renames(r.path)}>{@render body(r, false)}</a>
   {:else}
     <div class="row line line-tall">{@render body(r, false)}</div>
   {/if}
