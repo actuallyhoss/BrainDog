@@ -2,8 +2,13 @@
  * The operator's doors, as the Admin page reads and writes them: `/account/ops/*` and the Kennel's review. Each is
  * opened by the operator's own session (the Worker's `operator.ts`), so nothing here holds a key.
  *
+ * A SIGN-IN IN THE LAST FIFTEEN MINUTES, OR THE DOOR ASKS FOR ONE (security pass, 8 Nov). Every call goes through
+ * `provingFetch`, so a session signed in longer ago is asked "Confirm it's you" in place and the call sent once more.
+ *
  * A stranger's words (an application's name, its link) come back as plain strings and the page draws them as text.
  */
+
+import { provingFetch } from '../reauth/ask.ts';
 
 export type Answer<T> = { ok: true; value: T } | { ok: false; status: number; fix: string };
 
@@ -20,13 +25,15 @@ function said(status: number): string {
 export async function door<T>(path: string, body?: unknown): Promise<Answer<T>> {
   let res: Response;
   try {
-    res = await fetch(path, {
-      method: body === undefined ? 'GET' : 'POST',
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json' },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
+    res = await provingFetch(() =>
+      fetch(path, {
+        method: body === undefined ? 'GET' : 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }),
+    );
   } catch {
     return { ok: false, status: 0, fix: 'BrainDog could not be reached. Check the connection and try again.' };
   }

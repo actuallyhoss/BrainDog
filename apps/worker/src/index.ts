@@ -115,7 +115,7 @@ const APP_REVIEW_EMAIL = 'review@brain.dog';
 /** A BrainDog app's PKCE challenge, as `identity.ts` takes it: the base64url of a SHA-256. */
 const APP_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 import { cookieDomain, withSignedIn } from './signed-in.ts';
-import { bearerSent, operatorEmails, operatorOf, type OperatorSeen } from './operator.ts';
+import { bearerSent, OPERATOR_STALE, operatorEmails, operatorOf, type OperatorSeen } from './operator.ts';
 import { applyDoor, notHere, opsApplications, opsInvite, type OpsApplyDeps } from './apply.ts';
 import { seenDoor, servesSeen } from './seen.ts';
 import { stepDoor, servesStep } from './step.ts';
@@ -4291,8 +4291,10 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* THE KENNEL, THE REGISTRY EVERY HOST READS ADD-ONS FROM (`kennel.ts`), before any record door because it is nobody's
        record: its reads are public, and a write names who asks by an author's key, a bearer, or this host's session. */
     if (servesKennel(url.pathname)) {
-      /* THE REVIEW DOOR ALSO OPENS TO THE OPERATOR'S OWN SESSION, for the Admin page (`operator.ts`). */
+      /* THE REVIEW DOOR ALSO OPENS TO THE OPERATOR'S OWN SESSION, for the Admin page (`operator.ts`), signed in within
+         fifteen minutes; an older one is asked to sign in again. */
       const seen = KENNEL_REVIEW.test(url.pathname) ? await operatorSeen(request, env) : NOBODY;
+      if (seen.stale === true) return withCookie(json({ ok: false, refusal: OPERATOR_STALE }, 403), seen.cookie);
       return withCookie(await serveKennel(request, {
         blobs: env.BLOBS,
         assets: env.ASSETS,
@@ -5102,6 +5104,8 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
   }
   const seen = OPS_ME.test(path) || OPS_INVITE.test(path) || OPS_APPLICATIONS.test(path) || OPS_FUNNEL.test(path) || OPS_PEOPLE.test(path) ? await operatorSeen(request, env) : NOBODY;
   if (OPS_ME.test(path)) return withCookie(await opsMe(request, env, seen), seen.cookie);
+  /* EVERY DOOR PAST `/me` WANTS A SIGN-IN IN THE LAST FIFTEEN MINUTES (`operator.ts`), and an older one is asked for it. */
+  if (seen.stale === true) return withCookie(json({ ok: false, refusal: OPERATOR_STALE }, 403), seen.cookie);
   if (OPS_INVITE.test(path)) return withCookie(await opsInvite(request, opsApplyDeps(env, seen)), seen.cookie);
   if (OPS_APPLICATIONS.test(path)) return withCookie(await opsApplications(request, opsApplyDeps(env, seen)), seen.cookie);
   /* THE OPERATOR'S FUNNEL (`funnel.ts`): the Directory's week totals and each open record's firsts, as counts only. */
@@ -5281,7 +5285,9 @@ function operatorSeen(request: Request, env: Env): Promise<OperatorSeen> {
  */
 async function opsMe(request: Request, env: Env, seen: OperatorSeen): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return notHere();
-  if (seen.operator) return json({ ok: true, value: { operator: true } }, 200);
+  /* AN OLDER SIGN-IN IS STILL THE OPERATOR HERE (`stale`): this says only that Admin is theirs to draw, and every door it
+     lists asks for the fifteen minutes itself. */
+  if (seen.operator || seen.stale === true) return json({ ok: true, value: { operator: true } }, 200);
   const key = (env.PROVISION_KEY ?? '').trim();
   const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
   if (key !== '' && bearerSent(request) && (await sameKey(bearer, key))) return json({ ok: true, value: { operator: true } }, 200);
