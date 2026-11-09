@@ -37,6 +37,7 @@
   import { HEALTH, slotStyle } from './project-cards.ts';
   import { sectionsOf, trailOf, type Board, type BoardRow, type BoardSection, type Parked } from './projects-board.ts';
   import { readBoard } from './projects-board-read.ts';
+  import { renames } from '$lib/things/rename.ts';
 
   let { list, entries }: { list: string; entries: readonly { seq?: unknown; id?: unknown; fields?: Record<string, unknown> }[] } = $props();
 
@@ -131,7 +132,7 @@
     <div class="c-head">
       <ProjectWell mark={r.mark} name={r.name} hue={r.hue} />
       <div class="c-id">
-        <a class="c-name own-dir" href={at(r.href)}>{r.name}</a>
+        <a class="c-name own-dir" href={at(r.href)} {@attach renames(r.href)}>{r.name}</a>
         {#if r.laneWord || HEALTH[r.health]}
           <span class="small c-meta">{r.laneWord}{#if r.laneWord && HEALTH[r.health]}{' · '}{/if}{#if HEALTH[r.health]}<span class="c-health" data-tone={HEALTH[r.health]!.tone}><span class="dot" aria-hidden="true"></span>{HEALTH[r.health]!.word}</span>{/if}</span>
         {/if}
@@ -159,7 +160,7 @@
 {#snippet quietRow(r: BoardRow)}
     <ProjectWell mark={r.mark} name={r.name} hue={r.hue} />
     <div class="l-words">
-      <a class="c-name own-dir" href={at(r.href)}>{r.name}</a>
+      <a class="c-name own-dir" href={at(r.href)} {@attach renames(r.href)}>{r.name}</a>
       <p class="small own-dir l-next">{r.next || words.noNext}</p>
     </div>
     {#if r.chip}<div class="l-state">{@render chipOf(r)}</div>{/if}
@@ -170,7 +171,7 @@
 {#snippet shelfRow(p: Parked)}
     <ProjectWell mark={p.mark} name={p.name} hue={p.hue} />
     <div class="l-words">
-      <a class="c-name own-dir" href={at(p.href)}>{p.name}</a>
+      <a class="c-name own-dir" href={at(p.href)} {@attach renames(p.href)}>{p.name}</a>
       {#if p.due}<p class="small l-next" data-warn="">{p.due}</p>{/if}
     </div>
     {@render pinButton(p.href, p.name)}
