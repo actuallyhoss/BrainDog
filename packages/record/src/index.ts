@@ -9138,8 +9138,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the version (`stamp`), so nothing written is missed; what moves without one, a run's heartbeat and the clock, is at
    * most `HELD_MS` old. A clock that went back reads again. `most` keys are kept, the oldest let go first.
    */
-  const heldFor = <T>(store: Map<string, Held<T>>, key: string, make: () => T, most = 32): T => {
-    const version = stamp();
+  const heldFor = <T>(store: Map<string, Held<T>>, key: string, make: () => T, most = 32, at: () => string = () => stamp()): T => {
+    const version = at();
     const now = clock.now();
     const was = store.get(key);
     if (was !== undefined && was.version === version && was.at <= now && now - was.at < HELD_MS) return was.value;
@@ -9162,6 +9162,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               (SELECT max(rowid) FROM suggestion) AS s, (SELECT group_concat(id || ':' || coalesce(disabled_at, ''), ',') FROM pack) AS p`,
     );
     return JSON.stringify(at === undefined ? null : [at.e, at.r, at.d, at.s, at.p]);
+  };
+
+  /**
+   * THE VERSION OF WHAT THE PAGES ARE MADE FROM, AND NOT OF THE LOG: the rows (their newest, how many, their versions and
+   * their newest change), the declarations, the add-ons on and the rows kept private. A page is a declaration, filled
+   * from a row where it is a row's, so a line that changed no row (a key opened, an arrival read, a question) leaves every
+   * page as it was; `stamp` moved with each, and every page was resolved again, the most of `boot`'s time between writes.
+   */
+  const pagesStamp = (): string => {
+    const rows = sql.one<Record<string, unknown>>('SELECT max(rowid) AS r, count(*) AS n, total(version) AS v, max(updated_at) AS u FROM entry');
+    const at = sql.one<Record<string, unknown>>(
+      `SELECT (SELECT max(rowid) FROM declaration) AS d, (SELECT group_concat(id || ':' || coalesce(disabled_at, ''), ',') FROM pack) AS p,
+              (SELECT max(rowid) FROM entry_private) AS x, (SELECT count(*) FROM entry_private) AS y`,
+    );
+    return JSON.stringify([rows?.r ?? null, rows?.n ?? null, rows?.v ?? null, rows?.u ?? null, at?.d ?? null, at?.p ?? null, at?.x ?? null, at?.y ?? null]);
   };
 
   /**
@@ -9245,7 +9260,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (!slugAt.has(`${p.about.register}#${p.about.seq}`)) slugAt.set(`${p.about.register}#${p.about.seq}`, p.slug);
         }
       return every;
-    });
+    }, 32, pagesStamp);
 
   /**
    * THE OPEN QUESTIONS, AS THE KERNEL READS THEM, held while only the runs move (`quietFor`): `boot` read every one three
