@@ -15,7 +15,7 @@
  */
 
 import { batchMetrics, batchReads, batchSchemas, createClient, forgetSchemas, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
-import { railRoom } from '@braindog/kernel/constants';
+import { bellWorthy, railRoom, runFailed } from '@braindog/kernel/constants';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
    carried the same six and the sample's two made-up add-ons, until the sample left the app, then a hand copy in `modules.ts` until each module's
    own manifest said it, then each module's document (`firstPartyModule`), which put every document on the first open.
@@ -122,6 +122,7 @@ type ShellBase = {
   pen: PenItem[];
   people: Person[];
   questions: Question[];
+  /** What the bell says, in words: `boot`'s `bell` (`layoutOf`), every line of it one that wants the reader. */
   whatsNew: NewsItem[];
   /**
    * THE LINES `boot` SAID WERE NEW, as the record sent them, with the cursor they reach (`upTo`): Today's first read keeps
@@ -833,6 +834,18 @@ function exportText(e: EventLine): string | null {
 }
 
 /**
+ * SOMEBODY JOINING FROM AN INVITATION, BY NAME (9 Nov): the record lets them in itself (`acceptInvitation`), so the line
+ * was "Gave someone write access to everything", said by nobody. Who joined is the line's person, the member's own id on
+ * a level and the grantee (`person:<id>`) on a share. `null` for any other line.
+ */
+function joinedText(e: EventLine, names: ReadonlyMap<string, string>): string | null {
+  if (e.kind !== 'access.grant' || e.actor !== 'system') return null;
+  const person = e.target_kind === 'share' ? (e.field ?? '').replace(/^person:/u, '') : (e.target ?? '').replace(/^person:/u, '');
+  const name = names.get(person)?.trim();
+  return copy.feedJoined(name ? name : null);
+}
+
+/**
  * ACCESS GIVEN OR TAKEN AWAY, AS A SENTENCE. The kind is the record's (`access.grant`) and it reached Home as "Access
  * grant": a key made for an agent, a device let in, or a person given a level. What it reaches is in `to`, a key's or a
  * device's label in `note`, and a person's level may be on one list, named in `field`.
@@ -899,13 +912,24 @@ function textOf(e: EventLine): string {
 /** A record setting itself up is one line (`api.ts` `setupSaid`). */
 const setupText = (e: EventLine): string => setupSaid(e.target, typeof e.to === 'number' ? e.to : 0);
 
-/** Where a line goes: the row, the question, or the log for anything that is neither. */
+/** Where a line goes: the row, the question, the run's own rule or script, or the log for anything that is none of these. */
 function hrefOf(e: EventLine): string {
   if (e.register !== null && e.seq !== null) return `/r/${e.register}/${e.seq}`;
   /* AN ADD-ON'S NOTICE (`ctx.notify`) NAMES ITS ADD-ON, and opens the add-on's page. */
   if (e.kind === 'note' && e.target_kind === 'pack' && e.target) return `/plugins/${encodeURIComponent(e.target)}`;
   const question = /^(?:suggestion:)?(SG\d+)$/u.exec(e.target ?? '');
   if (e.target_kind === 'suggestion' && question) return `/decide/${question[1]}`;
+  /* A RUN, OR A NOTICE ABOUT NO ROW, OPENS WHAT RAISED IT (9 Nov): a rule's or a script's own page, where its runs and its
+     log are read (as Activity's `ranOf` opens them), the hub's scheduled tab for a door, which lists them, and the
+     keychain for a key. The bell holds a run only when it did not go through. */
+  if (e.kind === 'pull' || e.kind === 'note') {
+    const rule = /^rule[.:](.+)$/u.exec(e.actor)?.[1];
+    if (rule !== undefined && !/^(?:handled|additive|update|ladder)$/u.test(rule)) return `/automations/${encodeURIComponent(rule)}`;
+    const script = /^script:([^@]+)@v\d+$/u.exec(e.actor)?.[1];
+    if (script !== undefined) return `/scripts/${encodeURIComponent(script)}`;
+    if (e.actor.startsWith('ingest:')) return '/automations?tab=scheduled';
+    if (e.actor.startsWith('grant:') || e.actor.startsWith('key_ask:')) return '/keychain';
+  }
   return '/audit';
 }
 
@@ -1100,6 +1124,18 @@ function scriptRuns(events: readonly EventLine[]): { folded: Set<EventLine>; sai
   return { folded, said };
 }
 
+/** The states a list says its rows are finished in, as this tab learnt its declaration; `undefined` for one it did not. */
+const doneOf = (list: string): readonly string[] | undefined => REGISTERS[list]?.done;
+
+/**
+ * THE BELL'S LINES OUT OF ANY ANSWER (9 Nov, his words: "all the match, extract, read should only show in audit but not
+ * as a real notification"): what `bellWorthy` in the kernel keeps, as the record walks its own `bell` by. `boot` from a
+ * host that sends `bell` is drawn from it and never comes here; a host older than it sends `whatsNew` alone, and a page
+ * of history read for the bell from one is every line. The reader's own lines are still here, said "you", and the bell
+ * leaves them (`others` in `Bell.svelte`).
+ */
+export const bellOnly = <E extends EventLine>(events: readonly E[]): E[] => events.filter((e) => bellWorthy(e, doneOf));
+
 /** The record's lines as the feed's items, newest first as they came. */
 export function newsOf(events: readonly EventLine[], me: string | null, names: ReadonlyMap<string, string> = new Map()): NewsItem[] {
   const voice = voiceTexts(events);
@@ -1133,7 +1169,9 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
        mentioned you on Draft the home page copy: ...". The record marks it (`you`); the words are here. */
     const you = (e as EventLine & { you?: 'assigned' | 'mentioned' }).you;
     const yours = you === 'assigned' && e.title ? copy.feedGaveYou(by, e.title) : you === 'mentioned' ? copy.feedMentionedYou(by, e.title, e.note ?? '') : null;
-    return text == null && yours === null ? [] : [{ e, last, item: { at: e.ts, by, text: yours ?? text!, href: hrefOf(e), ...asked, ...(you ? { you } : {}) } }];
+    /* WHAT WENT WRONG WEARS THE BELL'S ALARM (`kindOf`): a run that did not go through, and a notice that interrupts. */
+    const bad = runFailed(e) || (e.kind === 'note' && e.field === 'urgent') ? { tone: 'bad' as const } : {};
+    return text == null && yours === null ? [] : [{ e, last, item: { at: e.ts, by, text: yours ?? joinedText(e, names) ?? text!, href: hrefOf(e), ...asked, ...(you ? { you } : {}), ...bad } }];
   });
 
   const out: NewsItem[] = [];
@@ -1387,7 +1425,9 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
     people: [],
     /* THE FIRST SCREEN'S QUESTIONS, capped as `boot` caps them. Their options and cost are one `governance` read away. */
     questions: (b.waiting ?? []).map((w, i) => ({ id: w.id, title: w.question || w.id, cost: '', rank: i + 1, opened: w.opened_at, options: [] })),
-    whatsNew: newsOf(b.whatsNew?.events ?? [], person, new Map(Object.entries(b.names ?? {}))),
+    /* WHAT THE BELL SAYS, which is the record's own `bell` where it sent one, and what changed since the reader looked,
+       less what is not the bell's, from a host older than it (`bellOnly`). Today reads `newsLines`, every line. */
+    whatsNew: newsOf(b.bell?.events ?? bellOnly(b.whatsNew?.events ?? []), person, new Map(Object.entries(b.names ?? {}))),
     newsLines: b.whatsNew?.events ?? [],
     sinceCapped: b.whatsNew?.sinceCapped ?? false,
     /* THE NEWEST LINE THIS CALLER MAY SEE, which is as near the record's version as `boot` says. A member held to named

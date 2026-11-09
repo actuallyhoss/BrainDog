@@ -74,6 +74,11 @@ export type Prefs = {
   'nav.labels'?: Record<string, string>;
   /** THE RULES WHOSE NOTICES THIS PERSON MUTED, as `rule:<id>`. Urgent notices always arrive. */
   'notify.muted'?: string[];
+  /**
+   * WHAT THE BELL SAID THAT THIS PERSON HAS SINCE OPENED: each address a bell line opens, to the time of the newest line
+   * read there by opening it. The bell reads it (`shell/bell-open.ts`); the record merges what is sent into what it keeps.
+   */
+  'bell.opened'?: Record<string, string>;
   /** THE KINDS OF PUSH THIS PERSON TURNED OFF on every phone (`needs`, `agents`, `money`, `summary`; `lib/phone/kinds.ts`). */
   'push.off'?: string[];
   /**

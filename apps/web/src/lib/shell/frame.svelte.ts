@@ -27,7 +27,7 @@ export const frame = $state({
   keys: false,
   /** Opens another record; the shell's, since it reloads the tab. */
   open: null as ((r: Reachable) => void) | null,
-  /** What arrived since the reader last looked, which the bell opens. */
+  /** What the bell holds: what wants the reader since they last looked (`boot`'s `bell`), which the bell opens. */
   news: [] as readonly NewsItem[],
   /** The cursor of the newest line in `news`, which "Mark all read" sends. */
   upTo: null as Cursor | null,
@@ -35,6 +35,11 @@ export const frame = $state({
   asks: 0,
   /** The newest line marked read from the bell, by its time: a line at or before it is read. */
   readTo: '',
+  /**
+   * WHAT THE BELL SAID THAT HAS SINCE BEEN OPENED (`bell.opened`, `shell/bell-open.ts`): each address a line opens, to the
+   * time of the newest line read there. A line at or before its address's time is read, on every device.
+   */
+  opened: {} as Readonly<Record<string, string>>,
   /** Where you are, in one word or name: the lit row of the sidebar, which the phone's head says. */
   here: '',
   /** The page's own name, as its head says it, for the last step of the crumb. */

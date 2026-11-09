@@ -1,6 +1,12 @@
 <!--
   The bell, on the desk's bar and the phone's head alike, and what it opens: what happened on the record since the reader
-  last looked. What was asked is Needs you's, not the bell's.
+  last looked that wants them. What was asked is Needs you's, not the bell's.
+
+  ONLY WHAT WANTS HIM (9 Nov, his words: "i want really good stuff only"): what somebody else or an agent did that
+  concerns him, what went wrong, and a notice something raised on purpose. Rules, scripts and doors at work (a match, a
+  balance, a mail looked at, a Read time) and a run keeping its own row are in Activity alone (`bellWorthy` in the
+  kernel), and the record sends the bell its own lines (`boot`'s `bell`), so none of them fills it or counts on the
+  badge. A line is read once what it is about is opened, with no press (`bell-open.ts`).
 
   THE NOTIFICATIONS, CALM (29 October, his word: "fix the notification center, it looks shit"). One panel, no boxes in
   it: a head with its name and "Mark all read" as a quiet text button, then the lines by day (Today, Yesterday, Earlier),
@@ -29,7 +35,7 @@
   import { tick } from 'svelte';
   import { page } from '$app/state';
   import { apiBase, at } from '../at.ts';
-  import { agoOf, bellDays, bellLines, kindOf, unreadBy, type BellLine, type Day } from './alerts.ts';
+  import { agoOf, bellDays, bellLines, kindOf, unreadIn, type BellLine, type Day } from './alerts.ts';
   import Icon from '../ui/Icon.svelte';
   import { isGlyph, type IconName } from '../ui/icons.ts';
   import { REGISTERS } from '../record/held.ts';
@@ -52,7 +58,7 @@
     forYou: 'For you',
     named: (n: number) => (n === 0 ? 'Notifications' : `Notifications, ${n.toLocaleString('en')} new`),
     none: 'Nothing new',
-    noneWhy: 'What agents and people change on your record shows up here.',
+    noneWhy: 'Comments, finished work, due dates and anything that fails show up here.',
     markAll: 'Mark all read',
     all: 'See all activity',
     days: { today: 'Today', yesterday: 'Yesterday', earlier: 'Earlier' } satisfies Record<Day, string>,
@@ -96,13 +102,15 @@
   let before = $state<BellLine[]>([]);
   async function readBefore(): Promise<void> {
     try {
-      const [{ createClient }, { newsOf }] = await Promise.all([import('@braindog/client'), import('../record/boot-live.ts')]);
-      const out = await createClient({ base: apiBase() }).recentHistory({ limit: 40 });
+      const [{ createClient }, { bellOnly, newsOf }] = await Promise.all([import('@braindog/client'), import('../record/boot-live.ts')]);
+      /* THE BELL'S OWN HISTORY (9 Nov), what wants him read or not, and never the rules and scripts at work that were most
+         of any forty lines of the log; a host older than `bell` answers every line, which `bellOnly` sifts here. */
+      const out = await createClient({ base: apiBase() }).recentHistory({ limit: 40, bell: true });
       if (!out.ok) return;
       /* BY NAME, AS WHAT IS NEW IS (collab pass 2, 2 Nov): the names `boot` told this reader. Without them every older line
          by a colleague said "Someone you share with" under the same person's name in the new lines above it. */
       const said = (page.data as { names?: Record<string, string> } | undefined)?.names ?? {};
-      before = bellLines(others(newsOf(out.value.events, frame.actor === '' ? null : frame.actor, new Map(Object.entries(said))))).slice(0, BEFORE_SHOWN);
+      before = bellLines(others(newsOf(bellOnly(out.value.events), frame.actor === '' ? null : frame.actor, new Map(Object.entries(said))))).slice(0, BEFORE_SHOWN);
     } catch {
       /* Not read: only what is new is drawn. */
     }
@@ -110,11 +118,14 @@
   const BEFORE_SHOWN = 12;
 
   /* WHAT HE DID HIMSELF IS NOT THE BELL'S (audit 31 Oct o, AO8): a fresh Founder's bell said "4 new", each a thing he had
-     done a moment before ("Added Tallow", "You shared Money with a link"). The bell is for what agents, rules, mail and
-     other people did; Activity keeps his own, as Arrivals on Today leaves them out (AN20). */
+     done a moment before ("Added Tallow", "You shared Money with a link"). The bell is for what other people and agents
+     did that concerns him, what went wrong and what was raised for him; Activity keeps his own, as Arrivals on Today
+     leaves them out (AN20). */
   const others = <N extends { by: string }>(items: readonly N[]): N[] => items.filter((n) => n.by !== 'you');
   const news = $derived(bellLines(others(frame.news)));
-  const unread = $derived(unreadBy(frame.readTo));
+  /* NEW IS AFTER MARK ALL READ AND NOT YET OPENED (9 Nov): a line whose page he opened is read, here and on every device
+     (`bell-open.ts`), and the badge drops with it. */
+  const unread = $derived(unreadIn(frame.readTo, frame.opened));
   const fresh = $derived(news.filter(unread).length);
   const seenBefore = $derived(before.filter((b) => !news.some((n) => n.text === b.text && n.at === b.at)).map((b) => ({ ...b, old: true as const })));
   const told = $derived<(BellLine & { old?: true })[]>([...news, ...seenBefore]);

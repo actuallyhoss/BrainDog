@@ -78,6 +78,39 @@ export const unreadBy =
   (l: { at: string }): boolean =>
     readTo === '' || !(Date.parse(l.at) <= Date.parse(readTo));
 
+/**
+ * Whether a line was read by opening what it is about (`bell.opened`, `bell-open.ts`): its address keeps the time of the
+ * newest line read there, and this one is no newer.
+ */
+export const openedBy =
+  (opened: Readonly<Record<string, string>>) =>
+  (l: { href: string; at: string }): boolean => {
+    const t = opened[l.href];
+    return t !== undefined && Date.parse(l.at) <= Date.parse(t);
+  };
+
+/** Whether a line is new: after what was marked read, and not read by opening it. */
+export const unreadIn = (readTo: string, opened: Readonly<Record<string, string>>): ((l: { href: string; at: string }) => boolean) => {
+  const after = unreadBy(readTo);
+  const open = openedBy(opened);
+  return (l) => after(l) && !open(l);
+};
+
+/**
+ * What two sayings of `bell.opened` come to: each address at the newer of its two times. A boot that was kept from
+ * before a line was opened in this tab never takes back what was read here.
+ */
+export function openedMerged(a: Readonly<Record<string, string>>, b: unknown): Record<string, string> {
+  const out: Record<string, string> = { ...a };
+  if (b === null || typeof b !== 'object' || Array.isArray(b)) return out;
+  for (const [address, at] of Object.entries(b as Record<string, unknown>)) {
+    if (typeof at !== 'string' || !Number.isFinite(Date.parse(at))) continue;
+    const had = out[address];
+    if (had === undefined || Date.parse(at) > Date.parse(had)) out[address] = at;
+  }
+  return out;
+}
+
 /** THE DAY A LINE FALLS IN, by the reader's own clock: Today, Yesterday, or Earlier. */
 export type Day = 'today' | 'yesterday' | 'earlier';
 

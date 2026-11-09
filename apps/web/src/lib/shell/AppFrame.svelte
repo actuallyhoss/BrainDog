@@ -36,7 +36,7 @@
   import { BASE, apiBase, at, here, slugOf } from '$lib/at.ts';
   import { nameAskDue } from '$lib/sharing/name-ask.ts';
   import { appPath, inIosApp, isApp, macNotifications, notify, onShell, setBadge, shellPlaces, shellSettled, shellTitle, shellVisit, windowFocused } from '$lib/shell.ts';
-  import { handoffAlert, instructionAlert, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
+  import { handoffAlert, instructionAlert, openedMerged, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
   /* THE STYLESHEETS AND `applyInset()` ARE THE ROOT LAYOUT'S (`routes/+layout.svelte`), in the order they always had,
      so the light frame and this one draw on the same skin. */
 
@@ -1529,6 +1529,22 @@
     frame.upTo = data.upTo ?? null;
     /* EVERY SHAPE DRAWS THE TOP BAR, so the bar says the page's name on every shape. */
     frame.crumbed = true;
+  });
+  /* WHAT THE BELL SAID THAT HE HAS SINCE OPENED, as the record keeps it (`bell.opened`), over what this tab read by
+     opening since: a boot kept from before never takes a line opened here back to new. Read untracked, so writing it
+     here does not ask this again. */
+  $effect.pre(() => {
+    const kept = data.me.prefs?.['bell.opened'];
+    untrack(() => {
+      frame.opened = openedMerged(frame.opened, kept);
+    });
+  });
+  /* CLEAR ON OPEN (9 Nov): the lines of the bell the page now shown is about are read without a press, and again when
+     new lines come while it is shown (`bell-open.ts`). Loaded only once the bell holds something. */
+  $effect(() => {
+    const url = { pathname: page.url.pathname, search: page.url.search };
+    if (frame.news.length === 0) return;
+    void import('$lib/shell/bell-open.ts').then((m) => m.sawUrl(url));
   });
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */

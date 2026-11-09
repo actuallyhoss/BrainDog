@@ -37,6 +37,7 @@ import { bylinesIn, bylineWords, keepSeen, seenOn, storeOf, type Byline, type Se
 import { askOf, onlyHere, type Ask, type Here } from './byline-undo.ts';
 import { cutIn, wholeOf } from './clipped.ts';
 import { dueWords, entryIn, finished, keyOf, titleOf, words, type RowAt, type Touch } from './row-verbs.ts';
+import { sawRow } from '../shell/bell-open.ts';
 
 /** Just changed, per page, for the life of the tab. */
 const kept = new Map<string, Map<string, Touch>>();
@@ -398,6 +399,8 @@ export class RowHost {
     this.changesOpen = false;
     this.panelOpen = true;
     this.seeRow(row);
+    /* AND THE BELL'S LINES ABOUT IT ARE READ, as opening its own screen reads them (`bell-open.ts`). */
+    sawRow(row);
     this.#tell();
     return true;
   }

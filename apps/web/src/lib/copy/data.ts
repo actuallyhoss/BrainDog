@@ -26,6 +26,8 @@ export const data = {
   feedMade: 'Your BrainDog was made',
   /* WHAT IS THE READER'S (collab pass, 2 Nov): a row given them, a comment naming them. */
   feedGaveYou: (by: string, title: string) => `${by} gave you ${title}`,
+  /** Somebody let in by an invitation (9 Nov), by name where the reader is told it. */
+  feedJoined: (who: string | null) => (who ? `${who} joined your BrainDog` : 'Somebody joined from your invitation'),
   feedMentionedYou: (by: string, title: string | null, note: string) =>
     `${by} mentioned you${title ? ` on ${title}` : ''}: ${note.length > 90 ? `${note.slice(0, 89)}…` : note}`,
   /** A decision in the feed, with the reason it was given when there is one. */
