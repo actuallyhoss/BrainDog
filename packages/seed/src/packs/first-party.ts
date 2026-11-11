@@ -1053,12 +1053,17 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   with the way to Investments and gold where Holdings holds something, and `page.money-book` under the book's
  *   accounts, headed as every book's. Each only while something is held beyond cash. Money's own figures, no id added or
  *   taken away, and a minor step, as 3.39.0's new order of a book's page was, that goes in quietly and keeps every row.
+ * - money-core 3.42.0 (11 Nov): new Ledger lines were left unfiled where two filing rules named the same text for the same
+ *   category, because `script.learn_category` made a whole-text rule beside one on how the text starts or on one
+ *   account, and the ladder reads a tie as no answer. `script.learn_category` now asks no rule where one that is on
+ *   already fits the entry, `script.file_back` reads a tie of one category as that category, as the record's ladder now
+ *   does, and `rule.txn-categorise` files a pending line too. No id added or taken away, a minor step that keeps every row.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.32.0',
   people: '4.8.0',
-  'money-core': '3.41.0',
+  'money-core': '3.42.0',
   estate: '2.8.1',
   work: '1.26.2',
 };

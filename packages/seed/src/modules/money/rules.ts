@@ -110,12 +110,15 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    *
    * `once_per: [entry]` means once an entry, ever. A category cleared by hand afterwards stays cleared,
    * which is `32-PARITY` §3.2's rule that a field a person set is never overwritten by a rule.
+   *
+   * A PENDING ENTRY TOO, SINCE money-core 3.42.0, so a bank's hold is filed when it arrives and not left bare until it
+   * clears; one that found no rule then is tried again when it clears, as its marker goes back.
    */
   'txn-categorise': {
     rule: 'txn-categorise',
     pack: 'money-core',
     register: 'transactions',
-    when: 'state is cleared, transfer is false, category is empty, parts is empty',
+    when: 'state is pending or cleared, transfer is false, category is empty, parts is empty',
     then: [
       { link: { field: 'category', to: { register: 'categories', by: 'match', value: '{{what}}', where: NAMED } } },
       filedBy('description', '{{what}}'),

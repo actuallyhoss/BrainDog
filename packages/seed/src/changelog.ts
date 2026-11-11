@@ -228,6 +228,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.42.0', notes: 'A new Ledger line is filed by a filing rule that fits it even where two rules name it for the same category, a pending line is filed when it arrives, and no rule is offered for a line a rule already files.' },
     { version: '3.41.0', notes: "Accounts and each book's page show what you hold beyond cash and your net worth under the accounts, once you hold something; Accounts links to Investments and gold." },
     { version: '3.40.0', notes: 'Instalments says the day each plan ends, beside its next part.' },
     { version: '3.39.0', notes: "A book's page leads with its accounts, this month's in and out, and where the month's money went; Cash ahead comes after them." },

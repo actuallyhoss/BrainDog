@@ -108,10 +108,11 @@ export default async function run(ctx) {
     return null;
   }
 
-  /* A RULE THAT IS ON AND NAMES THIS TEXT WHOLE, FOR THIS WAY, IS ALREADY THE ANSWER, or one Yes would tie with. */
+  /* A RULE THAT IS ON AND ALREADY FITS THIS ENTRY, by the ladder, its way and its account, is the answer or one Yes
+     would tie with. Asked by matching, since a rule on how the text starts or on its account copied whole ties with it. */
   const rivals = [];
   for (const how of ['exact', 'starts', 'contains', 'pattern']) rivals.push(...(await ctx.record.list('filing_rules', { all: [{ field: 'state', is: 'on' }, { field: 'match_by', is: how }] })));
-  const named = rivals.find((r) => r.fields.reads !== 'description' && r.fields.match === text && (r.fields.direction === 'either' || r.fields.direction === f.direction) && !r.fields.account);
+  const named = rivals.find((r) => filingFits(r, f) !== null);
   if (named) {
     ctx.log(`A filing rule already files ${whom}, so nothing was asked and nothing was made.`);
     return null;

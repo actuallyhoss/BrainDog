@@ -63,7 +63,7 @@ export function filingFits(rule, entry, key) {
 
 /**
  * The rule the category rule would file this entry by, among `rules`, read by the ladder alone: `{ id }`, `{ tie: true }`
- * where two fit equally, or `null` where none fits. "As the bank wrote it" first, then the description, as the category
+ * where two that file different categories fit equally, or `null` where none fits. "As the bank wrote it" first, then the description, as the category
  * rule's two steps go, and a tie on the first leaves the second to decide.
  */
 export function filingWinner(rules, entry) {
@@ -89,18 +89,21 @@ export function filingWinner(rules, entry) {
   };
   const best = (reads) => {
     let won = null;
-    let tie = false;
+    let level = [];
     for (const r of rules) {
       const r0 = r && r.fields ? r.fields : r;
       if ((r0.reads === 'description' ? 'description' : 'payee') !== reads) continue;
       const f = fits(r);
       if (!f) continue;
       if (won === null || f.rung < won.rung || (f.rung === won.rung && f.long > won.long)) {
-        won = { id: r.id, rung: f.rung, long: f.long };
-        tie = false;
-      } else if (f.rung === won.rung && f.long === won.long) tie = true;
+        won = { rung: f.rung, long: f.long };
+        level = [{ id: r.id, category: r0.category }];
+      } else if (f.rung === won.rung && f.long === won.long) level.push({ id: r.id, category: r0.category });
     }
-    return won === null ? null : tie ? { tie: true } : { id: won.id };
+    if (won === null) return null;
+    /* A TIE WHOSE RULES ALL FILE ONE CATEGORY IS NO TIE, as the record's ladder reads it: the oldest rule files it. */
+    if (level.length > 1 && !level.every((l) => typeof l.category === 'string' && l.category !== '' && l.category === level[0].category)) return { tie: true };
+    return { id: level.map((l) => l.id).sort()[0] };
   };
   const first = best('payee');
   if (first && first.id) return first;
