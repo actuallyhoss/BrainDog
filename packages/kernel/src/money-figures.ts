@@ -867,7 +867,10 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
   /* AND WHAT IT READ IS NOTED FOR EVERY FIGURE HANDED IT (`ReadMemo`), so the second figure over a walk is held on the
      lists the walk read, as the first is, and a bill written after them moves both. */
   const kept = ctx.walks;
-  const walk = kept === undefined ? runway(deps, opening, legs, horizon) : structuredClone(kept.once(JSON.stringify([opening, legs, horizon, at]), () => runway(deps, opening, legs, horizon)));
+  /* A WALK TO ZERO IS IN THE CURRENCY ITS OPENING IS IN, not the record's home one: a book held in USD on a record whose home is
+     EGP was walked in EGP and refused against its own opening. Legs in another currency are converted into it, as any walk's are. */
+  const into = toZero && openingUnit !== null ? openingUnit : undefined;
+  const walk = kept === undefined ? runway(deps, opening, legs, horizon, undefined, into) : structuredClone(kept.once(JSON.stringify([opening, legs, horizon, at, into]), () => runway(deps, opening, legs, horizon, undefined, into)));
   if (!walk.ok) return walk;
 
   /* SEVERAL CURRENCIES WITH NO WAY TO ADD THEM ARE ONE AMOUNT EACH, the walk run once per currency with its own

@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fill, openRecord, type Declaration, type Kernel, type Reading } from '../src/index.ts';
+import { fill, jcs, openRecord, type Declaration, type Kernel, type Reading } from '../src/index.ts';
 import { figureLists } from '../src/money-figures.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
@@ -178,4 +178,30 @@ test('A BOOK WHOSE NAME HOLDS A COLON OR A COMMA IS STILL ONE BOOK, and a walk w
 test('A WALK THAT OPENS FROM A FIGURE OF EACH BOOK READS THE LISTS THAT FIGURE READS', () => {
   const lists = figureLists(LASTS as never, (id) => (id === 'book-cash' ? (BOOK_CASH as never) : null));
   assert.deepEqual(lists.sort(), ['accounts', 'bills', 'transactions']);
+});
+
+test('A USD BOOK ON AN EGP-HOME RECORD IS WALKED IN USD, with a leg in another currency converted into it', async () => {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  const FX = register('fx', 'Rates', 'currency', [
+    { id: 'currency', type: 'text', required: true },
+    { id: 'base', type: 'text', required: true },
+    { id: 'rate', type: 'decimal', required: true },
+    { id: 'as_of', type: 'day', index: true, required: true },
+  ]);
+  assert.ok((await k.install([BOOKS, ACCOUNTS, TRANSACTIONS, BILLS, FX, metric(BOOK_CASH), metric(LASTS)])).ok);
+  k.rememberPack({ id: 'money-core', version: '1.0.0', source: 'local', ref: null, manifest: jcs({ pack: 'money-core', version: '1.0.0', config: { home_currency: { type: 'text' } } }), checksum: 'x' });
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  const made = (list: string, fields: Record<string, unknown>): string => {
+    const r = k.create(list, fields, { actor: 'p_1' });
+    assert.ok(r.ok, JSON.stringify(r));
+    return r.value.id;
+  };
+  made('fx', { currency: 'USD', base: 'EGP', rate: 50, as_of: '2026-09-15' });
+  const quartz = made('books', { name: 'Quartz' });
+  made('accounts', { name: 'Mercury', book: quartz, balance: money(100_000, 'USD'), as_of: '2026-09-20' });
+  made('bills', { what: 'Tools', book: quartz, direction: 'out', amount: money(150_000, 'USD'), due: '2026-10-01' });
+  assert.equal(read(k, LASTS, 'Quartz').value, dayNumber('2026-10-01'));
+  /* A bill in EGP is converted into the book's USD: EGP 25,000.00 is USD 500.00 at 50, and 1,000.00 less 500.00 holds. */
+  made('bills', { what: 'Local', book: quartz, direction: 'out', amount: money(2_500_000, 'EGP'), due: '2026-09-25' });
+  assert.equal(read(k, LASTS, 'Quartz').value, dayNumber('2026-10-01'));
 });
