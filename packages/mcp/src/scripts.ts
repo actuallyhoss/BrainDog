@@ -92,11 +92,13 @@ export function ruleLine(r: Record<string, unknown>): string {
   const month = isObject(r.month) ? r.month : {};
   const failed = num(month.failed);
   const on = str(r.trigger) ? `on ${String(r.trigger)}${str(r.register) ? ` in ${String(r.register)}` : ''}` : null;
+  /* AN INLINE RULE OPENS NO RUN, so its month is the firings counted for it, or it reads 0 however often it filed. */
+  const runs = r.path === 'inline' ? Math.max(num(r.month_fired), num(month.runs)) : num(month.runs);
   return [
     withId(r.name, r.rule),
     r.enabled === false ? 'off' : 'on',
     on,
-    `${counted(num(month.runs), 'run')} this month${failed > 0 ? `, ${String(failed)} failed` : ''}`,
+    `${counted(runs, 'run')} this month${failed > 0 ? `, ${String(failed)} failed` : ''}`,
   ]
     .filter((s): s is string => s !== null)
     .join(' · ');
@@ -116,7 +118,7 @@ export function ruleBrief(r: Record<string, unknown>, now: number): string {
     const why = str(run.error) ?? str(run.say) ?? str(run.why);
     lines.push(`Run ${at === null ? '' : `${when(at, now)} `}${state}${why === null ? '' : `: ${why}`}`.replace(/\s+/gu, ' '));
   }
-  if (runs.length === 0) lines.push('No runs yet.');
+  if (runs.length === 0 && !(r.path === 'inline' && num(r.fired) > 0)) lines.push('No runs yet.');
   else if (runs.length > 5) lines.push(`${counted(runs.length - 5, 'older run')} in format full.`);
   return lines.join('\n');
 }

@@ -743,7 +743,7 @@ const PATTERN_READS = 512;
 
 /** What a `link` links (`id`), the row it found (`row`, another row where the link takes) and the rung it was found
  *  on, or the sentence saying why it links nothing. */
-type Linked = { id: string; row: string; rung: LinkRung } | { none: string };
+type Linked = { id: string; row: string; rung: LinkRung } | { none: string; tied?: { ids: string[]; rung: LinkRung } };
 
 /**
  * The most rows of the linked list the `starts` and `contains` rungs read for one link, longest first on each rung.
@@ -770,7 +770,8 @@ const RUNG_SAID: Record<LinkRung, string> = { exact: '', starts: ', matched by h
  *
  * THE FIRST RUNG THAT FINDS A ROW DECIDES, AND ON IT THE LONGEST `by` WINS. `FENWICK CLOUD LTD` beats `FENWICK` on the
  * same rung, because the longer one is the more particular claim. Two rows of the same longest length on that rung are
- * a tie, and a tie links nothing and asks nothing: a rule that picked one would pick a different one next week.
+ * a tie, and a tie links nothing and asks nothing: a rule that picked one would pick a different one next week. Unless
+ * the link takes a field and every tied row takes the same one, since then they all file the same way.
  *
  * A CASE AWAY ON THE LOWER RUNGS, over the ASCII fold the ingest anchors use (`fold`), compared here rather than in SQL
  * because SQLite's `lower()` can fold more than ASCII where a build carries ICU, and the record runs on more than one
@@ -796,7 +797,7 @@ function linkOf(deps: Pick<RulesDeps, 'sql' | 'schemaOf' | 'doneOf' | 'ctx'>, to
     if (w === null || w.bad.length) return { none: "this link's where cannot be read" };
     only = { sql: w.sql, params: w.params };
   }
-  const found = climb(deps, to, value, only);
+  let found = climb(deps, to, value, only);
   /* WHY, WHEN THE FILTER IS WHY. A preview that said "nothing bears that name" of a category that plainly does would
      send somebody to retype the name. The ladder is climbed again without the filter only when it found nothing. */
   if ('none' in found && found.none === NOTHING && only !== null) {
@@ -806,6 +807,12 @@ function linkOf(deps: Pick<RulesDeps, 'sql' | 'schemaOf' | 'doneOf' | 'ctx'>, to
       whereFields(to.where, fields);
       return { none: `what bears that name is left out by this link's where${fields.length ? ` (${fields.join(', ')})` : ''}` };
     }
+  }
+  if ('none' in found && found.tied !== undefined && to.take !== undefined) {
+    /* A TIE THAT TAKES ONE VALUE IS NO TIE: two filing rules for the same text and the same category file the same way,
+       so the oldest is the one linked rather than neither. */
+    const takes = found.tied.ids.map((id) => deps.sql.one<{ said: unknown }>(`SELECT json_extract(fields, '${jsonPath(to.take!)}') AS said FROM entry WHERE id = ?`, id)?.said);
+    if (typeof takes[0] === 'string' && takes[0] !== '' && takes.every((t) => t === takes[0])) found = { id: found.tied.ids[0]!, row: found.tied.ids[0]!, rung: found.tied.rung };
   }
   if ('none' in found || to.take === undefined) return found;
   const taken = deps.sql.one<{ said: unknown }>(`SELECT json_extract(fields, '${jsonPath(to.take)}') AS said FROM entry WHERE id = ?`, found.id)?.said;
@@ -833,13 +840,15 @@ function climb(deps: Pick<RulesDeps, 'sql' | 'schemaOf'>, to: Pick<LinkTo, 'regi
   const and = only === null ? '' : ` AND (${only.sql})`;
   const filled = only === null ? [] : only.params;
   const whole = deps.sql.all<{ id: string }>(
-    `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${by}') = ?${and} LIMIT 2`,
+    `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${by}') = ?${and} ORDER BY id LIMIT ?`,
     to.register,
     value,
     ...filled,
+    LADDER_ROWS,
   );
   if (whole.length === 1) return { id: whole[0]!.id, row: whole[0]!.id, rung: 'exact' };
-  if (whole.length > 1) return { none: 'two rows bear that name' };
+  /* THE TIED ROWS GO BACK WITH THE REFUSAL, so `linkOf` can link them where they all take the same row. */
+  if (whole.length > 1) return { none: 'two rows bear that name', tied: { ids: whole.map((w) => w.id), rung: 'exact' } };
 
   /* THE FIELD IS ASKED OF THE LIST'S DECLARATION, never guessed from the rows, so its name is a declared field id and
      `jsonPath` takes it. */
@@ -859,6 +868,7 @@ function climb(deps: Pick<RulesDeps, 'sql' | 'schemaOf'>, to: Pick<LinkTo, 'regi
   const folded = fold(value);
   const head = [...value].slice(0, PATTERN_READS).join('');
   let won: { id: string; rung: number; long: number } | null = null;
+  const level: string[] = [];
   let unsafe = false;
   for (const row of rows) {
     if (won !== null && won.rung !== row.rung) break;
@@ -873,11 +883,13 @@ function climb(deps: Pick<RulesDeps, 'sql' | 'schemaOf'>, to: Pick<LinkTo, 'regi
     const long = [...row.said].length;
     if (won === null) {
       won = { id: row.id, rung: row.rung, long };
+      level.push(row.id);
       continue;
     }
-    if (won.long === long) return { none: 'two rows match it equally well' };
-    break;
+    if (won.long !== long) break;
+    level.push(row.id);
   }
+  if (level.length > 1) return { none: 'two rows match it equally well', tied: { ids: [...level].sort(), rung: RUNGS[won!.rung]! } };
   if (won === null) return { none: unsafe ? 'a pattern that might match it is not safe to run, so it was not tried' : NOTHING };
   return { id: won.id, row: won.id, rung: RUNGS[won.rung]! };
 }
