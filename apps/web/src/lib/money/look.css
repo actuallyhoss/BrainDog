@@ -1281,18 +1281,33 @@
     max-inline-size: none;
   }
 
+  /* A NOTE SITS BESIDE ITS OWN NAME, in a column of its own, so a part with one is no taller than its neighbours and an
+     empty one takes no line. */
   [data-money] .split[data-form='donut'] .split-legend > .split-item {
     grid-column: auto;
-    grid-template-columns: 28px minmax(0, 1fr) max-content 3.25rem;
+    grid-template-columns: 28px minmax(0, max-content) minmax(0, 1fr) max-content 3.25rem;
     column-gap: var(--sp-3);
   }
 
   [data-money] .split[data-form='donut'] .split-legend:not(:has(> .split-item > .part-chip)) > .split-item {
-    grid-template-columns: 8px minmax(0, 1fr) max-content 3.25rem;
+    grid-template-columns: 8px minmax(0, max-content) minmax(0, 1fr) max-content 3.25rem;
   }
 
-  [data-money] .split[data-form='donut'] .split-legend > .split-item > :is(.split-note, .glyph) {
-    grid-column: 2 / -1;
+  /* One row, whatever the order the words were drawn in. */
+  [data-money] .split[data-form='donut'] .split-legend > .split-item > :is(.split-dot, .split-label, .split-note, .split-value, .split-share) {
+    grid-row: 1;
+  }
+
+  [data-money] .split[data-form='donut'] .split-legend > .split-item > .split-note {
+    grid-column: 3;
+  }
+
+  [data-money] .split[data-form='donut'] .split-legend > .split-item > .split-value {
+    grid-column: 4;
+  }
+
+  [data-money] .split[data-form='donut'] .split-legend > .split-item > .split-share {
+    grid-column: 5;
   }
 }
 
