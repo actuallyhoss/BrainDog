@@ -32,6 +32,12 @@ export const words = {
   handoffFailed: 'The link could not be handed to the app. Sign in here instead, or ask for a new link in the app.',
   handoffHere: 'Sign in in this browser instead',
 
+  /* THE ANDROID APP: the letter carries six digits too, typed here when the link opens somewhere else. */
+  codeLabel: 'Or type the six digits from the email',
+  codeSignIn: 'Sign in',
+  codeSigningIn: 'Signing in',
+  codeRefused: 'Those digits did not work. Check the email, or ask for a new one.',
+
   /* THE UI PASS (3 Nov): the screen's own lines where `copy` said a fact the screen already shows. */
   /** The link-sent screen: the address stands on its own line, so this says only what happens. */
   sentWhy: 'If this address can sign in here, a link is on its way. It works once, for 15 minutes.',

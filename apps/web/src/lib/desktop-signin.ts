@@ -90,6 +90,21 @@ export async function handOff(linkToken: string, challenge: string, origin: stri
 /** The address that hands a code to the Mac app. */
 export const appLink = (code: string): string => `braindog://auth?code=${encodeURIComponent(code)}`;
 
+/** The six digits a sign-in letter carried, with this window's verifier, for the session cookie; true when it is set. */
+export async function signInWithCode(code: string, verifier: string, origin: string, label: string, ask: typeof fetch = fetch): Promise<boolean> {
+  try {
+    const res = await ask(`${origin}/auth/app/code`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: code.replace(/\D/g, ''), verifier, label }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Swap the one-time code for the session cookie; true when the host set it. */
 export async function swapCode(code: string, verifier: string, origin: string, ask: typeof fetch = fetch): Promise<boolean> {
   try {

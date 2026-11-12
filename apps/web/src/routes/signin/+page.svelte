@@ -43,8 +43,8 @@
   } from '$lib/auth.ts';
   import { opens } from '$lib/motion/open.ts';
   import { at, BASE } from '$lib/at.ts';
-  import { appLink, CHALLENGE, desktopStart, handOff, keepVerifier, pkce } from '$lib/desktop-signin.ts';
-  import { isApp, openOutside } from '$lib/shell.ts';
+  import { appLink, CHALLENGE, desktopStart, handOff, keepVerifier, pkce, signInWithCode } from '$lib/desktop-signin.ts';
+  import { inAndroidApp, isApp, openOutside } from '$lib/shell.ts';
   import { copy } from '$lib/copy.ts';
   import { forgetRead } from '$lib/record/forget-read.ts';
   import { words, wordsOf } from './words.ts';
@@ -278,7 +278,7 @@
     const query = new URLSearchParams(location.search);
     const app = query.get('app');
     if (app !== null) {
-      if (!isApp && CHALLENGE.test(app)) handoff = app;
+      if (!isApp && !inAndroidApp && CHALLENGE.test(app)) handoff = app;
       query.delete('app');
       history.replaceState(history.state, '', `${location.pathname}${query.size > 0 ? `?${query}` : ''}${location.hash}`);
     }
@@ -473,10 +473,30 @@
   /** `when` starts the sent screen's minute, after which it says what fixes a letter that did not come (`SENT_LATE`). */
   /* IN THE MAC APP THE LINK CARRIES THIS WINDOW'S CHALLENGE, so the browser the mail opens it in hands it back here. */
   const appChallenge = async (): Promise<string | null> => {
-    if (!isApp) return null;
+    if (!isApp && !inAndroidApp) return null;
     const { verifier, challenge } = await pkce();
+    /* THE ANDROID APP KEEPS ITS VERIFIER HERE, for the six digits typed on the sent screen; the link still works alone. */
+    if (inAndroidApp) {
+      codeVerifier = verifier;
+      return challenge;
+    }
     return keepVerifier(verifier, undefined, goTo) ? challenge : null;
   };
+
+  let codeVerifier = $state<string | null>(null);
+  let code = $state('');
+  let coding = $state<'idle' | 'busy' | 'refused'>('idle');
+  async function sendCode(e: SubmitEvent): Promise<void> {
+    e.preventDefault();
+    const v = codeVerifier;
+    if (v === null || coding === 'busy') return;
+    coding = 'busy';
+    if (await signInWithCode(code, v, origin, 'BrainDog for Android')) {
+      location.href = goTo;
+      return;
+    }
+    coding = 'refused';
+  }
 
   const sendTo = (to: string) =>
     void run(
@@ -656,6 +676,26 @@
           <p class="calm-body">{words.sentWhy}</p>
           {#if isApp}<p class="calm-body">{words.appLinkSent}</p>{/if}
         </div>
+        {#if inAndroidApp && codeVerifier !== null}
+          <form class="form" onsubmit={sendCode}>
+            <label class="field-label" for="in-code">{words.codeLabel}</label>
+            <span class="field field-lg">
+              <input
+                id="in-code"
+                class="field-input"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                pattern="[0-9 ]*"
+                maxlength="7"
+                required
+                bind:value={code}
+              />
+            </span>
+            {#if coding === 'refused'}<Notice tone="bad" role="alert">{words.codeRefused}</Notice>{/if}
+            <Button weight="primary" type="submit" aria-busy={coding === 'busy'}>{coding === 'busy' ? words.codeSigningIn : words.codeSignIn}</Button>
+          </form>
+        {/if}
         <!-- THE SECOND LINE, a minute on (`SENT_LATE`): the screen cannot know a letter failed, so it says what fixes one. -->
         {#if view.late}<Notice>{copy.linkSentLater}</Notice>{/if}
         <div class="doors">
