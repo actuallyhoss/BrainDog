@@ -187,7 +187,8 @@
   /* THE UI FACE, NAMED. An `h3` takes the display face from the skin, and that face is for 20px and
      up; a card's name is body size, so it takes the face every other name in a list takes. */
   .cards-title {
-    flex: 1;
+    /* ITS OWN WIDTH FIRST, then what is left: from nothing (`flex: 1`), the date beside it took the row and left the name a letter wide. */
+    flex: 1 1 auto;
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
@@ -212,9 +213,10 @@
     inset: 0;
   }
 
-  /* Shrinks and ellipsizes: a long "Last confirmed 28 Sep, out of date" ran past a narrow card's edge. */
+  /* Shrinks and ellipsizes: a long "Last confirmed 28 Sep, out of date" ran past a narrow card's edge. IT GIVES WAY
+     BEFORE THE NAME DOES: at an even share the name, which may break anywhere, was squeezed to a letter a line. */
   .cards-when {
-    flex: 0 1 auto;
+    flex: 0 1000 auto;
     min-inline-size: 0;
     overflow: hidden;
     color: var(--ink-3);
