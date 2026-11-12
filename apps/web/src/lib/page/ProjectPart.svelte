@@ -1288,11 +1288,11 @@
 
     /* DATES IS AS TALL AS ITS DATES (Q32 of 29 October): two lines stood in a tile stretched to Runs on's height. AND
        NUMBERS AS TALL AS ITS FIGURES (31 October, AG22): three figures stood over a tall empty band, stretched to Tasks. */
-    .shape-part:is([data-shape='dates'], [data-shape='numbers']) {
+    .shape-part:is([data-shape='dates'], [data-shape='numbers'], [data-shape='side']) {
       align-self: start;
     }
 
-    .shape-part:is([data-shape='dates'], [data-shape='numbers']) > :global(:last-child) {
+    .shape-part:is([data-shape='dates'], [data-shape='numbers'], [data-shape='side']) > :global(:last-child) {
       flex-grow: 0;
     }
 
