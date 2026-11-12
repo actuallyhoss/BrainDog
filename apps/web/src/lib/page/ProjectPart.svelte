@@ -448,7 +448,7 @@
                 <li class="a-row">
                   <AgentFace agent={s.agent} run={`S${s.seq}`} live={s.open ? 'working' : 'stopped'} size="xs" />
                   <span class="a-words" title={actor(s.agent).name}>
-                    <span class="a-name own-dir">{unsourced(s.title, actor(s.agent).name)}<span class="a-when">, {s.when}</span></span>
+                    <span class="a-name own-dir"><span class="a-title">{unsourced(s.title, actor(s.agent).name)}</span><span class="a-when">, {s.when}</span></span>
                     <span class="a-sub own-dir">{s.ended}{#if s.said}{' · '}{s.said}{/if}</span>
                   </span>
                 </li>
@@ -1633,7 +1633,19 @@
 
   /* SEND KEEPS ITS ONE PRIMARY LOOK, as on Agents (Q32 of 29 October): it was drawn in ink here and red there. */
 
+  /* THE DATE KEEPS ITS PLACE AT THE ROW'S END: the title gives way with an ellipsis, so the date is not what is cut. */
+  .a-name {
+    display: flex;
+  }
+
+  .a-title {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .a-when {
+    flex: none;
     color: var(--ink-3);
     font-weight: 400;
   }
