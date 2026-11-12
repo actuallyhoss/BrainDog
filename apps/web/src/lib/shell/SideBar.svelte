@@ -243,7 +243,7 @@
           answered = true;
           if (got === null) return;
           /* EACH PROJECT'S PAGE CAN NOW OPEN IN ITS OWN SHAPE (`known-project.ts`), its way back the Projects place. */
-          knowProjects(b, got.rows, model.projects?.href ?? null);
+          knowProjects(b, got.rows, model.projects?.href ?? null, got.list);
           const play = splitOf(got.rows, got.lanes).play;
           /* THE WEEK WAITS FOR THE SCREEN'S OWN READS (`rested`): a money figure a project, asked first, held every one
              of them up behind it in the record's one thread. */

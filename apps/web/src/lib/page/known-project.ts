@@ -19,9 +19,10 @@ export type ProjectSeen = Omit<KnownProject, 'list'> & { href: string; key: stri
 const byHref = new Map<string, KnownProject>();
 const byKey = new Map<string, KnownProject>();
 const places = new Map<string, string>();
+const lists = new Map<string, string>();
 
 /** Keep what a list of projects drew, and where the projects' own place is when the drawer knows it. */
-export function knowProjects(base: string, seen: readonly ProjectSeen[], place?: string | null): void {
+export function knowProjects(base: string, seen: readonly ProjectSeen[], place?: string | null, list?: string | null): void {
   for (const p of seen) {
     if (p.name.trim() === '') continue;
     /* ITS LIST TOO, by its row (`things#3`), so the page while it opens says the lane in that list's words. */
@@ -31,6 +32,7 @@ export function knowProjects(base: string, seen: readonly ProjectSeen[], place?:
     byKey.set(`${base} ${p.key}`, one);
   }
   if (typeof place === 'string' && place !== '') places.set(base, place);
+  if (typeof list === 'string' && list !== '') lists.set(base, list);
 }
 
 /** The project whose page opens at `href` (`/p/tidewater`), as this tab last drew it; `null` for one it has not. */
@@ -42,9 +44,13 @@ export const knownRow = (base: string, key: string): KnownProject | null => byKe
 /** The projects' own place (`/p/projects`), the way back a project's page draws, where a drawer said it. */
 export const projectsPlace = (base: string): string | null => places.get(base) ?? null;
 
+/** The projects' own list (`projects`), where a drawer said it: what the Projects place asks of before its page has answered. */
+export const projectsList = (base: string): string | null => lists.get(base) ?? null;
+
 /** Forget every record's projects: a sign-out, and the tests. */
 export function forgetProjects(): void {
   byHref.clear();
   byKey.clear();
   places.clear();
+  lists.clear();
 }

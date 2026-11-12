@@ -56,7 +56,7 @@
   import type { LessonsTile } from '$lib/home/told.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import ProjectWaiting from '$lib/page/ProjectWaiting.svelte';
-  import { knownProject, projectsPlace } from '$lib/page/known-project.ts';
+  import { knownProject, projectsList, projectsPlace } from '$lib/page/known-project.ts';
 
   const slug = $derived(route.params.slug ?? '');
   const showSource = $derived(route.url.searchParams.get('src') === '1');
@@ -254,6 +254,14 @@
     if (/^money(-|$)/u.test(asked)) {
       moneyLooks.ask();
       if (asked === 'money' && quick.base === apiBase() && quick.ledger?.book) askBooks(apiBase(), quick.ledger.book);
+    }
+    /* THE PROJECTS PLACE'S BOARD ASKS WHAT IT READS BESIDE ITS PROJECTS NOW, not once the page's rows are in (12 Nov): none of the
+       work, runs, asks, services or money that repeats waits on them, and the board took a round trip after the page for all of it.
+       Known once the sidebar has drawn the projects; the board takes it when it draws. */
+    {
+      const place = projectsPlace(apiBase());
+      const projects = projectsList(apiBase());
+      if (place !== null && projects !== null && place === `/p/${asked}`) void import('$lib/home/projects-board-read.ts').then((m) => m.askBoard(apiBase(), projects));
     }
     /* A PAGE ABOUT A PROJECT'S ROW CARRIES ITS SHAPE IN ITS OWN ANSWER (`page-live.ts`, `shape-answer.ts`), so nothing is
        asked for it beside the page. */
