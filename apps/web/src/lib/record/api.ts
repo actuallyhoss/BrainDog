@@ -1775,6 +1775,8 @@ export type BlockResult = PageBlock & {
    * aligned with `rows`, `null` for one in none. Absent, a card's names are read from `names`.
    */
   groups?: readonly (string | null)[];
+  /** A `cards` block with `group:`: the record's name for the cards in none ("No role"), which a host heads them with. */
+  noGroup?: string;
   /**
    * Aligned with `rows`, where the record said who changed some row last: that row's byline (`byline.ts`), who changed
    * it, for whom, whether the reader has seen it, and the batch its Undo puts back. `null` for a row a person changed.
