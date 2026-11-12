@@ -1913,7 +1913,7 @@
 {#snippet part(key: string, body: import('svelte').Snippet)}
   {@const cell = boardModel.placeOf(key)}
   {#if cell}
-    <div class="board-part" data-board-key={key} data-size={cell.size} style="grid-area:{cell.area}">
+    <div class="board-part" data-board-key={key} data-size={cell.size} data-foot={cell.foot ? '' : undefined} style="grid-area:{cell.area}">
       {@render body()}
       {#if boardModel.editing && EditCover}<EditCover model={boardModel} {key} />{/if}
     </div>

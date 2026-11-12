@@ -194,7 +194,7 @@
     /** What a home draws between its blocks, before the one at an index (`PageBody`'s `between`). Read only by a `home`. */
     between?: Snippet<[number]> | undefined;
     /** A board's cells, by declared index (`PageBody`'s `placed`). Read only by a `home`. */
-    placed?: ((i: number) => { key: string; area: string; size: string } | null) | undefined;
+    placed?: ((i: number) => { key: string; area: string; size: string; foot?: true } | null) | undefined;
     /** What a home draws inside a block's tile (`PageBody`'s `inside`). */
     inside?: Snippet<[number]> | undefined;
   } = $props();
@@ -1384,7 +1384,7 @@
       {/if}
     {/snippet}
     <div class="body-wrap" data-project={projectPage ? '' : undefined} style={projectStyle}>
-    {#snippet laidOut(blocks: LiveBlock[], placed: ((i: number) => { key: string; area: string; size: string } | null) | null, inside: import('svelte').Snippet<[number]> | null)}
+    {#snippet laidOut(blocks: LiveBlock[], placed: ((i: number) => { key: string; area: string; size: string; foot?: true } | null) | null, inside: import('svelte').Snippet<[number]> | null)}
       <PageBody
         mode="page"
         opens={about && !shapeBox.hold && !placed ? (waiting ?? null) : null}

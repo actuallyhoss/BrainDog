@@ -19,7 +19,7 @@ import { flushSync, tick } from 'svelte';
 import { SIZE_WORDS, WIDGET_SIZES, sizesOf, type WidgetSize } from 'braindog-render';
 
 import { still } from '../ui/motion.ts';
-import { areaOf, cellsOf, dropIndex, filled, heldAt, moved, pack, type Laid, type Packed } from './pack.ts';
+import { areaOf, cellsOf, feet, dropIndex, filled, heldAt, moved, pack, type Laid, type Packed } from './pack.ts';
 import { phoneWidgets, type Phone, type Widget } from './board-widgets.ts';
 import { stepsBetween, type Arranged, type Step } from './steps.ts';
 
@@ -34,7 +34,7 @@ const SLIDE_EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 const LEAVE_MS = 140;
 
 /** One widget's place for the reader: its key, its grid area and its size. */
-export type Place = { key: string; area: string; size: WidgetSize };
+export type Place = { key: string; area: string; size: WidgetSize; /** The frame ends where a wider one begins, and is drawn to that line (`feet`). */ foot?: true };
 
 /** A draft kept on the device while editing, so a closed tab can carry on (§5.5). */
 type Kept = { at: number; from: Arranged; now: Arranged; added: Record<string, unknown>[] };
@@ -274,11 +274,13 @@ export class BoardModel {
      moves nothing (audit 31 Oct, A17: People halved beside a hole the moment Edit was pressed). ONLY WHILE A WIDGET IS
      HELD, by the pointer or the keys, is the board drawn as packed, holes and all, so a drag or a resize lands in whole
      cells and the room a smaller size leaves is seen. */
-  places: ReadonlyMap<string, Place> = $derived(
-    new Map(
-      (this.editing && this.held !== null ? this.packed.laid : filled(this.packed, this.onPhone ? 2 : 4, this.short, this.onPhone ? undefined : this.src.weight?.())).map((l: Laid) => [l.key, { key: l.key, area: areaOf(l), size: l.size }]),
-    ),
-  );
+  places: ReadonlyMap<string, Place> = $derived.by(() => {
+    const laid = this.editing && this.held !== null ? this.packed.laid : filled(this.packed, this.onPhone ? 2 : 4, this.short, this.onPhone ? undefined : this.src.weight?.());
+    const out = new Map<string, Place>(laid.map((l: Laid) => [l.key, { key: l.key, area: areaOf(l), size: l.size }]));
+    /* THE FOOT OF A BAND (`feet`) says so, for the frame to be drawn to its line. Not on a phone, nor while a widget is held. */
+    if (!this.onPhone && !(this.editing && this.held !== null)) for (const key of feet(out.values())) out.set(key, { ...out.get(key)!, foot: true });
+    return out;
+  });
 
   /** A widget's place, or `null` where it takes none. */
   placeOf = (key: string | undefined): Place | null => (key === undefined ? null : (this.places.get(key) ?? null));

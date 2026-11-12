@@ -176,7 +176,7 @@
      * or `null` for a block that takes no cell. Given, the page is a board: its blocks are drawn in the order handed and
      * each in its own cell, and the look's order is the board's.
      */
-    placed?: ((i: number) => { key: string; area: string; size: string } | null) | null;
+    placed?: ((i: number) => { key: string; area: string; size: string; foot?: true } | null) | null;
     /** What the screen draws inside a block's tile, at its foot: Needs you's foot, a board's editing handles. */
     inside?: Snippet<[number]> | null;
     /**
@@ -1422,6 +1422,7 @@
       style="--span:{spans.get(slot.i) ?? slot.span}{cell ? `;grid-area:${cell.area}` : ''}"
       data-board-key={cell?.key}
       data-size={cell?.size}
+      data-foot={cell?.foot ? '' : undefined}
       aria-busy={(block as { pending?: unknown }).pending !== undefined ? 'true' : undefined}
       data-standing={(block as { pending?: unknown }).pending !== undefined ? '' : undefined}
       style:min-block-size={pendingH(block)}

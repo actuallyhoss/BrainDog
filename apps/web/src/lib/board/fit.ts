@@ -244,18 +244,26 @@ export function fitBoard(board: HTMLElement): Animation[] {
 function closeUp(board: HTMLElement, frames: readonly HTMLElement[]): void {
   const resting = board.dataset.cols !== '2' && !board.closest('[data-editing]');
   const moves = new Map<HTMLElement, number>();
+  const grows = new Map<HTMLElement, number>();
   let margin = '';
   if (resting && frames.length > 0) {
     const gap = parseFloat(getComputedStyle(board).rowGap) || 0;
     /* READ AS LAID, NOT AS DRAWN (blink fix, 3 Nov): a frame's offsets are the layout's own, which neither the move this
        made last time nor a widget's arrival (both transforms) shifts, so nothing is taken off to be read and a fit that
        lands where it stood writes nothing. */
+    /* A FOOT'S GROWTH IS TAKEN OFF TO READ IT, and put on again below, so its own height is read and not the one drawn. */
+    for (const f of frames) {
+      if (f.style.minBlockSize === '') continue;
+      f.style.minBlockSize = '';
+      f.style.maxBlockSize = '';
+      f.style.marginBlockEnd = '';
+    }
     const laid = frames
       .map((f) => {
         const css = getComputedStyle(f);
         const from = parseInt(css.gridColumnStart, 10);
         const to = parseInt(css.gridColumnEnd, 10);
-        return { f, row: parseInt(css.gridRowStart, 10) || 0, from, to, top: f.offsetTop, bottom: f.offsetTop + f.offsetHeight, height: f.offsetHeight };
+        return { f, row: parseInt(css.gridRowStart, 10) || 0, end: parseInt(css.gridRowEnd, 10) || 0, from, to, top: f.offsetTop, bottom: f.offsetTop + f.offsetHeight, height: f.offsetHeight };
       })
       .filter((l) => Number.isFinite(l.from) && Number.isFinite(l.to) && l.to > l.from && l.height > 0)
       .sort((a, b) => a.row - b.row || a.from - b.from);
@@ -271,6 +279,16 @@ function closeUp(board: HTMLElement, frames: readonly HTMLElement[]): void {
       lowest = Math.max(lowest, bottom);
       if (up > 0) moves.set(l.f, up);
     }
+    /* THE FOOT OF A BAND (`data-foot`, `feet` in `pack.ts`) IS DRAWN DOWN TO THE LOWEST FOOT ON ITS LINE, so the shorter of
+       two columns ends level with the taller and no hole stands above the wide tile that follows. Its height grows and a
+       negative margin takes the growth back out of its row, so the grid keeps the rows it had; its content stays at its top. */
+    for (const l of laid) {
+      if (!l.f.hasAttribute('data-foot')) continue;
+      let low = -Infinity;
+      for (const g of laid) if (g.end === l.end && g.f.hasAttribute('data-foot')) low = Math.max(low, g.bottom - (moves.get(g.f) ?? 0));
+      const drawn = l.bottom - (moves.get(l.f) ?? 0);
+      if (low - drawn >= 1) grows.set(l.f, Math.round(low - drawn));
+    }
     /* THE BOARD GIVES BACK WHAT ITS FOOT NO LONGER HOLDS, by its own laid height (a margin never moves it). */
     const slack = Math.round(board.offsetHeight - lowest);
     if (moves.size > 0 && slack > 0) margin = `${-slack}px`;
@@ -279,6 +297,11 @@ function closeUp(board: HTMLElement, frames: readonly HTMLElement[]): void {
     const up = moves.get(f);
     const want = up === undefined ? '' : `0px ${-up}px`;
     if (f.style.translate !== want) f.style.translate = want;
+    const grow = grows.get(f);
+    const [h, tall, give] = grow === undefined ? ['', '', ''] : [`${f.offsetHeight + grow}px`, `${f.offsetHeight + grow}px`, `${-grow}px`];
+    if (f.style.minBlockSize !== h) f.style.minBlockSize = h;
+    if (f.style.maxBlockSize !== tall) f.style.maxBlockSize = tall;
+    if (f.style.marginBlockEnd !== give) f.style.marginBlockEnd = give;
   }
   if (board.style.marginBlockEnd !== margin) board.style.marginBlockEnd = margin;
 }

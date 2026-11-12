@@ -26,7 +26,7 @@
   import { blockKeys } from './recompose.ts';
   import { boardSlug, boardWords, pageBoards, type PageBoardKept } from './page-boards.svelte.ts';
 
-  type Placed = (i: number) => { key: string; area: string; size: string } | null;
+  type Placed = (i: number) => { key: string; area: string; size: string; foot?: true } | null;
 
   let {
     slug,
