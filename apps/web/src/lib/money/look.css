@@ -2146,6 +2146,16 @@
   font-size: calc(11px * var(--type, 1));
 }
 
+/* A MONTH'S NAME THAT KEEPS ITS PLACE STANDS WHOLE, centred on its bar, over the room the hidden one beside it leaves: cut to
+   its bar's width a phone read "D… F… Apr Jun A… O…". */
+@container (inline-size < 3.5ch) {
+  [data-money] .series-tick:nth-child(odd) > .series-tick-short {
+    display: flex;
+    justify-content: center;
+    overflow: visible;
+  }
+}
+
 /* ── cards: an account, a plan ── */
 
 @media (width >= 640px) {
