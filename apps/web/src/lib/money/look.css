@@ -30,6 +30,12 @@
   --money-bar-quiet: color-mix(in oklab, var(--ink) 22%, var(--tile));
 }
 
+/* A MONEY PAGE'S BODY WAITS, UNSEEN, UNTIL ITS LEDGER, CHIPS AND BOOKS ARE IN (`PageView.svelte` `landing`), so it lands once
+   with its look, its Add an account row and its Which book row, and the first frame's outline stands behind it till then. */
+.hosted[data-landing] {
+  visibility: hidden;
+}
+
 /* ── the head ─────────────────────────────────────────────────────────────── */
 
 /* THE PAGE'S NAME AND ITS LINE, ON THE BOARD: no tile round them, the name a step up, the sentence at reading size.
@@ -1376,6 +1382,15 @@
   white-space: nowrap;
 }
 
+/* AND A FIGURE THAT IS WORDS ("Lasts past 12 Nov 2027", plain text with spaces and no amount's parts in it) WRAPS WHERE IT
+   MUST, since an amount is one word and these are not: kept on one line beside its label at 390 it ran out of the tile and
+   over "Runs out". */
+[data-money] .block[data-kind='stat'] .cell-figure:not(:has(*)) {
+  white-space: normal;
+  min-inline-size: 0;
+  text-wrap: balance;
+}
+
 [data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .glyph {
   grid-area: glyph;
 }
@@ -2129,6 +2144,16 @@
 [data-money] :is(.series-line-label, .series-ticks) {
   color: var(--ink-3);
   font-size: calc(11px * var(--type, 1));
+}
+
+/* A MONTH'S NAME THAT KEEPS ITS PLACE STANDS WHOLE, centred on its bar, over the room the hidden one beside it leaves: cut to
+   its bar's width a phone read "D… F… Apr Jun A… O…". */
+@container (inline-size < 3.5ch) {
+  [data-money] .series-tick:nth-child(odd) > .series-tick-short {
+    display: flex;
+    justify-content: center;
+    overflow: visible;
+  }
 }
 
 /* ── cards: an account, a plan ── */

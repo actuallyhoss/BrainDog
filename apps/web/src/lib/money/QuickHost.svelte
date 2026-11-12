@@ -18,6 +18,7 @@
   import { apiBase } from '$lib/at.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { inField } from '$lib/a11y/typed.ts';
+  import { keepMoney } from './kept.ts';
   import { quick } from './quick.svelte.ts';
 
   const lists = $derived((page.data as { lists?: { id: string; kernel?: true }[]; live?: boolean } | undefined)?.lists ?? []);
@@ -38,15 +39,21 @@
   $effect(() => {
     if (!leads || !live || lists.length === 0) return;
     const base = apiBase();
-    if (quick.base === base) return;
-    quick.found(base, null);
+    if (quick.asked === base) return;
+    quick.asked = base;
+    /* A LEDGER KEPT FROM THE LAST VISIT (`kept.ts`) STANDS WHILE IT IS ASKED AGAIN. */
+    if (quick.base !== base) quick.found(base, null);
     const asked = lists;
     void import('./read.ts')
       .then((m) => m.findLedger(base, asked))
       .then((l) => {
-        if (quick.base === base) quick.found(base, l);
+        if (quick.base === base) {
+          quick.found(base, l);
+          keepMoney({ ledger: l }, base);
+        }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .then(() => quick.settle(base));
   });
 
   function onkeydown(e: KeyboardEvent) {

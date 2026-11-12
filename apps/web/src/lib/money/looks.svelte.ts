@@ -11,6 +11,7 @@ import { apiBase } from '../at.ts';
 import { createClient } from '@braindog/client';
 
 import { accountLook, categoryLook, type Look } from './category-look.ts';
+import { keepMoney } from './kept.ts';
 import type { Looks } from './read.ts';
 
 /** A part that is no category: money nothing has filed, which keeps the ledger's dashed `?` and no chip here. */
@@ -48,9 +49,24 @@ class Held {
     void import('./read.ts')
       .then((m) => m.readLooks(base, (page.data as { lists?: { id: string; kernel?: true }[] } | undefined)?.lists ?? []))
       .then((l) => {
-        if (this.#asked === base) this.#looks = l;
+        if (this.#asked !== base) return;
+        this.#looks = l;
+        keepMoney({ looks: l }, base);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        /* A READ THAT FAILED IS AN ANSWER OF NONE, so a page waiting on the chips lands with the names alone. */
+        if (this.#asked === base) this.#looks = { categories: [], accounts: [] };
+      });
+  }
+
+  /** The chips as the copy kept them, which stand until this record's read answers; never over an answer. */
+  seed(l: Looks): void {
+    if (this.#looks === null) this.#looks = l;
+  }
+
+  /** Whether the chips have been read for this record, empty or not: what Money's page waits on before it lands. */
+  get read(): boolean {
+    return this.#looks !== null;
   }
 
   /*
