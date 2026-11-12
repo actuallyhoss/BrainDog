@@ -519,6 +519,12 @@
     gap: var(--sp-1);
   }
 
+  /* A FACT'S LABEL IS NEVER BROKEN: "Met in" took two lines when the places beside it wrapped, and the words stay one line. */
+  .cards-item:has(> .cards-head > .cards-face) .cards-fact dt {
+    flex: none;
+    white-space: nowrap;
+  }
+
   /* `cards lead`: THE FIRST CARD IS TWO TRACKS WIDE WHERE THE GRID HAS TWO, and one where it has one.
      The renderer only marks the card (05 §4, told and never inferred), so the host has to know how
      many tracks there are, and the grid cannot say. `span 2` in a grid of one track makes an
