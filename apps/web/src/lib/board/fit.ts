@@ -189,6 +189,9 @@ export function fitBoard(board: HTMLElement): Animation[] {
       const need = Math.ceil(end - box.top + tail);
       if (need > box.height + 1) grows.set(frame, need);
     }
+    /* A FRAME OF NO ROWS (a figure's bars) HAS NOTHING TO CUT, so its overflow was clipped at the frame's foot, the last
+       bar on the edge with no padding (Cash by book). It is let as tall as its content, padding included, as the first line is. */
+    if (rows.length === 0 && !board.closest('[data-editing]') && frame.scrollHeight > Math.ceil(box.height) + 1) grows.set(frame, frame.scrollHeight);
     const cutOf = (i: number): boolean => !line.includes(i) && rects[i]!.height > 0 && rects[i]!.bottom > cutAt + 1;
     rows.forEach((row, i) => cutOf(i) && cut.add(row));
     /* A FOOT THAT COUNTS WHAT IT LEAVES OUT COUNTS WHAT THE FRAME CUT TOO (live check of 30 October, 5): Needs you held 4,
