@@ -580,7 +580,9 @@ export function hardSaid(card: Pick<Card, 'cost' | 'ways'>, primary: string | nu
   if (hard.length === 0) return '';
   /* BARE ONLY UNDER THE FILLED ONE; a hard answer left unfilled (`primaryOf`) is named, so it says so of itself. */
   if (hard.length === 1 && hard[0]!.key === primary) return queueWords.hardLine;
-  const said = hard.map((w) => queueWords.doing(w.label)).map((d, i) => (i === 0 ? d : d.charAt(0).toLowerCase() + d.slice(1)));
+  const doing = hard.map((w) => queueWords.doing(w.label));
+  if (doing.some((d) => d === null)) return queueWords.hardThese;
+  const said = (doing as string[]).map((d, i) => (i === 0 ? d : d.charAt(0).toLowerCase() + d.slice(1)));
   return queueWords.hardOf(said.join(' or '));
 }
 
