@@ -1382,6 +1382,15 @@
   white-space: nowrap;
 }
 
+/* AND A FIGURE THAT IS WORDS ("Lasts past 12 Nov 2027", plain text with spaces and no amount's parts in it) WRAPS WHERE IT
+   MUST, since an amount is one word and these are not: kept on one line beside its label at 390 it ran out of the tile and
+   over "Runs out". */
+[data-money] .block[data-kind='stat'] .cell-figure:not(:has(*)) {
+  white-space: normal;
+  min-inline-size: 0;
+  text-wrap: balance;
+}
+
 [data-money] .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .glyph {
   grid-area: glyph;
 }
