@@ -267,6 +267,8 @@
       :root[data-shell='ios'] :is(.ff-side, .ff-bar, .ff-tabs, .ff-edge), :root:not([data-first]) .ff-edge { display: none; }
       [data-entry] #ff { display: none; }
       html[data-ff] :is(.viz-grow-x, .viz-wipe, .viz-fade, .viz-sweep) { animation-delay: -1s; }
+      /* WHAT LANDS OVER THE OUTLINE LANDS WHOLE: fading up, it stood half seen over its own grey bars, two pictures of one page. */
+      html[data-ff] [data-arrive] { transition: none; }
       html[data-ff] :is(.waiting, .skel-board, .pw, .sk, .sk-group, .examples-room, [data-standing], [data-board-reading], .block-slot:has([data-board-reading])) { visibility: hidden; }
     </style>
 
