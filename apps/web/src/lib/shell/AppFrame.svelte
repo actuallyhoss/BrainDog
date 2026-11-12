@@ -2391,8 +2391,11 @@
     }
   }
 
+  /* AT THE TOP OF THE FRAME, since left where it fell it stood one pixel under the page and the document scrolled by it. */
   .sr-only {
     position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
     inline-size: 1px;
     block-size: 1px;
     overflow: hidden;
