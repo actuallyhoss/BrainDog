@@ -955,23 +955,36 @@ function drawn(build: () => UsageView): UsageRead {
  * TWO BASES SINCE THE RECORD IS IN THE ADDRESS. `base` is the bare host, where `/account/usage` and `/auth/methods` are the
  * person's; `api` is where the record answers, `/<slug>` under a slug, so the events counted are the record on screen.
  * `home` is the record's home currency (`homeCurrency()`), whose code an amount of extra use then drops, as every screen does.
+ *
+ * `signedIn` IS A CALLER THAT ALREADY KNOWS SOMEBODY IS (the Cloud's live shell), and whether they own the record:
+ * nobody is asked who is signed in, and the ledger and the record's reads go out together. One after another they were
+ * three round trips, sign-in, then the ledger, then the names, about a second before the month drew. The scripts are
+ * asked ahead only for the owner, whose ledger names them; a member's month never read them. A session that ended
+ * since is the ledger's 401, and the record is asked as before.
  */
-export async function readUsage(io: Fetch, now: number, base = '', api: string = base, month?: string, home: string | null = null): Promise<UsageRead> {
+export async function readUsage(
+  io: Fetch,
+  now: number,
+  base = '',
+  api: string = base,
+  month?: string,
+  home: string | null = null,
+  signedIn: false | 'member' | 'owner' = false,
+): Promise<UsageRead> {
   const range = monthRange(now, month);
   const current = range.to === new Date(now).toISOString().slice(0, 10);
+  /* THE NAMES, FROM THE RECORD ON SCREEN, asked beside each other and never waited on for an answer that failed:
+     a name not found is said as the ledger holds it, which is what this page said before it asked. */
+  const askScripts = () => send<{ id: string; script?: string; title: string }[]>(io, `${api}/api/scripts`);
+  const askRest = () => Promise.all([send<{ id: string; rule?: string; name: string }[]>(io, `${api}/api/automations`), live(io, api).actions()] as const);
+  const ahead = signedIn === false ? null : { rest: askRest(), scripts: signedIn === 'owner' ? askScripts() : null };
   /* NOBODY SIGNED IN IS NO LEDGER TO ASK. An open self-host, or a browser with no session, would only be told 401, and
      the browser logs that as an error; `/auth/methods` says so without one. A host that cannot say is asked as before. */
   let member = false;
-  if (!(await nobodySignedIn(io, base))) {
+  if (signedIn !== false || !(await nobodySignedIn(io, base))) {
     const ledger = await send<AccountUsage>(io, `${base}/account/usage?from=${range.from}&to=${range.to}`);
     if (ledger.ok && ledger.value.records.length > 0) {
-      /* THE NAMES, FROM THE RECORD ON SCREEN, asked beside each other and never waited on for an answer that failed:
-         a name not found is said as the ledger holds it, which is what this page said before it asked. */
-      const [automations, scripts, actions] = await Promise.all([
-        send<{ id: string; rule?: string; name: string }[]>(io, `${api}/api/automations`),
-        send<{ id: string; script?: string; title: string }[]>(io, `${api}/api/scripts`),
-        live(io, api).actions(),
-      ]);
+      const [[automations, actions], scripts] = await Promise.all([ahead?.rest ?? askRest(), ahead?.scripts ?? askScripts()]);
       const names = namesOf({
         automations: automations.ok && Array.isArray(automations.value) ? automations.value : undefined,
         scripts: scripts.ok && Array.isArray(scripts.value) ? scripts.value : undefined,
@@ -985,7 +998,11 @@ export async function readUsage(io: Fetch, now: number, base = '', api: string =
     else if (!ledger.notFound && !ASK_THE_RECORD.has(ledger.refusal.code)) return { ok: false, refusal: ledger.refusal };
   }
 
-  const [events, automations] = await Promise.all([live(io, api).actions(), current ? send<AutomationRuns[]>(io, `${api}/api/automations`) : null]);
+  /* THE RECORD'S OWN EVENTS, already asked where its reads went out ahead: the same two. */
+  const [events, automations] =
+    ahead !== null
+      ? await ahead.rest.then(([autos, acts]) => [acts, current ? (autos as unknown as Answer<AutomationRuns[]>) : null] as const)
+      : await Promise.all([live(io, api).actions(), current ? send<AutomationRuns[]>(io, `${api}/api/automations`) : null]);
   if (events.ok) {
     /* THE RECORD'S EVENTS ARE THIS MONTH'S ONLY (`ActionRow.month`), so a past month read from them is a month with
        nothing to say, never this month's runs under last month's name. Its automations' counts are this month's too. */

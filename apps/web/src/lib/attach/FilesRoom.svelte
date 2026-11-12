@@ -18,7 +18,8 @@
   import { cardShape, shapeKey } from '$lib/ui/shape.ts';
   import Ring from '$lib/viz/Ring.svelte';
   import { bytes } from 'braindog-render';
-  import { readRoom, type Room } from './attached.ts';
+  import { roomOf } from '$lib/data/usage-early.ts';
+  import type { Room } from './attached.ts';
 
   let room = $state<Room | null>(null);
   /* THE TILE IT DREW LAST TIME STANDS WHILE ITS READ IS OUT (`Tile`'s `ready`, kept in `ui/shape.ts`): it came a beat after the
@@ -26,7 +27,8 @@
      on a live record, since nothing is kept yet to say it has one. */
   let asking = $state(cardShape(shapeKey(), 'files-room') !== null || (Boolean(page.data.live) && !noRoom));
   onMount(() => {
-    void readRoom(apiBase()).then((r) => {
+    /* The page asked as it opened (`usage-early.ts`); a tile mounted later than that reads for itself. */
+    void roomOf(apiBase()).then((r) => {
       room = r;
       noRoom = r === null;
       asking = false;

@@ -56,7 +56,8 @@
    * no tile rather than a refusal; a refusal is no tile too, because the bill below already says what the host said.
    */
   async function usageOf(): Promise<Result<UsageView | null>> {
-    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase(page.url), undefined, homeCurrency());
+    /* Asked only where the Cloud holds the record (`hosted`), so somebody is signed in and nothing asks who. */
+    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase(page.url), undefined, homeCurrency(), (page.data as { me?: { owner?: boolean } }).me?.owner === true ? 'owner' : 'member');
     if (out.ok === true) return { ok: true, value: out.view };
     if (out.ok === 'none') return { ok: true, value: null };
     return { ok: false, refusal: out.refusal };

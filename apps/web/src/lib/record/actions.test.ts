@@ -367,6 +367,38 @@ test('NOBODY SIGNED IN, AS ON AN OPEN SELF-HOST, asks no ledger and reads the re
   assert.ok(mine.ok === true && mine.view.from === 'ledger');
 });
 
+test('A CALLER THAT KNOWS SOMEBODY IS SIGNED IN asks the ledger and the names together, and nobody who is signed in', async () => {
+  /* One after another they were three round trips before the month drew: sign-in, the ledger, then the names. */
+  const signed = host({ '/account/usage': () => json(200, { ok: true, value: ledger(0) }) });
+  /* Each answer comes a moment after it was asked, and the first to land says how many asks were out by then. */
+  let outAtFirst: number | null = null;
+  const io: Fetch = async (url, init) => {
+    const answer = signed.io(url, init).catch((e: unknown) => e);
+    await new Promise((r) => setTimeout(r, 2));
+    outAtFirst ??= signed.sent.length;
+    const got = await answer;
+    if (got instanceof Response) return got;
+    throw got;
+  };
+  const mine = await readUsage(io, NOW_MS, '', '/acme', undefined, null, 'owner');
+  assert.ok(mine.ok === true && mine.view.from === 'ledger');
+  const sent = signed.sent.map((x) => x.url.split('?')[0]);
+  assert.deepEqual([...sent].sort(), ['/account/usage', '/acme/api/actions', '/acme/api/automations', '/acme/api/scripts']);
+  assert.equal(outAtFirst, 4, 'the ledger and the names went out one after another');
+
+  /* A SESSION THAT ENDED SINCE is the ledger's 401, and the record's events are read from the reads already out. */
+  const ended = host({
+    '/account/usage': () => new Response('', { status: 401 }),
+    '/api/actions': () => json(200, { ok: true, value: [row({ days: [{ day: '2026-09-02', ...totals, runs: 5 }] })] }),
+  });
+  const read = await readUsage(ended.io, NOW_MS, '', '', undefined, null, 'member');
+  assert.ok(read.ok === true && read.view.from === 'events' && read.view.weeks[0]?.runs === 5, JSON.stringify(read).slice(0, 200));
+  assert.equal(ended.sent.filter((x) => x.url.startsWith('/api/actions')).length, 1, 'the events were asked twice');
+  assert.ok(!ended.sent.some((x) => x.url.startsWith('/auth/methods')));
+  /* A MEMBER'S MONTH NEVER READ THE SCRIPTS, and is not asked for them ahead either. */
+  assert.ok(!ended.sent.some((x) => x.url.startsWith('/api/scripts')), 'a member was asked for the scripts');
+});
+
 test('a month is five weeks at most, from the first, and every day lands in one', () => {
   const weeks = weeksOf([{ day: '2026-09-01', runs: 1 }, { day: '2026-09-07', runs: 2 }, { day: '2026-09-08', runs: 4 }, { day: '2026-09-30', runs: 8 }, { day: '2026-08-31', runs: 100 }], '2026-09');
   assert.deepEqual(weeks.map((w) => w.runs), [3, 4, 0, 0, 8]);
