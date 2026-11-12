@@ -212,7 +212,12 @@
   /* WHAT AGENTS ASKED HIM BACK, of what he told them: counted in the badge, drawn over the questions. */
   const toldNeeds = $derived(toldNow().needs.map((t) => toldNeedOf(t, toldNow().agents)));
 
+  /* AFTER THE QUESTIONS HAVE LANDED, as the note above says: asked at mount it joined their wave, and the record answers a
+     wave when its last read is done, so the queue waited for the third column (12 Nov). `reread` asks it with every later read. */
+  let handledAsked = false;
   $effect(() => {
+    if (got === null || handledAsked) return;
+    handledAsked = true;
     untrack(() => void readHandled());
   });
 
