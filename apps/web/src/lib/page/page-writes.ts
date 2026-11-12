@@ -85,6 +85,8 @@ export const heldNone = (): Held => ({
 export type Seen = { see(list: string, keys: readonly string[], answered?: boolean): ReadonlySet<string>; forget(): void };
 
 export type WritesDeps = {
+  /** Read wherever a draw depends on the declarations, which a page's own state moves with when they are learnt. */
+  declared?: () => unknown;
   /** The page's address now, which a hold is taken on and a late write is checked against. */
   slug: () => string;
   /** The record's clock the page was read against, or `null` while no live answer is drawn, when nothing is written. */
@@ -455,7 +457,11 @@ export function pageWrites(deps: WritesDeps) {
    * `page-write.ts` is for the other verbs. Where this is false the capture is handed no `oncapture` and draws its one
    * line naming the list, which is the renderer's rule: a field that cannot write is absent, not greyed.
    */
-  const capturable = (block: LiveBlock): boolean => block.kind === 'capture' && Boolean(block.register && REGISTERS[block.register]?.title);
+  const capturable = (block: LiveBlock): boolean => {
+    /* READ SO A PAGE DRAWN BEFORE ITS DECLARATIONS ARE IN DRAWS THE LINE WHEN THEY ARRIVE: `REGISTERS` is no state. */
+    deps.declared?.();
+    return block.kind === 'capture' && Boolean(block.register && REGISTERS[block.register]?.title);
+  };
 
   /**
    * A line typed into a `capture`: one row in its list, titled with the line and filled with what the block pins.

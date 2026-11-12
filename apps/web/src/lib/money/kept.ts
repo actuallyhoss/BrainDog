@@ -68,6 +68,11 @@ export function keepMoney(part: KeptMoney, base: string = apiBase()): void {
     held.set(base, next);
     const [tab, local] = await Promise.all([import('$lib/data/local-tab.ts'), import('$lib/data/local.ts')]);
     /* AS PLAIN JSON: what the readers hold are reactive proxies, which the copy would refuse. */
-    tab.keepLocal(NAME, base, [local.EVERY], JSON.parse(JSON.stringify(next)), tab.localTicket(), {}, { always: true });
+    /* WITH THE DECLARATIONS OF THE LISTS THE PAGE DRAWS FROM, which the copy keeps beside an answer and a tab takes back
+       before the page lands: the book page's Add an account is drawn only once its list's declaration is known, and without
+       them it arrived with the schemas, a second after the page, and moved everything under it. */
+    const l = next.ledger;
+    const lists = l ? [l.list, l.account.list, ...(l.category ? [l.category.list] : []), ...(l.book ? [l.book.list] : [])] : [];
+    tab.keepLocal(NAME, base, [local.EVERY, ...new Set(lists)], JSON.parse(JSON.stringify(next)), tab.localTicket(), {}, { always: true });
   })().catch(() => undefined);
 }

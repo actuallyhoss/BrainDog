@@ -471,6 +471,8 @@
      held row redraws where it was. */
   let held = $state.raw<Held>(heldNone());
   const writes = pageWrites({
+    /* THE LEDGER'S LOOK ENDS ONLY AFTER THE DECLARATIONS ARE LEARNT, kept or asked (`money/kept.ts`, `QuickHost`). */
+    declared: () => quick.settled,
     slug: () => slug,
     now: () => live?.now ?? null,
     blocks: () => all,
@@ -913,7 +915,10 @@
     const blocks = declaredOnly(toArrange ? toArrange.blocks : (live?.page.blocks ?? []));
     if (mode === 'preview') return blocks;
     /* A SCREEN WHOSE SHELL NAMES NO READER keeps every line, as it drew them before, and the record answers a press. */
-    const drawn = heldTo(inVoice(blocks, said), (list) => !shell?.me || may(shell, 'append', list));
+    /* BEFORE THE RECORD HAS ANSWERED `boot` THE SHELL IS THE LAST ONE'S WITHOUT ITS LEVELS (`me.levels` has none), so a line the
+       kept page drew for this reader is not taken out for want of them: Money's Add an account was drawn a second late, under
+       the page's first paint, and moved everything below it. The record answers a press either way. */
+    const drawn = heldTo(inVoice(blocks, said), (list) => !shell?.me || Object.keys(shell.me.levels ?? {}).length === 0 || may(shell, 'append', list));
     /* A BLOCK THE PROJECT'S SHAPE SAYS ALREADY IS LEFT OUT, by the source it declares (`repeatOf`), once the shape has it. */
     /* ON A PROJECT'S PAGE, WHAT THE HERO AND ITS TILES SAY IS NOT SAID AGAIN, and More about is folded (`project-page.ts`).
        Not while the page is arranged, which moves the blocks as they are declared. */
