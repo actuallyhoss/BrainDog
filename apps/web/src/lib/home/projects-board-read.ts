@@ -15,6 +15,7 @@
 import { createClient } from '@braindog/client';
 import { money as moneyOf } from 'braindog-render';
 
+import { askEarly, takeEarly } from '../data/early-asks.ts';
 import { readBoot, recordNow } from '../record/boot-live.ts';
 import { homeCurrency } from '../record/api.ts';
 import { REGISTERS } from '../record/held.ts';
@@ -158,26 +159,71 @@ export function projectsFrom(list: string, entries: readonly Row[]): BoardProjec
   return out;
 }
 
+type Client = ReturnType<typeof createClient>;
+
+/** What the board reads of its list that no project row decides: the work, the runs, the leads, the asks, the services and the money that repeats. */
+type Beside = { openRows: Row[]; movedRows: Row[]; runRows: Row[]; leads: KpiAnswered[]; asksRaw: { about?: unknown; question?: unknown }[]; renewRows: Row[]; recRows: Row[] };
+
+/**
+ * THE BOARD'S READS THAT DO NOT NEED THE PROJECTS' ROWS (12 Nov): the work, the runs, the lead numbers, the asks, what renews and
+ * the money that repeats are found by what the lists declare, so they were asked a round trip after the page, once its
+ * rows were in hand, for nothing in them. The Projects place asks them as its page is asked (`askBoard`), and the board takes
+ * them (`readBoard`).
+ */
+async function readBeside(base: string, list: string, client: Client): Promise<Beside> {
+  await learnAll(base, client);
+  const rows = async (register: string, w: string, opts: { order?: unknown } = {}): Promise<Row[]> => {
+    const got = await client.list({ register, where: where(w) as never, limit: READ, ...(opts.order ? { order: opts.order as never } : {}) }).catch(() => null);
+    return got?.ok ? (got.value.rows as Row[]) : [];
+  };
+  const work = Object.keys(REGISTERS).find((id) => handFor(REGISTERS[id]) !== null && viaOf(REGISTERS[id], list) !== null);
+  const via = work ? viaOf(REGISTERS[work], list) : null;
+  const openWhere = via ? `${via.field} is set${via.done.length > 0 ? `, ${via.state.id} is not ${via.done.join(' or ')}` : ''}` : '';
+  const runs = runsListFor(list);
+  const services = listWith(list, ['renews', 'provider']);
+  const recurring = listWith(list, ['every', 'next_due', 'direction']);
+  const [openRows, movedRows, runRows, leads, asksRaw, renewRows, recRows] = await Promise.all([
+    work && via ? rows(work, openWhere) : Promise.resolve([]),
+    work && via ? rows(work, `${via.field} is set, updated_at after -31d`) : Promise.resolve([]),
+    runs ? rows(runs.list, 'last_seen after -31d', { order: [{ field: 'last_seen', dir: 'desc' }] }) : Promise.resolve([]),
+    readLeads(base).catch(() => [] as KpiAnswered[]),
+    client
+      .call<{ blocks?: { queue?: unknown }[] }>('previewPage', { body: { page: 'project-asks', title: 'Asks', blocks: [{ kind: 'queue', source: 'governance.open', where: `list is ${list}`, limit: 50 }] } })
+      .then((out) => (out.ok && Array.isArray(out.value.blocks?.[0]?.queue) ? (out.value.blocks[0].queue as { about?: unknown; question?: unknown }[]) : []))
+      .catch(() => []),
+    services ? rows(services.list, 'renews after yesterday, renews before +61d') : Promise.resolve([]),
+    recurring ? rows(recurring.list, `${recurring.field} is set`) : Promise.resolve([]),
+  ]);
+  return { openRows, movedRows, runRows, leads, asksRaw, renewRows, recRows };
+}
+
+const beside = (base: string, list: string): string => `${base} board ${list}`;
+
+/** Ask what the board reads beside its projects now, for it to take when its page lands. Held for one first read (`early-asks.ts`). */
+export function askBoard(base: string, list: string): void {
+  askEarly(beside(base, list), () => readBeside(base, list, createClient({ base, ahead: true })));
+}
+
 /** The board for the projects list `list` and the rows its block answered. */
 export async function readBoard(base: string, list: string, entries: readonly Row[]): Promise<Board | null> {
   const client = createClient({ base });
+  const early = takeEarly<Beside>(beside(base, list));
   await learnAll(base, client);
+  /* WHAT IS READ BESIDE THE PROJECTS IS ASKED NOW, unless the place asked it ahead, and the projects' own readings go out
+     with it, so a board opened with nothing ahead still waits one round trip for them all. */
+  const besides = (early ?? Promise.resolve(null)).then((taken) => taken ?? readBeside(base, list, client));
+  void besides.catch(() => undefined);
   const projects = projectsFrom(list, entries);
   if (projects.length === 0) return null;
   const now = recordNow();
   const today = localDay(now);
   const home = homeCurrency();
   const format = (minor: number, currency: string): string => symbolText(moneyOf(minor, currency), home, true);
-  const rows = async (register: string, w: string, opts: { order?: unknown; fields?: string[] } = {}): Promise<Row[]> => {
-    const got = await client.list({ register, where: where(w) as never, limit: READ, ...(opts.order ? { order: opts.order as never } : {}) }).catch(() => null);
-    return got?.ok ? (got.value.rows as Row[]) : [];
-  };
 
   /* ── its work ── */
   const work = Object.keys(REGISTERS).find((id) => handFor(REGISTERS[id]) !== null && viaOf(REGISTERS[id], list) !== null);
   const via = work ? viaOf(REGISTERS[work], list) : null;
   const titleOf = (f: Record<string, unknown>) => text(f[REGISTERS[work ?? '']?.title ?? 'what']);
-  const openWhere = via ? `${via.field} is set${via.done.length > 0 ? `, ${via.state.id} is not ${via.done.join(' or ')}` : ''}` : '';
   /* ── its runs, its services and the money that repeats on it ── */
   const runs = runsListFor(list);
   const services = listWith(list, ['renews', 'provider']);
@@ -201,19 +247,8 @@ export async function readBoard(base: string, list: string, entries: readonly Ro
     });
   };
 
-  const [openRows, movedRows, runRows, leads, asksRaw, renewRows, recRows, feeds] = await Promise.all([
-    work && via ? rows(work, openWhere) : Promise.resolve([]),
-    work && via ? rows(work, `${via.field} is set, updated_at after -31d`) : Promise.resolve([]),
-    runs ? rows(runs.list, 'last_seen after -31d', { order: [{ field: 'last_seen', dir: 'desc' }] }) : Promise.resolve([]),
-    readLeads(base).catch(() => [] as KpiAnswered[]),
-    client
-      .call<{ blocks?: { queue?: unknown }[] }>('previewPage', { body: { page: 'project-asks', title: 'Asks', blocks: [{ kind: 'queue', source: 'governance.open', where: `list is ${list}`, limit: 50 }] } })
-      .then((out) => (out.ok && Array.isArray(out.value.blocks?.[0]?.queue) ? (out.value.blocks[0].queue as { about?: unknown; question?: unknown }[]) : []))
-      .catch(() => []),
-    services ? rows(services.list, 'renews after yesterday, renews before +61d') : Promise.resolve([]),
-    recurring ? rows(recurring.list, `${recurring.field} is set`) : Promise.resolve([]),
-    Promise.all(projects.filter((p) => inPlayOf(p.lane, lanes)).map(feedOf)),
-  ]);
+  const [feeds, ahead] = await Promise.all([Promise.all(projects.filter((p) => inPlayOf(p.lane, lanes)).map(feedOf)), besides]);
+  const { openRows, movedRows, runRows, leads, asksRaw, renewRows, recRows } = ahead;
 
   const input: BoardInput = {
     projects,

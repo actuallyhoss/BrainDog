@@ -96,6 +96,42 @@ function walkAhead(client: Client, base: string, body: Row): void {
 }
 
 /**
+ * THE LISTS A BODY THAT IS ASKED FOR AS A WHOLE (`ask`: Today) LINKS TO, kept per record on this device (12 Nov). Its body names
+ * no lists until the record answers, so the walks of what its blocks link to went out after the answer, a round trip it
+ * drew behind. The last answer's are walked beside the next ask, and the tab's walk (`ref-rows.ts`) is shared, so the
+ * answer then finds them out already. Only list ids, never a row; a list the answer no longer links to is walked for nothing.
+ */
+const WALKED_KEY = 'bd_walked_targets';
+
+function rememberedTargets(base: string): string[] {
+  try {
+    const v = (JSON.parse(globalThis.localStorage?.getItem(WALKED_KEY) ?? '{}') as Record<string, unknown>)[base];
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && /^[a-z][a-z0-9_]*$/u.test(x)).slice(0, 12) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberTargets(base: string, targets: readonly string[]): void {
+  try {
+    const store = globalThis.localStorage;
+    if (!store) return;
+    const all = (JSON.parse(store.getItem(WALKED_KEY) ?? '{}') ?? {}) as Record<string, unknown>;
+    if (JSON.stringify(all[base]) === JSON.stringify(targets)) return;
+    store.setItem(WALKED_KEY, JSON.stringify({ ...all, [base]: targets }));
+  } catch {
+    /* Nothing kept is nothing walked ahead. */
+  }
+}
+
+/** Walk what the last answer linked to, beside the ask. */
+function walkRemembered(client: Client, base: string): void {
+  const asked = new Map<string, Promise<void>>();
+  const schema: SchemaCall = (register) => client.schema(register);
+  for (const target of rememberedTargets(base)) void learn(schema, target, asked).then(() => rowsOf(client, base, target)).catch(() => undefined);
+}
+
+/**
  * WHAT ACCEPTING THE PAGE WOULD DRAW, drawn by the record before anybody accepts it.
  *
  * THE LINES NAMED THE BLOCKS AND NOTHING FILLED THEM. "Shows: Open, Notes" was the whole preview of a page, so what an
@@ -117,6 +153,7 @@ export async function drawnOf(
      blocks read, so their targets are known before the record answers, and the walk the answer then needs is the tab's
      walk already out (`ref-rows.ts`). Only through the browser's own fetch, where the walk is the tab's. */
   if (io === undefined) walkAhead(client, base, body);
+  if (io === undefined && ask) walkRemembered(client, base);
   const out = ask ? await ask(client) : await client.call<{ read_at?: unknown; blocks?: unknown }>('previewPage', { body });
   if (!out.ok) {
     if (!('refusal' in out)) return { from: 'none' };
@@ -126,5 +163,7 @@ export async function drawnOf(
   const said = typeof out.value.read_at === 'string' ? Date.parse(out.value.read_at) : Number.NaN;
   const now = Number.isFinite(said) ? said : Date.now();
   const [live = []] = await liveOf(client, [blocks], now, new Map(), { base, ...(io ? { io } : {}) });
+  /* AFTER THE LISTS ARE LEARNT, which is what says what they link to. */
+  if (io === undefined && ask) rememberTargets(base, [...new Set(bodyLists({ blocks }).flatMap(targetsOf))]);
   return { from: 'live', now, blocks: live };
 }

@@ -395,6 +395,9 @@
   const toldBack = (base: string): void => {
     void import('$lib/record/told-live.ts')
       .then(async (m) => {
+        /* AFTER THE SCREEN'S OWN READS, NEVER BESIDE THEM (12 Nov): asked on every move, its two reads joined the page's first
+           wave, and Needs you and the project pages came back with them. What was heard stays drawn meanwhile (`told-now`). */
+        await rested();
         const back = await m.readToldBack(base);
         if (back === null) return;
         heardTold(back);
