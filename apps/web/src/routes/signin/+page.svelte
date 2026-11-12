@@ -1081,6 +1081,11 @@
     line-height: var(--lead-meta);
   }
 
+  /* The refusal under the code field takes the same 12 the button does. */
+  .form :global(.notice) {
+    margin-block-start: var(--sp-3);
+  }
+
   .form :global(.btn) {
     margin-block-start: var(--sp-3);
   }
