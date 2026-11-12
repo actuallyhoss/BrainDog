@@ -119,6 +119,7 @@
   import { quick } from '$lib/money/quick.svelte.ts';
   import { words as quickWords } from '$lib/money/quick.ts';
   import SetupGate from '$lib/money/SetupGate.svelte';
+  import { seedMoney } from '$lib/money/kept.ts';
   import { looks as moneyLooks } from '$lib/money/looks.svelte.ts';
   import { masonry } from '$lib/money/masonry.ts';
   import { headsSection, SETUP_KEY, type SetupFacts } from '$lib/money/setup.ts';
@@ -779,6 +780,10 @@
   let booksIn = $state<string | null>(null);
   const landReady = $derived(quick.settled === apiBase() && moneyLooks.read && (!booksWanted || booksIn === visit));
   const landing = $derived(mode === 'page' && moneyPage && !!live && !showSource && !arranging && landOpen !== visit && landCap !== visit);
+  /* WHAT IT WAITS FOR IS KEPT BESIDE THE PAGE (`money/kept.ts`) AND TAKEN ON OPEN, so a visit after the first lands with the page. */
+  $effect(() => {
+    if (mode === 'page') void seedMoney(untrack(() => apiBase()));
+  });
   $effect(() => {
     if (mode === 'page' && moneyPage && live) moneyLooks.ask();
   });

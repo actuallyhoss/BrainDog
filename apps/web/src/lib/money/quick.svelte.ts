@@ -26,6 +26,8 @@ class Quick {
   base = $state<string | null>(null);
   /** The record whose ledger has been looked for and answered, finding none included: what a page waits on before it lands. */
   settled = $state<string | null>(null);
+  /** The record the ledger was last asked for fresh, so a kept one (`kept.ts`) is still asked behind. Not state: nothing draws it. */
+  asked: string | null = null;
   /** How many hosts are mounted. The first one draws the sheet and answers the key. */
   #hosts = $state<number[]>([]);
   #next = 0;
