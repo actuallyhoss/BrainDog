@@ -212,10 +212,14 @@
     inset: 0;
   }
 
+  /* Shrinks and ellipsizes: a long "Last confirmed 28 Sep, out of date" ran past a narrow card's edge. */
   .cards-when {
-    flex: none;
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 

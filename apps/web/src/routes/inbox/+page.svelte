@@ -274,7 +274,10 @@
     void retally();
     void import('./series.ts')
       .then((m) => m.readPatterns(apiBase()))
-      .then((read) => (patterns = read));
+      .then((read) => {
+        patterns = read;
+        patternsIn = true;
+      });
     void import('./series.ts')
       .then((m) => m.readArrivals(apiBase(), Date.now(), SOURCE_DAYS))
       .then((read) => (arrivals = read));
@@ -341,6 +344,27 @@
   const whoFiled = $derived(whoFiledOf(tally));
   const figure = $derived(figureOf(tally));
   let patterns = $state<Pattern[]>([]);
+  /* THE ROOM THE PATTERNS TILE TOOK LAST TIME: it lands above What waits, so until the read is back that room is held and
+     the list is not pushed down by it. Kept for the tab; storage that is off holds nothing. */
+  let patternsIn = $state(false);
+  const PATTERNS_ROOM = 'inbox patterns room';
+  const patternsRoom = ((): number => {
+    try {
+      return Number(sessionStorage.getItem(PATTERNS_ROOM)) || 0;
+    } catch {
+      return 0;
+    }
+  })();
+  $effect(() => {
+    if (!patternsIn) return;
+    const h = patterns.length > 0 ? Math.round(document.querySelector('[data-inbox-patterns]')?.getBoundingClientRect().height ?? 0) : 0;
+    try {
+      if (h > 0) sessionStorage.setItem(PATTERNS_ROOM, String(h));
+      else sessionStorage.removeItem(PATTERNS_ROOM);
+    } catch {
+      /* the tile then lands as it did */
+    }
+  });
   /* NOTHING HAS EVER COME IN, by the record's own tally, so the board is the one tile that says so. A pattern waiting
      on Decide is something to show, so it keeps the board. */
   const never = $derived(patterns.length === 0 && nothingEver(tally, ways, INBOX.length));
@@ -833,10 +857,11 @@
         {#if view !== 'waiting'}
           {@render settledSeries()}
         {:else}
+          {#if !patternsIn && patternsRoom > 0}<div style:min-block-size="{patternsRoom}px" aria-hidden="true"></div>{/if}
           {#if patterns.length > 0}
             <!-- PATTERNS FIRST: one accepted pattern files every arrival like its samples from then on, so it is worth
                  more than any one arrival below it. Each opens its question on Decide, where it is accepted or not. -->
-            <Tile class="section" data-surface="tile" title={words.patterns} count={patterns.length || undefined}>
+            <Tile class="section" data-surface="tile" data-inbox-patterns="" title={words.patterns} count={patterns.length || undefined}>
               <div class="section-body">
                 <ul class="ledger ledger-lead">
                   {#each patterns as p (p.id)}
@@ -1749,9 +1774,12 @@
     position: absolute;
     inline-size: 1px;
     block-size: 1px;
+    /* The tile head's 28px floor and its wrapping made this 1px box a clipped 28px one holding three lines. */
+    min-block-size: 0;
     margin: 0;
     padding: 0;
     overflow: hidden;
+    flex-wrap: nowrap;
     clip-path: inset(50%);
     white-space: nowrap;
   }

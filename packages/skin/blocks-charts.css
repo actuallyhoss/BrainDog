@@ -1619,7 +1619,9 @@
   }
 
   /* `--forecast-gutter` is the room the value axis stands in at the chart's end edge. */
-  .forecast {
+  /* `.prop` (kinds/proportional.css) also sets a gap and can load after this sheet, so the pair outranks it: the horizon
+     pills stood 4px over the figures. */
+  .prop.forecast {
     --forecast-gutter: 10ch;
     /* How far above the figure the head's row is centred, for the tools placed in it. Measured against `.block-bar`. */
     --forecast-head: 46px;
