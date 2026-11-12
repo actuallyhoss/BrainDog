@@ -33,6 +33,30 @@
   let pressed = $state.raw<Card | null>(null);
   let open = $state(false);
 
+  /* THE ROOM IT TOOK LAST TIME, kept for the tab: the strip lands after the page has drawn the tiles under it, so without
+     its room held they were pushed down when it did. Gone once the read is back, whatever it found. */
+  const heldKey = $derived(`vs-h ${on}`);
+  let loaded = $state(false);
+  const room = $derived.by(() => {
+    if (loaded) return 0;
+    try {
+      return Number(sessionStorage.getItem(heldKey)) || 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  $effect(() => {
+    if (!loaded || !box) return;
+    const h = cards.length > 0 ? Math.round(box.getBoundingClientRect().height) : 0;
+    try {
+      if (h > 0) sessionStorage.setItem(heldKey, String(h));
+      else sessionStorage.removeItem(heldKey);
+    } catch {
+      /* storage may be off; the strip then lands as it did */
+    }
+  });
+
   const me = $derived(String(page.data.me?.person ?? '') || null);
   const names = $derived(new Map(Object.entries((page.data.names ?? {}) as Record<string, string>)));
   const now = $derived(Date.now());
@@ -52,6 +76,7 @@
   async function read() {
     const got = await cardsFor(apiBase(), on);
     cards = got.ok ? got.value : [];
+    loaded = true;
   }
 
   /* A NEW THING IS READ AFRESH. */
@@ -98,7 +123,7 @@
   </ul>
 {/snippet}
 
-<div class="vs" bind:this={box} hidden={cards.length === 0 ? true : undefined}>
+<div class="vs" bind:this={box} hidden={cards.length === 0 && room === 0 ? true : undefined} style:min-block-size={room > 0 ? `${room}px` : undefined}>
   {#if cards.length > 0}
     {#if tile}
       <Tile icon="doc" title={words.heading} count={cards.length > 1 ? cards.length : undefined}>{@render strip()}</Tile>
