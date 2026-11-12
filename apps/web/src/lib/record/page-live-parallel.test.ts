@@ -139,3 +139,27 @@ test('ANSWERS THAT LAND OUT OF ORDER DRAW THE SAME PAGE, in the order the page n
   if (shuffled.from !== 'live') return;
   assert.deepEqual(shuffled.page.blocks.map((b) => b.heading), ['Kites', 'Ponds', 'Reeds']);
 });
+
+/* A LINKED LIST NO BLOCK DRAWS waited a round trip for its declaration and another for its rows. */
+test("A LINKED LIST'S ROWS ARE ASKED FOR BESIDE ITS DECLARATION, and its rows are still named by it", async () => {
+  const log: string[] = [];
+  const page = { page: 'kites', title: 'Kites', blocks: [PAGE.blocks[0]] };
+  const io = (async (url: string | URL | Request) => {
+    const u = new URL(String(url));
+    const method = u.pathname.split('/').pop() ?? '';
+    const register = u.searchParams.get('register') ?? '';
+    log.push(`ask ${method} ${register}`.trim());
+    await tick();
+    log.push(`answer ${method} ${register}`.trim());
+    if (method === 'page') return json(200, { ok: true, value: page });
+    if (method === 'schema') return json(200, { ok: true, value: SCHEMAS[register] });
+    if (method === 'list') return json(200, { ok: true, value: { rows: register === 'ponds' ? PONDS : KITES, cursor: null } });
+    return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no such method.' } });
+  }) as Fetch;
+  const got = await pageReader(BASE, io, () => AT).read('kites');
+  assert.equal(got.from, 'live');
+  assert.ok(log.indexOf('ask list ponds') !== -1 && log.indexOf('ask schema ponds') !== -1, log.join(', '));
+  assert.ok(log.indexOf('ask list ponds') < log.indexOf('answer schema ponds'), `the walk waited for the declaration: ${log.join(', ')}`);
+  if (got.from !== 'live') return;
+  assert.match(got.page.blocks[0]!.rows.flatMap((r) => r.cells).join(' | '), /Mill pond/u);
+});

@@ -2892,9 +2892,10 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
   }
   const asked = new Map<string, Promise<void>>();
   async function mapOf(register: string): Promise<RefMap | null> {
-    /* A use case's own list is declared before it is walked, or its rows have no title to be named by. */
-    await learn(client.schema, register, asked);
-    const rows = await rowsOf(register);
+    /* A use case's own list is declared before its rows are named, or they have no title to be named by. THE WALK GOES
+       OUT BESIDE THE ASK, since it reads nothing of the declaration: one after the other, a page's linked lists waited a
+       round trip for their declarations and another for their rows. */
+    const [, rows] = await Promise.all([learn(client.schema, register, asked), rowsOf(register)]);
     if (!rows) return null;
     const kept = maps.get(register);
     if (kept && kept.rows === rows) return kept.map;
