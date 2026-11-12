@@ -2630,6 +2630,17 @@
     position: relative;
   }
 
+  /* A ROW THE FRAME CANNOT HOLD WHOLE IS NOT DRAWN (`fit.ts` marks it `data-cut`): the flex above beat the board's own
+     `display: none`, so the cut rows stood under the first and the frame sliced one, with its "N more" under the cut. */
+  .body[data-board] :global(.board:not([data-fit-measure]) .block-slot[data-board-key='numbers'][data-size='full'] .kpi-row[data-cut]) {
+    display: none;
+  }
+
+  /* ITS OWN DOOR, "All numbers", IS AT ITS FOOT, so the count the frame writes beside it says the same twice. */
+  .body[data-board] :global(.block-slot[data-board-key='numbers'][data-size='full'] a[data-fit-more]) {
+    display: none;
+  }
+
   .body[data-board] :global(.block-slot[data-board-key='numbers'][data-size='full'] .kpi-menu) {
     position: absolute;
     inset-block-start: 0;

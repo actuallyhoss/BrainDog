@@ -192,6 +192,9 @@ export function fitBoard(board: HTMLElement): Animation[] {
     /* A FRAME OF NO ROWS (a figure's bars) HAS NOTHING TO CUT, so its overflow was clipped at the frame's foot, the last
        bar on the edge with no padding (Cash by book). It is let as tall as its content, padding included, as the first line is. */
     if (rows.length === 0 && !board.closest('[data-editing]') && frame.scrollHeight > Math.ceil(box.height) + 1) grows.set(frame, frame.scrollHeight);
+    /* A FRAME THAT CUTS NO ROW BUT HAS ITS FOOT'S DOOR SLICED ("All numbers" at 1280) IS LET AS TALL AS ITS CONTENT, as a
+       frame of no rows is: a line is never cut in half. */
+    else if (!board.closest('[data-editing]') && frame.querySelector('a.kb-all') !== null && !rects.some((r, i) => !line.includes(i) && r.height > 0 && r.bottom > cutAt + 1) && frame.scrollHeight > Math.ceil(box.height) + 1) grows.set(frame, frame.scrollHeight);
     const cutOf = (i: number): boolean => !line.includes(i) && rects[i]!.height > 0 && rects[i]!.bottom > cutAt + 1;
     rows.forEach((row, i) => cutOf(i) && cut.add(row));
     /* A FOOT THAT COUNTS WHAT IT LEAVES OUT COUNTS WHAT THE FRAME CUT TOO (live check of 30 October, 5): Needs you held 4,
