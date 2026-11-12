@@ -9,7 +9,7 @@
  * run, since it is the list of runs' own (`session.ts`) and a module imports nothing of the kernel at run time.
  */
 
-import { refused } from '@braindog/ports';
+import { refused, type Refusal } from '@braindog/ports';
 import type { Schema } from '@braindog/where';
 import { evaluate } from '@braindog/where';
 
@@ -109,47 +109,16 @@ const runsAmong = (uses: readonly { actor: string; ts: string }[], since: string
  */
 const isRun = (actor: string, SESSION_PREFIX: string): boolean => actor.startsWith(SESSION_PREFIX) && /^[1-9][0-9]*$/u.test(actor.slice(SESSION_PREFIX.length));
 
-/**
- * What one project runs on: its keys, tools, skills and scheduled actions, then the ones that apply everywhere, each
- * group by name.
- *
- * NEARER WINS AS `inScope` DECIDES IT, the one read `context` and `inherit:` are built on, so a project's own skill hides
- * the global one of the same name here exactly as it does for an agent working in that project, and a retired row is
- * left out as a finished one is there.
- *
- * NO ROW OF A LIST IS HANDED BACK AS IT IS: each answer row is built from the fields `RUNS_ON` names, so the grant a
- * key's row points at is used to ask who opened it and goes no further, and nothing else of the key's row travels.
- */
-function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
-  const { predicateOf, typesOf, markOf, agentOf, SPOKEN, SESSION, SESSION_PREFIX } = kit;
-  if (!deps.inScope || !deps.scopeOf)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what a project runs on onto a page yet.', at: 'source' }) };
-  const about = typeof block.about === 'string' ? SPOKEN.exec(block.about) : null;
-  if (!about)
-    return {
-      ...base,
-      refusals: also({ code: 'REQUIRED_MISSING', fix: 'runs_on reads what one project runs on, and about: names that project by its row, such as things#1.', at: 'about' }),
-    };
-  const projects = about[1]!;
-  const spoken = String(block.about);
-  if (block.order?.length)
-    return {
-      ...base,
-      refusals: also({ code: 'DECLARATION_INVALID', fix: "runs_on comes the project's own first, then what applies everywhere, each by name, so it takes no order:.", at: 'order' }),
-    };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(RUNS_ON.fields, f));
-  if (unknown.length)
-    return {
-      ...base,
-      refusals: also({ code: 'FIELD_UNKNOWN', fix: `What a project runs on has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(RUNS_ON.fields) }),
-    };
-  const said = predicateOf(block.where, RUNS_ON, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+/** A project and everything it runs on, in the order a block draws it, or the refusal that stopped the read (`null`: a read that failed without one). */
+type Gathered = { home: Entry; all: Entry[] } | { refusal: Refusal | null };
 
-  const found = deps.list({ register: projects, where: { field: 'seq', is: Number(about[2]) }, limit: 1 });
-  if (!found.ok) return { ...base, refusals: refused(found) ? also(found.refusal) : also() };
+/** Every key, tool, skill and scheduled action of the project `projects#seq`, its own first and then what applies everywhere. */
+function gathered(deps: PageDeps, kit: SourceKit, projects: string, seq: number, spoken: string): Gathered {
+  const { agentOf, SESSION, SESSION_PREFIX } = kit;
+  const found = deps.list({ register: projects, where: { field: 'seq', is: seq }, limit: 1 });
+  if (!found.ok) return { refusal: refused(found) ? found.refusal : null };
   const home = found.value.rows[0];
-  if (!home) return { ...base, refusals: also({ code: 'VALUE_MALFORMED', fix: `${spoken} is not a row of ${projects}, so there is no project to read.`, at: 'about' }) };
+  if (!home) return { refusal: { code: 'VALUE_MALFORMED', fix: `${spoken} is not a row of ${projects}, so there is no project to read.`, at: 'about' } };
 
   const scalar = (v: Json | undefined): string | null => (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : null);
   const byName = (a: Entry, b: Entry): number => {
@@ -186,9 +155,9 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
   const everywhere: Entry[] = [];
   for (const list of RUNS_ON_LISTS) {
     const schema = deps.schemaOf(list.register);
-    if (!schema || deps.scopeOf(list.register)?.to !== projects) continue;
-    const read = deps.inScope(list.register, home.id, { open: true, limit: RUNS_ON_EACH });
-    if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
+    if (!schema || deps.scopeOf!(list.register)?.to !== projects) continue;
+    const read = deps.inScope!(list.register, home.id, { open: true, limit: RUNS_ON_EACH });
+    if (!read.ok) return { refusal: refused(read) ? read.refusal : null };
     const title = deps.titleOf(list.register) ?? '';
     const secret = Object.keys(schema.fields).find((f) => schema.fields[f]?.type === 'secret');
     const shaped = (r: Entry, scope: 'project' | 'global'): Entry => {
@@ -228,7 +197,58 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
       fields: { kind: 'action', name: a.ingest, scope, state: a.state, detail: a.next, used_by: null, used_agent: null, used_at: null, used_runs: 0, used_agents: null, spoken: a.ingest, quiet: scope === 'global' ? 'global' : null, ...monthOf(a) },
     });
   }
-  const all = [...own, ...acts.project.sort(byName), ...everywhere, ...acts.global.sort(byName)];
+  return { home, all: [...own, ...acts.project.sort(byName), ...everywhere, ...acts.global.sort(byName)] };
+}
+
+/**
+ * What one project runs on: its keys, tools, skills and scheduled actions, then the ones that apply everywhere, each
+ * group by name.
+ *
+ * NEARER WINS AS `inScope` DECIDES IT, the one read `context` and `inherit:` are built on, so a project's own skill hides
+ * the global one of the same name here exactly as it does for an agent working in that project, and a retired row is
+ * left out as a finished one is there.
+ *
+ * NO ROW OF A LIST IS HANDED BACK AS IT IS: each answer row is built from the fields `RUNS_ON` names, so the grant a
+ * key's row points at is used to ask who opened it and goes no further, and nothing else of the key's row travels.
+ */
+function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
+  const { predicateOf, typesOf, markOf, SPOKEN } = kit;
+  if (!deps.inScope || !deps.scopeOf)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog does not read what a project runs on onto a page yet.', at: 'source' }) };
+  const about = typeof block.about === 'string' ? SPOKEN.exec(block.about) : null;
+  if (!about)
+    return {
+      ...base,
+      refusals: also({ code: 'REQUIRED_MISSING', fix: 'runs_on reads what one project runs on, and about: names that project by its row, such as things#1.', at: 'about' }),
+    };
+  const projects = about[1]!;
+  const spoken = String(block.about);
+  if (block.order?.length)
+    return {
+      ...base,
+      refusals: also({ code: 'DECLARATION_INVALID', fix: "runs_on comes the project's own first, then what applies everywhere, each by name, so it takes no order:.", at: 'order' }),
+    };
+  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(RUNS_ON.fields, f));
+  if (unknown.length)
+    return {
+      ...base,
+      refusals: also({ code: 'FIELD_UNKNOWN', fix: `What a project runs on has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(RUNS_ON.fields) }),
+    };
+  const said = predicateOf(block.where, RUNS_ON, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+
+  /* EVERYTHING THE PROJECT RUNS ON IS GATHERED ONCE FOR A READ (`ctx.walks`), and each block keeps its own rows of it. A
+     project's page draws four of these blocks, keys, tools, skills and what applies everywhere, and each gathered every
+     kind again with who used each: on a lived-in record that was most of the page's time. The memo hands on what the
+     gathering read, so a block that took it is still held by those lists. */
+  const gather = (): Gathered => gathered(deps, kit, projects, Number(about[2]), spoken);
+  const got = deps.ctx.walks ? deps.ctx.walks.once(`runs_on ${spoken}`, gather) : gather();
+  if ('refusal' in got) return { ...base, refusals: got.refusal === null ? also() : also(got.refusal) };
+  const home = got.home;
+  /* A COPY, since a block's rows are its own to shape after this. */
+  const all = structuredClone(got.all);
+
+  const scalar = (v: Json | undefined): string | null => (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : null);
   /* WITH THE ROW, because `seq is 3` is a sentence the grammar reads over any schema and answers from the row's column,
      and `evaluate` throws rather than guess when it is handed only the fields. */
   const kept = all.filter((r) => evaluate(said.predicate, r.fields, RUNS_ON, r));
