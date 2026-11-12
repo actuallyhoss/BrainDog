@@ -41,12 +41,16 @@ export const queueWords = {
   hardTail: HARD_TAIL,
   /** The same care as a line of its own under a row of answers, where the filled one is the hard one. */
   hardLine: 'Can’t be undone easily',
+  /** The same care said of answers whose names are not plain verbs, so no name is bent into a sentence. */
+  hardThese: 'These answers can’t easily be undone',
   /** And naming the answers it is said of, where those are not the filled one alone: "Retiring can’t easily be undone"
    *  (T15), each answer said as a doing, so the line is a sentence and not a button's name stuck to a fragment. */
   hardOf: (names: string) => `${names} can’t easily be undone`,
   /** One answer's name as a doing: "Retire it" → "Retiring", "Move to the apex" → "Moving to the apex". */
-  doing: (label: string): string => {
+  doing: (label: string): string | null => {
     const [verb = '', ...rest] = label.trim().split(/\s+/u);
+    /* A label that is no plain command ("Yes, I paid the card") has no doing; the caller says it another way. */
+    if (!/^[A-Za-z]{2,}$/u.test(verb) || /^(?:yes|no|not|ok|okay|sure|i|we|it|the|a|an|my|this|that)$/iu.test(verb) || rest.length > 3 || /[,.?!]/u.test(rest.join(' '))) return null;
     const lower = verb.toLowerCase();
     const ing = /ie$/u.test(lower) ? `${verb.slice(0, -2)}ying` : /[^e]e$/u.test(lower) ? `${verb.slice(0, -1)}ing` : `${verb}ing`;
     const tail = rest.join(' ');

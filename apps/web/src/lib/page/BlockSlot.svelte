@@ -952,6 +952,7 @@
     {#await partLanded.part ?? import('./ProjectPart.svelte').then((m) => m.default) then ProjectPart}<ProjectPart {hold} {parts} />{/await}
   {/if}
 {:else if desk && !arranging && !block.refusals.length}
+  {@const runsTo = desk.kind === 'working' && block.total > block.shown ? openHref(block) : null}
   <!-- THE DESK'S OWN TILE, its component fetched as the tile is drawn, so a page that is not Today carries none of it. -->
   <div class="desk-part" data-desk={desk.kind}>
     {#if desk.kind === 'late'}
@@ -964,7 +965,7 @@
         <LateNow lines={desk.lines} heading={desk.heading} more={desk.more} most={phone.current ? Math.min(3, desk.most) : desk.most} writes={(list) => may(route.data as unknown as Shell, 'write', list)} onfinished={() => void writes?.reread()} />
       {/await}
     {:else if desk.kind === 'working'}
-      {#await landed.working ?? import('$lib/home/WorkingNow.svelte').then((m) => m.default) then WorkingNow}<WorkingNow rows={desk.rows} />{/await}
+      {#await landed.working ?? import('$lib/home/WorkingNow.svelte').then((m) => m.default) then WorkingNow}<WorkingNow rows={desk.rows} all={runsTo && source ? { href: inApp(runsTo), said: copy.allIn(block.total, source) } : null} />{/await}
     {:else if desk.kind === 'projects' && deskProjects && block.register}
       {#await import('$lib/home/ProjectCards.svelte') then { default: ProjectCards }}
         <ProjectCards cards={deskProjects.cards} more={deskProjects.more} list={block.register} name={desk.name} working={workingNow()} />
@@ -1199,7 +1200,7 @@
      are days, AND IT COUNTS THEM OVER THE DAYS THE RECORD WALKED (`walk.reach`), which since a walk opens on a shorter
      length than it runs to is further than the length it opened on: "of 1,825 over 90 days" counted five years under a
      three-month label. -->
-{#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown && !folded && !homeFold}
+{#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && desk?.kind !== 'working' && block.total > block.shown && !folded && !homeFold}
   {@const to = openHref(block)}
   {@const door = to && source ? to : block.register && block.register !== 'deadlines' ? null : doorOf(block)}
   {#if lateSlice}

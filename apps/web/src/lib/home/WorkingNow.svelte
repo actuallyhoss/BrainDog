@@ -31,7 +31,8 @@
   import { afterFirst } from '$lib/data/first-drawn.ts';
   import { THREADS_READ, earlyRuns, takeWorking, workingHeld } from './working-early.ts';
 
-  let { rows }: { rows: readonly WorkingRow[] } = $props();
+  /* `all` is the list's door, said as the tile's last line so it sits inside the tile and not in the gap under it. */
+  let { rows, all = null }: { rows: readonly WorkingRow[]; all?: { href: string; said: string } | null } = $props();
 
   const words = {
     title: 'Working now',
@@ -159,6 +160,7 @@
     </ol>
     {#if drawn.length > shown.length}<p class="r-more">{words.more(drawn.length - shown.length)}</p>{/if}
     {#each folds as f (f)}<p class="r-more">{f}</p>{/each}
+    {#if all}<a class="r-all tap" href={all.href}>{all.said}<Icon name="arrow" size="s" /></a>{/if}
   </Tile>
 {/if}
 
@@ -338,6 +340,22 @@
       margin-block: -8px;
       margin-inline-end: -8px;
     }
+  }
+
+  .r-all {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--sp-1);
+    margin-block-start: var(--sp-2);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
+  }
+
+  .r-all:hover {
+    color: var(--ink);
   }
 
   .r-more {
