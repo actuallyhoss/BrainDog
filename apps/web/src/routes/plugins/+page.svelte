@@ -182,9 +182,16 @@
      its place and the shelves are not drawn, so they arrive into empty room and nothing moves. */
   let recordRead = $state(false);
   /* NOR DO THEY DRAW BEFORE THE COUNTS HAVE ANSWERED: From BrainDog is the most held first, so a count landing after the
-     shelves re-sorted it under the reader. Answered or none, either is an answer. */
+     shelves re-sorted it under the reader. Answered or none, either is an answer, and the shelves wait no longer than
+     `COUNTS_GRACE_MS` for them once the rest is in, the counts being a file beside the store and not the record. */
   let countsRead = $state(false);
+  const COUNTS_GRACE_MS = 300;
   const settled = $derived((kennel !== null || kennelRefused !== null) && recordRead && countsRead);
+  $effect(() => {
+    if (countsRead || (kennel === null && kennelRefused === null) || !recordRead) return;
+    const t = setTimeout(() => (countsRead = true), COUNTS_GRACE_MS);
+    return () => clearTimeout(t);
+  });
   function readStore(): void {
     kennelRefused = null;
     void readHostCatalogue(fetch).then((got) => {
