@@ -2860,6 +2860,22 @@ export function earlyPage(base: string, slug: string, now: number = Date.now()):
 }
 
 /** A page reader for one tab. `base` is the page's own origin; the app never holds a token. */
+/**
+ * The lists a project's shape reads, as the record names them in its answer (`project-shape.ts` in the record): the
+ * project's own, its work's, its runs', what it runs on, its readings and repeating money, and each list that points at it.
+ */
+export function shapeLists(shape: unknown): string[] {
+  if (!isObject(shape) || typeof shape.register !== 'string') return [];
+  const lists = new Set<string>([shape.register]);
+  for (const part of ['work', 'runs', 'services', 'readings', 'recurring'] as const) {
+    const named = shape[part];
+    if (isObject(named) && typeof named.list === 'string') lists.add(named.list);
+  }
+  const from = isObject(shape.links) && Array.isArray(shape.links.from) ? shape.links.from : [];
+  for (const group of from) if (isObject(group) && typeof group.register === 'string') lists.add(group.register);
+  return [...lists].filter((list) => /^[a-z][a-z0-9_]*$/u.test(list));
+}
+
 export function pageReader(base: string, io?: Fetch, clock: () => number = () => Date.now()): PageReader {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   /* EACH MAP BY THE WALK IT WAS MADE FROM, so a walk the tab asked again makes it again. */
@@ -2966,6 +2982,11 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         const by = b.refusals?.length || partsNamed(b) ? null : groupedBy(b);
         if (by) learning.add(by.register);
       }
+      /* A PROJECT'S SHAPE NAMES LISTS OF ITS OWN (`shapeLists`): the project's, its work's, its runs' and each list that
+         points at it. Its parts asked what those declare once the page had drawn, and then walked what they link to, two
+         round trips after the page. They are asked here with the blocks' lists, so the parts find them learnt. */
+      const shaped = shapeLists((out.value as { shape?: unknown }).shape);
+      for (const register of shaped) learning.add(register);
       await Promise.all([...learning].map((register) => learn(client.schema, register, asked)));
       const wanted = new Set<string>();
       for (const b of blocks) {
@@ -2991,6 +3012,9 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       /* THE LINKED LISTS ARE WALKED TOGETHER, one step deep as before (a target's own targets are not walked), and kept
          in the order they were wanted. A list this reader may not walk is left out alone. */
       const mapping = Promise.all([...wanted].map(async (target) => [target, await mapOf(target)] as const));
+      /* AND WHAT THE SHAPE'S LISTS LINK TO IS WALKED BESIDE THEM, never waited on: the tab keeps each walk, and the parts
+         take it from there. A reader handed a fetch of its own keeps no walk for anyone else, and walks none. */
+      if (!io) for (const register of shaped) for (const target of targetsOf(register)) if (!wanted.has(target)) void rowsOf(target).catch(() => null);
       /* THE PAGE IS THE ANSWER, AND THE ONE DERIVED KEY IS DERIVED FROM THE ANSWER. `identity` names
          the row a page is ABOUT, and it is what the page and its rail row wear a project's colour
          from; the record does not send it, but an expanded page sends `param`: the register, the
