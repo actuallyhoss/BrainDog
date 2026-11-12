@@ -2469,6 +2469,11 @@ export function blockOf(
      ungrouped rather than under a heading of something else. A record on an older build answered the names beside the
      rows, `groups`, which is read the same way when no row says its own. */
   const cardGroups = kind === 'cards' ? groupsOf(got, groupNames) : kind === 'table' ? tableGroupsOf(got) : null;
+  /* THE NAME THE RECORD GIVES THE CARDS IN NO GROUP, off the first row that says it (`value: ''`, "No role"). */
+  const noGroup =
+    kind === 'cards'
+      ? got.map((r) => r.group).find((g): g is { value: string; name: string } => isObject(g) && g.value === '' && typeof g.name === 'string' && g.name.trim() !== '')?.name.trim()
+      : undefined;
   /* A TABLE'S ROWS SAY THEIR GROUP THEMSELVES, `group` on each drawn row, which the table reads (`tableLines` in the
      renderer): a page slices a folded table's rows and marks the ones that arrived, and a name on the row goes where
      the row goes, where a list beside the rows would have to be cut the same way at every step. */
@@ -2516,6 +2521,7 @@ export function blockOf(
     ...(outsideDays === undefined ? {} : { outsideDays }),
     names: namesOf(refs),
     ...(cardGroups ? { groups: cardGroups } : {}),
+    ...(noGroup ? { noGroup } : {}),
     ...(bylines ? { bylines } : {}),
     ...(inherited === undefined ? {} : { inherited }),
     /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 15 minutes (`WORKING_MS`), read off its

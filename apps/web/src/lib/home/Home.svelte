@@ -1913,7 +1913,7 @@
 {#snippet part(key: string, body: import('svelte').Snippet)}
   {@const cell = boardModel.placeOf(key)}
   {#if cell}
-    <div class="board-part" data-board-key={key} data-size={cell.size} style="grid-area:{cell.area}">
+    <div class="board-part" data-board-key={key} data-size={cell.size} data-foot={cell.foot ? '' : undefined} style="grid-area:{cell.area}">
       {@render body()}
       {#if boardModel.editing && EditCover}<EditCover model={boardModel} {key} />{/if}
     </div>
@@ -2618,6 +2618,9 @@
   .body[data-board] :global(.block-slot[data-board-key='numbers'][data-size='full'] .kpi-row) {
     display: flex;
     flex-direction: column;
+    /* THE WORDS START AT THE TILE'S TEXT EDGE: the row's `align-items: center` set each block of words in the middle of the
+       column, so one stood 100px in and the next at another distance by how long its words were. */
+    align-items: stretch;
     gap: 2px;
     min-block-size: 0;
     padding-block: 0;

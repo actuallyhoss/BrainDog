@@ -1438,7 +1438,22 @@ function groupedSegments(block: BlockResult, kinds?: Readonly<Record<string, Kin
   const gone = new Set(block.entries.flatMap((e, i) => (mergedAway(e.fields, decl) ? [i] : [])));
   /* A GROUP BY A KIND OF ROW HEADS A KIND OF ONE TOO: an organisation with one person in it needs no heading, but a
      lone cash account under no heading read as one more bank account. */
-  const runs = groupCards(keys, block.fold ?? false, gone, field?.type === 'enum');
+  const found = groupCards(keys, block.fold ?? false, gone, field?.type === 'enum');
+  /* THE CARDS IN NO GROUP ARE ONE RUN, DRAWN LAST UNDER THE RECORD'S NAME FOR THEM ("No role"): left where the record put
+     them they were unheaded grids between the headed groups, which read as part of the group above. A run of them with
+     no name to head it stays where it stood. A card whose group is one of one stays among the cards around it. */
+  const none = block.noGroup?.trim() && found.some((r) => r.kind === 'group') ? found.flatMap((r) => (r.kind === 'loose' ? r.rows.filter((i) => keys[i] === null) : [])) : [];
+  const runs: CardRun[] =
+    none.length === 0
+      ? found
+      : [
+          ...found.flatMap((r): CardRun[] => {
+            if (r.kind === 'group') return [r];
+            const rows = r.rows.filter((i) => keys[i] !== null);
+            return rows.length > 0 ? [{ kind: 'loose', rows }] : [];
+          }),
+          { kind: 'group', key: '', name: block.noGroup!.trim(), ref: null, rows: none, total: none.length },
+        ];
   /* EVERY CARD MERGED AWAY draws nothing, so the block says its `empty:` (`drawn`) rather than an empty grid. */
   if (runs.length === 0) return [];
   if (!runs.some((r) => r.kind === 'group')) return gone.size > 0 ? drawSegments(only(block, runs.flatMap((r) => r.rows)), kinds) : null;

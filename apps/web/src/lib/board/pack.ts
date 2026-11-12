@@ -146,6 +146,20 @@ export function filled(packed: Packed, cols: number, short: ReadonlySet<string> 
   return out;
 }
 
+/**
+ * THE KEYS OF THE FRAMES THAT END WHERE A WIDER ONE BEGINS, from the areas as drawn (`areaOf`): the frames beside one end
+ * on that line too, so the shorter of two columns left a hole above the wide tile that follows. `Board.svelte` stretches
+ * them to the line, their content at their top.
+ */
+export function feet(places: Iterable<{ key: string; area: string }>): Set<string> {
+  const read = (area: string) => {
+    const [r0 = 0, c0 = 0, r1 = 0, c1 = 0] = area.split('/').map((n) => parseInt(n, 10) || 0);
+    return { r0, c0, r1, c1 };
+  };
+  const all = [...places].map((p) => ({ key: p.key, ...read(p.area) }));
+  return new Set(all.filter((a) => all.some((b) => b.r0 === a.r1 && b.c0 <= a.c0 && b.c1 >= a.c1 && b.c1 - b.c0 > a.c1 - a.c0)).map((a) => a.key));
+}
+
 export const areaOf = (l: Pick<Laid, 'x' | 'y' | 'w' | 'h'>): string => `${l.y + 1} / ${l.x + 1} / ${l.y + l.h + 1} / ${l.x + l.w + 1}`;
 
 /**
