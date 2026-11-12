@@ -33,7 +33,7 @@ export function frameGone(): void {
 }
 
 const MAIN_DRAWN = 'main#main[data-screen]';
-const WAITS = 'main#main :is(.waiting, .skel-board, .pw, .sk, .sk-group, [data-standing], [data-board-reading])';
+const WAITS = 'main#main :is(.waiting, .skel-board, .pw, .sk, .sk-group, [data-standing], [data-board-reading], [data-landing])';
 /** Quiet before reading: what a screen fills in just after it says it has drawn (a side tile, the name's banner). */
 const REST_MS = 1500;
 /** What arrives fades up (`data-arrive`, `--d-swap`): the outline stands under it until that has played. */

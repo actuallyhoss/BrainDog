@@ -24,6 +24,8 @@ class Quick {
   ledger = $state<Ledger | null>(null);
   /** The record the ledger was found on, so a second record is asked afresh. */
   base = $state<string | null>(null);
+  /** The record whose ledger has been looked for and answered, finding none included: what a page waits on before it lands. */
+  settled = $state<string | null>(null);
   /** How many hosts are mounted. The first one draws the sheet and answers the key. */
   #hosts = $state<number[]>([]);
   #next = 0;
@@ -73,6 +75,11 @@ class Quick {
   found(base: string, ledger: Ledger | null): void {
     this.base = base;
     this.ledger = ledger;
+  }
+
+  /** The look for a record's ledger has ended, whatever it found. */
+  settle(base: string): void {
+    this.settled = base;
   }
 }
 

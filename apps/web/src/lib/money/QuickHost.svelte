@@ -46,7 +46,8 @@
       .then((l) => {
         if (quick.base === base) quick.found(base, l);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .then(() => quick.settle(base));
   });
 
   function onkeydown(e: KeyboardEvent) {

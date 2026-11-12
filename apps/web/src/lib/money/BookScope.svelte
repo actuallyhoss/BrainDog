@@ -30,10 +30,23 @@
   import Segmented from '$lib/ui/Segmented.svelte';
   import type { SideList } from './ledger.ts';
 
-  let { base, book, on }: { base: string; book: SideList; on: number | null } = $props();
+  let { base, book, on, onread }: { base: string; book: SideList; on: number | null; onread?: () => void } = $props();
+
+  /* THE ROW IS KNOWN once the books are, which a page that holds its body for them is told (`onread`), at once when they were kept. */
+  let loaded = false;
+  const said = (): void => {
+    loaded = true;
+    onread?.();
+  };
+  $effect(() => {
+    void on;
+    if (loaded) onread?.();
+  });
 
   // svelte-ignore state_referenced_locally
   let books = $state<Book[]>(kept.get(`${base} ${book.list}`) ?? []);
+  // svelte-ignore state_referenced_locally
+  if (kept.has(`${base} ${book.list}`)) said();
 
   /* ON MONEY'S HOME WITH TWO BOOKS OR MORE, THE FIRST BOOK IN ITS PLACE. */
   function leaveHome() {
@@ -50,7 +63,8 @@
     /* ASKED WITH MONEY'S OWN FIRST READ WHERE THE LEDGER WAS KNOWN BY THEN (`books.ts`), else now. */
     void (takeBooks(base, book) ?? readBooks(base, book))
       .then((got) => {
-        if (gone || !got?.ok) return;
+        if (gone) return;
+        if (!got?.ok) return said();
         const rows = ((got.value as { rows?: unknown } | null)?.rows ?? []) as { seq?: unknown; fields?: Record<string, unknown> }[];
         books = rows
           .filter((r) => typeof r.seq === 'number')
@@ -60,8 +74,9 @@
           });
         kept.set(key, books);
         leaveHome();
+        said();
       })
-      .catch(() => undefined);
+      .catch(() => said());
     return () => {
       gone = true;
     };

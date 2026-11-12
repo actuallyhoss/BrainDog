@@ -50,7 +50,15 @@ class Held {
       .then((l) => {
         if (this.#asked === base) this.#looks = l;
       })
-      .catch(() => undefined);
+      .catch(() => {
+        /* A READ THAT FAILED IS AN ANSWER OF NONE, so a page waiting on the chips lands with the names alone. */
+        if (this.#asked === base) this.#looks = { categories: [], accounts: [] };
+      });
+  }
+
+  /** Whether the chips have been read for this record, empty or not: what Money's page waits on before it lands. */
+  get read(): boolean {
+    return this.#looks !== null;
   }
 
   /*

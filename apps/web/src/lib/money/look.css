@@ -30,6 +30,12 @@
   --money-bar-quiet: color-mix(in oklab, var(--ink) 22%, var(--tile));
 }
 
+/* A MONEY PAGE'S BODY WAITS, UNSEEN, UNTIL ITS LEDGER, CHIPS AND BOOKS ARE IN (`PageView.svelte` `landing`), so it lands once
+   with its look, its Add an account row and its Which book row, and the first frame's outline stands behind it till then. */
+.hosted[data-landing] {
+  visibility: hidden;
+}
+
 /* ── the head ─────────────────────────────────────────────────────────────── */
 
 /* THE PAGE'S NAME AND ITS LINE, ON THE BOARD: no tile round them, the name a step up, the sentence at reading size.

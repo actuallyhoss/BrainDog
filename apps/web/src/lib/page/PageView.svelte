@@ -766,6 +766,31 @@
   const ledgerHere = $derived(mode === 'page' && live && quick.base === apiBase() ? quick.ledger : null);
   /** The ledger's book list (`ledger.ts` `book`), which Money's home and each book's page draw Which book over. */
   const bookHere = $derived(ledgerHere?.book ?? null);
+  /** Whether the page draws Which book over its body: Money's home and each book's own page. */
+  const booksWanted = $derived(moneyPage && !showSource && !!bookHere && !!live && (live.page.page.page === 'money' || about?.register === bookHere.list));
+  /* A MONEY PAGE LANDS ONCE (12 Nov): its look, its chips, its Add an account row and its Which book row each arrived
+     after the page had drawn (the ledger is found from the declarations, the chips and the books are read after that), so
+     it painted in four steps and the later ones moved the earlier. The body waits, unseen, for the ledger, the chips and
+     the books while the page's outline stands (`data-landing`, which the first frame waits on), and lands whole; a read
+     that never answers lets it land after `LAND_CAP_MS`. */
+  const LAND_CAP_MS = 4000;
+  let landOpen = $state<string | null>(null);
+  let landCap = $state<string | null>(null);
+  let booksIn = $state<string | null>(null);
+  const landReady = $derived(quick.settled === apiBase() && moneyLooks.read && (!booksWanted || booksIn === visit));
+  const landing = $derived(mode === 'page' && moneyPage && !!live && !showSource && !arranging && landOpen !== visit && landCap !== visit);
+  $effect(() => {
+    if (mode === 'page' && moneyPage && live) moneyLooks.ask();
+  });
+  $effect(() => {
+    if (landing && landReady) landOpen = visit;
+  });
+  $effect(() => {
+    if (!landing) return;
+    const v = visit;
+    const t = setTimeout(() => (landCap = v), LAND_CAP_MS);
+    return () => clearTimeout(t);
+  });
   /** Whether this page draws the ledger or its accounts, so a phone's head offers Add a movement (`QuickHost`). */
   const quickHere = $derived(mode === 'page' && moneyPage && !!live && pageOfLedger(live.page.page.requires, quick.ledger));
   /** Whether this page is one row of the ledger's accounts, which an owner may share as a household view. */
@@ -1174,7 +1199,7 @@
   <!-- THE PAGE GIVES UP WHAT THE DOCKED PANEL TAKES, past the gutter it already pads by (`ui/Panel.svelte`'s `--dock-w`,
        0px while no panel is docked), so a row open beside the page never sits over its head or its tiles. -->
   <!-- `data-arrive` (`$lib/motion/motion.css`): in the skeleton's place it fades up rather than switching on. -->
-  <div class="hosted" data-arrive data-money={moneyPage ? '' : undefined} data-lent={buttonsTaken ? '' : undefined} {@attach moneyPage ? masonry : undefined}>
+  <div class="hosted" data-arrive data-money={moneyPage ? '' : undefined} data-landing={landing ? '' : undefined} data-lent={buttonsTaken ? '' : undefined} {@attach moneyPage ? masonry : undefined}>
   <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place somebody is looking
        at one. Not on a page that has its own headline sentence, which says what this page is better than the noun. -->
   <PageHead
@@ -1292,9 +1317,9 @@
   <!-- WHICH BOOK, under the name of Money's home and of each book's page: Everything, then Personal and each business,
        where the record keeps two or more. -->
   {#snippet bookScope()}
-    {#if moneyPage && !showSource && bookHere && (live.page.page.page === 'money' || about?.register === bookHere.list)}
+    {#if booksWanted && bookHere}
       {#await import('$lib/money/BookScope.svelte') then { default: BookScope }}
-        <BookScope base={apiBase()} book={bookHere} on={about?.register === bookHere.list ? about.seq : null} />
+        <BookScope base={apiBase()} book={bookHere} on={about?.register === bookHere.list ? about.seq : null} onread={() => (booksIn = visit)} />
       {/await}
     {/if}
   {/snippet}
