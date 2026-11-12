@@ -36,8 +36,6 @@ const MAIN_DRAWN = 'main#main[data-screen]';
 const WAITS = 'main#main :is(.waiting, .skel-board, .pw, .sk, .sk-group, [data-standing], [data-board-reading])';
 /** Quiet before reading: what a screen fills in just after it says it has drawn (a side tile, the name's banner). */
 const REST_MS = 1500;
-/** What arrives fades up (`data-arrive`, `--d-swap`): the outline stands under it until that has played. */
-const FADE_MS = 240;
 /** A first open whose screen said it has drawn and whose page differs from its outline: this long, then the outline goes anyway. */
 const SAID_MS = 400;
 /** A move: what the screen has to draw in before its outline comes up. Under this the reader never sees one. */
@@ -250,9 +248,10 @@ export function pageOpened(first: boolean): void {
        its 8 s in `app.html`. Its own bars came up for half a second in the outline's place. */
     if (document.querySelector(MAIN_DRAWN) === null || document.querySelector(WAITS) !== null) return;
     if (landed()) {
+      /* AT ONCE: what lands over the outline lands whole (`app.html`), so there is no fade for it to stand under. */
       leaving = true;
       clearTimeout(said);
-      setTimeout(() => settle(address), FADE_MS);
+      settle(address);
     } else if (said === undefined) {
       said = setTimeout(() => settle(address), SAID_MS);
     }
