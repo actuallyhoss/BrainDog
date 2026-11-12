@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
-import { SHAPE_FIGURES, SHAPE_LINKED, linkedListOf, workListOf, type ShapeAnswer } from '../src/project-shape.ts';
+import { SHAPE_FIGURES, SHAPE_LINKED, kpisDrawnOn, linkedListOf, workListOf, type ShapeAnswer } from '../src/project-shape.ts';
 import { runsListOf } from '../src/today.ts';
 import { installSeed } from '../../seed/src/index.ts';
 import { NOW } from '../../seed/src/modules/base.ts';
@@ -109,4 +109,31 @@ test('A MEMBER WHO MAY NOT READ THE WORK IS ANSWERED NO WORK, AS HER OWN READ OF
   assert.equal(shape.work, null, 'and the shape holds none of it');
   assert.deepEqual(shape.row, value(await api.get({ register, seq, values: true }, member)), 'the row is hers as her own read of it is');
   sql.close();
+});
+
+/* THE PAGE'S OWN BLOCK AND THE SHAPE DREW THE SAME KEY NUMBERS, each reading read twice in one call. */
+test("THE SHAPE TAKES THE KEY NUMBERS THE PAGE'S OWN BLOCK DREW, and only a block that is this project's whole set", () => {
+  const drawn = [{ kpi: 'k1', name: 'Revenue a month' }];
+  const block = { kind: 'kpis', source: 'kpis', for: 'project', kpis: drawn, refusals: [] };
+  assert.deepEqual(kpisDrawnOn([{ kind: 'note' }, block], 'things#1'), drawn);
+  assert.notEqual(kpisDrawnOn([block], 'things#1'), drawn, 'the shape was handed the block\'s own array');
+  assert.deepEqual(kpisDrawnOn([{ ...block, about: 'things#1' }], 'things#1'), drawn);
+  /* Another project's, a cut set, Today's, a block not drawn, a refused one and a held shell are each asked for as before. */
+  assert.equal(kpisDrawnOn([{ ...block, about: 'things#2' }], 'things#1'), null);
+  assert.equal(kpisDrawnOn([{ ...block, limit: 3 }], 'things#1'), null);
+  assert.equal(kpisDrawnOn([{ ...block, for: 'today' }], 'things#1'), null);
+  assert.equal(kpisDrawnOn([{ ...block, drawn: false }], 'things#1'), null);
+  assert.equal(kpisDrawnOn([{ ...block, refusals: [{ code: 'FORBIDDEN', fix: 'No.' }] }], 'things#1'), null);
+  assert.equal(kpisDrawnOn([{ kind: 'kpis', source: 'kpis', for: 'project' }], 'things#1'), null);
+  assert.equal(kpisDrawnOn([], 'things#1'), null);
+});
+
+test('A PAGE THAT DRAWS ITS KEY NUMBERS ANSWERS THE SHAPE THE SAME ONES, as the block alone answers them', async () => {
+  const { api } = await record();
+  const spoken = 'things#1';
+  const page = value<{ blocks: { kind?: string; kpis?: unknown[] }[]; shape?: ShapeAnswer }>(await api.page({ slug: spoken, shape: '1' }, owner));
+  const alone = value<{ blocks: { kpis?: unknown[] }[] }>(await api.previewPage({ body: { page: 'key-numbers', title: 'Key numbers', blocks: [{ kind: 'kpis', source: 'kpis', for: 'project', about: spoken }] } }, owner));
+  assert.deepEqual(page.shape?.kpis ?? null, alone.blocks[0]!.kpis ?? null);
+  const own = page.blocks.find((b) => b.kind === 'kpis');
+  if (own?.kpis) assert.deepEqual(page.shape?.kpis, own.kpis);
 });

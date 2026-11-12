@@ -131,10 +131,38 @@ export function workListOf(decls: readonly Decl[], projects: string): { list: st
 }
 
 /**
+ * The key numbers of the project `spoken` as one of the page's own blocks drew them for this reader, or `null`.
+ *
+ * A PROJECT'S PAGE DRAWS ITS KEY NUMBERS IN A BLOCK AND THE SHAPE ASKED FOR THE SAME ONES AGAIN, every reading of every
+ * number read twice in one call. Only a block that is the body the shape asks: all of this project's, with no `limit:`,
+ * drawn and not refused. `blocks` are the page's as this reader is sent them, so nothing she is not shown is taken, and
+ * the caller hands none of a page a filter narrowed, whose figures are the choice's and not the project's.
+ */
+export function kpisDrawnOn(blocks: readonly unknown[], spoken: string): unknown[] | null {
+  for (const block of blocks) {
+    if (block === null || typeof block !== 'object') continue;
+    const b = block as { kind?: unknown; source?: unknown; for?: unknown; about?: unknown; limit?: unknown; kpis?: unknown; refusals?: unknown; drawn?: unknown };
+    if (b.kind !== KPIS_KIND || b.source !== KPIS_KIND || b.for !== 'project' || b.limit !== undefined || b.drawn === false) continue;
+    if (b.about !== undefined && b.about !== '' && b.about !== spoken) continue;
+    if (!Array.isArray(b.kpis) || (Array.isArray(b.refusals) && b.refusals.length > 0)) continue;
+    return structuredClone(b.kpis) as unknown[];
+  }
+  return null;
+}
+
+/**
  * Every part of the project `register#seq`'s shape, asked of the record one after another in this one call, or `null`
  * where the row is not a project's. `decls` are the record's lists (the caller's ceiling is each part's own method's).
  */
-export async function shapeAnswerOf(asks: ShapeAsks, register: string, seq: number, decls: readonly Decl[], ctx: unknown): Promise<ShapeAnswer | null> {
+export async function shapeAnswerOf(
+  asks: ShapeAsks,
+  register: string,
+  seq: number,
+  decls: readonly Decl[],
+  ctx: unknown,
+  /** Its key numbers as the page's own block already drew them in this read (`kpisDrawnOn`), which are then not drawn again. */
+  drawnKpis: unknown[] | null = null,
+): Promise<ShapeAnswer | null> {
   const decl = decls.find((d) => d.id === register);
   if (decl?.scopes === undefined || !Number.isInteger(seq) || seq < 1) return null;
   const spoken = `${register}#${seq}`;
@@ -158,9 +186,12 @@ export async function shapeAnswerOf(asks: ShapeAsks, register: string, seq: numb
     if (got !== null && Array.isArray(got.rows)) runs = { ...runsOn, rows: got.rows };
   }
   /* ITS KEY NUMBERS, the body `card-kpis.ts` asks for one project, drawn by the same method. */
-  const body = { page: 'key-numbers', title: 'Key numbers', blocks: [{ kind: KPIS_KIND, source: KPIS_KIND, for: 'project', about: spoken }] };
-  const drawn = valueOf(await asking(asks.previewPage, { body }, ctx)) as { blocks?: { kpis?: unknown }[] } | null;
-  const kpis = Array.isArray(drawn?.blocks?.[0]?.kpis) ? (drawn.blocks[0].kpis as unknown[]) : null;
+  let kpis = drawnKpis;
+  if (kpis === null) {
+    const body = { page: 'key-numbers', title: 'Key numbers', blocks: [{ kind: KPIS_KIND, source: KPIS_KIND, for: 'project', about: spoken }] };
+    const drawn = valueOf(await asking(asks.previewPage, { body }, ctx)) as { blocks?: { kpis?: unknown }[] } | null;
+    kpis = Array.isArray(drawn?.blocks?.[0]?.kpis) ? (drawn.blocks[0].kpis as unknown[]) : null;
+  }
   /* ITS MONEY, BY ITS NAME as the row holds it now: a row she may not read has no name, and no money is asked. */
   const fields = (row as { fields?: Record<string, unknown> } | null)?.fields;
   const name = typeof fields?.[decl.title ?? ''] === 'string' ? String(fields[decl.title!]).trim() : '';

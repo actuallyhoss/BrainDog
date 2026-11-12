@@ -153,6 +153,8 @@
           .filter((g) => g.areas.length > 0),
   );
   let indexAsked = false;
+  /** The index's read for this visit, settled once it has answered or failed: what is said under the title waits for it. */
+  let indexRead: Promise<void> = Promise.resolve();
 
   async function readIndex(): Promise<void> {
     indexAsked = true;
@@ -192,7 +194,7 @@
       indexDown = true;
       return;
     }
-    if (area === undefined || declares) untrack(() => void readIndex());
+    if (area === undefined || declares) untrack(() => void (indexRead = readIndex()));
   });
 
   /* THIS SCREEN'S OWN WORDS: the index's one tool, and its line where the record has no health to say. */
@@ -353,6 +355,10 @@
 
   async function readHealth(): Promise<void> {
     asked = true;
+    /* AFTER THE INDEX HAS ANSWERED, NEVER BESIDE IT: reads asked together go to the record as one request and come back
+       together, so the index's tiles waited for the copies, the engine, the signs and the faults (measured 12 Nov: 0.7 s
+       for the five, where the index alone is a fraction of it). The sentence was never waited on, and still is not. */
+    await indexRead.catch(() => undefined);
     const now = Date.now();
     const hosted = hostedHere(shell);
     const client = recordClient();
@@ -360,7 +366,8 @@
       hosted ? readSnapshots(apiBase()).catch(() => null) : null,
       /* THE MONTH'S USE, FOR SOMEBODY WHO READS THE WHOLE RECORD (collab pass 4): past the ledger it reads the record's
          `actions`, which a contractor held to one project was refused on every open of Settings. */
-      hosted && may(shell, 'read') ? readUsage((url, init) => fetch(url, init), now, '', apiBase(page.url), undefined, homeCurrency()).catch(() => null) : null,
+      /* Somebody is signed in on the Cloud, so the ledger and the names are asked together (`readUsage`). */
+      hosted && may(shell, 'read') ? readUsage((url, init) => fetch(url, init), now, '', apiBase(page.url), undefined, homeCurrency(), owns ? 'owner' : 'member').catch(() => null) : null,
       valueOf(() => client.engineHealth()),
       valueOf(() => client.call<{ signs: Sign[] }>('signs')),
       owns ? readFaults() : null,

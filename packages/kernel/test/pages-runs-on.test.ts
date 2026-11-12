@@ -177,6 +177,34 @@ test('INHERITED IS EVERY ROW KEPT THAT APPLIES EVERYWHERE, counted before the bl
   assert.deepEqual([blocks.Own!.rows.length, blocks.Own!.inherited], [3, 0]);
 });
 
+/* A PROJECT'S PAGE DRAWS FOUR OF THESE BLOCKS, and each gathered every key, tool and skill again with who used each. */
+test('THE BLOCKS OF ONE READ GATHER WHAT THE PROJECT RUNS ON ONCE, and the next read sees what was written since', async () => {
+  const clock = fixedClock(NOW);
+  const db = openSqlite();
+  let tools = 0;
+  /* Every read of the tools list's rows in scope, counted where the kernel asks the database. */
+  const counted = { ...db, all: ((text: string, ...params: never[]) => (/FROM entry e WHERE e\.register = \?/u.test(text) && params[0] === 'tools' ? tools++ : 0, db.all(text, ...params))) as typeof db.all };
+  const k: Kernel = await openRecord(counted, clock);
+  value(await k.install([...LISTS, pageAbout('kiln', 'things#1')]));
+  value(k.create('things', { name: 'Kiln' }, OWNER));
+  value(k.create('tools', { name: 'kiln-mcp', project: 'things#1' }, OWNER));
+  tools = 0;
+  const first = page(k, 'kiln');
+  const once = tools;
+  assert.ok(once > 0, 'the tools were never read');
+  assert.deepEqual(first.All!.rows.map((r) => r.fields.name), ['kiln-mcp']);
+  assert.deepEqual(first.Own!.rows.map((r) => r.fields.name), ['kiln-mcp']);
+  /* One block alone reads as much as the page's three did. */
+  tools = 0;
+  k.block({ kind: 'table', source: 'runs_on', about: 'things#1' } as never);
+  assert.equal(tools, once, `three blocks read the tools ${once} times and one block ${tools}`);
+  /* A block's rows are its own: a second tool written after the read is on the next read of every block. */
+  value(k.create('tools', { name: 'kiln-cli', project: 'things#1' }, OWNER));
+  const second = page(k, 'kiln');
+  assert.deepEqual(second.All!.rows.map((r) => r.fields.name), ['kiln-cli', 'kiln-mcp']);
+  assert.deepEqual(second.Own!.rows.map((r) => r.fields.name), ['kiln-cli', 'kiln-mcp']);
+});
+
 test('A PROJECT WITH NOTHING OF ITS OWN ANSWERS ONLY WHAT APPLIES EVERYWHERE, every row of it quiet', async () => {
   const { k } = await record();
   const blocks = page(k, 'oxbow');

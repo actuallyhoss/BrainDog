@@ -28,6 +28,7 @@
   reached a door, counted and never limited, so they sit under everything the allowance is about rather than inside it.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import { MediaQuery } from 'svelte/reactivity';
@@ -56,6 +57,8 @@
   import { asksOf, byProject, daysSaid, earlierOf, groupName, heatOf, offCloud, projectsSaid, placeOf, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
   import { extraOffered, hostedHere, readBilling, type BillingAnswer } from '../settings/billing.ts';
   import ExtraCap from './ExtraCap.svelte';
+  import { askUsageEarly } from '$lib/data/usage-early.ts';
+  import { askEarly, takeEarly } from '$lib/data/early-asks.ts';
   import Menu from '$lib/ui/Menu.svelte';
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
   import { saidRowPages } from '$lib/record/row-href.ts';
@@ -79,7 +82,9 @@
    * `readUsage` reads through the client: the ledger is a host door, not a record method.
    */
   async function usageOf(): Promise<Result<UsageView | Fault | null>> {
-    const out = await readUsage((url, init) => fetch(url, init), recordNow(), '', apiBase(page.url), month, homeCurrency());
+    /* THE CLOUD'S LIVE SHELL IS SOMEBODY SIGNED IN, so the ledger and the names are asked together (`readUsage`). */
+    const shell = page.data as unknown as Shell;
+    const out = await readUsage((url, init) => fetch(url, init), recordNow(), '', apiBase(page.url), month, homeCurrency(), hostedHere(shell) ? (shell.me?.owner === true ? 'owner' : 'member') : false);
     if (out.ok === true) return { ok: true, value: out.view };
     if (out.ok === 'none') return { ok: true, value: null };
     /* AN ANSWER, NOT A REFUSAL: the record was reached, and the fault is this screen's, drawn below as one. */
@@ -93,6 +98,21 @@
   /* THE RECORD'S ADDRESS AND THE MONTH ARE THE QUESTION, so moving to another record, or another month, asks again
      rather than drawing the last answer under the new name. The project is not: a slice is drawn from the same month. */
   const usage = read(() => `${apiBase(page.url)} ${month}`, usageOf, { empty: (v) => v === null || ('totals' in v && v.totals.runs === 0) });
+
+  /** What Billing's answer asked ahead is held under: this record's, since the answer is the person's on this host. */
+  const billingKey = (): string => `usage billing ${apiBase(page.url)}`;
+
+  /* WHAT THE TILES UNDER THE MONTH READ IS ASKED NOW, beside the month (`usage-early.ts`): each waited for the month to draw
+     and then read alone. Only this month draws them, Slash's and the cap only for the owner on the Cloud. */
+  untrack(() => {
+    const shell = page.data as unknown as Shell;
+    const now = recordNow();
+    const current = monthRange(now, page.url.searchParams.get('month') ?? undefined).to === new Date(now).toISOString().slice(0, 10);
+    if (!current || !shell.live || shell.refused) return;
+    const owner = shell.me?.owner === true && hostedHere(shell);
+    askUsageEarly(apiBase(page.url), { slash: owner && page.data.slash === true, room: true });
+    if (owner) askEarly(billingKey(), () => readBilling());
+  });
 
   const n = (v: number): string => v.toLocaleString('en-GB');
 
@@ -125,7 +145,8 @@
   const billed = read(
     () => (view && view.from === 'ledger' && view.owner && hosted && view.current ? `${apiBase(page.url)} billing` : null),
     async (): Promise<Result<BillingAnswer | null>> => {
-      const out = await readBilling();
+      /* The answer asked as the page opened, where it is still fresh, else asked now. */
+      const out = (await (takeEarly<Awaited<ReturnType<typeof readBilling>>>(billingKey()) ?? null)) ?? (await readBilling());
       return { ok: true, value: out.ok ? out.value : null };
     },
   );

@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import './fixtures/fill.ts';
-import { pageReader, type Fetch } from './page-live.ts';
+import { pageReader, shapeLists, type Fetch } from './page-live.ts';
 
 const BASE = 'http://record.test';
 const AT = Date.UTC(2026, 8, 15, 12);
@@ -138,4 +138,58 @@ test('ANSWERS THAT LAND OUT OF ORDER DRAW THE SAME PAGE, in the order the page n
   assert.deepEqual(shuffled, serial);
   if (shuffled.from !== 'live') return;
   assert.deepEqual(shuffled.page.blocks.map((b) => b.heading), ['Kites', 'Ponds', 'Reeds']);
+});
+
+/* A LINKED LIST NO BLOCK DRAWS waited a round trip for its declaration and another for its rows. */
+test("A LINKED LIST'S ROWS ARE ASKED FOR BESIDE ITS DECLARATION, and its rows are still named by it", async () => {
+  const log: string[] = [];
+  const page = { page: 'kites', title: 'Kites', blocks: [PAGE.blocks[0]] };
+  const io = (async (url: string | URL | Request) => {
+    const u = new URL(String(url));
+    const method = u.pathname.split('/').pop() ?? '';
+    const register = u.searchParams.get('register') ?? '';
+    log.push(`ask ${method} ${register}`.trim());
+    await tick();
+    log.push(`answer ${method} ${register}`.trim());
+    if (method === 'page') return json(200, { ok: true, value: page });
+    if (method === 'schema') return json(200, { ok: true, value: SCHEMAS[register] });
+    if (method === 'list') return json(200, { ok: true, value: { rows: register === 'ponds' ? PONDS : KITES, cursor: null } });
+    return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no such method.' } });
+  }) as Fetch;
+  const got = await pageReader(BASE, io, () => AT).read('kites');
+  assert.equal(got.from, 'live');
+  assert.ok(log.indexOf('ask list ponds') !== -1 && log.indexOf('ask schema ponds') !== -1, log.join(', '));
+  assert.ok(log.indexOf('ask list ponds') < log.indexOf('answer schema ponds'), `the walk waited for the declaration: ${log.join(', ')}`);
+  if (got.from !== 'live') return;
+  assert.match(got.page.blocks[0]!.rows.flatMap((r) => r.cells).join(' | '), /Mill pond/u);
+});
+
+/* A PROJECT'S PARTS ASKED WHAT THEIR LISTS DECLARE ONCE THE PAGE HAD DRAWN, a round trip after it. */
+test("THE LISTS A PROJECT'S SHAPE READS ARE ASKED ABOUT WITH THE PAGE'S OWN, before any of them answers", async () => {
+  assert.deepEqual(
+    shapeLists({ register: 'kites', seq: 1, work: { list: 'reeds', rows: [] }, runs: null, links: { from: [{ register: 'ponds', field: 'kite', rows: [] }, { register: 'Not A List' }] }, readings: { list: 'ponds', field: 'kite', rows: [] } }),
+    ['kites', 'reeds', 'ponds'],
+  );
+  assert.deepEqual(shapeLists(null), []);
+  assert.deepEqual(shapeLists({ seq: 1 }), []);
+
+  const log: string[] = [];
+  const page = { page: 'kite', title: 'Kite', blocks: [PAGE.blocks[0]], shape: { register: 'kites', seq: 1, figures: {}, links: { from: [{ register: 'ponds', field: 'kite', rows: [], matched: 0 }] } } };
+  const io = (async (url: string | URL | Request) => {
+    const u = new URL(String(url));
+    const method = u.pathname.split('/').pop() ?? '';
+    const register = u.searchParams.get('register') ?? '';
+    log.push(`ask ${method} ${register}`.trim());
+    await tick();
+    log.push(`answer ${method} ${register}`.trim());
+    if (method === 'page') return json(200, { ok: true, value: page });
+    if (method === 'schema') return json(200, { ok: true, value: SCHEMAS[register] });
+    if (method === 'list') return json(200, { ok: true, value: { rows: register === 'ponds' ? PONDS : KITES, cursor: null } });
+    return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no such method.' } });
+  }) as Fetch;
+  const got = await pageReader(BASE, io, () => AT).read('kite');
+  assert.equal(got.from, 'live');
+  const firstAnswer = log.findIndex((l) => l.startsWith('answer schema'));
+  assert.ok(log.indexOf('ask schema ponds') !== -1 && log.indexOf('ask schema ponds') < firstAnswer, `the shape's list was asked about after the page's: ${log.join(', ')}`);
+  assert.equal(log.filter((l) => l === 'ask schema ponds').length, 1);
 });

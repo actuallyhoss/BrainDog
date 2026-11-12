@@ -271,7 +271,7 @@ import { drawingsOf, drewDraft, drewFiled, DREW_MODEL_PREF } from './drew.ts';
 import { censusSlices, methods as censusMethods, type CensusPart } from './methods/pages-census.ts';
 import { dropTextFaults, keepTextFaults, keepTextFaultsStep, textFaultsUnderway } from './methods/text-faults.ts';
 import { todayOf, turn as turnOf, type TodayAnswer, type TodayAsks, type TodayLine } from './today.ts';
-import { shapeAnswerOf, type ShapeAsks } from './project-shape.ts';
+import { kpisDrawnOn, shapeAnswerOf, type ShapeAsks } from './project-shape.ts';
 import { HOST_SOURCES, hostSourcesOf } from './sources/index.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
@@ -14899,22 +14899,30 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          DECLARES THE PARTS: a page of a use case older than founder 3.3.0 or team 2.25.0 declares none, and the host
          draws them in their places all the same. */
       const param = (out.value as { param?: { register?: unknown; seq?: unknown } }).param;
-      const shape =
-        (args.shape === true || args.shape === '1' || args.shape === 'true') && shapeAsks !== null && typeof param?.register === 'string' && typeof param.seq === 'number'
-          ? await shapeAnswerOf(shapeAsks, param.register, param.seq, [...kernel.registers()].map(([, decl]) => decl as never), ctx)
-          : null;
       /* THE ROWS A BLOCK SHE IS SHOWN DRAWS COME LESS THE FIELDS HIDDEN FROM HER (`sight.mask`). The shape's parts were
          each held by their own method already. */
-      return ok({
-        ...sight.mask(ctx, {
-          ...out.value,
-          ...(declared ? { declared_version: declared.version } : {}),
-          ...(filters ? { filters: filters.map((f) => (unseen(f) ? { ...f, chosen: null, values: [], reads: [] } : f)) } : {}),
-          ...(look === undefined ? {} : { look: lookAt === undefined ? look : { ...look, at: lookAt } }),
-          blocks: blocks.map((b, i) => refsNamed(ctx, line !== null && i === line.at ? { ...b, said: line.text } : b)),
-        }),
-        ...(shape === null ? {} : { shape }),
+      const sent = sight.mask(ctx, {
+        ...out.value,
+        ...(declared ? { declared_version: declared.version } : {}),
+        ...(filters ? { filters: filters.map((f) => (unseen(f) ? { ...f, chosen: null, values: [], reads: [] } : f)) } : {}),
+        ...(look === undefined ? {} : { look: lookAt === undefined ? look : { ...look, at: lookAt } }),
+        blocks: blocks.map((b, i) => refsNamed(ctx, line !== null && i === line.at ? { ...b, said: line.text } : b)),
       });
+      /* ITS KEY NUMBERS ARE DRAWN ONCE: where the page's own block drew them for her, the shape takes those (`kpisDrawnOn`).
+         Not on a page a choice narrowed, whose figures are counted over the choice. */
+      const narrowed = filter !== undefined && Object.keys(filter).length > 0;
+      const shape =
+        (args.shape === true || args.shape === '1' || args.shape === 'true') && shapeAsks !== null && typeof param?.register === 'string' && typeof param.seq === 'number'
+          ? await shapeAnswerOf(
+              shapeAsks,
+              param.register,
+              param.seq,
+              [...kernel.registers()].map(([, decl]) => decl as never),
+              ctx,
+              narrowed ? null : kpisDrawnOn(sent.blocks as readonly unknown[], `${param.register}#${param.seq}`),
+            )
+          : null;
+      return ok({ ...sent, ...(shape === null ? {} : { shape }) });
     },
 
     /**

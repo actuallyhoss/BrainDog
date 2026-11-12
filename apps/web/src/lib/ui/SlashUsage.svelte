@@ -21,14 +21,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { createClient, type SlashAsked, type SlashStatus } from '@braindog/client';
+  import type { SlashAsked, SlashStatus } from '@braindog/client';
+  import { slashUsageOf } from '$lib/data/usage-early.ts';
   import { apiBase, at } from '$lib/at.ts';
   import {
     asksLine,
     atCap,
     backgroundLine,
     costSaid,
-    LEDGER_FETCHED,
     metered,
     purposeLines,
     resetsWords,
@@ -66,12 +66,12 @@
 
   onMount(() => {
     if (!offered) return;
-    const client = createClient({ base: apiBase() });
-    void Promise.all([client.slashStatus(), client.slashAsks(LEDGER_FETCHED)])
-      .then(([s, a]) => {
-        if (!s.ok || !a.ok) return;
-        status = s.value;
-        rows = a.value.asks;
+    /* The page asked both as it opened (`usage-early.ts`); a tile mounted later than that reads for itself. */
+    void slashUsageOf(apiBase())
+      .then((got) => {
+        if (got === null) return;
+        status = got.status;
+        rows = got.asks;
       })
       .catch(() => {
         /* Nothing to draw; the page's own read says when the record cannot be reached. */

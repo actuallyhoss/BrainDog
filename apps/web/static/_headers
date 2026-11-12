@@ -7,10 +7,26 @@
 # the first four hex of the file's SHA-256 (`src/lib/fonts.test.ts` holds them equal), so a new font
 # is a new address and the old one may be kept for a year like a chunk.
 #
-# Everything else (the shell, the marks) keeps the platform's default, so a deploy is seen on the
-# next load.
+# THE TAB'S MARKS ARE KEPT FOR A DAY. A browser asks for the tab icon again on every move inside the
+# app, and at `max-age=0` each ask was a round trip of 130 to 650 ms beside the page's own reads.
+# They are not hashed, so a new mark is seen within a day, and a week more may show the old one
+# while the new one is fetched behind it.
+#
+# Everything else (the shell) keeps the platform's default, so a deploy is seen on the next load.
 /_app/immutable/*
   Cache-Control: public, max-age=31536000, immutable
 
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
+
+/favicon.ico
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/mark-small.svg
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/mark-alpha.svg
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/mark.svg
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
