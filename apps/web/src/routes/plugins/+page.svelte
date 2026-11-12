@@ -181,7 +181,10 @@
      once for From BrainDog landing over them (0.08 at 1512). Until both have answered or refused, the chips row holds
      its place and the shelves are not drawn, so they arrive into empty room and nothing moves. */
   let recordRead = $state(false);
-  const settled = $derived((kennel !== null || kennelRefused !== null) && recordRead);
+  /* NOR DO THEY DRAW BEFORE THE COUNTS HAVE ANSWERED: From BrainDog is the most held first, so a count landing after the
+     shelves re-sorted it under the reader. Answered or none, either is an answer. */
+  let countsRead = $state(false);
+  const settled = $derived((kennel !== null || kennelRefused !== null) && recordRead && countsRead);
   function readStore(): void {
     kennelRefused = null;
     void readHostCatalogue(fetch).then((got) => {
@@ -209,7 +212,13 @@
 
   function start(): void {
     readStore();
-    void readCounts(fetch).then((got) => (counts = got));
+    void readCounts(fetch).then(
+      (got) => {
+        counts = got;
+        countsRead = true;
+      },
+      () => (countsRead = true),
+    );
     void read(async () => {
       try {
         return await readRecord();
@@ -221,25 +230,30 @@
 
   async function readRecord(): Promise<boolean> {
     const client = createClient({ base: apiBase() });
-    const chosen = await choose(client);
-    if (!chosen.first.ok) return false;
-    states = chosen.first.value;
-    /* THE SIGNS AND THE OPEN QUESTIONS ARE ASKED AFTER, and a refusal of either is no suggestion, never an error here.
-       AWAITED INSIDE THE READ, so the screen is drawn once with what it suggests: the phone was captured before they
-       landed, and "Suggested for you" led on the laptop and was missing on the phone. */
-    await Promise.allSettled([
+    /* THE FOUR READS ARE ASKED TOGETHER (12 Nov): the packs, what the record made, its signs and its open questions do not
+       depend on one another, and the second three waited for the first, so a cold open paid two round trips before the shelves
+       drew. A refusal of any of the last three is no suggestion, never an error here. */
+    const [chosen] = await Promise.all([
+      choose(client),
       client
         .call<{ addons?: unknown }>('addons', { installed: true, limit: 30 })
-        .then((out) => (mine = out.ok && Array.isArray(out.value?.addons) ? (out.value.addons as AddonLine[]) : null)),
+        .then((out) => (mine = out.ok && Array.isArray(out.value?.addons) ? (out.value.addons as AddonLine[]) : null))
+        .catch(() => undefined),
       client
         .call<{ signs?: unknown }>('signs')
-        .then((out) => (signs = out.ok && Array.isArray(out.value?.signs) ? (out.value.signs as SignRead[]) : null)),
-      client.governance({ register: 'suggestion', status: 'open', limit: 50 }).then((out) => {
-        const rows = out.ok && Array.isArray(out.value) ? (out.value as { question?: unknown }[]) : [];
-        openRows = rows as OpenRow[];
-        questions = rows.flatMap((r) => (typeof r.question === 'string' ? [r.question] : []));
-      }),
+        .then((out) => (signs = out.ok && Array.isArray(out.value?.signs) ? (out.value.signs as SignRead[]) : null))
+        .catch(() => undefined),
+      client
+        .governance({ register: 'suggestion', status: 'open', limit: 50 })
+        .then((out) => {
+          const rows = out.ok && Array.isArray(out.value) ? (out.value as { question?: unknown }[]) : [];
+          openRows = rows as OpenRow[];
+          questions = rows.flatMap((r) => (typeof r.question === 'string' ? [r.question] : []));
+        })
+        .catch(() => undefined),
     ]);
+    if (!chosen.first.ok) return false;
+    states = chosen.first.value;
     /* ADD-ONS FROM GITHUB ARE LOOKED AT AS THE STORE OPENS (`gitUpdates`): a newer tag on the repository each came from
        is asked about on Decide, and said here once. Not awaited, since GitHub is slower than the screen; refused for
        anybody but the owner in a browser, which says nothing. */
