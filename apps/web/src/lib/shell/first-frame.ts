@@ -91,6 +91,29 @@ function stop(): void {
   watcher = null;
   queued = false;
   clearTimeout(outlineTimer);
+  unscroll?.();
+}
+
+/**
+ * THE OUTLINE IS THE PAGE'S FIRST SCREEN, FIXED BEHIND IT. Once the page scrolls, its boxes no longer stand under what
+ * they stand for, so it goes and the page's own waits, which scroll with the page, take its place. In the iPhone app the
+ * outline goes with the document and needs none of this.
+ */
+let unscroll: (() => void) | null = null;
+function goOnScroll(f: FrameDoor): void {
+  if (inIosApp || unscroll !== null) return;
+  const on = (e: Event): void => {
+    const t = e.target;
+    const top = t === document ? scrollY : t instanceof Element && t.matches('main#main') ? t.scrollTop : 0;
+    if (top <= 0) return;
+    f.clear();
+    unscroll?.();
+  };
+  addEventListener('scroll', on, { capture: true, passive: true });
+  unscroll = () => {
+    removeEventListener('scroll', on, { capture: true });
+    unscroll = null;
+  };
 }
 
 /** Whether the page's tiles are over most of their outlines: the page has landed, not only said it has. */
@@ -173,8 +196,11 @@ function typicalShape(f: FrameDoor, address: string): void {
 function openMove(f: FrameDoor, address: string): void {
   /* THE OUTLINE OF THE MOVE THIS ONE TURNED ASIDE is not this page's shape. */
   f.clear();
+  goOnScroll(f);
   outlineTimer = setTimeout(() => {
     if (addressNow() !== address || document.querySelector(MAIN_DRAWN) !== null) return;
+    /* A PAGE ALREADY SCROLLED has no first screen for an outline to stand behind. */
+    if (!inIosApp && (document.querySelector('main#main')?.scrollTop ?? 0) > 0) return;
     if (!f.draw(address)) typicalShape(f, address);
     /* COMING UP RATHER THAN SWITCHING ON, so a read that lands just after this shows no flash of it. */
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.querySelector('#ff .ff-page')?.animate({ opacity: [0, 1] }, { duration: 120, easing: 'ease-out' });
@@ -213,6 +239,7 @@ export function pageOpened(first: boolean): void {
   if (first === false && document.querySelector(MAIN_DRAWN) !== null) return settle(address);
   if (!first) return openMove(f, address);
   if (document.querySelector('#ff .ff-page > * > *') === null) typicalShape(f, address);
+  goOnScroll(f);
   let said: ReturnType<typeof setTimeout> | undefined;
   let leaving = false;
   const look = (): void => {
