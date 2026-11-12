@@ -167,7 +167,9 @@
       }
       /* A PAGE THE SHELL NAMED AND THE RECORD NO LONGER HOLDS is the house body again, as one never declared is. */
       if (out === null || out.from === 'missing') {
-        const m = await import('../../decide/[id]/proposed.ts');
+        /* THE DRAWING'S OWN MODULE, not the one that says what a proposal would do (`page-drawn.ts` says why): that one is the
+           rules, flows and scripts too, and the index waited on all of it before its one read went out. */
+        const m = await import('$lib/record/page-drawn.ts');
         const drawn = await m.drawnOf(SETTINGS_INDEX, apiBase());
         if (drawn.from === 'live')
           out = { from: 'live', now: drawn.now, page: { page: { page: SETTINGS_INDEX.page, title: SETTINGS_INDEX.title }, blocks: drawn.blocks } };
