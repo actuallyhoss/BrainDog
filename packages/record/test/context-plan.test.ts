@@ -105,7 +105,7 @@ test('THE SECTIONS COME IN RANK ORDER: card, may, rules and brief, here now, lan
 
 test('THE CARD IS FIVE LINES AND 120 WORDS AT MOST, with no More line and no signs', () => {
   const long = 'word '.repeat(80);
-  const plan = planContext(his({ who: who({ next: `Next     ${long}`, waiting: `Waiting  ${long}`, update: 'Update   This command is older than this BrainDog. Run braindog update and restart this session.' }) }));
+  const plan = planContext(his({ who: who({ next: `Next     ${long}`, waiting: `Waiting  ${long}`, update: 'Update   This command is older than this BrainDog. Run braindog update, or switch on updates by itself in Settings > Agents.' }) }));
   const card = lines(plan.card);
   assert.ok(card.length <= PLAN_CARD_LINES, plan.card);
   assert.ok(wordCount(plan.card) <= PLAN_CARD_WORDS, `${String(wordCount(plan.card))} words`);
@@ -164,7 +164,7 @@ test('ANOTHER RUN ON YOUR BRANCH IS WARNED OF, and the warning is never cut', ()
 
 test('A RUN IN YOUR WORKING TREE IS WARNED OF ON THE CARD: Learned gives way, Next and Update stay, five lines', () => {
   const others = [...his().others, { spoken: 'S888', agent: 'claude', doing: 'Same folder', branch: 'other', same_tree: true, for_s: 60 }];
-  const update = 'Update   This command is older than this BrainDog. Run braindog update and restart this session.';
+  const update = 'Update   This command is older than this BrainDog. Run braindog update, or switch on updates by itself in Settings > Agents.';
   const plan = planContext(his({ others, told: [], who: who({ update }) }));
   const card = lines(plan.card);
   assert.equal(card.length, PLAN_CARD_LINES, plan.card);

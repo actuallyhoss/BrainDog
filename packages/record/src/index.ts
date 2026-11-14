@@ -2136,6 +2136,11 @@ export type EffectiveSettings = {
   context: { budget: number; lines: boolean };
   enforce: { hooks: boolean; channel: boolean };
   stop: Stop | null;
+  /**
+   * `true` while the person behind the key has "Keep BrainDog's command line, hooks and skill up to date by itself" on
+   * (`SELF_UPDATE_PREF`), so an open session's bridge updates its machine's command when a deploy reaches it. Absent off.
+   */
+  self_update?: true;
 };
 
 /** Another run that is live now, as `context` shows it. */
@@ -3274,6 +3279,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       context: p?.context ?? { budget: 700, lines: true },
       enforce: p?.enforce ?? { hooks: true, channel: false },
       stop: held === null || run === null ? null : kernel.stopOf(run.id),
+      ...(kernel.prefsOf(principal.person)[SELF_UPDATE_PREF] === true ? { self_update: true as const } : {}),
     };
   };
 

@@ -55,7 +55,7 @@ import { privateTermsCommand } from './private-terms.ts';
 import { understandCommand } from './understand.ts';
 import { signsCommand } from './signs.ts';
 import { AGENTS, cliBuild, hostSessionOf, isAgent, positionOf, sessionHeaders, type ClientInfo } from './position.ts';
-import { watchInstalled } from './installed-build.ts';
+import { installedNow, watchInstalled } from './installed-build.ts';
 import { context } from './context.ts';
 import { doctor } from './doctor.ts';
 import { envCommand } from './env.ts';
@@ -714,7 +714,13 @@ async function mcp(args: string[]): Promise<void> {
       setTimeout(() => process.exit(0), SIGNAL_EXIT_MS).unref();
     };
     for (const signal of ['SIGTERM', 'SIGHUP', 'SIGINT'] as const) process.on(signal, closeOnSignal);
-    await serveBridge({ input: process.stdin, output, say, session, installed }, to, hints);
+    /* HIS SWITCH IN AN OPEN SESSION (`upkeep.ts`, `bridge.ts`): a deploy this session sees puts the newer command in, and
+       the requests say the command the machine has now. NO SCRIPTS: this process may be older than the installed file,
+       and writing its own hook scripts would put older hooks back; the update places the new build's hooks itself. */
+    const file = fileURLToPath(import.meta.url);
+    const keep = installedBuild() ? (owed: { build: string; behind: boolean; deadline: number }) => upkeep({ ...owed, file, released: released(), env: process.env, home: homedir(), scripts: null }) : undefined;
+    const machine = installedBuild() ? installedNow({ file, mine: cliBuild() }) : undefined;
+    await serveBridge({ input: process.stdin, output, say, session, installed, upkeep: keep, machine }, to, hints);
     process.exitCode = 0;
     setTimeout(() => process.exit(0), 1_000).unref();
     return;

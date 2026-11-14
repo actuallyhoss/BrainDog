@@ -75,6 +75,7 @@ import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 
 import { TOOLS, type McpSurface } from '@braindog/mcp';
+import { buildDay } from '@braindog/mcp/build';
 import { agreed, handle, VERSIONS, type Reply } from '@braindog/mcp/rpc';
 
 import { readDoorCache, writeDoorCache, type DoorCache } from './bridge-cache.ts';
@@ -103,6 +104,7 @@ import { keepPlace } from './profile-place.ts';
 import { signedOutSurface } from './signed-out.ts';
 import { helloOf } from './stdio.ts';
 import { UNREACHABLE_FIX, type Ctx } from './surface.ts';
+import type { Upkept } from './upkeep.ts';
 
 /** Where the bridge reads and writes, and what it may be told in place of its defaults (a test's fetch and folder). */
 export type BridgeIo = {
@@ -140,7 +142,22 @@ export type BridgeIo = {
    * (`watchInstalled`), else `null`. Left out, nothing is ever said.
    */
   installed?: (() => string | null) | undefined;
+  /**
+   * HIS SWITCH IN AN OPEN SESSION (`upkeep.ts`): puts in a newer signed build of this command once an answer shows the host
+   * on a newer one, when `whoami` says the person behind the key has "Keep BrainDog's command line, hooks and skill up to
+   * date by itself" on. Before this only a session's start updated, so a session open for days, compacted many times,
+   * kept its machine on the build it started with through every deploy. Left out (a checkout, a test), nothing updates.
+   */
+  upkeep?: ((owed: { build: string; behind: boolean; deadline: number }) => Promise<Upkept>) | undefined;
+  /**
+   * The build installed on this machine when it is newer than the one this process runs (`installedNow`), else `null`:
+   * what every request says as `x-braindog-cli`. Left out, this process's own build.
+   */
+  machine?: (() => string | null) | undefined;
 };
+
+/** The longest an update made by an open session may take: the bundle's download and checks, well past the slowest. */
+export const KEEP_UP_MS = 120_000;
 
 /**
  * A tool's answer with one more line of text at its end, for the agent to read: how a newer command reaches a session
@@ -440,11 +457,16 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
   /* AN ANSWER MADE ON THE MACHINE SAYS THE BUILD THAT MADE IT, this command's (`serverInfo.version`), never `0.0.0`. */
   const onMachine = (message: unknown, surface: McpSurface<Ctx>, m?: Message) => handle(message, surface, ctx(), target.base, (m && versionIn(m)) ?? version, '', cliBuild());
 
+  /* THE COMMAND THIS MACHINE HAS NOW, which an update under this session moves past the build this process runs. Said
+     as `x-braindog-cli` on every request, the `/api` calls' included (their session headers are set after their own). */
+  const cliSaid = (): string => io.machine?.() ?? cliBuild();
+  const hinted: Hints = async (c) => ({ ...(await hints(c)), 'x-braindog-cli': cliSaid() });
+
   /** One POST to the host's `/mcp`, and what came of it. Never throws, and no sentence here quotes the request. */
   const post = async (message: Message, signal: AbortSignal): Promise<Outcome> => {
     /* A HINT THAT CANNOT BE READ IS A REQUEST WITHOUT HINTS, never one left unanswered. */
-    const session = await hints(client).catch(() => ({}) as Record<string, string>);
-    const headers = new Headers({ 'content-type': 'application/json', accept: 'application/json', 'x-braindog-cli': cliBuild() });
+    const session = await hinted(client).catch(() => ({}) as Record<string, string>);
+    const headers = new Headers({ 'content-type': 'application/json', accept: 'application/json', 'x-braindog-cli': cliSaid() });
     if (target.token) headers.set('authorization', `Bearer ${target.token}`);
     for (const [name, value] of Object.entries(session)) headers.set(name, value);
     const method = typeof message.method === 'string' ? message.method : undefined;
@@ -499,8 +521,33 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     });
   };
 
-  /** What the host's build on an answer means for the app's tool list. */
+  /* ── his switch in an open session (`upkeep.ts`) ───────────────────────── */
+
+  /* EACH HOST BUILD IS TRIED ONCE BY THIS PROCESS; the upkeep's hour between tries and its lock hold back the rest, so
+     ten sessions seeing one deploy update the machine once. */
+  const keptFor = new Set<string>();
+  const keepUp = (host: string | null) => {
+    const keep = io.upkeep;
+    if (keep === undefined || host === null || refusing !== null || keptFor.has(host)) return;
+    const mine = cliSaid();
+    const ours = buildDay(mine);
+    const theirs = buildDay(host);
+    if (ours === null || theirs === null || theirs < ours || host === mine) return;
+    keptFor.add(host);
+    void (async () => {
+      const session = await hinted(client).catch(() => ({}) as Record<string, string>);
+      const who = await apiCall(target, 'whoami', {}, session, go, ms);
+      const effective = who.kind === 'ok' && isObject(who.value) && isObject(who.value.effective) ? who.value.effective : {};
+      if (effective.self_update !== true) return;
+      /* THE BUILD IT REPLACES IS THE ONE INSTALLED, which an earlier update under this session may have moved on. */
+      const done = await keep({ build: mine, behind: true, deadline: Date.now() + KEEP_UP_MS });
+      if (done.said !== null) say(done.said);
+    })().catch(() => undefined);
+  };
+
+  /** What the host's build on an answer means for the app's tool list, and for the command on this machine. */
   const heard = (now: string | null) => {
+    keepUp(now);
     if (local) {
       local = false;
       /* THE SAME BUILD IS THE SAME LIST only when the list the app was given was the cache's. A cache with a handshake
@@ -581,7 +628,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       pulseOff = true;
       return every;
     }
-    const session = await hints(client).catch(() => ({}) as Record<string, string>);
+    const session = await hinted(client).catch(() => ({}) as Record<string, string>);
     const id = session['x-braindog-client'] ?? io.session;
     if (typeof id !== 'string' || id === '') return every;
     const file = inboxPath(env, id);
@@ -711,7 +758,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
    */
   const seenFirst = async (): Promise<void> => {
     if (!greeted || closing || pulseOff || !target.token || refusing !== null) return;
-    const session = await hints(client).catch(() => ({}) as Record<string, string>);
+    const session = await hinted(client).catch(() => ({}) as Record<string, string>);
     const id = session['x-braindog-client'] ?? io.session;
     if (typeof id !== 'string' || id === '' || !unreported(id)) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -861,7 +908,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
   if (pulseTimer !== null) clearTimeout(pulseTimer);
   if (pulsing !== null) await pulsing;
   while (inFlight.size > 0) await Promise.all(inFlight);
-  if (ran !== null && refusing === null) await endOnClose(io, target, ran, () => hints(client), go);
+  if (ran !== null && refusing === null) await endOnClose(io, target, ran, () => hinted(client), go);
 }
 
 /**

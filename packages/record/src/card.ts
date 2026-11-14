@@ -47,7 +47,7 @@ const HANDOFFS_READ = 'braindog:handoffs';
 export const TWO_SESSIONS = 'Two sessions in one working tree overwrite each other. Coordinate or stop.';
 
 /** Said when the command's build is older than the oldest the record's door still works with, or than the host's own. */
-export const OLDER = 'Run braindog update and restart this session.';
+export const OLDER = 'Run braindog update, or switch on updates by itself in Settings > Agents.';
 
 const DAY_S = 86_400;
 const DAY_MS = DAY_S * 1_000;

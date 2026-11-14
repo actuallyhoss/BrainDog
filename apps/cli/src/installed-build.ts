@@ -29,7 +29,7 @@ export function buildInBundle(text: string): string | null {
 
 /** The line the next answer carries once a newer command is installed under this session. */
 export const newerSaid = (mine: string, installed: string): string =>
-  `A newer BrainDog command is installed (${buildDay(installed) ?? installed}); this session still runs ${buildDay(mine) ?? mine}. Start a new session to use it.`;
+  `BrainDog's command on this machine went from ${buildDay(mine) ?? mine} to ${buildDay(installed) ?? installed} while this session was open. Its hooks use the new one already and its tools come from BrainDog itself, so nothing needs restarting.`;
 
 export type InstalledIo = {
   /** The installed bundle this process runs. */
@@ -75,5 +75,43 @@ export function watchInstalled(io: InstalledIo): () => string | null {
     } catch {
       return null;
     }
+  };
+}
+
+/**
+ * The build installed on this machine when it is newer than `mine`, else `null`, looked at as `watchInstalled` looks:
+ * one `stat` a minute at most, and the file read only when its time moved. A bridge says it as `x-braindog-cli`
+ * (`bridge.ts`), so once the command was updated under an open session the record stops calling the machine behind,
+ * which before kept every open session's card on "This command is older" until the session ended.
+ */
+export function installedNow(io: InstalledIo): () => string | null {
+  const now = io.now ?? Date.now;
+  const stat = io.stat ?? ((f: string) => statSync(f));
+  const read = io.read ?? ((f: string) => readFileSync(f, 'utf8'));
+  const mineDay = buildDay(io.mine);
+  let seen: number | null = null;
+  let lastLook = Number.NEGATIVE_INFINITY;
+  let newer: string | null = null;
+  try {
+    seen = stat(io.file).mtimeMs;
+  } catch {
+    /* No file: nothing newer is ever said. */
+  }
+  return () => {
+    if (mineDay === null || seen === null) return newer;
+    const at = now();
+    if (at - lastLook < LOOK_EVERY_MS) return newer;
+    lastLook = at;
+    try {
+      const moved = stat(io.file).mtimeMs;
+      if (moved === seen) return newer;
+      seen = moved;
+      const there = buildInBundle(read(io.file));
+      const day = buildDay(there);
+      newer = there !== null && there !== io.mine && day !== null && day >= mineDay ? there : null;
+    } catch {
+      /* Kept as it was: a file caught mid-rename is read again a minute on. */
+    }
+    return newer;
   };
 }

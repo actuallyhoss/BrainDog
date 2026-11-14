@@ -491,7 +491,7 @@ test('THE COMMAND LINE OUT OF DATE IS ONE LINE: older than the host’s build or
   assert.equal(staleLine(OLD, undefined, null, host), null);
   assert.equal(staleLine('dev+0000000', behind, '2026.10.20+f46ccf9', host), null);
   /* SAID ONCE: the record's card already says to update, or the build address's line above the card does. */
-  const carded = { ...CONTEXT, card: 'BrainDog · run S7\nUpdate   This command is older than this BrainDog. Run braindog update and restart this session.' } as never;
+  const carded = { ...CONTEXT, card: 'BrainDog · run S7\nUpdate   This command is older than this BrainDog. Run braindog update, or switch on updates by itself in Settings > Agents.' } as never;
   assert.equal(staleLine(OLD, carded, '2026.10.20+f46ccf9', host), null);
   assert.equal(staleLine(OLD, undefined, '2026.10.20+f46ccf9', host, true), null);
 });
