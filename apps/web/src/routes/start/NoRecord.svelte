@@ -89,7 +89,7 @@
   {/if}
 
   {#if inStoreApp}
-    <p class="own-why">{copy.planManaged}</p>
+    <!-- NO PLAN IN A STORE APP (App Store 3.1.1 / 3.1.3(f)): nothing sold, nothing pointed to. -->
   {:else if open === false}
     {#if !describe}<p class="own-why">{copy.signupClosedWhy}</p>{/if}
   {:else}

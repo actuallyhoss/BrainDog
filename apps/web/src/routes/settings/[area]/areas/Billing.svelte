@@ -235,9 +235,7 @@
 {/snippet}
 
 {#if inStoreApp}
-  <Tile icon="money" title={tileWords.planTitle}>
-    <p class="hint">{copy.planManaged}</p>
-  </Tile>
+  <!-- NO PLAN IN A STORE APP (App Store 3.1.1 / 3.1.3(f)): the app is a free companion and says nothing of what is sold. -->
 {:else}
 <!-- WHILE THE BILL, THIS MONTH AND ITS COUNTS ARE READ the tiles wait out of sight (`settings.css`): the plan's tile
      landed over the bill and pushed it down, and the bill's own rows grew it after. -->

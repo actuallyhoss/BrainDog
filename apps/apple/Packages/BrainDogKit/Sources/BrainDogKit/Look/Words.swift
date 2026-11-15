@@ -68,11 +68,9 @@ public enum Words {
     public static let account = "Account"
 
     // Settings (iOS: billing is managed on the web, App Store 3.1.1)
-    public static let planManaged = "Your plan is managed at brain.dog."
     public static let settings = "Settings"
     public static let about = "About"
     public static func version(_ v: String, _ build: String) -> String { "BrainDog for \(device) \(v) (\(build))" }
-    public static let billing = "Billing"
 
     // The shell
     public static let today = "Today"

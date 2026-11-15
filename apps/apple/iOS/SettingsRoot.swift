@@ -83,7 +83,6 @@ struct SettingsRoot: View {
                 Tile(Words.about) {
                     VStack(alignment: .leading, spacing: Space.s2) {
                         Text(Words.version(version, build)).font(Typeface.body).foregroundStyle(Palette.ink).leading(.body)
-                        Text("\(Words.billing): \(Words.planManaged)").font(Typeface.meta).foregroundStyle(Palette.ink3)
                     }
                 }
             }

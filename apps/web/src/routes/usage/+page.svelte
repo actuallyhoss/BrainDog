@@ -120,7 +120,7 @@
   /* ONLY THE CLOUD HOLDS A RECORD TO AN ALLOWANCE: anywhere else the month is its counts and
      charts, with no rings and no plan, as Billing says there is nothing to bill. */
   const hosted = $derived(hostedHere(page.data as unknown as Shell));
-  const view = $derived(usage.value && !('fault' in usage.value) ? (hosted ? usage.value : offCloud(usage.value)) : null);
+  const view = $derived(usage.value && !('fault' in usage.value) ? (hosted && !inStoreApp ? usage.value : offCloud(usage.value)) : null);
   /* NO MONTH FROM BEFORE THE RECORD WAS MADE. */
   const earlier = $derived(view ? earlierOf(beside, view) : beside.earlier);
   /* A SLICE THAT MATCHES NOTHING SHOWS EVERY PROJECT, with the link back, rather than an empty page under a filter. */

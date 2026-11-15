@@ -89,7 +89,7 @@
 
 {#if lines && here}
   <Banner tone="late" icon="lock">
-    {lines.fix}{#if lines.deletes}{' '}{lines.deletes}{/if}{#if inStoreApp}{' '}{copy.planManaged}{/if}
+    {lines.fix}{#if lines.deletes}{' '}{lines.deletes}{/if}
     {#snippet actions()}
       {#if !inStoreApp}
         <Button weight="primary" onclick={payAgain} aria-busy={going} disabled={going}

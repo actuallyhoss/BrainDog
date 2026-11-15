@@ -40,7 +40,7 @@
       <ul class="area-rows">
         {#each rowsOf(g) as a (a.href)}
           {#if inStoreApp && a.id === 'billing'}
-            <li><p class="area-said">{copy.planManaged}</p></li>
+            <!-- NO PLAN IN A STORE APP (App Store 3.1.1 / 3.1.3(f)): no row, no line naming a plan or where it is bought. -->
           {:else}
           <!-- `wide-only` is one of `settings.css`'s shared rules: the row is not drawn below 900px. -->
           <li class={a.id !== undefined && ONLY_WIDE.has(a.id) ? 'wide-only' : undefined}>
