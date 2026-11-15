@@ -2,8 +2,8 @@
  * What /download offers, and which of it the visitor's own device wants.
  *
  * ONE LINE PER PLATFORM, SO AN APP GOING LIVE IS ONE CHANGE: give its row an `href` and its button goes from "Coming soon"
- * on a press to a link. Nothing here says a store has an app until that store shows it: iPhone was rejected on 5 November
- * and Mac has no listing yet, and the page must not send anybody to a store that answers with nothing.
+ * on a press to a link. Nothing here says a store has an app until that store shows it: Mac is still in review, and the
+ * page must not send anybody to a store that answers with nothing.
  */
 import { APP, DOCS } from './links.ts';
 
@@ -26,6 +26,8 @@ export type Platform = {
 /** Listed under Quartz Apps since 5 November (1.0.1). */
 export const WINDOWS_STORE = 'https://apps.microsoft.com/detail/9nw4cq8dfbz4';
 const IPHONE_STORE = 'https://apps.apple.com/app/id6830139915';
+/** Live on Google Play since 12 November (1.0.1). */
+const GOOGLE_PLAY = 'https://play.google.com/store/apps/details?id=dog.brain.app';
 export const INSTALL = 'curl -fsSL https://brain.dog/cli/install.sh | sh';
 
 const APPLE = 'M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701';
@@ -36,7 +38,7 @@ export const PLATFORMS: readonly Platform[] = [
   { id: 'windows', name: 'Windows', say: 'The desktop app, from the Microsoft Store.', action: 'Get it from Microsoft', href: WINDOWS_STORE, mark: WINDOWS },
   { id: 'iphone', name: 'iPhone', say: 'A notification the moment something needs you.', action: 'App Store', href: IPHONE_STORE, mark: APPLE },
   { id: 'mac', name: 'Mac', say: 'The desktop app, from the Mac App Store.', action: 'Mac App Store', mark: APPLE },
-  { id: 'android', name: 'Android', say: 'BrainDog in your pocket, from Google Play.', action: 'Google Play', mark: ANDROID },
+  { id: 'android', name: 'Android', say: 'BrainDog in your pocket, from Google Play.', action: 'Google Play', href: GOOGLE_PLAY, mark: ANDROID },
   { id: 'web', name: 'Web', say: 'Any browser on any device, with nothing to install.', action: 'Open BrainDog', href: APP, glyph: 'globe' },
   { id: 'terminal', name: 'Terminal', say: 'The command line, for you and your agents, on Mac and Linux.', action: 'Read the docs', href: DOCS, glyph: 'terminal' },
 ];
