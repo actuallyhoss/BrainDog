@@ -781,6 +781,16 @@ export const account = {
   billingNotBilled: 'Not billed',
   /* WHAT A SHARE SAYS IN A STORE APP where the plan has none, with no plan named (App Store 3.1.1 / 3.1.3(f)). */
   shareNotOnPlan: 'Sharing is not turned on for this BrainDog.',
+  /* THE STORE APP'S PLAN (App Store 3.1.1): the plan by name and state, and a press that opens the app's own Plan sheet,
+     where the App Store shows its prices and takes the payment. No price, page or place of ours is named here. */
+  planInApp: 'Plan',
+  planInAppFree: 'Free',
+  planInAppActive: 'Active',
+  planInAppBehind: 'Renewal is late. The App Store is retrying the payment.',
+  planInAppLapsed: 'Ended. This BrainDog is read-only until a plan is chosen again.',
+  planInAppSee: 'See plans',
+  planInAppChange: 'Change plan',
+  planInAppOwner: 'The owner of this BrainDog chooses its plan.',
   billingManage: 'Manage payment',
   billingPayAgain: 'Pay again',
   billingOpening: 'Opening the payment page',

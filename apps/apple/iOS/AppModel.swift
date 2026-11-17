@@ -265,7 +265,7 @@ final class AppModel {
                 let given = await askPush()
                 screen?.emit("pushAnswer", given ? "yes" : "no")
             }
-        case .notify, .ready, .haptic, .signedOut, .title, .drag, .titleBarDoubleClick, .scheme, .modal, .settled, .actions:
+        case .notify, .ready, .haptic, .signedOut, .title, .drag, .titleBarDoubleClick, .scheme, .modal, .settled, .actions, .plans:
             /* A notification from the page would ring twice beside the record's push; the rest the screen answered. */
             break
         }

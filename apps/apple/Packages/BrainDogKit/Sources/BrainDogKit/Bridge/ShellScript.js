@@ -81,6 +81,9 @@
       });
     },
   };
+  // THE PLAN SHEET, WHERE THE APP STORE SELLS THE PLANS: the Mac for now, whose products are on sale. The page draws its
+  // Plan tile only where this member is there (`sellsInApp`).
+  if (shell.kind === 'mac') shell.plans = (record) => post('plans', { record: text(record, 128) });
   Object.defineProperty(window, '__BRAINDOG_SHELL__', { value: Object.freeze(shell), writable: false, configurable: false });
   // THE MAC: THE BAR'S EMPTY PART IS THE TITLE BAR. The traffic lights stand in the web's own 56px bar (`--shell-lead`),
   // so a press on that row where nothing is pressable moves the window, and a double press zooms it, as a title bar does.

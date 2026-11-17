@@ -49,6 +49,8 @@ import { CURRENCY, EXTRA_CAP_MOST, PACKS, PLAN_TABLE, priceOf as centsAsPrice, t
 import { badSlug, type ExtraDue, type AccountUsage, type BillingAnswers, type BillingCall, type BillingRow, type BillingSet, type BillingState } from '@braindog/record/directory';
 import { no, ok, refused, type Refusal, type Result, type Who } from '@braindog/ports';
 
+import { MAC_APP, IOS_APP } from './apple.ts';
+import { appAccountTokenOf, transactionOf, verifyAppStore, type AppStoreTransaction } from './app-store.ts';
 import { SIGNUP_CLOSED, signupMode } from './launch.ts';
 import { sendMail, type MailEnv } from './mail.ts';
 import { op } from './oplog.ts';
@@ -189,6 +191,11 @@ export type BillingEnv = MailEnv & {
    */
   STRIPE_TAX?: string | undefined;
   PUBLIC_HOST?: string | undefined;
+  /**
+   * App Store purchases made in Apple's sandbox (TestFlight, Xcode, and App Review, which buys in the sandbox against
+   * the live server): taken unless this is `off`. Off, only production purchases move a plan.
+   */
+  APPLE_IAP_SANDBOX?: string | undefined;
   /** Who may make an account (`launch.ts`): while it is `closed`, nobody makes a free record either. */
   SIGNUP?: string | undefined;
 };
@@ -435,6 +442,39 @@ export async function reportExtra(env: BillingEnv, deps: Pick<BillingDeps, 'bill
 /** A gift's row (`comp`): the operator's, which no Stripe event moves. */
 export const isGift = (row: Pick<BillingRow, 'state'>): boolean => row.state === 'comp';
 
+/* ── the App Store ───────────────────────────────────────────────────────── */
+
+/**
+ * The App Store's subscriptions, by product id, each the plan it pays for. One subscription group ("BrainDog") a
+ * store app, Cloud and Cloud Plus monthly in it, at the Apple price point the web's figure is (`PLAN_TABLE`).
+ * The iPhone's ids are named now so the same server takes them once that app sells them.
+ */
+export const APPLE_PRODUCTS: Readonly<Record<string, HostedPlan>> = {
+  'dog.brain.desktop.cloud.monthly': 'cloud',
+  'dog.brain.desktop.plus.monthly': 'plus',
+  'dog.brain.app.cloud.monthly': 'cloud',
+  'dog.brain.app.plus.monthly': 'plus',
+};
+
+/** The apps whose purchases are taken: the Mac's and the iPhone's. */
+const APPLE_BUNDLES: ReadonlySet<string> = new Set([MAC_APP, IOS_APP]);
+
+/** A row's customer when it is paid through the App Store: `apple:<originalTransactionId>`, never a Stripe customer. */
+const APPLE_PREFIX = 'apple:';
+const appleCustomer = (originalTransactionId: string): string => `${APPLE_PREFIX}${originalTransactionId}`;
+
+/**
+ * A row paid for through the App Store. ITS CUSTOMER IS NO STRIPE CUSTOMER, so no door that asks Stripe takes it:
+ * the portal, invoices, extra usage and a pack's payer all step past it, and a deletion cannot end it (Apple's only).
+ */
+export const isApple = (row: Pick<BillingRow, 'customer'>): boolean => row.customer.startsWith(APPLE_PREFIX);
+
+/** The plan an App Store product pays for, or `null` for none of these. */
+const planOfProduct = (product: string | null): HostedPlan | null => (product !== null && Object.hasOwn(APPLE_PRODUCTS, product) ? APPLE_PRODUCTS[product]! : null);
+
+/** The one sentence a web door that asks Stripe says to a record paid through the App Store. */
+const APPLE_MANAGED = 'This BrainDog is paid for through the App Store. Its subscription is managed in your Apple account, or in Settings in the BrainDog app.';
+
 /**
  * The secret key, when billing is on and its mode and its key agree; otherwise the sentence that says which setting
  * is wrong. THE KEY'S PREFIX IS ITS MODE (`sk_test_`, `rk_test_`, `sk_live_`, `rk_live_`), so a live key on a host set
@@ -534,7 +574,7 @@ export type BillingDeps = {
 };
 
 /** The doors `serveAccount` is handed for billing's four rows. */
-export type BillingDoors = Required<Pick<AccountDoor, 'billing' | 'checkout' | 'portal' | 'invoices' | 'extra' | 'webhook'>>;
+export type BillingDoors = Required<Pick<AccountDoor, 'billing' | 'checkout' | 'portal' | 'invoices' | 'extra' | 'webhook' | 'apple' | 'appleNotify'>>;
 
 /**
  * A row whose record went back to Free when its plan was cancelled: it keeps its customer and has no subscription. Any
@@ -556,7 +596,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
    * customer and every payment page answered "Stripe could not be reached" (`billing-rehearsal.test.ts`, "FIX (gift
    * customer)").
    */
-  const payingAs = (rows: readonly BillingRow[]): string | undefined => rows.find((r) => r.customer !== '')?.customer;
+  const payingAs = (rows: readonly BillingRow[]): string | undefined => rows.find((r) => r.customer !== '' && !isApple(r))?.customer;
 
   /** The open records this person owns, from the Directory's usage ledger, as of today. */
   const ownedOpen = async (person: string): Promise<Result<AccountUsage['records']>> => {
@@ -688,7 +728,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
 
     const stripe = deps.stripe(key.value);
     /* A GIFT'S ROW HAS NO CUSTOMER, so the record's own is taken only when it has one. */
-    const paying = [row, ...rows].find((r) => r !== undefined && r.customer !== '')?.customer;
+    const paying = [row, ...rows].find((r) => r !== undefined && r.customer !== '' && !isApple(r))?.customer;
     const customer = paying ?? (await customerFor(stripe, who.person, who.email));
     if (customer === null) {
       op({ op: 'billing', door: 'checkout', ok: false, why: 'customer', pack: id }, 'error');
@@ -748,7 +788,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
           /* A RECORD BACK ON FREE IS LISTED AS ONE MADE FREE, with nothing billed and no period, so it is offered the upgrade. */
           const held = rows.find((b) => b.record === r.record);
           const row = held && !(backOnFree(held) && r.plan === FREE_PLAN.directory) ? held : undefined;
-          const plan: ListedPlan = planOfPrice(env, row?.price ?? null) ?? planOfMeter(r.plan);
+          const plan: ListedPlan = planOfPrice(env, row?.price ?? null) ?? planOfProduct(row?.price ?? null) ?? planOfMeter(r.plan);
           const lapsedAt = row?.state === 'lapsed' ? row.lapsed_at : null;
           /* THE PACK CREDITS LEFT ON IT, which a Directory without the ledger answers as none. */
           const credits = (await ledger({ op: 'credits', record: r.record }))?.packs ?? 0;
@@ -761,6 +801,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
             limits: limitsOf(plan),
             credits,
             ...(row && isGift(row) ? { gift: true } : {}),
+            ...(row && isApple(row) ? { by: 'apple' } : {}),
             ...(row && row.period_end !== null ? { period_end: row.period_end } : {}),
             ...(lapsedAt !== null ? { lapsed_at: lapsedAt, delete_on: lapsedAt + LAPSE_DELETES_DAYS * DAY_MS } : {}),
           };
@@ -825,7 +866,8 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
         if (row.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours to pay for by that id.', { at: 'record' });
         if (isGift(row)) return no('ALREADY_KNOWN', 'This BrainDog is a gift from us, so there is nothing to pay for.', { at: 'record' });
         if (row.state !== 'lapsed') return no('ALREADY_KNOWN', 'This BrainDog is paid for. Manage payment changes the card or the plan.', { at: 'record' });
-        customer = row.customer;
+        /* A LAPSED APP STORE PLAN PAID AGAIN ON THE WEB pays as this person's Stripe customer, never as `apple:`. */
+        customer = isApple(row) ? (payingAs(await deps.billing({ op: 'for', person: who.person })) ?? (await customerFor(stripe, who.person, who.email))) : row.customer;
         metadata = { person: who.person, record: row.record, plan: plan.value };
         back = `${origin.value}/${row.slug}/settings/billing`;
       }
@@ -883,6 +925,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const row = await ownedRow(who.person, body['record']);
     if (row === null || row.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours with a payment to manage by that id.', { at: 'record' });
     if (isGift(row)) return no('FORBIDDEN', 'This BrainDog is a gift from us, so there is no payment to manage.', { at: 'record' });
+    if (isApple(row)) return no('FORBIDDEN', APPLE_MANAGED, { at: 'record' });
     const stripe = deps.stripe(key.value);
     const back = `${origin.value}/${row.slug}/settings/billing`;
 
@@ -927,7 +970,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (!key.ok) return key;
     const row = await ownedRow(who.person, body['record']);
     if (row === null) return no('OUT_OF_BOUNDS', 'There is no record of yours with payments by that id.', { at: 'record' });
-    if (isGift(row) || row.customer === '') return ok({ invoices: [] });
+    if (isGift(row) || row.customer === '' || isApple(row)) return ok({ invoices: [] });
     const out = await invoicesOf(deps.stripe(key.value), row.customer);
     if (!Array.isArray(out)) {
       op({ op: 'billing', door: 'invoices', ok: false, status: out.status, code: out.code }, 'error');
@@ -1025,15 +1068,17 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
         op({ op: 'billing', did: 'paid', ok: false, why: 'gift', rec: record }, 'error');
         return 'gift';
       }
-      if (before.customer !== customer) throw new Error('a payment again for a record whose customer is another');
+      /* A LAPSED APP STORE PLAN PAID AGAIN ON THE WEB takes the Stripe customer from here on. */
+      const fromApple = isApple(before);
+      if (!fromApple && before.customer !== customer) throw new Error('a payment again for a record whose customer is another');
       await lapseSwitch(before, record, state);
       await planFollows(record, sub.price);
-      await setRow({ record, subscription: sub.id, price: sub.price, state, period_end: sub.period_end });
+      await setRow({ record, ...(fromApple ? { person, customer } : {}), subscription: sub.id, price: sub.price, state, period_end: sub.period_end });
       await backLetter(before, state, sub.email, before.slug);
       /* THE SUBSCRIPTION THIS PAYMENT REPLACED IS ENDED, so the record is never paid for twice. A failure is a line: the
          row already points at the new one, so nothing the old one says moves the record again. Once the row is written
          a later delivery reads the new subscription as the old one and ends nothing. */
-      if (before.subscription !== null && before.subscription !== sub.id) {
+      if (!fromApple && before.subscription !== null && before.subscription !== sub.id) {
         const ended = await endSubscription(stripe, before.subscription);
         if (ended !== true) op({ op: 'billing', did: 'end', ok: false, rec: record, status: ended.status, code: ended.code }, 'error');
       }
@@ -1349,6 +1394,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const row = await ownedRow(who.person, body['record']);
     if (row === null) return no('OUT_OF_BOUNDS', 'There is no paid record of yours by that id.', { at: 'record' });
     if (isGift(row)) return no('VALUE_MALFORMED', 'This plan is a gift and is never charged, so it has no extra usage.', { at: 'record' });
+    if (isApple(row)) return no('VALUE_MALFORMED', `${APPLE_MANAGED} Extra usage is sold on the web only.`, { at: 'record' });
     if (row.subscription === null || row.state === 'lapsed')
       return no('VALUE_MALFORMED', `Extra usage is part of ${planName('cloud')} and ${planName('plus')}, and this BrainDog is not paid for on either just now.`, { at: 'record' });
     if (cap > 0) {
@@ -1368,7 +1414,192 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     return ok({ record: row.record, extra: set.value });
   };
 
-  return { billing, checkout, portal, invoices, extra, webhook };
+  /* ── POST /account/billing/apple ──────────────────────────────────────── */
+
+  /** Whether a verified transaction is one this host takes: one of the apps, one of the products, and its environment. */
+  const appleRefusal = (tx: AppStoreTransaction): string | null => {
+    if (!APPLE_BUNDLES.has(tx.bundleId)) return 'bundle';
+    if (planOfProduct(tx.productId) === null) return 'product';
+    if (tx.environment === 'Sandbox' && (env.APPLE_IAP_SANDBOX ?? '').trim() === 'off') return 'sandbox';
+    if (tx.environment !== 'Sandbox' && tx.environment !== 'Production') return 'environment';
+    return null;
+  };
+
+  /**
+   * An App Store transaction applied to the record it pays for, by the same steps the Stripe webhook takes: the lapse
+   * switch, then the Directory's plan, then the row last; a plan that ended goes back to Free when it fits (`toFree`)
+   * and lapses when it does not, as a cancelled Stripe plan does.
+   *
+   * THE ROW IS `customer` AND `subscription` `apple:<originalTransactionId>`, `price` THE PRODUCT ID, `period_end` THE
+   * PERIOD'S END. Every renewal of one subscription shares its original transaction, so every notification finds the
+   * same row. AN OLDER TRANSACTION MOVES NOTHING: one whose period ends before the row's is a notification that came
+   * late, and the row already says what is true now.
+   */
+  const appleApplied = async (record: string, person: string, before: BillingRow | null, tx: AppStoreTransaction, said: 'active' | 'past_due' | 'ended' | null = null): Promise<string> => {
+    const plan = planOfProduct(tx.productId);
+    if (plan === null) return 'ignored';
+    const customer = appleCustomer(tx.originalTransactionId);
+    const ours = before !== null && before.customer === customer;
+    if (ours && before.period_end !== null && tx.expiresDate !== null && tx.expiresDate < before.period_end && tx.revocationDate === null) return 'stale';
+    const now = deps.clock();
+    /* A FAILED RENEWAL IS STILL WRITABLE while Apple retries the payment, though its period has passed. */
+    const ended = said === 'ended' || tx.revocationDate !== null || (said !== 'past_due' && tx.expiresDate !== null && tx.expiresDate <= now);
+    if (ended) {
+      /* A SUBSCRIPTION THAT ENDED BEFORE IT EVER PAID FOR THIS RECORD (a restore of an old one) writes nothing. */
+      if (!ours) return 'expired';
+      if (backOnFree(before)) return 'free';
+      if (await fitsFree(before)) return toFree(before);
+      await lapseSwitch(before, record, 'lapsed');
+      await setRow({ record, state: 'lapsed', period_end: tx.expiresDate });
+      return 'lapsed';
+    }
+    const state: BillingState = said === 'past_due' ? 'past_due' : 'active';
+    await lapseSwitch(before, record, state);
+    const refusal = await deps.setPlan(record, HOSTED_PLANS[plan].directory);
+    if (refusal !== null) op({ op: 'billing', did: 'plan', ok: false, rec: record, code: refusal.code }, 'error');
+    await setRow({ record, person, customer, subscription: customer, price: tx.productId, state, period_end: tx.expiresDate });
+    await backLetter(before, state, null, before?.slug ?? null);
+    return state;
+  };
+
+  /**
+   * The store app's plan door, `{ record }` or `{ record, jws }`, for a record this person owns.
+   *
+   * WITHOUT `jws`, what the app needs to draw the Plan screen: `{ record, token, plan, state, by, may_buy, products }`.
+   * `token` is the `appAccountToken` every purchase for this record carries; `by` is who the plan is paid through
+   * (`apple`, `web`, `gift`, or `null` for nothing paid); `may_buy` is whether a purchase may be offered at all.
+   * A RECORD PAID ON THE WEB, OR GIVEN, IS NEVER OFFERED ONE, so nobody pays for one record twice: the app shows the plan
+   * as it is, with no button and no word of where else it is bought.
+   *
+   * WITH `jws`, a signed transaction StoreKit handed the app, checked against Apple's root (`verifyAppStore`), and
+   * applied: it must carry this record's token and be no other record's subscription already. A Stripe subscription
+   * still on the record is ended, so the record is not paid for twice. Answers the same shape, read after.
+   */
+  const apple = async (who: Who, body: Record<string, unknown>): Promise<Result<unknown>> => {
+    const owned = await ownedOpen(who.person);
+    if (!owned.ok) return owned;
+    const mine = owned.value.find((r) => r.record === body['record']);
+    if (mine === undefined) return no('OUT_OF_BOUNDS', 'There is no record of yours by that id.', { at: 'record' });
+    const record = mine.record;
+    const token = await appAccountTokenOf(record);
+
+    let before = await deps.billing({ op: 'of', record });
+    if (body['jws'] !== undefined) {
+      const payload = await verifyAppStore(body['jws'], deps.clock());
+      const tx = payload === null ? null : transactionOf(payload);
+      if (tx === null) {
+        op({ op: 'billing', door: 'apple', ok: false, why: 'signature' }, 'error');
+        return no('VALUE_MALFORMED', 'That purchase could not be checked with the App Store. Try Restore Purchases.', { at: 'jws' });
+      }
+      const wrong = appleRefusal(tx);
+      if (wrong !== null) {
+        op({ op: 'billing', door: 'apple', ok: false, why: wrong }, 'error');
+        return no('VALUE_MALFORMED', 'That purchase is not a BrainDog plan this server sells.', { at: 'jws' });
+      }
+      if (tx.appAccountToken !== token) return no('FORBIDDEN', 'That App Store subscription was bought for another BrainDog, so it does not pay for this one.', { at: 'jws' });
+      const elsewhere = (await deps.billing({ op: 'byCustomer', customer: appleCustomer(tx.originalTransactionId) })).find((r) => r.record !== record);
+      if (elsewhere !== undefined) return no('ALREADY_KNOWN', 'That App Store subscription already pays for another BrainDog.', { at: 'jws' });
+      if (before !== null && isGift(before)) return no('ALREADY_KNOWN', 'This BrainDog is a gift from us, so there is nothing to pay for.', { at: 'record' });
+      /* NEVER TWO WAYS AT ONCE: a Stripe subscription still on the row ends as the App Store one takes over. */
+      if (before !== null && !isApple(before) && before.subscription !== null) {
+        const key = billingKey(env);
+        const ended = key.ok ? await endSubscription(deps.stripe(key.value), before.subscription) : null;
+        if (ended !== true) op({ op: 'billing', did: 'end', ok: false, why: 'apple', rec: record, ...(ended ? { status: ended.status, code: ended.code } : {}) }, 'error');
+      }
+      try {
+        const did = await appleApplied(record, who.person, before, tx);
+        op({ op: 'billing', door: 'apple', ok: true, did, env: tx.environment });
+      } catch (e) {
+        op({ op: 'billing', door: 'apple', ok: false, why: e instanceof Error ? e.message : 'unknown' }, 'error');
+        return no('RECORD_UNAVAILABLE', 'The purchase went through and could not be applied just now. Open Plan again in a minute.');
+      }
+      before = await deps.billing({ op: 'of', record });
+    }
+
+    const row = before !== null && !(backOnFree(before) && mine.plan === FREE_PLAN.directory) ? before : null;
+    const by = row === null ? null : isGift(row) ? 'gift' : isApple(row) ? 'apple' : row.subscription !== null && row.state !== 'lapsed' ? 'web' : null;
+    const plan: ListedPlan = planOfProduct(row?.price ?? null) ?? planOfPrice(env, row?.price ?? null) ?? planOfMeter(mine.plan);
+    const owner = mine.slug !== null;
+    return ok({
+      record,
+      token,
+      plan,
+      name: planName(plan),
+      state: row ? row.state : 'unbilled',
+      by,
+      ...(row && row.period_end !== null ? { period_end: row.period_end } : {}),
+      may_buy: owner && (by === null || by === 'apple'),
+      products: Object.keys(APPLE_PRODUCTS).map((id) => ({ id, plan: APPLE_PRODUCTS[id], name: planName(APPLE_PRODUCTS[id]!), limits: limitsOf(APPLE_PRODUCTS[id]!) })),
+    });
+  };
+
+  /* ── POST /account/billing/apple/notify ───────────────────────────────── */
+
+  /**
+   * App Store Server Notifications V2: `{ signedPayload }`, verified, and its transaction applied to the row that
+   * subscription pays for. A renewal moves the period on, a failed renewal is `past_due` (still writable, as Stripe's
+   * retries are), an expiry, a refund or a revocation ends the plan as a cancellation does.
+   *
+   * A SUBSCRIPTION NO ROW KNOWS YET is answered 200 and moves nothing: the app posts every purchase it makes, and every
+   * entitlement it holds each time it opens, so the row is written from there. A failure to apply is a 500, and Apple
+   * sends the notification again.
+   */
+  const appleNotify = async (request: Request): Promise<Response> => {
+    const raw = await bodyOf(request, 65_536);
+    if (raw === null) return answer(413, { ok: false, refusal: { code: 'BODY_MALFORMED', fix: 'A notification is at most 64 KB.' } });
+    let signed: unknown = null;
+    try {
+      signed = (JSON.parse(raw) as { signedPayload?: unknown }).signedPayload;
+    } catch {
+      signed = null;
+    }
+    const now = deps.clock();
+    const payload = await verifyAppStore(signed, now);
+    if (payload === null) {
+      op({ op: 'billing', door: 'apple-notify', ok: false, why: 'signature' }, 'error');
+      return answer(400, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'The signed payload is not signed by the App Store.' } });
+    }
+    const type = typeof payload['notificationType'] === 'string' ? payload['notificationType'] : '';
+    const subtype = typeof payload['subtype'] === 'string' ? payload['subtype'] : '';
+    const data = (typeof payload['data'] === 'object' && payload['data'] !== null ? payload['data'] : {}) as Record<string, unknown>;
+    if (type === 'TEST' || data['signedTransactionInfo'] === undefined) {
+      op({ op: 'billing', door: 'apple-notify', ok: true, event: type, did: 'nothing' });
+      return answer(200, { received: true });
+    }
+    const inner = await verifyAppStore(data['signedTransactionInfo'], now);
+    const tx = inner === null ? null : transactionOf(inner);
+    if (tx === null) {
+      op({ op: 'billing', door: 'apple-notify', ok: false, why: 'transaction', event: type }, 'error');
+      return answer(400, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'The transaction inside is not signed by the App Store.' } });
+    }
+    const wrong = appleRefusal(tx);
+    if (wrong !== null) {
+      op({ op: 'billing', door: 'apple-notify', ok: true, event: type, did: 'ignored', why: wrong });
+      return answer(200, { received: true });
+    }
+    try {
+      const before = (await deps.billing({ op: 'byCustomer', customer: appleCustomer(tx.originalTransactionId) }))[0] ?? null;
+      let did = 'unknown';
+      if (before !== null && !isGift(before)) {
+        const said =
+          type === 'EXPIRED' || type === 'GRACE_PERIOD_EXPIRED' || type === 'REFUND' || type === 'REVOKE'
+            ? 'ended'
+            : type === 'DID_FAIL_TO_RENEW'
+              ? 'past_due'
+              : type === 'SUBSCRIBED' || type === 'DID_RENEW' || type === 'DID_CHANGE_RENEWAL_PREF' || type === 'OFFER_REDEEMED' || type === 'RENEWAL_EXTENDED' || type === 'REFUND_REVERSED'
+                ? 'active'
+                : null;
+        did = said === null ? 'ignored' : await appleApplied(before.record, before.person, before, tx, said === 'active' ? null : said);
+      }
+      op({ op: 'billing', door: 'apple-notify', ok: true, event: type, subtype, did, env: tx.environment });
+      return answer(200, { received: true });
+    } catch (e) {
+      op({ op: 'billing', door: 'apple-notify', ok: false, event: type, why: e instanceof Error ? e.message : 'unknown' }, 'error');
+      return answer(500, { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'The notification was read and could not be applied.' } });
+    }
+  };
+
+  return { billing, checkout, portal, invoices, extra, webhook, apple, appleNotify };
 }
 
 /* ── a record deleted while it is paid for ───────────────────────────────── */
@@ -1390,6 +1621,11 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
 export async function endForDeleted(env: BillingEnv, deps: Pick<BillingDeps, 'billing' | 'stripe'>, record: string): Promise<'none' | 'ended' | 'failed'> {
   const row = await deps.billing({ op: 'of', record });
   if (row === null || isGift(row) || row.subscription === null) return 'none';
+  /* AN APP STORE SUBSCRIPTION IS ENDED ONLY BY ITS BUYER, in their Apple account: the line says one was left. */
+  if (isApple(row)) {
+    op({ op: 'billing', did: 'end', ok: false, why: 'apple', rec: record }, 'error');
+    return 'none';
+  }
   const key = billingKey(env);
   if (!key.ok) {
     op({ op: 'billing', did: 'end', ok: false, why: 'key', rec: record }, 'error');

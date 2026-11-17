@@ -112,6 +112,10 @@ struct MainWindow: View {
         .background(WindowReader { chrome.take($0) })
         .animation(.easeOut(duration: 0.2), value: session.signedIn)
         .quickLookPreview($model.previewing)
+        /* THE PLAN SHEET, over the window: when it closes the page reads its plan again. */
+        .sheet(item: $model.planFor, onDismiss: { model.desk.emit("refresh") }) { sheet in
+            PlanView(.record(sheet.record)) { model.planFor = nil }
+        }
         .onAppear {
             model.openWindow = { id in openWindow(id: id) }
             model.openSettings = { openSettings() }

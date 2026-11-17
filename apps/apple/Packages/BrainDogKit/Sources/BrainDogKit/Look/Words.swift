@@ -72,6 +72,30 @@ public enum Words {
     public static let about = "About"
     public static func version(_ v: String, _ build: String) -> String { "BrainDog for \(device) \(v) (\(build))" }
 
+    // Plan (App Store 3.1.1: the App Store's products and prices, bought with Apple)
+    public static let plan = "Plan"
+    public static let planSubscribe = "Subscribe"
+    public static let planCurrent = "Your plan"
+    public static let planRestore = "Restore Purchases"
+    public static let planManage = "Manage Subscription"
+    public static let planTerms = "Terms of Use"
+    public static let planPrivacy = "Privacy Policy"
+    public static let planFree = "Free"
+    public static let planActive = "Active"
+    public static let planBehind = "Renewal is late. The App Store is retrying the payment."
+    public static let planLapsed = "Ended. This BrainDog is read-only until a plan is chosen again."
+    public static let planOwnerOnly = "The owner of this BrainDog chooses its plan."
+    public static let planHeldElsewhere = "This plan is already on. There is nothing to buy here."
+    public static let planNoProducts = "The App Store's plans could not be read just now. Try again in a minute."
+    public static let planPending = "Waiting for approval. The plan starts once the purchase is approved."
+    public static let planFailed = "The App Store could not finish the purchase. Nothing was charged."
+    public static let planNothingToRestore = "No BrainDog subscription was found on this Apple account."
+    public static let planRenews = "Payment is charged to your Apple account. The subscription renews each month unless it is turned off at least 24 hours before the period ends, and can be managed or cancelled in your Apple account's subscription settings."
+    public static func planFor(_ record: String) -> String { "For \(record)" }
+    public static func planPrice(_ price: String, _ every: String) -> String { "\(price) \(every)" }
+    public static let planCloudLine = "Your BrainDog hosted for you, with Slash."
+    public static let planPlusLine = "More Slash, more AI tools and more people."
+
     // The shell
     public static let today = "Today"
     public static let needsYou = "Needs you"

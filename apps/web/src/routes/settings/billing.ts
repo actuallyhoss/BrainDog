@@ -124,6 +124,8 @@ export type BilledRecord = {
   credits: number | null;
   /** The operator gave this plan: never charged, nothing at Stripe to manage. */
   gift: boolean;
+  /** Paid for through the App Store, in a store app: nothing at Stripe to manage, and changed only with Apple. */
+  apple: boolean;
   /** What the plan holds, the one table's figures as the Worker sends them; `null` from a host older than the field. */
   limits: Limits | null;
 };
@@ -186,6 +188,7 @@ function billedOf(v: unknown): BilledRecord | null {
     deleteOn: num(v.delete_on),
     credits: credits === null ? null : Math.max(0, Math.floor(credits)),
     gift: v.gift === true || v.state === 'comp',
+    apple: v.by === 'apple',
     limits: limitsOf(v.limits),
   };
 }
@@ -285,7 +288,7 @@ export const EXTRA_CAP_MOST = 100_000;
  * not lapsed. A gift is never charged, and Free has none.
  */
 export const extraOffered = (r: BilledRecord | null, answer: BillingAnswer | null): boolean =>
-  r !== null && answer !== null && answer.extra === true && !r.gift && (r.state === 'active' || r.state === 'past_due') && (r.plan === 'cloud' || r.plan === 'plus');
+  r !== null && answer !== null && answer.extra === true && !r.gift && !r.apple && (r.state === 'active' || r.state === 'past_due') && (r.plan === 'cloud' || r.plan === 'plus');
 
 /**
  * A cap typed in whole currency units ("20", "12.50") as cents, or `null` when it is not one: a sum from a cent to
@@ -422,13 +425,25 @@ export function planLine(r: BilledRecord): string {
   return r.gift ? words.gift(name) : copy.billingPlan(name, r.price);
 }
 
+/**
+ * The plan as the store app's Plan tile says it (App Store 3.1.1): its name and how it stands, never a price of ours.
+ * `change` says whether the Plan sheet is for choosing a first plan or for changing one bought there; a plan paid any
+ * other way, or given, is shown as it is and the sheet only shows it too.
+ */
+export function inAppPlan(r: BilledRecord): { name: string; state: string | null; change: boolean } {
+  const name = r.plan === 'free' ? copy.planInAppFree : r.plan === 'plus' ? copy.billingPlanPlus : copy.billingPlanHosted;
+  const state =
+    r.plan === 'free' || r.state === 'unbilled' ? null : r.state === 'past_due' ? copy.planInAppBehind : r.state === 'lapsed' ? copy.planInAppLapsed : copy.planInAppActive;
+  return { name: r.gift ? words.gift(name) : name, state, change: r.apple && r.state !== 'lapsed' };
+}
+
 /** What a record's line says beside its name: its plan, or that it is not billed (a record the operator made). */
 export function planShown(r: BilledRecord): string {
   return r.plan === 'free' || r.gift || r.state !== 'unbilled' ? planLine(r) : copy.billingNotBilled;
 }
 
 /** Whether Stripe's own page has anything to manage for this record: a gift and a record with no row have nothing there. */
-export const managedAtStripe = (r: BilledRecord, answer: BillingAnswer): boolean => answer.open && r.state !== 'unbilled' && !r.gift;
+export const managedAtStripe = (r: BilledRecord, answer: BillingAnswer): boolean => answer.open && r.state !== 'unbilled' && !r.gift && !r.apple;
 
 /**
  * What a record says of Slash credit packs: what is left of them, and the packs it can buy, or nothing at all.
@@ -477,7 +492,7 @@ export function moreOf(l: Limits | null): string | null {
  * a gift, a lapsed record (which pays again on the plan it picks) and while the host takes no payment.
  */
 export function moveUpOf(r: BilledRecord, answer: BillingAnswer): SoldPlan | null {
-  if (!answer.open || r.gift || r.state === 'lapsed' || r.state === 'unbilled' || r.plan !== 'cloud') return null;
+  if (!answer.open || r.gift || r.apple || r.state === 'lapsed' || r.state === 'unbilled' || r.plan !== 'cloud') return null;
   return answer.plans.find((p) => p.id === 'plus') ?? null;
 }
 

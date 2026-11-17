@@ -25,7 +25,7 @@
 <script lang="ts">
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { inStoreApp } from '$lib/shell.ts';
+  import { inStoreApp, sellsInApp } from '$lib/shell.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { ONLY_WIDE, rowsOf, type AreaGroup } from './place.ts';
@@ -39,7 +39,7 @@
       <h2 class="group-title">{g.title}</h2>
       <ul class="area-rows">
         {#each rowsOf(g) as a (a.href)}
-          {#if inStoreApp && a.id === 'billing'}
+          {#if inStoreApp && !sellsInApp && a.id === 'billing'}
             <!-- NO PLAN IN A STORE APP (App Store 3.1.1 / 3.1.3(f)): no row, no line naming a plan or where it is bought. -->
           {:else}
           <!-- `wide-only` is one of `settings.css`'s shared rules: the row is not drawn below 900px. -->
@@ -47,8 +47,8 @@
             <a class="area-row" href={at(a.href)} aria-current={a.id !== undefined && a.id === current ? 'page' : undefined}>
               <span class="area-icon"><IconWell name={a.icon} /></span>
               <span class="words">
-                <span class="name">{a.label}</span>
-                {#if a.line}<span class="area-line">{a.line}</span>{/if}
+                <span class="name">{inStoreApp && a.id === 'billing' ? copy.planInApp : a.label}</span>
+                {#if a.line && !(inStoreApp && a.id === 'billing')}<span class="area-line">{a.line}</span>{/if}
               </span>
               <span class="go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
             </a>

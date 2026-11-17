@@ -63,6 +63,8 @@ interface Shell {
   actions?(list: readonly ShellAction[]): void;
   /** Native pushes a screen for this address instead of the page moving in place (the iPhone's stacks). */
   visit?(path: string, opts: { mode: VisitMode }): void;
+  /** The store app's Plan sheet for a record, where the App Store sells the plans (StoreKit). Only the Apple apps have it. */
+  plans?(record: string): void;
 }
 
 const shell = (): Shell | undefined => (globalThis as { __BRAINDOG_SHELL__?: Shell }).__BRAINDOG_SHELL__;
@@ -100,11 +102,26 @@ function readAndroid(): boolean {
 export const inAndroidApp: boolean = readAndroid();
 
 /**
- * An app a store sells that takes no card of ours: the iPhone's, the Mac's or Android's, where a plan is never bought or
- * managed inside the app and no press leads out to a payment page (App Review 3.1.1 and 3.1.3, Google Play's payments
- * policy). Windows and the web take the card as usual.
+ * An app a store sells that takes no card of ours: the iPhone's, the Mac's or Android's, where no price of ours is shown
+ * and no press leads out to a payment page (App Review 3.1.1 and 3.1.3, Google Play's payments policy). A plan is bought
+ * there only through the store itself, where the app sells it (`sellsInApp`). Windows and the web take the card as usual.
  */
 export const inStoreApp: boolean = shellKind() === 'ios' || shellKind() === 'mac' || inAndroidApp;
+
+/**
+ * A store app that sells the plans itself, through the App Store (the Apple apps, whose shell has `plans`). There the
+ * Plan screen shows the record's plan and opens native's Plan sheet, where the App Store's own prices are shown and a
+ * plan is bought with Apple; nothing names a price of ours, a payment page or the web. Android sells nothing yet.
+ */
+export const sellsInApp: boolean = inStoreApp && typeof shell()?.plans === 'function';
+
+/** Open native's Plan sheet for a record. True when the app took it. */
+export function openPlans(record: string): boolean {
+  const s = shell();
+  if (!sellsInApp || !s?.plans) return false;
+  s.plans(record);
+  return true;
+}
 
 /** In the native Mac app, which keeps the web's own frame under its title bar. */
 export const inMacApp: boolean = shellKind() === 'mac';

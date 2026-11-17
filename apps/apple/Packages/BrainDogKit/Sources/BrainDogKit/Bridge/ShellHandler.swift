@@ -28,6 +28,8 @@ nonisolated public enum ShellAsk: Sendable, Equatable {
     case settled
     /// The page's own buttons, handed to the native bar (`head-actions.ts`): `[{ id, label, icon, primary }]`.
     case actions(JSONValue)
+    /// The store app's Plan sheet for a record, by its id (`openPlans` in `shell.ts`).
+    case plans(record: String)
 }
 
 /// The kind of shell a web view is in, which the web reads as `kind` and decides its frame by.
@@ -110,6 +112,9 @@ public final class ShellBridge: NSObject, WKScriptMessageHandler {
         case "actions":
             if let list = a["list"], let data = try? JSONSerialization.data(withJSONObject: list, options: [.fragmentsAllowed]),
                let value = try? JSONDecoder().decode(JSONValue.self, from: data) { hear(.actions(value)) }
+        case "plans":
+            let record = text("record")
+            if !record.isEmpty, record.count <= 128 { hear(.plans(record: record)) }
         case "drag":
             hear(.drag)
         case "zoom":

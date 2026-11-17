@@ -23,6 +23,9 @@ struct SettingsView: View {
             SigningInSettings()
                 .tabItem { Label { Text("Signing in") } icon: { glyph(.session) } }
                 .tag("signing-in")
+            PlanSettings()
+                .tabItem { Label { Text(Words.plan) } icon: { glyph(.money) } }
+                .tag("plan")
         }
         .frame(width: 500)
         .fixedSize(horizontal: false, vertical: true)
@@ -169,5 +172,20 @@ private struct SigningInSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// The plan of the BrainDog open in the window, as the App Store sells it (`PlanView`): the same screen the page's
+/// Plan tile opens.
+private struct PlanSettings: View {
+    @State private var model = MacModel.shared
+    @State private var session = Session.shared
+
+    var body: some View {
+        if session.signedIn, let slug = model.boot?.record?.slug {
+            PlanView(.slug(slug)).frame(height: 520)
+        } else {
+            Form { Text(Words.planOwnerOnly).foregroundStyle(.secondary) }.formStyle(.grouped)
+        }
     }
 }

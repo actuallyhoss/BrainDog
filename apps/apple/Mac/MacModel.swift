@@ -25,6 +25,14 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
     /// A file the page opened to be looked at (an attached PDF), in Quick Look over the window.
     var previewing: URL?
 
+    /// The record whose Plan sheet is open over the window (`plans` from the page).
+    var planFor: PlanSheet?
+
+    struct PlanSheet: Identifiable, Hashable {
+        let record: String
+        var id: String { record }
+    }
+
     /// One place in the app: the Go menu's and the quick panel's Search's.
     struct Place: Identifiable, Hashable {
         let href: String
@@ -85,6 +93,7 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
         desk.webView.pageZoom = zoom
         desk.cover = LaunchPicture.kept
         HotKey.shared.onPress = { QuickPanel.shared.toggle() }
+        PlanStore.shared.listen()
         HotKey.shared.start()
         NotificationCenter.default.addObserver(forName: NSApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.keepPicture() }
@@ -144,6 +153,8 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
         boot = nil
         badge(0)
         tell.text = ""
+        planFor = nil
+        PlanStore.shared.forget()
         GlanceStore.redraw()
     }
 
@@ -176,6 +187,8 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
             desk.emit("slash", prefill.isEmpty ? nil : prefill)
         case .visit(let path, _):
             desk.go(path)
+        case .plans(let record):
+            planFor = PlanSheet(record: record)
         case .ready, .haptic, .signedOut, .title, .places, .pushAsk, .drag, .titleBarDoubleClick, .scheme, .modal, .settled, .actions:
             break
         }

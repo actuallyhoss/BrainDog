@@ -65,7 +65,7 @@ export { personName } from './invite.ts';
  * `worker` ROWS ARE BILLING'S AND CLOSING'S, which a self-host has no use for. A host that serves a row answers it;
  * one that does not hand `serveAccount` the row's door answers 404, and the row stays one table for both.
  */
-export type AccountRoute = { path: string; method: 'GET' | 'POST'; on: 'both' | 'worker'; needs: 'session' | 'stripe'; what: string };
+export type AccountRoute = { path: string; method: 'GET' | 'POST'; on: 'both' | 'worker'; needs: 'session' | 'stripe' | 'apple'; what: string };
 
 /**
  * The routes that answer about a person's account rather than a record.
@@ -89,6 +89,10 @@ export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
   { path: '/account/billing/invoices', method: 'POST', on: 'worker', needs: 'session', what: 'The newest invoices for a BrainDog you own and pay for, `{ record }`, each with its own page at the payment provider.' },
   { path: '/account/billing/extra', method: 'POST', on: 'worker', needs: 'session', what: 'Extra usage past the allowance for a paid record you own, under a monthly cap: `{ record, cap_cents }`, 0 turning it off.' },
   { path: '/account/billing/webhook', method: 'POST', on: 'worker', needs: 'stripe', what: 'The payment provider saying a payment happened, signed over the body as it was sent.' },
+  /* THE STORE APPS' PLAN: purchases are made with Apple in the app and told to the server here (`billing.ts`), and
+     Apple's own server notifications arrive at `notify`, signed over their payload, with no cookie, as Stripe's do. */
+  { path: '/account/billing/apple', method: 'POST', on: 'worker', needs: 'session', what: 'The plan of a BrainDog you own as the store app draws it, `{ record }`, or an App Store purchase applied to it, `{ record, jws }`.' },
+  { path: '/account/billing/apple/notify', method: 'POST', on: 'worker', needs: 'apple', what: 'The App Store saying a subscription renewed, ended or was refunded, signed over its payload.' },
   { path: '/account/close', method: 'POST', on: 'worker', needs: 'session', what: 'Close your account, `{ email }` typed to confirm, from a sign-in in the last fifteen minutes.' },
   /* THE WAY BACK FROM A LOST MAILBOX, with the operator's claim link: sign in by passkey or claim link, then change the
      address. Both hosts, because a self-host's person loses a mailbox as easily; a host with no way to send mail is
@@ -127,6 +131,10 @@ export type AccountDoor = {
   invoices?: AccountAsk | undefined;
   /** `POST /account/billing/extra`: `{ record, extra }`, the record's extra usage under the cap just set. */
   extra?: AccountAsk | undefined;
+  /** `POST /account/billing/apple`: the store app's plan for a record this person owns, after any App Store purchase it sent. */
+  apple?: AccountAsk | undefined;
+  /** `POST /account/billing/apple/notify`: App Store Server Notifications V2, answered whole by the door, as the webhook is. */
+  appleNotify?: ((request: Request) => Promise<Response>) | undefined;
   /** `POST /account/close`: the account closed, after the checks the door makes. */
   close?: AccountAsk | undefined;
   /**
@@ -344,7 +352,7 @@ export function closeDoor(deps: CloseDeps): AccountAsk {
 type Asked = (who: Who, body: Record<string, unknown>, url: URL) => Result<unknown> | Promise<Result<unknown>>;
 
 function askedOf(path: string, door: AccountDoor): Asked | null {
-  const { billing, checkout, portal, invoices, extra, close, email } = door;
+  const { billing, checkout, portal, invoices, extra, apple, close, email } = door;
   switch (path) {
     case '/account/usage':
       return (who, _body, url) => door.usage(who.person, { from: url.searchParams.get('from') ?? '', to: url.searchParams.get('to') ?? '' });
@@ -360,6 +368,8 @@ function askedOf(path: string, door: AccountDoor): Asked | null {
       return invoices ? (who, body) => invoices(who, body) : null;
     case '/account/billing/extra':
       return extra ? (who, body) => extra(who, body) : null;
+    case '/account/billing/apple':
+      return apple ? (who, body) => apple(who, body) : null;
     case '/account/close':
       return close ? (who, body) => close(who, body) : null;
     case '/account/email':
@@ -401,6 +411,7 @@ export async function serveAccount(request: Request, door: AccountDoor): Promise
 
   /* UNTOUCHED: no cookie read, no origin asked, no byte of the body consumed. */
   if (route.needs === 'stripe') return door.webhook ? door.webhook(request) : unserved();
+  if (route.needs === 'apple') return door.appleNotify ? door.appleNotify(request) : unserved();
 
   const asked = askedOf(path, door);
   if (asked === null) return unserved();

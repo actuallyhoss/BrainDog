@@ -58,6 +58,12 @@ public final class Client: Sendable {
         return try decodeValue(data)
     }
 
+    /// A door of the person's own account that takes a POST (`/account/billing/apple`), answered as `T`.
+    public func account<T: Decodable & Sendable>(_ path: String, _ body: [String: JSONValue] = [:], as: T.Type = T.self) async throws(CallFailure) -> T {
+        let data = try await post(path, body: .object(body))
+        return try decodeValue(data)
+    }
+
     /// A read of the person's own (`GET /account/records`), answered as `T`: the account's doors are GETs, a record's are POSTs.
     public func get<T: Decodable & Sendable>(_ path: String, as: T.Type = T.self) async throws(CallFailure) -> T {
         var request = URLRequest(url: Server.url(path))

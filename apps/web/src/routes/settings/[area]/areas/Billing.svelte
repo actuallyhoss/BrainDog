@@ -5,18 +5,19 @@
   export are. A free record says Free and offers the paid plans quietly, or says they are coming soon while they are.
   A limit reached is said in red under the bars, kindly: what waits, what still works, when it comes back, and the way on.
 
-  IN THE IPHONE APP NONE OF IT (App Store 3.1.1, apps plan §3.4): one plain line says where the plan is managed, with no
-  link, no price and no way to pay, and nothing of the Cloud's billing is asked. The Mac app draws Billing as usual.
+  IN A STORE APP NONE OF IT (App Store 3.1.1): no price of ours, no payment page, no word of the web. Where the app sells
+  the plans itself through the App Store (`sellsInApp`, the Mac for now) a Plan tile names the plan and opens the app's
+  own Plan sheet, which shows Apple's prices and buys with Apple; anywhere else in a store app, nothing.
 -->
 <script lang="ts">
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { apiBase } from '$lib/at.ts';
-  import { inStoreApp, openOutside } from '$lib/shell.ts';
+  import { inStoreApp, onShell, openOutside, openPlans, sellsInApp } from '$lib/shell.ts';
   import { readUsage, words as actionWords, type Meter, type UsageView } from '$lib/record/actions.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import {
-    backFromCheckout, billingLine, dayOf, hostedHere, invoiceAmount, invoiceState, limitBars, managedAtStripe, monthDay, moveUpOf, packPage, packsOf,
+    backFromCheckout, billingLine, dayOf, hostedHere, inAppPlan, invoiceAmount, invoiceState, limitBars, managedAtStripe, monthDay, moveUpOf, packPage, packsOf,
     paymentPage, planLine, planShown, readBilling, readInvoices, shareOf, stateLine, thisRecord, tileWords, toolsConnected, upgradeOf,
     words as billWords, type BilledRecord, type Invoice,
   } from '../../billing.ts';
@@ -46,7 +47,12 @@
      `read()` would draw as a refusal on a screen that has nothing wrong with it. So the question is asked only where
      `boot` said the host is the Cloud, and everywhere else the key is `null` and nothing is asked. */
   const hosted = $derived(!inStoreApp && hostedHere(shell));
-  const bill = read(() => (hosted ? 'account-billing' : null), readBilling, { empty: (v) => v.records.length === 0 });
+  /* THE STORE APP THAT SELLS THE PLANS (`sellsInApp`) reads the same list for the plan's name and state, and nothing
+     else of it: no price, no payment page. The app says `refresh` once a purchase is applied, and the list is asked again. */
+  const inApp = $derived(sellsInApp && hostedHere(shell));
+  let asked = $state(0);
+  $effect(() => (inApp ? onShell('refresh', () => (asked += 1)) : undefined));
+  const bill = read(() => (hosted ? 'account-billing' : inApp ? `account-billing ${asked}` : null), readBilling, { empty: (v) => v.records.length === 0 });
 
   /**
    * THIS MONTH AGAINST THE ALLOWANCE, which only `/usage` asked for until this tile.
@@ -235,7 +241,22 @@
 {/snippet}
 
 {#if inStoreApp}
-  <!-- NO PLAN IN A STORE APP (App Store 3.1.1 / 3.1.3(f)): the app is a free companion and says nothing of what is sold. -->
+  <!-- THE STORE APP'S PLAN (App Store 3.1.1): bought with Apple in the app's own Plan sheet, which shows the App Store's
+       prices. Nothing here names a price of ours, a payment page or the web. Android sells nothing and shows nothing. -->
+  {#if inApp}
+    {@const here = billed ? inAppPlan(billed) : null}
+    <Tile icon="money" title={copy.planInApp}>
+      {#if here}
+        <p class="figure">{here.name}</p>
+        {#if here.state}<p class="hint">{here.state}</p>{/if}
+        <div class="row-actions">
+          <Button weight={here.change ? 'quiet' : 'primary'} onclick={() => billed && openPlans(billed.record)}>{here.change ? copy.planInAppChange : copy.planInAppSee}</Button>
+        </div>
+      {:else if bill.state !== 'waiting'}
+        <p class="hint">{copy.planInAppOwner}</p>
+      {/if}
+    </Tile>
+  {/if}
 {:else}
 <!-- WHILE THE BILL, THIS MONTH AND ITS COUNTS ARE READ the tiles wait out of sight (`settings.css`): the plan's tile
      landed over the bill and pushed it down, and the bill's own rows grew it after. -->
