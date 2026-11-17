@@ -46,6 +46,10 @@ public final class PlanStore {
         #endif
     }()
 
+    /// Whether the server sells plans now (`open` in `GET /account/billing`). FALSE UNTIL IT SAYS SO: while it is false
+    /// the app shows no Plan tab, no Plan sheet and no price, and asks StoreKit for nothing (billing off, 17 Nov).
+    public private(set) var selling = false
+
     public private(set) var products: [Product] = []
     public private(set) var status: PlanStatus?
     /// The product of the subscription active on this Apple account for this group, if any.
@@ -60,9 +64,20 @@ public final class PlanStore {
 
     // MARK: listening
 
-    /// Once, at launch: hear every transaction StoreKit hands the app from now on, and tell the server any it holds.
+    /// Ask the server whether it sells plans now, and start listening once it does. Asked at launch and at each sign-in.
+    public func check() async {
+        do {
+            let list = try await Client.shared.get("/account/billing", as: JSONValue.self)
+            if case .bool(let open) = list["open"] ?? .null { selling = open } else { selling = false }
+        } catch {
+            selling = false
+        }
+        if selling { listen() }
+    }
+
+    /// Once, while the server sells plans: hear every transaction StoreKit hands the app from now on, and tell the server any it holds.
     public func listen() {
-        guard listening == nil else { return }
+        guard selling, listening == nil else { return }
         listening = Task { [weak self] in
             for await update in Transaction.updates {
                 await self?.told(update)
@@ -76,6 +91,7 @@ public final class PlanStore {
     /// The plan of a record this person owns, by its id, with the App Store's products.
     public func open(record: String) async {
         line = nil
+        guard selling else { status = nil; return }
         await loadProducts()
         await read(record: record, jws: nil)
         await readOwned()
@@ -83,6 +99,7 @@ public final class PlanStore {
 
     /// The plan of the record with this name, found among the records this person owns (`GET /account/billing`).
     public func open(slug: String) async {
+        guard selling else { status = nil; return }
         do {
             let list = try await Client.shared.get("/account/billing", as: JSONValue.self)
             let records: [JSONValue] = { if case .array(let a) = list["records"] ?? .null { return a } else { return [] } }()

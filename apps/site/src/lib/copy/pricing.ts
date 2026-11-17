@@ -55,7 +55,7 @@ export const pricing = {
       title: 'Free to start.',
       lede: 'Everything in BrainDog is free for now, with no card.',
       plan: {
-        name: 'Free',
+        name: 'Free for now',
         price: '$0',
         lines: (f: Figures) => [
           'Every feature',
@@ -68,7 +68,7 @@ export const pricing = {
       },
       /* ONE LINE FOR WHAT COMES LATER (plan F20): a tile naming Cloud and Cloud Plus with two "Coming soon" rows said
          nothing a reader could act on. */
-      later: { say: 'Paid plans for more agents, more questions and your team come later. Nothing you set up now is lost.' },
+      later: { say: 'Every BrainDog gets the full allowance while paid plans are paused. They come back later. Nothing you set up now is lost.' },
       faq: {
         title: 'Questions people ask',
         questions: [

@@ -423,7 +423,8 @@
               <!-- THE SLASH LINE when there is no allowance of asks to draw a ring against, which is every host today. -->
               {#if r.slash && !asksOf(r) && !(rings.length > 0 && !used)}<p class="aside-line">{r.slash}</p>{/if}
               <!-- THE PLAN'S LIMITS IN ONE SENTENCE, then extra usage: its running amount, and the cap where one may be set. -->
-              {#if r.planLine}<p class="aside-line">{r.planLine}</p>{/if}
+              <!-- NO PLAN NAMED WHILE THE CLOUD SELLS NONE (billing off): every record has the full allowance, free for now. -->
+              {#if r.planLine && billed.value?.open !== false}<p class="aside-line">{r.planLine}</p>{/if}
               <!-- NEITHER IN THE IPHONE APP (App Store 3.1.1): what extra usage costs and the cap on it are bought at brain.dog. -->
               {#if r.extraUse && capOffered(r.record) && !inStoreApp}
                 <ExtraCap record={r.record} on={r.extraUse.on} cap={r.extraUse.cap} said={r.extra} onset={usage.reread} />

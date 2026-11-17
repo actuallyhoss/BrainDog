@@ -797,7 +797,9 @@ export const account = {
   /* ABOUT BRAINDOG'S OWN PLANS: "not taking payments" read as if her bakery had stopped taking them (E9). */
   /* N2 AND N3, THE SITE'S OWN WORDS: the paid plans are named, monthly, coming soon and priced at launch, and nothing made
      on Free is lost or locked when they arrive. */
-  billingNotOpen: 'Cloud and Cloud Plus, the monthly plans, are coming soon and priced at launch. Nothing you make now will be lost or locked when they arrive.',
+  billingNotOpen: 'BrainDog is free for now. Every BrainDog gets the full allowance while plans are paused, and nothing you make will be lost or locked when they come back.',
+  /* A record's plan while the host sells none (billing off): free, with Cloud Plus's allowance, and no price. */
+  billingFreeNow: 'Free for now',
   billingNoneOwned: 'Billing belongs to the owner, and you own no BrainDog here.',
   billingUnread: 'What your BrainDog costs could not be read just now. Try again in a minute.',
   /* The Worker's `LAPSED_FIX` (`apps/worker/src/lapse.ts`), word for word, because the banner and a refused write must

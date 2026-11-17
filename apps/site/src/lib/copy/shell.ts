@@ -23,8 +23,8 @@ export const shell = {
       title: LAUNCH.billing ? `BrainDog pricing: free to start, Cloud from ${TABLE.hosted.price.month} a month` : 'Pricing: free to start · BrainDog',
       description: LAUNCH.billing
         ? 'Free to start with 3 connected agents. Cloud and Cloud Plus add more agents, more questions and, on Cloud Plus, your team.'
-        : 'BrainDog is free to start: every feature, 3 connected agents and 20 questions to the built-in assistant a ' +
-          'month. Paid plans come later.',
+        : 'BrainDog is free for now: every feature, 75 connected agents and 400 questions to the built-in assistant a ' +
+          'month. Paid plans come back later.',
     },
     agents: {
       title: 'One memory for Claude Code, ChatGPT and Cursor · BrainDog',

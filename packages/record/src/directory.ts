@@ -1573,6 +1573,18 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
   if (version < DIRECTORY_VERSION) attempt(() => sql.exec(`PRAGMA user_version = ${DIRECTORY_VERSION}`));
 
   const mint = ulids(() => clock.now());
+
+  /**
+   * THE PLAN A RECORD IS METERED UNDER, which is its own plan while this host sells one. WHILE IT SELLS NOTHING
+   * (`host.sells === false`, the Worker with `BILLING` empty) EVERY RECORD GETS CLOUD PLUS'S ALLOWANCES: runs, requests,
+   * bytes, Slash credits, agents and files, so nobody meets a limit there is no way past. The stored plan is untouched,
+   * so billing turned back on meters each record under its own plan again. A self-host's plan is never limited anyway.
+   */
+  const meteredOf = (value: string | undefined): Plan => {
+    const plan = planOf(value);
+    return host.sells === false && plan !== 'selfhost' ? 'plus' : plan;
+  };
+
   const at = (): string => new Date(clock.now()).toISOString();
 
   /**
@@ -1797,7 +1809,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
   /** The record's plan, or `null` for a record this Directory does not know. */
   const planFor = (record: string): Plan | null => {
     const row = typeof record === 'string' ? sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record) : undefined;
-    return row ? planOf(row.plan) : null;
+    return row ? meteredOf(row.plan) : null;
   };
 
   const atOr = (at: unknown): number => (typeof at === 'number' && Number.isFinite(at) ? at : clock.now());
@@ -1907,6 +1919,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
    * next without anybody setting it again.
    */
   const extraMonth = (record: string, plan: Plan, at: number): ExtraUsage | null => {
+    /* NONE IS SOLD WHILE THE HOST SELLS NO PLAN: every record has Cloud Plus's allowance then, and no extra past it. */
+    if (host.sells === false) return null;
     if (PLAN_TABLE[plan].extra === null || PLAN_TABLE[plan].allowance === null) return null;
     const first = monthStart(at);
     const month = monthOf(first);
@@ -2704,7 +2718,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
     /** The plan a record is metered under, or `null` for a record this Directory does not hold. */
     planFor: (record: string): Plan | null => {
       const row = sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record);
-      return row === undefined ? null : planOf(row.plan);
+      return row === undefined ? null : meteredOf(row.plan);
     },
 
     /**
@@ -3139,7 +3153,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
      */
     mayRun: (record: string, action: string, pending = 0): { until: number; say: string } | null => {
       const row = sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record);
-      const allowance = row ? ALLOWANCE[planOf(row.plan)] : null;
+      const allowance = row ? ALLOWANCE[meteredOf(row.plan)] : null;
       if (!allowance) return null;
       const now = clock.now();
       const until = nextMonth(now);
@@ -3153,7 +3167,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       if (over === undefined) return null;
       const turns = new Date(until);
       /* PAST THE ALLOWANCE WITH EXTRA USAGE ON, IT RUNS UNTIL THE MONTH COMES TO THE CAP, and then waits with the cap named. */
-      const extra = row ? extraMonth(record, planOf(row.plan), now) : null;
+      const extra = row ? extraMonth(record, meteredOf(row.plan), now) : null;
       if (extra !== null && extra.on) {
         if (extra.cents < extra.cap_cents) return null;
         return {
@@ -3182,7 +3196,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
     notice: (record: string): UsageNotice | null =>
       sql.transactionSync(() => {
         const row = sql.one<{ plan: string; owner: string }>('SELECT plan, owner FROM dir_record WHERE id = ? AND closed_at IS NULL', record);
-        const allowance = row ? ALLOWANCE[planOf(row.plan)] : null;
+        const allowance = row ? ALLOWANCE[meteredOf(row.plan)] : null;
         if (!row || !allowance) return null;
         const now = clock.now();
         const first = dayOf(monthStart(now));
@@ -3194,7 +3208,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         const share = used[binding] / allowance[binding];
         /* WITH EXTRA USAGE ON, PAST THE ALLOWANCE THE CAP IS THE LIMIT, told by its own two rows (`notice:extra-near`,
            `notice:extra-held`), so a record told it neared its allowance is told again as it nears the cap. */
-        const extra = extraMonth(record, planOf(row.plan), now);
+        const extra = extraMonth(record, meteredOf(row.plan), now);
         const extraOn = extra !== null && extra.on;
         const past = extraOn && share >= 1;
         const capShare = past ? extra.cents / extra.cap_cents : 0;
@@ -3284,7 +3298,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         return { ...slashMonth(id, plan, now), asks: days.reduce((n, d) => n + d.asks, 0), neurons: days.reduce((n, d) => n + d.neurons, 0), days };
       };
       const records = owned.map((r): RecordUsage => {
-        const plan = planOf(r.plan);
+        const plan = meteredOf(r.plan);
         return {
           record: r.id,
           slug: slugOf(r.id),

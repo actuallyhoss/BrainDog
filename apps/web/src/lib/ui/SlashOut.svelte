@@ -12,8 +12,14 @@
   import Button from '$lib/ui/Button.svelte';
   import { inStoreApp } from '$lib/shell.ts';
   import { outOfAsks, words } from '$lib/ui/slash-asks.ts';
+  import { sellsHere } from '../../routes/settings/billing.ts';
 
-  const cloud = $derived(page.data.host === 'cloud' && !inStoreApp);
+  /* "SEE PLANS" ONLY WHILE THE CLOUD SELLS THEM (`sellsHere`): with billing off there is no plan to see. */
+  let selling = $state(false);
+  $effect(() => {
+    if (page.data.host === 'cloud' && !inStoreApp) void sellsHere().then((v) => (selling = v));
+  });
+  const cloud = $derived(page.data.host === 'cloud' && !inStoreApp && selling);
 </script>
 
 <div class="slash-out">

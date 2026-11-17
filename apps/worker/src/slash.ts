@@ -879,6 +879,9 @@ export function planAgents(sql: Sql, plan: string): void {
 /** Where the record's kernel reads the plan's room for files (`FILES_KEY` in `packages/kernel/src/attachment.ts`). */
 export const PLAN_FILES = 'plan.files';
 
+/** Whether the host sold plans when the two rows above were written (`true` or `false`), so a flip of billing rewrites them. */
+export const PLAN_SOLD = 'plan.sold';
+
 /**
  * A record's room for attached files, moved with its plan: `PLAN_TABLE`'s `files`, its name and the plan above it with
  * its room, which `writeAttachment` reads at every new file. A plan with no figure takes the row away, and absent is the

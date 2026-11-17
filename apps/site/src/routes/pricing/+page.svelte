@@ -43,7 +43,8 @@
         <div class="go"><Start /></div>
       </div>
       <ul>
-        {#each e.plan.lines(TABLE.free) as line (line)}<li>{line}</li>{/each}
+        <!-- WHILE BILLING IS OFF EVERY BRAINDOG HAS CLOUD PLUS'S ALLOWANCE (17 Nov), so these are its figures. -->
+        {#each e.plan.lines(TABLE.plus) as line (line)}<li>{line}</li>{/each}
       </ul>
     </article>
     <p class="later">{e.later.say}</p>

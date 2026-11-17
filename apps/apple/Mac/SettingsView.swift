@@ -11,6 +11,7 @@ enum SettingsTabs {
 /// out). Everything about the BrainDog itself is its Settings in the app, one press away.
 struct SettingsView: View {
     @State private var tab = SettingsTabs.chosen
+    @State private var plans = PlanStore.shared
 
     var body: some View {
         TabView(selection: $tab) {
@@ -23,9 +24,12 @@ struct SettingsView: View {
             SigningInSettings()
                 .tabItem { Label { Text("Signing in") } icon: { glyph(.session) } }
                 .tag("signing-in")
-            PlanSettings()
-                .tabItem { Label { Text(Words.plan) } icon: { glyph(.money) } }
-                .tag("plan")
+            /* NO PLAN TAB WHILE THE SERVER SELLS NO PLAN (`PlanStore.selling`, billing off from 17 Nov). */
+            if plans.selling {
+                PlanSettings()
+                    .tabItem { Label { Text(Words.plan) } icon: { glyph(.money) } }
+                    .tag("plan")
+            }
         }
         .frame(width: 500)
         .fixedSize(horizontal: false, vertical: true)

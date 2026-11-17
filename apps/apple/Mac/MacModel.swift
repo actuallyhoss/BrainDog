@@ -93,7 +93,6 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
         desk.webView.pageZoom = zoom
         desk.cover = LaunchPicture.kept
         HotKey.shared.onPress = { QuickPanel.shared.toggle() }
-        PlanStore.shared.listen()
         HotKey.shared.start()
         NotificationCenter.default.addObserver(forName: NSApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.keepPicture() }
@@ -137,6 +136,8 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
             }
         }
         glance = await GlanceStore.refresh() ?? glance
+        /* WHETHER THE SERVER SELLS PLANS NOW: no Plan tab, sheet or StoreKit call until it says it does. */
+        await PlanStore.shared.check()
         badge(count)
     }
 
@@ -188,7 +189,7 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
         case .visit(let path, _):
             desk.go(path)
         case .plans(let record):
-            planFor = PlanSheet(record: record)
+            if PlanStore.shared.selling { planFor = PlanSheet(record: record) }
         case .ready, .haptic, .signedOut, .title, .places, .pushAsk, .drag, .titleBarDoubleClick, .scheme, .modal, .settled, .actions:
             break
         }

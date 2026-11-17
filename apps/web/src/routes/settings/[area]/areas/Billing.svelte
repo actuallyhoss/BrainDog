@@ -79,8 +79,16 @@
   const meters = $derived<Meter[]>(allowed?.meters ?? []);
   const billed = $derived(bill.value ? thisRecord(bill.value, shell.index.slug) : null);
   const month = $derived(monthDay(shell.now));
+  /* WHILE THE HOST SELLS NO PLAN a record nobody pays for is "Free for now", with no plan name or price beside it. */
+  const freeNow = (r: BilledRecord): boolean => bill.value?.open === false && r.state === 'unbilled' && !r.gift;
   const figure = $derived(
-    billed && (billed.state !== 'unbilled' || billed.plan === 'free' || billed.gift) ? planLine(billed) : (allowed?.plan ?? null),
+    billed && freeNow(billed)
+      ? copy.billingFreeNow
+      : billed && (billed.state !== 'unbilled' || billed.plan === 'free' || billed.gift)
+        ? planLine(billed)
+        : bill.value?.open === false
+          ? copy.billingFreeNow
+          : (allowed?.plan ?? null),
   );
 
   /**
@@ -243,7 +251,7 @@
 {#if inStoreApp}
   <!-- THE STORE APP'S PLAN (App Store 3.1.1): bought with Apple in the app's own Plan sheet, which shows the App Store's
        prices. Nothing here names a price of ours, a payment page or the web. Android sells nothing and shows nothing. -->
-  {#if inApp}
+  {#if inApp && bill.value?.open === true}
     {@const here = billed ? inAppPlan(billed) : null}
     <Tile icon="money" title={copy.planInApp}>
       {#if here}
@@ -307,7 +315,7 @@
               <div class="bill-main">
                 <div class="bill-head">
                   <span class="bill-name" dir="auto">{nameOf(r)}</span>
-                  <span class="bill-plan">{planShown(r)}</span>
+                  <span class="bill-plan">{freeNow(r) ? copy.billingFreeNow : planShown(r)}</span>
                 </div>
                 {#if upgrade}
                   <p class="bill-state">{upgrade.line}</p>

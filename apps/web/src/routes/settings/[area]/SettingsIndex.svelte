@@ -26,11 +26,17 @@
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { inStoreApp, sellsInApp } from '$lib/shell.ts';
+  import { sellsHere } from '../billing.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { ONLY_WIDE, rowsOf, type AreaGroup } from './place.ts';
 
   let { groups, current }: { groups: readonly AreaGroup[]; current?: string | undefined } = $props();
+  /* A STORE APP'S PLAN ROW ONLY WHILE THE HOST SELLS PLANS (`sellsHere`): billing off, the app says nothing of plans. */
+  let selling = $state(false);
+  $effect(() => {
+    if (inStoreApp && sellsInApp) void sellsHere().then((v) => (selling = v));
+  });
 </script>
 
 <nav class="index" aria-label={copy.settings} data-beside={current === undefined ? undefined : ''}>
@@ -39,7 +45,7 @@
       <h2 class="group-title">{g.title}</h2>
       <ul class="area-rows">
         {#each rowsOf(g) as a (a.href)}
-          {#if inStoreApp && !sellsInApp && a.id === 'billing'}
+          {#if inStoreApp && !(sellsInApp && selling) && a.id === 'billing'}
             <!-- NO PLAN IN A STORE APP (App Store 3.1.1 / 3.1.3(f)): no row, no line naming a plan or where it is bought. -->
           {:else}
           <!-- `wide-only` is one of `settings.css`'s shared rules: the row is not drawn below 900px. -->

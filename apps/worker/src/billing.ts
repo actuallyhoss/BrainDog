@@ -781,6 +781,9 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const owned = await deps.usage(who.person, { from: today, to: today });
     if (!owned.ok) return owned;
     const rows = await deps.billing({ op: 'for', person: who.person });
+    /* WHILE THIS HOST SELLS NO PLAN EVERY RECORD HAS CLOUD PLUS'S ALLOWANCE (the Directory's `meteredOf`), so its limits
+       are said as Plus's and no price is named beside a record nobody pays for. */
+    const selling = sells(env);
     const records = await Promise.all(
       owned.value.records
         .filter((r) => !r.closed)
@@ -797,8 +800,8 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
             slug: r.slug,
             state: row ? row.state : 'unbilled',
             plan,
-            price: planPrice(plan),
-            limits: limitsOf(plan),
+            price: selling || row ? planPrice(plan) : '',
+            limits: limitsOf(selling ? plan : 'plus'),
             credits,
             ...(row && isGift(row) ? { gift: true } : {}),
             ...(row && isApple(row) ? { by: 'apple' } : {}),
@@ -808,7 +811,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
         }),
     );
     const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: planName(p), price: planPrice(p), limits: limitsOf(p) }));
-    const open = sells(env);
+    const open = selling;
     const canMake = signupMode(env) !== 'closed' && !records.some((r) => r.plan === 'free');
     return ok({ records, open, plans: open ? sold : [], packs: packsOnSale(env), extra: sellsExtra(env), tax: open && taxOn(env), canMake, teams_held: (env as { TEAMS_HELD?: string }).TEAMS_HELD === '1' });
   };

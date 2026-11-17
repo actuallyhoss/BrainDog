@@ -14,13 +14,14 @@ export const FOR_SHOWN: readonly string[] = ['/for/founders', '/for/teams', '/fo
  * production's Worker vars (`apps/worker/wrangler.jsonc`), and `claims.test.ts` holds each pair equal:
  * `signup` is `SIGNUP` being `open` or `invite` (a stranger reaches sign-up either way), and `billing` is `BILLING` being `live`.
  *
- * SIGN-UP OPENED TO STRANGERS ON 8 OCTOBER. Billing went live on 5 November, on the owner's word.
+ * SIGN-UP OPENED TO STRANGERS ON 8 OCTOBER. Billing went live on 5 November, on the owner's word, and off again on
+ * 17 November until the Mac app is approved: everything is free for now.
  */
 export const LAUNCH = {
   signup: true, // a stranger can make a hosted record at SIGNUP
   invite: false, // sign-up is by invite (SIGNUP=invite): every start button says "Get early access"
-  billing: true, // the Hosted price is charged
-  extra: true, // extra usage past the allowance is sold: production sets STRIPE_PRICE_EXTRA and STRIPE_METER_EXTRA, with billing live
+  billing: false, // the Hosted price is charged (off from 17 Nov: free for now, until the Mac app is approved)
+  extra: false, // extra usage past the allowance is sold: production sets STRIPE_PRICE_EXTRA and STRIPE_METER_EXTRA, with billing live
   repo: true, // the GitHub repository is public (the owner)
   cli: true, // the CLI is on npm under the name the docs print
   render: true, // braindog-render is on npm

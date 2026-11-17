@@ -265,6 +265,14 @@ export async function readBilling(io: Fetch = (u, i) => globalThis.fetch(u, i)):
 }
 
 /**
+ * WHETHER THIS HOST SELLS PLANS NOW (`open`), asked once a page load. A store app shows no plan, no price and no way to
+ * a plan while it is false (billing off from 17 Nov until the Mac app is approved), and nothing else on the web
+ * offers one either. Any failure is `false`, so a screen that cannot ask shows nothing about plans.
+ */
+let sold: Promise<boolean> | null = null;
+export const sellsHere = (): Promise<boolean> => (sold ??= readBilling().then((o) => o.ok && o.value.open, () => false));
+
+/**
  * Ask for the page a payment is made or managed on, and answer its address.
  *
  * `portal` IS STRIPE'S OWN PAGE for a record already paid for, and `checkout` WITH `record` IS PAYING AGAIN for one that

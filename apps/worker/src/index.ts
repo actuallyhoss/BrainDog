@@ -75,7 +75,7 @@ import { fileModelSignMoved } from '@braindog/host/sign-model';
 import { ALARM_SLICE_UNITS, ASIDE_MS, breathe, pace, type Pace } from './alarm-pace.ts';
 import { OBSERVED_LATER_MS, observedLater, type ObservedLater } from './observed-later.ts';
 import { slashDue, slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
-import { PLAN_AGENTS, PLAN_FILES, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
+import { PLAN_AGENTS, PLAN_FILES, PLAN_SOLD, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
 import { fallbackWire, includedCandidates, includedInference, kennelNoteModel } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerMeaning, workerModelJobs } from './slash-jobs.ts';
@@ -810,7 +810,10 @@ export class Record$ extends DurableObject<Env> {
     }
     if (plan === null) return null;
     try {
-      planAgents(guardedSql(this.ctx.storage), plan);
+      const sql = guardedSql(this.ctx.storage);
+      planAgents(sql, plan);
+      /* AND WHETHER THE HOST SOLD PLANS WHEN IT WAS WRITTEN, so billing switched off or on asks again (`#agentsHeld`). */
+      sql.exec('INSERT INTO host_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value', PLAN_SOLD, String(sells(this.env)));
     } catch (e) {
       op({ op: 'plan', did: 'agents', ok: false, rec: record, error: e instanceof Error ? e.message : String(e) }, 'error');
       return plan;
@@ -826,6 +829,9 @@ export class Record$ extends DurableObject<Env> {
    */
   #agentsHeld(sql: Sql): boolean {
     if (!sql.one("SELECT 1 AS hit FROM sqlite_master WHERE type = 'table' AND name = 'host_meta'")) return false;
+    /* WRITTEN WHILE THE HOST SOLD PLANS AND READ WHILE IT SELLS NONE, or the other way: the plan is asked again, so every
+       record gets Cloud Plus's room while billing is off and its own plan's when it is back on. */
+    if (sql.one<{ value: string }>('SELECT value FROM host_meta WHERE key = ?', PLAN_SOLD)?.value !== String(sells(this.env))) return false;
     return Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM host_meta WHERE key IN (?, ?)', PLAN_AGENTS, PLAN_FILES)?.n ?? 0) === 2;
   }
 
