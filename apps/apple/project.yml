@@ -160,8 +160,10 @@ targets:
           - CFBundleURLName: dog.brain.desktop
             CFBundleURLSchemes: [braindog]
         BrainDogServer: https://app.brain.dog
-        BrainDogAppGroup: $(TeamIdentifierPrefix)dog.brain
-        BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
+        # Written out, not $(TeamIdentifierPrefix): the store archive is built unsigned, where the prefix is empty, and the
+        # app then asked for groups its signature does not hold.
+        BrainDogAppGroup: MG86668Z52.dog.brain
+        BrainDogKeychainGroup: MG86668Z52.dog.brain.shared
         # The menu bar extra and the Dock badge keep the count while the window is closed; the app stays open then.
         NSSupportsAutomaticTermination: false
 
@@ -220,8 +222,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         BrainDogServer: https://app.brain.dog
-        BrainDogAppGroup: $(TeamIdentifierPrefix)dog.brain
-        BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
+        BrainDogAppGroup: MG86668Z52.dog.brain
+        BrainDogKeychainGroup: MG86668Z52.dog.brain.shared
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
@@ -287,8 +289,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         BrainDogServer: https://app.brain.dog
-        BrainDogAppGroup: $(TeamIdentifierPrefix)dog.brain
-        BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
+        BrainDogAppGroup: MG86668Z52.dog.brain
+        BrainDogKeychainGroup: MG86668Z52.dog.brain.shared
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareController
