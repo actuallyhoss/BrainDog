@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   The Mac app, signed for the Mac App Store. Sandboxed; the network for the web app and
-  the calls; Downloads for exports and backups; passkeys through both names, universal links on app.brain.dog;
+  the calls; a Save panel for exports and backups; passkeys through both names, universal links on app.brain.dog;
   the team-prefixed App Group and the
   Keychain group the widgets and the share extension read the session from; push (M4).
 -->
@@ -11,8 +11,6 @@
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<key>com.apple.security.network.client</key>
-	<true/>
-	<key>com.apple.security.files.downloads.read-write</key>
 	<true/>
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>

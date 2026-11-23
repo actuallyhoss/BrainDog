@@ -195,22 +195,28 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// An export or a backup the page made: into Downloads, said back to the page, and shown in Finder.
+    /// An export or a backup the page made: saved where the person picks in a Save panel, said back to the page, and shown in Finder.
+    /// THE PANEL, NOT DOWNLOADS: the store build holds only the user-selected file entitlement, so a place the person chose is the one it may write.
     private func keep(_ file: URL) {
-        guard let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
-        var target = downloads.appendingPathComponent(file.lastPathComponent)
-        let stem = target.deletingPathExtension().lastPathComponent, ext = target.pathExtension
-        var n = 2
-        while FileManager.default.fileExists(atPath: target.path) {
-            target = downloads.appendingPathComponent(ext.isEmpty ? "\(stem) \(n)" : "\(stem) \(n).\(ext)")
-            n += 1
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = file.lastPathComponent
+        panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        panel.canCreateDirectories = true
+        let done: (NSApplication.ModalResponse) -> Void = { [weak self] answer in
+            guard let self else { return }
+            guard answer == .OK, let target = panel.url else {
+                try? FileManager.default.removeItem(at: file)
+                return
+            }
+            do {
+                if FileManager.default.fileExists(atPath: target.path) { try FileManager.default.removeItem(at: target) }
+                try FileManager.default.moveItem(at: file, to: target)
+                NSWorkspace.shared.activateFileViewerSelecting([target])
+            } catch {
+                self.desk.emit("unsaved", file.lastPathComponent)
+            }
         }
-        do {
-            try FileManager.default.moveItem(at: file, to: target)
-            NSWorkspace.shared.activateFileViewerSelecting([target])
-        } catch {
-            desk.emit("unsaved", file.lastPathComponent)
-        }
+        if let window = desk.webView.window { panel.beginSheetModal(for: window, completionHandler: done) } else { done(panel.runModal()) }
     }
 
     private func share(_ items: [Any]) {
