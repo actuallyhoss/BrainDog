@@ -260,8 +260,9 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.portfolio);
   /* 1.31.0 AND 1.31.1 SINCE 3 November: Numbers with no reading says what it will list, and opens on no line. 1.31.2 SINCE
      4 November: Projects opens on the projects, with no bar of how they are going (fdc1b185b). 1.32.0 SINCE 9 November: a
-     project wears a picture, its logo, in place of its mark. */
-  assert.equal(doc.version, '1.32.0');
+     project wears a picture, its logo, in place of its mark. 1.33.0 SINCE 24 November: In play holds only the projects in
+     play, and the parked and closed are their own list at the end. */
+  assert.equal(doc.version, '1.33.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');

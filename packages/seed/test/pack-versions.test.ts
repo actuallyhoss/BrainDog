@@ -3947,6 +3947,25 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'portfolio@1.33.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-lane-earning
+      metric.projects-live metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track
+      metric.projects-parked metric.projects-past-aim metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      metric.readings-held
+      page.all-numbers page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.kind-offers-kpis rule.project-past-aim
+      script.kind_drafts script.kpi_backfill
+    `,
+    declares: 'e440799850b68361',
+    history: [
+      'portfolio 1.33.0 of 24 November (his record): `page.portfolio` draws only the projects in play on its board, and the parked and closed as a list of their own under Parked and closed, grouped by status and folded past four -> e440799850b68361',
+    ],
+  },
+
   'portfolio@1.32.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged

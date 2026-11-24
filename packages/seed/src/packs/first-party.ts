@@ -1062,10 +1062,15 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   Noor): `page.money-plan` is drawn for every plan that is not cancelled (`for.where`), where it was drawn for every
  *   plan. The cancelled rows and their parts stay, read on Plans; only their pages go, and a plan opened again has its
  *   page back. No id added or taken away, a patch step that keeps every row.
+ * - portfolio 1.33.0 (24 Nov, his record: In play drew 13 of his 32 projects that are parked or closed): `page.portfolio`'s
+ *   board reads the projects in play alone (`where: lane is building or earning`), and the parked and closed are a list
+ *   of their own after Waiting on you, under Parked and closed, grouped Parked then Closed, folded past four and open
+ *   over four or fewer. Four blocks added to one page and no id added or taken away, so a minor step that keeps every
+ *   row.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
-  portfolio: '1.32.0',
+  portfolio: '1.33.0',
   people: '4.8.0',
   'money-core': '3.42.1',
   estate: '2.8.1',

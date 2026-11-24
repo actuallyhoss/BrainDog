@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.32.0",
+  "version": "1.33.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "A project can wear a picture, its logo, in place of its mark: hover its mark to change it, and an agent that finds the logo saves it.",
+  "changes": "In play shows only the projects you are building or earning from. Parked and closed projects have their own list at the end of the page, folded once there are more than four.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -254,6 +254,7 @@
           "span": 12,
           "key": "board",
           "source": "register.things",
+          "where": "lane is building or earning",
           "columns": [
             { "field": "name", "as": "title" },
             { "field": "mark", "as": "mark" },
@@ -274,13 +275,7 @@
           ],
           "order": [ { "field": "name", "dir": "asc" } ],
           "limit": 100,
-          "when": {
-            "any": [
-              { "metric": "projects-live", "gt": 0 },
-              { "metric": "projects-parked", "gt": 0 },
-              { "metric": "projects-retired", "gt": 0 }
-            ]
-          }
+          "when": { "metric": "projects-live", "gt": 0 }
         },
         {
           "kind": "queue",
@@ -292,6 +287,44 @@
           "limit": 3,
           "tiles": true,
           "when": { "metric": "questions-open-in:things", "gt": 0 }
+        },
+        { "kind": "section", "heading": "Parked and closed", "icon": "archive", "span": 12, "fold": true, "when": { "metric": "projects-not-in-play", "gt": 4 } },
+        {
+          "kind": "cards",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is parked or retired",
+          "group": "lane",
+          "fold": 50,
+          "columns": [
+            { "field": "name", "as": "title" },
+            { "field": "mark", "as": "mark" },
+            { "field": "hue", "as": "hue" },
+            { "field": "about", "as": "reply" },
+            { "field": "lane", "label": "", "as": "fact" }
+          ],
+          "order": [ { "field": "name", "dir": "asc" } ],
+          "limit": 100,
+          "when": { "metric": "projects-not-in-play", "gt": 4 }
+        },
+        { "kind": "section", "heading": "Parked and closed", "icon": "archive", "span": 12, "when": { "all": [ { "metric": "projects-not-in-play", "gt": 0 }, { "metric": "projects-not-in-play", "lte": 4 } ] } },
+        {
+          "kind": "cards",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is parked or retired",
+          "group": "lane",
+          "fold": 50,
+          "columns": [
+            { "field": "name", "as": "title" },
+            { "field": "mark", "as": "mark" },
+            { "field": "hue", "as": "hue" },
+            { "field": "about", "as": "reply" },
+            { "field": "lane", "label": "", "as": "fact" }
+          ],
+          "order": [ { "field": "name", "dir": "asc" } ],
+          "limit": 100,
+          "when": { "all": [ { "metric": "projects-not-in-play", "gt": 0 }, { "metric": "projects-not-in-play", "lte": 4 } ] }
         }
       ]
     },

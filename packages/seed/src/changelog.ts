@@ -20,6 +20,7 @@ export type ModuleChange = { version: string; notes: string };
 
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
+    { version: '1.33.0', notes: 'In play shows only the projects you are building or earning from. Parked and closed projects have their own list at the end of the page, folded once there are more than four.' },
     { version: '1.32.0', notes: 'A project can wear a picture, its logo, in place of its mark: hover its mark to change it, and an agent that finds the logo saves it.' },
     { version: '1.31.2', notes: 'Projects opens on your projects. The bar of how they are going is gone; each project says it if it is at risk or off track.' },
     { version: '1.31.1', notes: 'Numbers no longer opens on a line saying what it lists. It still says how to add a key number while it has none.' },

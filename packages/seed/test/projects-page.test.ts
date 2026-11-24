@@ -85,28 +85,43 @@ const headed = (blocks: Drawn[], heading: string): Drawn => {
 
 const drawn = (b: Drawn): boolean => b.drawn !== false;
 
-test('THE BOARD HOLDS EVERY PROJECT, the finished too, and no bar of lanes is drawn over it', async () => {
+/** The parked and closed the page drew under Parked and closed, by name (portfolio 1.33.0). */
+const shelvedOf = (page: Drawn[]): string[] =>
+  page
+    .filter((b) => b.kind === 'cards' && b.heading === undefined && drawn(b))
+    .flatMap((b) => ((b.rows ?? []) as unknown as { fields: Record<string, unknown> }[]).map((r) => String(r.fields.name)))
+    .sort();
+
+test('THE BOARD HOLDS THE PROJECTS IN PLAY, the parked and closed are under their own heading, and no bar of lanes is drawn', async () => {
   const { k } = await fresh();
   for (const [name, lane] of SIX) add(k, name, lane);
   add(k, 'Kestrel', 'retired');
   const page = projects(k);
-  /* SINCE portfolio 1.30.0 the board's date line says how many are in play, parked and finished, where a split said it. */
+  /* SINCE portfolio 1.30.0 no split says how many are in play, parked and finished. */
   assert.equal(page.filter((b) => b.heading === 'Where they are').length, 0, 'the bar of lanes is drawn again');
   const board = page.filter((b) => (b as { key?: unknown }).key === 'board');
   assert.equal(board.length, 1, `${board.length} blocks are the board`);
   assert.ok(drawn(board[0]!), 'the board is not drawn over five projects in play');
   assert.equal(board[0]!.kind, 'cards');
+  /* ONLY WHAT IS IN PLAY, SINCE portfolio 1.33.0 (24 Nov, his record: In play drew 13 projects parked or closed). From
+     1.30.0 to 1.32.0 the board held every project, the finished too. */
   const names = ((board[0]!.rows ?? []) as unknown as { fields: Record<string, unknown> }[]).map((r) => String(r.fields.name)).sort();
-  assert.deepEqual(names, ['Bindery', 'Harbour', 'Kestrel', 'Lantern', 'Orchard', 'Quill', 'Saltmarsh']);
+  assert.deepEqual(names, ['Bindery', 'Lantern', 'Orchard', 'Quill', 'Saltmarsh']);
+  assert.deepEqual(shelvedOf(page), ['Harbour', 'Kestrel']);
+  /* TWO ARE OPEN UNDER THEIR HEADING, never folded behind a Show button. */
+  const shelf = page.filter((b) => b.heading === 'Parked and closed' && drawn(b));
+  assert.deepEqual(shelf.map((b) => (b as { fold?: unknown }).fold === true), [false]);
 });
 
-test('THREE PROJECTS ARE THE BOARD, and a record with only finished ones still draws it', async () => {
+test('THREE PROJECTS ARE THE BOARD, and a record with only a closed one draws it under Parked and closed', async () => {
   const { k } = await fresh();
   for (const [name, lane] of SIX.slice(2, 5)) add(k, name, lane);
   assert.ok(drawn(headed(projects(k), 'In play')), 'the board is not drawn');
+  assert.deepEqual(shelvedOf(projects(k)), [], 'Parked and closed is drawn over nothing');
   const done = await fresh();
   add(done.k, 'Kestrel', 'retired');
-  assert.ok(drawn(headed(projects(done.k), 'In play')), 'the board is not drawn over a finished project');
+  assert.ok(!drawn(headed(projects(done.k), 'In play')), 'the board is drawn over nothing in play');
+  assert.deepEqual(shelvedOf(projects(done.k)), ['Kestrel'], 'the closed project is drawn nowhere');
 });
 
 /* NO SPLIT AT ALL SINCE portfolio 1.31.2 (fdc1b185b): how a project is going is said on its own card, once it says, and a bar said it again. */

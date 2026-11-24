@@ -1018,10 +1018,10 @@ test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versio
   assert.deepEqual(people.filter((b) => b.kind === 'table').map((b) => b.heading), []);
   assert.deepEqual(people.filter((b) => b.kind === 'cards').map((b) => b.heading), ['Everyone']);
   for (const id of ['metric.people-in-touch-90d', 'metric.people-in-touch-12w']) assert.ok(k.packClaims('people').includes(id), `${id} is not on the record`);
-  /* AND PROJECTS HOLDS NO HEADING OVER ITS CARDS (proj F5): what each earns alone, and
-     the parked a lane of the cards. */
+  /* AND PROJECTS HOLDS NO HEADING OVER ITS CARDS IN PLAY (proj F5), and SINCE portfolio 1.33.0 one heading, last, over
+     the parked and closed: two declared, folded past four and open under, each over its own cards. */
   const sections = blocks('portfolio').filter((b) => b.kind === 'section');
-  assert.deepEqual(sections.map((b) => b.heading), []);
+  assert.deepEqual(sections.map((b) => [b.heading, b.fold === true]), [['Parked and closed', true], ['Parked and closed', false]]);
 
   /* AND ONCE IN, THE NEXT RUN HAS NOTHING TO DO. */
   assert.deepEqual(await updateFirstParty(port), []);

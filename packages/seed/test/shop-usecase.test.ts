@@ -303,12 +303,13 @@ test('A NEW SHOP\'S PROJECTS HAS NO LINE AND ONE BOX TO ADD A PROJECT, and a pro
     drawn.map((b) => b.body ?? `${b.kind} ${b.heading ?? ''}`),
     ['No project yet. Add the first one below.', 'capture Add a project'],
   );
-  /* ONE PARKED: the line says how to start and the box is still there. */
+  /* ONE PARKED: the line says how to start, the box is still there, and the parked one is under Parked and closed
+     (portfolio 1.33.0). */
   value(k.create('things', { name: 'Glaze trials', lane: 'parked' }, { actor: 'p_owner' }));
   const parked = value<{ blocks: (Drawn & { lead?: boolean })[] }>(k.page('portfolio')).blocks.filter((b) => b.drawn !== false && b.kind !== 'cards');
   assert.deepEqual(
     parked.map((b) => b.body ?? b.heading),
-    ['No project is in play. Add one, or set a parked one building.', 'Add a project'],
+    ['No project is in play. Add one, or set a parked one building.', 'Add a project', 'Parked and closed'],
   );
   /* ONE IN PLAY: the board leads, SINCE portfolio 1.30.0, its headline the page's line, and no box. */
   value(k.create('things', { name: 'Kiln room', lane: 'building' }, { actor: 'p_owner' }));

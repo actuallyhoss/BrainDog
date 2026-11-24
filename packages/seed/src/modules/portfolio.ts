@@ -1063,6 +1063,34 @@ const PROJECT_DONE_CELL = { metric: 'project-done-7d:{{name}}', label: 'Done thi
 /* NO LINE COUNTING HOW MANY SAY WHAT THEY EARNED, SINCE portfolio 1.18.0: "3 of 3 projects in play say what they earned in a
    year" in a grey box beside the split, which the split says by being drawn. */
 
+/** More than four projects parked or closed, which Projects folds away under Parked and closed (portfolio 1.33.0). */
+const MANY_SHELVED = { metric: 'projects-not-in-play', gt: 4 } as const;
+/** One to four parked or closed, which Projects lists open. */
+const FEW_SHELVED = { all: [{ metric: 'projects-not-in-play', gt: 0 }, { metric: 'projects-not-in-play', lte: 4 }] } as const;
+/**
+ * THE PARKED AND CLOSED PROJECTS AS CARDS (portfolio 1.33.0): each with its mark, what it is and its status, by name. No
+ * ring, next step or agent, since nobody is moving them. GROUPED BY STATUS, Parked then Closed, each saying how many,
+ * so a host draws no lane bar with an In play of none over them, and every card of a group drawn (`fold: 50`, the most a
+ * group shows), since the heading over them is already the fold.
+ */
+const SHELVED_CARDS = {
+  kind: 'cards',
+  span: 12,
+  source: 'register.things',
+  where: 'lane is parked or retired',
+  group: 'lane',
+  fold: 50,
+  columns: [
+    { field: 'name', as: 'title' },
+    { field: 'mark', as: 'mark' },
+    { field: 'hue', as: 'hue' },
+    { field: 'about', as: 'reply' },
+    { field: 'lane', label: '', as: 'fact' },
+  ],
+  order: [{ field: 'name', dir: 'asc' }],
+  limit: 100,
+} as const;
+
 export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
   /**
    * THE PORTFOLIO, LEADING WITH WHAT NEEDS YOU. "Which of my
@@ -1169,8 +1197,12 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            parked and finished as a strip. Read by its key; a host that does not know it draws the cards. */
         key: 'board',
         source: 'register.things',
-        /* EVERY PROJECT, THE FINISHED TOO, SINCE portfolio 1.30.0: the board counts them on its date line and folds them
-           into its last strip. The cards a host draws in its place leave the finished out themselves. */
+        /* ONLY THE PROJECTS IN PLAY, SINCE portfolio 1.33.0 (24 Nov, his record): it read every project, parked and
+           closed too, so a host that draws the cards drew all of them under In play, and on his record that was 13 of
+           32 that are not in play. The parked and the closed are their own list under Parked and closed, below.
+           EVERY PROJECT, THE FINISHED TOO, from portfolio 1.30.0 to 1.32.0: the board counted them on its date line
+           and folded them into its last strip. */
+        where: LIVE,
         /* EACH CARD WEARS THE PROJECT'S OWN MARK IN ITS OWN HUE, SINCE portfolio 1.6.0, the identity the list declares
            (`identity: { mark, accent }`), and says what the project is under its name (`about`, drawn as the quieter
            line under a title). Neither is a fact, so the three facts below are unchanged.
@@ -1212,13 +1244,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { metric: 'project-worked:{{name}}', as: 'when', label: 'Worked on' },
         ],
         order: [{ field: 'name', dir: 'asc' }],
-        /* EVERY PROJECT IN PLAY OR PARKED, SINCE portfolio 1.21.0 (batch 4's look on his record): twelve by name, parked
-           among them, and the lane bar the app draws over these cards said "In play 5" where Today, the sidebar and the
-           More sheet said 13. A count read off part of a list is never drawn; a hundred is past any record's projects. */
+        /* A HUNDRED, SINCE portfolio 1.21.0 (batch 4's look on his record): twelve by name drew part of the list, and the
+           lane bar the app draws over these cards said "In play 5" where Today, the sidebar and the More sheet said 13. A
+           count read off part of a list is never drawn; a hundred is past any record's projects. */
         limit: 100,
-        /* DRAWN ONLY WHILE ONE IS IN PLAY OR PARKED, SINCE portfolio 1.13.0 and the redesign: its empty line,
-           the one thing to do on a page with no project, is the line's now, and a parked one is a lane of these cards. */
-        when: { any: [{ metric: 'projects-live', gt: 0 }, { metric: 'projects-parked', gt: 0 }, { metric: 'projects-retired', gt: 0 }] },
+        /* DRAWN ONLY WHILE ONE IS IN PLAY, SINCE portfolio 1.33.0: its empty line, the one thing to do on a page with
+           nothing in play, is the line's, and the parked and the closed are under their own heading. */
+        when: { metric: 'projects-live', gt: 0 },
       },
       {
         /* WHAT A RULE OR AN AGENT ASKED ABOUT A PROJECT, SINCE portfolio 1.17.0, answered here, three at a time,
@@ -1239,6 +1271,15 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
       },
       /* NO WHAT EACH ONE EARNS, SINCE portfolio 1.30.0: the board's Earning, a month says it beside its headline, a
          month at a time and with each project's own warning, where this split said the year each one typed. */
+      /* PARKED AND CLOSED, LAST, SINCE portfolio 1.33.0 (24 Nov, his record: In play drew 13 projects that are not).
+         Folded past four, as a fold is for a long list (portfolio 1.15.0), and open over four or fewer, so a short
+         list is not a heading with a Show button over almost nothing. TWO HEADINGS, EACH OVER ITS OWN CARDS, and one
+         pair is drawn on one figure: a heading whose `when:` says no hides the blocks under it (`pages.ts`), so one set
+         of cards under both would go with whichever heading was not drawn. */
+      { kind: 'section', heading: 'Parked and closed', icon: 'archive', span: 12, fold: true, when: MANY_SHELVED },
+      { ...SHELVED_CARDS, when: MANY_SHELVED },
+      { kind: 'section', heading: 'Parked and closed', icon: 'archive', span: 12, when: FEW_SHELVED },
+      { ...SHELVED_CARDS, when: FEW_SHELVED },
     ],
   },
 

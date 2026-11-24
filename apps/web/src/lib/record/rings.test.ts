@@ -70,8 +70,9 @@ test('A PROJECT WITH NO NUMBER TYPED IS AS FAR ALONG AS ITS STEPS, AND A NUMBER 
   assert.ok(k.update('things', `things#${portage.seq}`, { progress: null }, { actor: 'p_owner' }).ok);
   SAID.forEach((done, i) => assert.ok(k.create('milestones', { what: `Milestone ${i + 1}`, thing: portage.id, done }, { actor: 'p_owner' }).ok));
   const answered = (k.page('portfolio') as { value: { blocks: Record<string, unknown>[] } }).value.blocks.find((b) => b.heading === 'In play')!;
-  /* FOUR (proj F1): the cards hold the parked project too, for the Parked lane. */
-  assert.deepEqual(answered.rings, [null, null, 25, null]);
+  /* THREE, SINCE portfolio 1.33.0: In play holds the projects in play alone, and the parked one is under Parked and
+     closed. From proj F1 to 1.32.0 the cards held it too, for the Parked lane. */
+  assert.deepEqual(answered.rings, [null, null, 25]);
   const live = rings(blockOf(answered as never, new Map(), NOW));
 
   /* THE SAMPLE IS THE RECORD NOW: `fixtures/readers.ts` asks a kernel seeded once and never written to, so the
