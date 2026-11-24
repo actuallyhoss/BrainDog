@@ -162,12 +162,12 @@ async function keyedModel() {
   let { provider, url, model, key } = own;
   let keyName = 'DRAFT_EVAL_KEY';
   if (keyed === 'checks') {
-    const { ROUTED } = await import(join(root, 'apps', 'worker', 'src', 'inference.ts'));
+    const { ROUTED, INCLUDED_MODEL } = await import(join(root, 'apps', 'worker', 'src', 'inference.ts'));
     const base = env('MODEL_CHECK_BASE').replace(/\/+$/u, '') || 'https://api.cloudflare.com/client/v4';
     provider = 'openai';
     url = `${base}/accounts/${checks.account}/ai/v1`;
     /* The routing name every template of the packages asks, as `run.mjs` reads it. */
-    model = (ROUTED.find((r) => r.name === 'glm-5.3-flash') ?? ROUTED[0]).provider;
+    model = (ROUTED.find((r) => r.name === INCLUDED_MODEL) ?? ROUTED[0]).provider;
     key = checks.token;
     keyName = 'MODEL_CHECK_TOKEN';
   } else if (url === '') url = provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1';

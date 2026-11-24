@@ -7,6 +7,11 @@
  *
  *   --routes            one ask a routed name (`ROUTED` in `apps/worker/src/inference.ts`): served, schema taken, time,
  *                       tokens, and the provider's own words on a failure; and one ask through the production gateway
+ *   --steps             one real ask of each routed name on each of Slash's routes, streamed so the first byte is timed:
+ *                       answer (a chat step that must call the right tool, one that must fill a tool's args, one that must
+ *                       answer from a result), compose (the page headline) and small (a digest's prose)
+ *   --model <name>      the routed name the suites ask; the included model (`INCLUDED_MODEL`) by default
+ *   --only <a,b>        only these routed names for --routes and --steps
  *   --suite slash       Slash's thirty questions (`packages/slash/eval/run.ts --json`), scored against the bar
  *   --suite record      the seventeen descriptions and the night's headlines (`packages/record/eval/run.ts --json`)
  *   --small             the routes and eight chosen cases (`SMALL` in `lib.mjs`); nothing named is the routes and both suites
@@ -73,10 +78,16 @@ if (args.changed !== null) {
 
 /* ── what the Worker routes ────────────────────────────────────────────────────────────────────────────────────────── */
 
-const { ROUTED } = await import(join(root, 'apps', 'worker', 'src', 'inference.ts'));
-/** The routing name every template of the packages asks (`packages/slash/src/prompts.ts`, `INCLUDED_MODEL` in `apps/worker/src/slash.ts`). */
-const INCLUDED = 'glm-5.3-flash';
+const { ROUTED, INCLUDED_MODEL } = await import(join(root, 'apps', 'worker', 'src', 'inference.ts'));
+/** The routing name every template of the packages asks (`INCLUDED_MODEL`, `@braindog/ports`), or the one `--model` names. */
+const INCLUDED = args.model ?? INCLUDED_MODEL;
 const included = ROUTED.find((r) => r.name === INCLUDED) ?? ROUTED[0];
+if (args.model !== null && included.name !== args.model) {
+  console.error(`model checks: --model ${args.model} is not a routed name; the routed names are ${ROUTED.map((r) => r.name).join(', ')}`);
+  process.exit(2);
+}
+/** The routed rows `--routes` and `--steps` ask: every one, or those `--only` names. */
+const asked = args.only === null ? ROUTED : ROUTED.filter((r) => args.only.includes(r.name));
 
 /** The production gateway's name, read from `wrangler.jsonc`: the last `AI_GATEWAY` there is the production environment's. */
 const gatewayName = (() => {
@@ -96,7 +107,7 @@ const history = (() => {
   }
 })();
 
-const report = { at, mode, models: ROUTED.map((r) => ({ name: r.name, provider: r.provider })), routes: [], gateway: null, suites: {}, neurons: { spent: 0, ceiling: args.maxNeurons } };
+const report = { at, mode, models: ROUTED.map((r) => ({ name: r.name, provider: r.provider })), routes: [], steps: [], gateway: null, suites: {}, neurons: { spent: 0, ceiling: args.maxNeurons } };
 
 /* ── one ask of a route ────────────────────────────────────────────────────────────────────────────────────────────── */
 
@@ -150,8 +161,9 @@ async function askOnce(route, url) {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     /* AND THE ROW'S OWN `reasoning_effort` (`Effort` in `inference.ts`), so the check asks as the Worker asks: at the
-       model's default the thinking alone runs a 120-token ceiling out and the route reads cut off whatever it would answer. */
-    body: JSON.stringify({ messages: PROMPT, max_tokens: MAX_TOKENS, response_format: formatFor(route.shape), ...(route.effort ? { reasoning_effort: route.effort } : {}) }),
+       model's default the thinking alone runs a 120-token ceiling out and the route reads cut off whatever it would answer.
+       And its `thinks: false` switch the same way (`knobsOf`), or a model that thinks by default is measured thinking. */
+    body: JSON.stringify({ messages: PROMPT, max_tokens: MAX_TOKENS, response_format: formatFor(route.shape), ...knobsOf(route) }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   const said = await res.text();
@@ -182,7 +194,7 @@ const gatewayOf = (route) => `${GATEWAY}/v1/${account}/${gatewayName}/workers-ai
 const afford = (n) => report.neurons.spent + n <= args.maxNeurons;
 
 async function checkRoutes() {
-  for (const route of ROUTED) {
+  for (const route of asked) {
     const row = { name: route.name, provider: route.provider, shape: route.shape };
     if (!afford(lib.worst(route, PROMPT.map((m) => m.content).join(''), MAX_TOKENS))) {
       report.routes.push({ ...row, outcome: lib.NONE, reason: lib.CEILING });
@@ -203,13 +215,225 @@ async function checkRoutes() {
   }
 }
 
+/* ── one ask of each of Slash's routes ─────────────────────────────────────────────────────────────────────────────── */
+
+/* THE CONVERSATION'S OWN SYSTEM TEXT AND SCHEMA (`packages/slash/src/prompts.ts`), so a step is asked as the bar asks it.
+   The record is a fixed one with no person's content: the day the seed's clock stands at, five lists and the tools the
+   bar offers, as `promptOf` in `packages/slash/src/chat.ts` lays them out. */
+const { CHAT_SYSTEM, PROMPTS } = await import(join(root, 'packages', 'slash', 'src', 'prompts.ts'));
+const TOOL_LINES = [
+  'figures(words): Totals BrainDog works out, each with its value now. Use for any money or count question: "cash", "runway", "spent this month", "spent last month", "owed to you", "late payables", "renews"',
+  'today(): What is late, due today, stopped or waiting on them',
+  'search(q): Find rows by a name or one or two key words, in every list: "Ada", "Analytics", "rent". Not a whole sentence',
+  'open(id): One row whole, by its id (tasks#3) or its name; or one figure by its id (cash-now)',
+  'list(list, where?, limit?): Rows of one list, newest first. where filters by field ids: {"field":"state","is":"open"}. Tests: is, not, in, gt, lt, before, after, contains',
+  'lists(list): One list\'s fields: their ids and the values they take, for list\'s where, add and change',
+  'changes(about?, since?): What changed lately and who changed it',
+  'waiting(): The questions waiting for their answer in Decide',
+  'add(list, fields): Add a row: the list id and its fields by field id, days as YYYY-MM-DD, money as a plain number (25.50). add("tasks", {"what":"Call the bank","due":"2026-11-02"})',
+  'change(id, fields): Change fields of one row by its id: change("tasks#3", {"state":"done"})',
+  'draft(what, page?): Draft a new page, a change to a page, or an automation from what they described; it waits for them in Decide',
+  'go(to): Take them to a page, a list, a row, or to decide, inbox, automations, settings or agents',
+];
+const TOOL_NAMES = new Set(TOOL_LINES.map((l) => l.slice(0, l.indexOf('('))));
+const stepPrompt = (said, done) =>
+  [
+    'Today is Thursday 3 September 2026. Tomorrow is Friday 4 September 2026.',
+    '',
+    'Their lists, as name (id, rows): Tasks (tasks, 41), Bills and invoices (obligations, 14), Ledger (ledger, 310), People (people, 26), Services (services, 9).',
+    '',
+    'Tools, as name(args): what it does.',
+    ...TOOL_LINES,
+    '',
+    `Now they say: ${said}`,
+    ...(done === null ? ['Call the tools that answer this, or answer with "calls": [] if it needs nothing from the record.'] : ['', 'What your calls answered this turn:', ...done, '', 'Answer with "calls": [] if this is enough. Otherwise call again.']),
+  ].join('\n');
+const callsOf = (v) => (Array.isArray(v?.calls) ? v.calls.filter((c) => c !== null && typeof c === 'object') : []);
+const PROSE_SCHEMA = { type: 'object', additionalProperties: false, required: ['text'], properties: { text: { type: 'string' } } };
+
+/** Each step: its route, what is sent, and what a right answer is (a fault in words, or `''`). */
+const STEPS = [
+  {
+    id: 'tool',
+    route: 'answer',
+    system: CHAT_SYSTEM,
+    user: stepPrompt("what's late?", null),
+    schema: PROMPTS.chat.schema,
+    maxTokens: PROMPTS.chat.maxTokens,
+    right: (v) => {
+      const calls = callsOf(v);
+      if (calls.length === 0) return `it called nothing and said ${JSON.stringify(String(v?.say ?? '').slice(0, 80))}`;
+      const unknown = calls.filter((c) => !TOOL_NAMES.has(c.tool)).map((c) => c.tool);
+      if (unknown.length > 0) return `it called ${unknown.join(', ')}, which is no tool`;
+      return calls.some((c) => c.tool === 'today' || (c.tool === 'list' && /obligations|tasks/u.test(JSON.stringify(c.args ?? {})))) ? '' : `it called ${calls.map((c) => c.tool).join(', ')} and not today`;
+    },
+  },
+  {
+    id: 'args',
+    route: 'answer',
+    system: CHAT_SYSTEM,
+    user: stepPrompt('add a task to call Priya tomorrow', null),
+    schema: PROMPTS.chat.schema,
+    maxTokens: PROMPTS.chat.maxTokens,
+    right: (v) => {
+      const add = callsOf(v).find((c) => c.tool === 'add');
+      if (add === undefined) return `it called ${callsOf(v).map((c) => c.tool).join(', ') || 'nothing'} and not add`;
+      const args = add.args ?? {};
+      const said = JSON.stringify(args);
+      if (!/"tasks"/u.test(said)) return `add went to ${said.slice(0, 80)}, not tasks`;
+      if (!said.includes('2026-09-04')) return `add's fields name no due day of 2026-09-04: ${said.slice(0, 120)}`;
+      return /priya/iu.test(said) ? '' : `add's fields do not name Priya: ${said.slice(0, 120)}`;
+    },
+  },
+  {
+    id: 'answer',
+    route: 'answer',
+    system: CHAT_SYSTEM,
+    user: stepPrompt("what's late?", [
+      '[1] today {}',
+      'Late: {{ref:obligations#16}} Invoice 2026-041, £4,800, 38 days late. {{ref:obligations#9}} Legal review, June, £9,190, 64 days late. {{ref:tasks#31}} Send the Kiln proofs, 2 days late.',
+    ]),
+    schema: PROMPTS.chat.schema,
+    maxTokens: PROMPTS.chat.maxTokens,
+    right: (v) => {
+      if (callsOf(v).length > 0) return `it called ${callsOf(v).map((c) => c.tool).join(', ')} again with the answer in hand`;
+      const say = String(v?.say ?? '');
+      const missing = ['£4,800', '£9,190', 'obligations#16', 'obligations#9'].filter((f) => !say.includes(f));
+      return missing.length === 0 ? '' : `its answer left out ${missing.join(', ')}: ${JSON.stringify(say.slice(0, 120))}`;
+    },
+  },
+  {
+    id: 'headline',
+    route: 'compose',
+    system: PROMPT[0].content,
+    user: PROMPT[1].content,
+    schema: SCHEMA,
+    maxTokens: 600,
+    right: (v) => (typeof v?.lines?.bills === 'string' && v.lines.bills.trim() !== '' ? '' : `no line for bills: ${JSON.stringify(v).slice(0, 120)}`),
+  },
+  {
+    id: 'prose',
+    route: 'small',
+    system: 'You write at most two calm sentences that go above a digest about to be sent to the owner of a business record. No figures, no names of rows, no greeting. Answer with one JSON object and nothing else.',
+    user: 'A digest named "Weekly bills" is about to be sent. It lists three bills due this week and one paid late last week. Answer as {"text": "<the sentences>"}.',
+    schema: PROSE_SCHEMA,
+    maxTokens: 600,
+    right: (v) => {
+      const t = String(v?.text ?? '').trim();
+      if (t === '') return 'no text';
+      return /[0-9]/u.test(t) ? `it wrote a figure: ${JSON.stringify(t.slice(0, 120))}` : '';
+    },
+  },
+];
+
+/** The knobs a row asks with, as `aiInference` sends them (`effort`, `thinks`). */
+const knobsOf = (route) => ({
+  ...(route.effort ? { reasoning_effort: route.effort } : {}),
+  ...(route.thinks === false ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+});
+
+/**
+ * One step streamed: how long to the first event, to the first word of the answer and to the end, the answer read as
+ * `readStream` in `inference.ts` reads it, and the counts from the stream's last word.
+ */
+async function stepOnce(route, step) {
+  const started = performance.now();
+  const res = await fetch(restOf(route), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      messages: [
+        { role: 'system', content: step.system },
+        { role: 'user', content: step.user },
+      ],
+      max_tokens: step.maxTokens,
+      response_format: route.shape === 'chat' ? { type: 'json_schema', json_schema: { name: 'answer', schema: step.schema, strict: true } } : { type: 'json_schema', json_schema: step.schema },
+      stream: true,
+      ...knobsOf(route),
+    }),
+    signal: AbortSignal.timeout(TIMEOUT_MS * 2),
+  });
+  if (!res.ok || res.body === null) {
+    const said = lib.scrub(`${res.status}: ${await res.text()}`, secrets);
+    const ms = Math.round(performance.now() - started);
+    if (res.status === 429 || res.status >= 500) return { answered: false, said, ms };
+    if (lib.refused(said)) return { answered: false, refused: true, said, ms };
+    return { answered: true, served: !lib.unserved(said), right: false, ms, first: null, firstText: null, said, usage: { in: 0, out: 0 } };
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let held = '';
+  let text = '';
+  let first = null;
+  let firstText = null;
+  let usage = { in: 0, out: 0 };
+  let cut = false;
+  const take = (line) => {
+    const data = line.startsWith('data:') ? line.slice(5).trim() : '';
+    if (data === '' || data === '[DONE]') return;
+    first ??= Math.round(performance.now() - started);
+    let chunk;
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      return;
+    }
+    const u = chunk?.usage;
+    if (u && typeof u === 'object') usage = { in: Math.max(usage.in, u.prompt_tokens ?? 0), out: Math.max(usage.out, u.completion_tokens ?? 0) };
+    const choice = Array.isArray(chunk?.choices) ? chunk.choices[0] : undefined;
+    const piece = choice !== undefined ? choice?.delta?.content : chunk?.response;
+    if (choice?.finish_reason === 'length') cut = true;
+    if (typeof piece === 'string' && piece !== '') {
+      firstText ??= Math.round(performance.now() - started);
+      text += piece;
+    }
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    held += decoder.decode(value, { stream: true });
+    const lines = held.split('\n');
+    held = lines.pop() ?? '';
+    for (const l of lines) take(l.trim());
+  }
+  if (held.trim() !== '') take(held.trim());
+  const ms = Math.round(performance.now() - started);
+  if (cut) return { answered: true, served: true, right: false, ms, first, firstText, said: `it stopped at the ${step.maxTokens}-token ceiling`, usage };
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return { answered: true, served: true, right: false, ms, first, firstText, said: lib.scrub(`not JSON: ${text.slice(0, 200)}`, secrets), usage };
+  }
+  const fault = step.right(value);
+  return { answered: true, served: true, right: fault === '', ms, first, firstText, said: lib.scrub(fault, secrets), usage };
+}
+
+async function checkSteps() {
+  for (const route of asked) {
+    for (const step of STEPS) {
+      const row = { name: route.name, step: step.id, route: step.route };
+      if (!afford(lib.worst(route, step.system + step.user, step.maxTokens))) {
+        report.steps.push({ ...row, outcome: lib.NONE, reason: lib.CEILING });
+        continue;
+      }
+      const got = await lib.tried(() => stepOnce(route, step), waits);
+      const spent = got.answered ? lib.neurons(route, got.usage) : 0;
+      report.neurons.spent += spent;
+      const outcome = !got.answered ? lib.NONE : got.served && got.right ? lib.PASS : lib.BELOW;
+      report.steps.push({ ...row, outcome, ms: got.ms ?? null, first: got.first ?? null, firstText: got.firstText ?? null, tokens: got.usage ?? null, neurons: spent, tries: got.tries, said: lib.scrub(got.said ?? '', secrets) });
+    }
+  }
+}
+
 /* ── the two harnesses, in their own process ───────────────────────────────────────────────────────────────────────── */
 
 /** The variables each harness reads, pointed at Workers AI's chat-completions address with the included model. */
 const harnessEnv = (suite) => {
   const base = `${BASE}/accounts/${account}/ai/v1`;
   const p = suite === 'slash' ? 'SLASH_EVAL' : 'DRAFT_EVAL';
-  return { ...process.env, [`${p}_PROVIDER`]: 'openai', [`${p}_URL`]: base, [`${p}_MODEL`]: included.provider, [`${p}_KEY`]: token };
+  /* AND THE ROW'S OWN KNOBS (`knobsOf`), which the Slash harness adds to each ask, so the suite asks as the Worker asks. */
+  return { ...process.env, [`${p}_PROVIDER`]: 'openai', [`${p}_URL`]: base, [`${p}_MODEL`]: included.provider, [`${p}_KEY`]: token, [`${p}_EXTRA`]: JSON.stringify(knobsOf(included)) };
 };
 
 /** One run of a harness with `--json`, and its score object, or `{ said }` with what it printed when it gave none. */
@@ -309,17 +533,19 @@ async function checkSuite(suite) {
 let reason = null;
 if (token === '' || account === '') {
   reason = lib.NO_TOKEN;
-  for (const r of args.routes ? ROUTED : []) report.routes.push({ name: r.name, provider: r.provider, shape: r.shape, outcome: lib.NONE, reason });
+  for (const r of args.routes ? asked : []) report.routes.push({ name: r.name, provider: r.provider, shape: r.shape, outcome: lib.NONE, reason });
+  for (const r of args.steps ? asked : []) report.steps.push({ name: r.name, outcome: lib.NONE, reason });
   for (const s of args.suites) report.suites[s] = { outcome: lib.NONE, reason, bar: baseline[s]?.[mode] ?? null };
 } else {
   if (args.routes) await checkRoutes();
+  if (args.steps) await checkSteps();
   for (const s of args.suites) report.suites[s] = await checkSuite(s);
 }
 
-const outcomes = [...report.routes.map((r) => r.outcome), ...Object.values(report.suites).map((s) => s.outcome)];
+const outcomes = [...report.routes.map((r) => r.outcome), ...report.steps.map((r) => r.outcome), ...Object.values(report.suites).map((s) => s.outcome)];
 report.outcome = lib.overall(outcomes);
 if (reason === null && report.outcome === lib.NONE) {
-  const all = [...report.routes, ...Object.values(report.suites)].filter((x) => x.outcome === lib.NONE).map((x) => x.reason ?? (x.refused ? lib.REFUSED : lib.NO_ANSWER));
+  const all = [...report.routes, ...report.steps, ...Object.values(report.suites)].filter((x) => x.outcome === lib.NONE).map((x) => x.reason ?? (x.refused ? lib.REFUSED : lib.NO_ANSWER));
   reason = all.includes(lib.REFUSED) ? lib.REFUSED : all.includes(lib.NO_ANSWER) ? lib.NO_ANSWER : (all[0] ?? lib.NO_ANSWER);
 }
 report.reason = reason;
@@ -336,6 +562,15 @@ for (const r of reason === lib.NO_TOKEN ? [] : report.routes) {
     console.log(
       `route ${r.name.padEnd(14)} ${r.outcome}  ${r.provider}  served ${r.served ? 'yes' : 'no'}  schema ${r.strict ? 'taken' : 'not taken'}  ` +
         `${r.ms ?? '-'} ms  ${r.tokens?.in ?? 0} in ${r.tokens?.out ?? 0} out  ${r.neurons} neurons${r.said ? `  (${r.said.slice(0, 160)})` : ''}`,
+    );
+}
+for (const r of reason === lib.NO_TOKEN ? [] : report.steps) {
+  const tail = r.said ? `  (${r.said.slice(0, 160)})` : '';
+  if (r.outcome === lib.NONE) console.log(`step  ${r.name.padEnd(20)} ${String(r.step ?? '').padEnd(8)} ${r.outcome} (${r.reason ?? lib.NO_ANSWER})${tail}`);
+  else
+    console.log(
+      `step  ${r.name.padEnd(20)} ${r.step.padEnd(8)} ${r.route.padEnd(7)} ${r.outcome === lib.PASS ? 'right' : 'WRONG'}  first ${r.first ?? '-'} ms  words ${r.firstText ?? '-'} ms  ` +
+        `end ${r.ms ?? '-'} ms  ${r.tokens?.in ?? 0} in ${r.tokens?.out ?? 0} out  ${r.neurons} neurons${tail}`,
     );
 }
 if (report.gateway !== null) {

@@ -11,6 +11,8 @@
  *   SLASH_EVAL_MODEL     the model name the provider knows
  *   SLASH_EVAL_KEY       the key, read from the environment so it stays out of a shell's history; nothing here prints it
  *   SLASH_EVAL_TIMEOUT_MS how long one ask may take, by default 30 seconds as the host's own; past it the ask is a fault
+ *   SLASH_EVAL_EXTRA     a JSON object added to each chat completions body, the row's own knobs as the Worker sends them
+ *                        (`{"reasoning_effort":"low"}`, `{"chat_template_kwargs":{"enable_thinking":false}}`)
  *
  *   --only 1,2,3   only those questions, by number (`questions.ts`)
  *   --json         the lines below go to stderr, and stdout is one JSON line, the score object (`Score`), for a runner
@@ -49,6 +51,14 @@ const timeoutMs = Number.isFinite(timeoutSaid) && timeoutSaid > 0 ? timeoutSaid 
 /** `--json`: the human lines move to stderr so stdout carries the score object alone. */
 const json = process.argv.includes('--json');
 const say = (line: string): void => (json ? console.error(line) : console.log(line));
+const extra = ((): Record<string, unknown> => {
+  try {
+    const v: unknown = JSON.parse(process.env['SLASH_EVAL_EXTRA'] ?? '{}');
+    return v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+})();
 const baseUrl = (process.env['SLASH_EVAL_URL'] ?? (provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1')).replace(/\/+$/, '');
 
 /** A fenced reply, which some models send even when asked for JSON alone. */
@@ -72,6 +82,7 @@ const openai = async (call: InferenceCall): Promise<InferenceReply> => {
     max_tokens: call.maxTokens,
     response_format: { type: 'json_schema', json_schema: { name: 'answer', schema: call.jsonSchema, strict: true } },
     messages: call.messages.map((m) => ({ role: m.role, content: m.content })),
+    ...extra,
   });
   const choices = got['choices'] as { message?: { content?: unknown } }[] | undefined;
   const usage = (got['usage'] ?? {}) as { prompt_tokens?: number; completion_tokens?: number };

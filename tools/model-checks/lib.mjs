@@ -155,7 +155,7 @@ export const watches = (globs, file) => globs.some((g) => (g.endsWith('/**') ? f
 
 /** The flags, read plainly. An unknown flag is an error, so a typo never runs the expensive default. */
 export function parseArgs(argv) {
-  const out = { routes: false, suites: [], small: false, changed: null, maxNeurons: null, out: 'model-checks.json', history: null, scheduled: false, setBaseline: false };
+  const out = { routes: false, steps: false, model: null, only: null, suites: [], small: false, changed: null, maxNeurons: null, out: 'model-checks.json', history: null, scheduled: false, setBaseline: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => {
@@ -164,6 +164,9 @@ export function parseArgs(argv) {
       return v;
     };
     if (a === '--routes') out.routes = true;
+    else if (a === '--steps') out.steps = true;
+    else if (a === '--model') out.model = next();
+    else if (a === '--only') out.only = next().split(',').map((s) => s.trim()).filter(Boolean);
     else if (a === '--suite') {
       const v = next();
       if (v === 'limits') throw new Error('--suite limits is not built yet: ENG-A14 fills it');
@@ -182,7 +185,7 @@ export function parseArgs(argv) {
     else throw new Error(`unknown flag ${a}`);
   }
   /* `--small` IS THE ROUTES AND EIGHT CASES, and nothing named is everything. */
-  if (out.small || (!out.routes && out.suites.length === 0)) {
+  if (out.small || (!out.routes && !out.steps && out.suites.length === 0)) {
     out.routes = true;
     if (out.suites.length === 0) out.suites = ['slash', 'record'];
   }
