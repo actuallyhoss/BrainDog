@@ -1325,7 +1325,8 @@ export class Record$ extends DurableObject<Env> {
   /**
    * WHEN THIS OBJECT STARTED, AND WHETHER IT HAS RUN AN ALARM SINCE: in memory, so both begin again when the platform
    * restarts it, which no other line shows (`boot` is written only on a new build). The `alarm-work` line says them
-   * (`fresh`, `upMs`), since the look's later walk keeps its quarter-hour gate in memory too (`slashHeadlinesAgain`).
+   * (`fresh`, `upMs`), so a walk that ran just after a restart can be told apart. The look's later walk keeps its
+   * quarter-hour gate as Slash's pref `headlines.looked` (`slashHeadlinesAgain`), so a restart no longer opens it.
    */
   #bornAt = Date.now();
   #alarmed = false;
