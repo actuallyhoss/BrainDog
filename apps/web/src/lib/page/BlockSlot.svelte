@@ -606,7 +606,9 @@
     return doors.map((d) => {
       const name = d.half === 'todo' ? source : named;
       const href = d.half === 'todo' ? (own && source ? own : null) : list && named ? registerHref(list, lateWhere(REGISTERS[list])) : null;
-      return { half: d.half, href, said: doors.length > 1 && name ? lateWords.moreIn(d.more, name) : words.more(d.more) };
+      /* AND NAMED BY ITS LIST WHERE IT CAN BE (`named`), for Late's tile to say beside its own "3 more" that opens in place,
+         so the two counts are told apart ("3 more", "4 more in Tasks"). */
+      return { half: d.half, href, said: doors.length > 1 && name ? lateWords.moreIn(d.more, name) : words.more(d.more), named: name ? lateWords.moreIn(d.more, name) : null };
     });
   });
 
@@ -680,6 +682,9 @@
      line, who is working, and the projects' row of cards, each the desk's component over the block's own answer. The
      block's bar is kept for a screen reader, as a lead question's is, since the tile says its own name. */
   const desk = $derived((block as { desk?: Desk }).desk ?? null);
+  /* LATE DRAWN AS THE DESK'S TILE SAYS ITS OWN DOORS, inside its tile (`LateNow`'s foot): drawn here too they stood under
+     the tile, outside it, at its corner ("4 more" under Late at 1512, 25 Nov). */
+  const lateDesk = $derived(desk?.kind === 'late' && !arranging && !block.refusals.length);
   /* ── a row of a project's shape ──────────────────────────────────────────
      A `project` BLOCK IS A ROW OF THE PROJECT'S OWN SHAPE (`ProjectPart.svelte`): its hero, path, money, work,
      people, what it runs on or its agents, drawn from the one read of the project the page holds (`shape-key.ts`). Its
@@ -960,9 +965,9 @@
       <!-- AND WHILE IT IS ON ITS WAY, ITS ROOM (`LateHold`, which Today puts in hand as it loads): the same tile and lines
            with nothing to press, so code that misses the reader's wait moves nothing under it (nojump, 2 Nov). -->
       {#await landed.late ?? import('$lib/home/LateNow.svelte').then((m) => m.default)}
-        {#if landed.hold}{@const LateHold = landed.hold}<LateHold lines={desk.lines} heading={desk.heading} more={desk.more} most={phone.current ? Math.min(3, desk.most) : desk.most} writes={(list) => may(route.data as unknown as Shell, 'write', list)} />{/if}
+        {#if landed.hold}{@const LateHold = landed.hold}<LateHold lines={desk.lines} heading={desk.heading} more={desk.more} doors={lateSlice ?? []} most={phone.current ? Math.min(3, desk.most) : desk.most} writes={(list) => may(route.data as unknown as Shell, 'write', list)} />{/if}
       {:then LateNow}
-        <LateNow lines={desk.lines} heading={desk.heading} more={desk.more} most={phone.current ? Math.min(3, desk.most) : desk.most} writes={(list) => may(route.data as unknown as Shell, 'write', list)} onfinished={() => void writes?.reread()} />
+        <LateNow lines={desk.lines} heading={desk.heading} more={desk.more} doors={lateSlice ?? []} most={phone.current ? Math.min(3, desk.most) : desk.most} writes={(list) => may(route.data as unknown as Shell, 'write', list)} onfinished={() => void writes?.reread()} />
       {/await}
     {:else if desk.kind === 'working'}
       {#await landed.working ?? import('$lib/home/WorkingNow.svelte').then((m) => m.default) then WorkingNow}<WorkingNow rows={desk.rows} all={runsTo && source ? { href: inApp(runsTo), said: copy.allIn(block.total, source) } : null} />{/await}
@@ -1200,7 +1205,7 @@
      are days, AND IT COUNTS THEM OVER THE DAYS THE RECORD WALKED (`walk.reach`), which since a walk opens on a shorter
      length than it runs to is further than the length it opened on: "of 1,825 over 90 days" counted five years under a
      three-month label. -->
-{#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && desk?.kind !== 'working' && block.total > block.shown && !folded && !homeFold}
+{#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && desk?.kind !== 'working' && !lateDesk && block.total > block.shown && !folded && !homeFold}
   {@const to = openHref(block)}
   {@const door = to && source ? to : block.register && block.register !== 'deadlines' ? null : doorOf(block)}
   {#if lateSlice}

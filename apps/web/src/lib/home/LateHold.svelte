@@ -19,7 +19,14 @@
   import type { HomeLine } from './home-rows.ts';
   import { asideToday, isBill, lateWords, verbOf } from './late-verb.ts';
 
-  let { lines, heading, more = 0, most, writes }: { lines: readonly HomeLine[]; heading: string; more?: number; most: number; writes: (list: string) => boolean } = $props();
+  let {
+    lines,
+    heading,
+    more = 0,
+    doors = [],
+    most,
+    writes,
+  }: { lines: readonly HomeLine[]; heading: string; more?: number; doors?: readonly { half: string; href: string | null; said: string; named?: string | null }[]; most: number; writes: (list: string) => boolean } = $props();
 
   const kept = $derived.by(() => {
     const aside = asideToday();
@@ -55,8 +62,14 @@
         </li>
       {/each}
     </ul>
-    {#if hidden > 0}<p class="late-more">{hidden} more</p>{/if}
-    {#if more > 0 && hidden === 0}<p class="late-past">and {more} more, past these</p>{/if}
+    {#if hidden > 0 || more > 0}
+      <div class="late-foot">
+        {#if hidden > 0}<p class="late-more">{hidden} more</p>{/if}
+        {#if more > 0 && doors.some((d) => d.href)}
+          {#each doors as d (d.half)}<p class={d.href ? 'late-more' : 'late-past'}>{d.href && hidden > 0 && d.named ? d.named : d.said}</p>{/each}
+        {:else if more > 0 && hidden === 0}<p class="late-past">and {more} more, past these</p>{/if}
+      </div>
+    {/if}
   </Tile>
 </div>
 
@@ -173,6 +186,14 @@
       justify-content: flex-start;
       padding-block-start: var(--sp-1);
     }
+  }
+
+  .late-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-5);
+    min-inline-size: 0;
   }
 
   .late-more,

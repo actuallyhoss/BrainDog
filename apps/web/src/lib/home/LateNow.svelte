@@ -33,6 +33,7 @@
     lines,
     heading,
     more = 0,
+    doors = [],
     most,
     writes,
     onfinished,
@@ -43,6 +44,12 @@
     heading: string;
     /** Late things past what the lines hold. */
     more?: number;
+    /**
+     * Where those are, a door for each half of the list that was cut ("4 more", or "4 more in Tasks" and "2 more in
+     * Bills" where both were), with no `href` where no one list holds them (`BlockSlot`'s `lateSlice`), and named by
+     * its list (`named`) for beside the count this tile opens in place.
+     */
+    doors?: readonly { half: string; href: string | null; said: string; named?: string | null }[];
     /** How many lines show before the rest open in place. */
     most: number;
     /** Whether the reader may change a row of the list named. */
@@ -68,6 +75,11 @@
   const kept = $derived(lines.filter((l) => !aside.has(l.key)));
   const shown = $derived(open ? kept : kept.slice(0, most));
   const hidden = $derived(kept.length - shown.length);
+  /* THE LINES OPENED IN PLACE, and the rest: a door to its list where one holds it, at rest as every tile's "N more →"
+     is; else in words once the lines are all out, so two bare counts never stand side by side. */
+  const opener = $derived(hidden > 0 || open);
+  const linked = $derived(more > 0 && doors.some((d) => d.href));
+  const past = $derived(more > 0 && !linked && (open || hidden === 0));
 
   /**
    * An amount to the cent, in its own currency, as a person says it, WITH ITS WAY (audit 31 Oct f, AF5): "−£9,190" for a
@@ -189,10 +201,20 @@
       </li>
     {/each}
   </ul>
-  {#if hidden > 0 || open}
-    <button type="button" class="late-more tap" aria-expanded={open} onclick={() => (open = !open)}>{open ? words.fewer : words.more(hidden)}</button>
+  <!-- THE FOOT, INSIDE THE TILE (25 Nov: Today drew the doors under the tile, outside it, its count cut at the corner):
+       the lines it opens in place, and the doors to the rest where a list holds them, as every other tile's "N more →"
+       is, each named by its list beside the count that opens in place; else, once the lines are all out, how many more
+       there are in words. -->
+  {#if opener || linked || past}
+    <div class="late-foot">
+      {#if opener}
+        <button type="button" class="late-more tap" aria-expanded={open} onclick={() => (open = !open)}>{open ? words.fewer : words.more(hidden)}</button>
+      {/if}
+      {#if linked}
+        {#each doors as d (d.half)}{#if d.href}<a class="late-more tap" href={at(d.href)}>{opener && d.named ? d.named : d.said}</a>{:else}<p class="late-past">{d.said}</p>{/if}{/each}
+      {:else if past}<p class="late-past">{words.past(more)}</p>{/if}
+    </div>
   {/if}
-  {#if more > 0 && (open || hidden === 0)}<p class="late-past">{words.past(more)}</p>{/if}
 </Tile>
 
 <ItemMenu label={menuLine?.title ?? heading} bind:at={point} href={menuLine?.href} omit={['state']}>
@@ -370,6 +392,15 @@
     .ln:has(> .ln-acts > :global(*)) > .ln-when {
       padding-block: 0;
     }
+  }
+
+  /* THE FOOT: one line at the tile's foot, its presses side by side, folding under each other where they do not fit. */
+  .late-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-5);
+    min-inline-size: 0;
   }
 
   .late-more {

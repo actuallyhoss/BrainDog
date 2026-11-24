@@ -777,7 +777,7 @@
 
   /* LATE'S "N MORE" SITS AT THE TILE'S FOOT, as All people and Activity do beside it, not under its last line with an
      empty band below it (live check of 30 October, 22: the phone's Late and urgent). */
-  .board :global([data-board-key] .tile > .late-more) {
+  .board :global([data-board-key] .tile > :is(.late-more, .late-foot)) {
     margin-block-start: auto;
   }
 
