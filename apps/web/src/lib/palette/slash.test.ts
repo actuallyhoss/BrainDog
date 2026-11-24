@@ -18,7 +18,7 @@ import type { Reading, SlashProposal, SlashStatus } from '@braindog/client';
 
 import { copy } from '../copy.ts';
 import { modeSent } from './slash-chat.ts';
-import { asksFirst, capLine, drawProposal, drawReading, FIGURES_TRACE, inOrder, offersSlash, pass2Refused, secondPass, slashWords, whereWords } from './slash.ts';
+import { asksFirst, capLine, drawProposal, drawReading, FIGURES_TRACE, inOrder, offersSlash, pass2Refused, saidExactly, secondPass, slashWords, whereWords } from './slash.ts';
 
 const ASK = { slash: true, prefix: null, text: 'late invoices', pending: false, places: 0 };
 
@@ -263,4 +263,15 @@ test('THE BAR SENDS AUTO WHERE A DEEP KEY IS SET, so a failed Quick turn can han
   assert.equal(modeSent('quick', true), 'quick');
   assert.equal(modeSent('deep', true), 'deep');
   assert.equal(modeSent('deep', false), 'deep');
+});
+
+test('A COMMAND TYPED OUT IN FULL IS SAID EXACTLY, case, spaces and a closing stop aside, so it leads the ask (audit finding 15)', () => {
+  assert.equal(saidExactly('Customise this page', 'customise this page'), true);
+  assert.equal(saidExactly('Customise this page', '  Customise   this page. '), true);
+  assert.equal(saidExactly('Customise this page', 'customise this page for me'), false);
+  assert.equal(saidExactly('Customise this page', ''), false);
+  /* AND THE ASK IS THE FALLBACK UNDER IT, as the panel orders it when `exactRow` is found. */
+  const row = { id: 'slash', title: 'Ask Slash' };
+  const flat = inOrder([{ id: 'customise-page', title: 'Customise this page' }], undefined, { row, first: asksFirst('customise this page') && !saidExactly('Customise this page', 'customise this page') });
+  assert.deepEqual(flat.map((r) => r.id), ['customise-page', 'slash']);
 });

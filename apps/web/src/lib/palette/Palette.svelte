@@ -105,7 +105,7 @@
   import { palette as opener } from './open.svelte.ts';
   import { tick, untrack } from 'svelte';
   import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
-  import { asksFirst, capLine, inOrder, offersSlash, slashWords } from './slash.ts';
+  import { asksFirst, capLine, inOrder, offersSlash, saidExactly, slashWords } from './slash.ts';
   import SlashThread from './SlashThread.svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import ThreadList from '../../routes/slash/ThreadList.svelte';
@@ -1509,7 +1509,14 @@
   const overflow = $derived(rows.find((r) => r.id === 'all'));
   /* THE ASK'S ROW, FIRST FOR A SENTENCE: three words or a question mark is somebody asking, so it leads. */
   const askRow = $derived(rows.find((r) => r.id === 'slash'));
-  const askLeads = $derived(askRow !== undefined && asksFirst(askRow.ask ?? ''));
+  /* BUT A COMMAND TYPED OUT IN FULL LEADS IT, and the ask is the fallback under it: "customise this page" and Enter runs
+     the command, and spends no ask. */
+  const exactRow = $derived(
+    parsed.prefix === null || parsed.prefix === '>'
+      ? rows.find((r) => r.id !== 'slash' && (r.group === copy.commands || r.group === copy.customise.group || r.act !== undefined) && saidExactly(r.title, parsed.text))
+      : undefined,
+  );
+  const askLeads = $derived(askRow !== undefined && asksFirst(askRow.ask ?? '') && exactRow === undefined);
 
   /* THE GROUPS OPENED PAST THEIR SIX, for this query only. */
   let opened = $state<ReadonlySet<string>>(new Set());
@@ -1547,10 +1554,13 @@
        tool called Fenwick over the organisation Fenwick Cloud. Who leads, then what is named exactly, three at most. */
     const titled = (r: Row): string => r.title.trim().toLowerCase();
     const leads = (r: Row): boolean => isWho(r) && (titled(r) === needle || titled(r).startsWith(`${needle} `));
+    /* A COMMAND TYPED OUT IN FULL IS THE BEST MATCH where its own group ranks below it, so the row Enter runs is the top
+       row on screen too. */
+    const exact = exactRow !== undefined && rankOf(exactRow.group) > rankOf(BEST) ? [exactRow.id] : [];
     const best =
       needle === ''
         ? new Set<string>()
-        : new Set([...rows.filter((r) => named(r) && leads(r)), ...rows.filter((r) => named(r) && !leads(r) && titled(r) === needle)].slice(0, 3).map((r) => r.id));
+        : new Set([...exact, ...[...rows.filter((r) => named(r) && leads(r)), ...rows.filter((r) => named(r) && !leads(r) && titled(r) === needle)].slice(0, 3).map((r) => r.id)]);
     for (const r of [...rows].sort((a, b) => Number(best.has(b.id) && leads(b)) - Number(best.has(a.id) && leads(a)))) {
       if (r.id === 'all' || r.id === 'slash') continue;
       const group = best.has(r.id) ? BEST : r.group;

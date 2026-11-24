@@ -62,6 +62,16 @@ export function asksFirst(text: string): boolean {
 }
 
 /**
+ * Whether a row's title is the line typed exactly, case, spacing and a closing stop or question mark aside. A command
+ * said in full leads even a sentence's ask (audit finding 15): "customise this page" and Enter asked Slash, and spent an
+ * ask, because three words put the Ask row first.
+ */
+export function saidExactly(title: string, text: string): boolean {
+  const plain = (s: string): string => s.trim().toLowerCase().replace(/[.!?]+$/u, '').replace(/\s+/gu, ' ').trim();
+  return plain(text) !== '' && plain(title) === plain(text);
+}
+
+/**
  * The rows in the order the keys walk them: the ask first when `asksFirst` says so, then the groups, then the overflow
  * row, then the ask when it is only the fallback. Pure, so a test holds the order the panel draws.
  */
