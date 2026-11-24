@@ -22,13 +22,8 @@
   import Table from './p/Table.svelte';
   import { comparisonPlan } from '../src/table.ts';
   import Media from './p/Media.svelte';
-  import Inputs from './Inputs.svelte';
-  import Calendar from './Calendar.svelte';
-  import Form from './Form.svelte';
-  import Lanes from './Lanes.svelte';
+  import Lazy from './Lazy.svelte';
   import Links from './Links.svelte';
-  import Gallery from './Gallery.svelte';
-  import Embed from './Embed.svelte';
   import Path from './Path.svelte';
   import Actions from './Actions.svelte';
   import { actionLabels, tableSourceRow, type OnAct } from '../src/actions.ts';
@@ -204,22 +199,22 @@
          would take a write it can never make. -->
     <!-- AND NOT THROUGH `Rows` EVEN READ-ONLY: an inputs row is `field | label | type | value`, so `Rows` would print the
          field's id as its label and its label as its value. `Inputs` draws the spec itself, in `Rows`' classes. -->
-    <Inputs {block} {opts} {oninput} />
-  {:else if block.kind === 'form'}<Form {block} {opts} {act} />
+    <Lazy kind="inputs" props={{ block, opts, oninput }} />
+  {:else if block.kind === 'form'}<Lazy kind="form" props={{ block, opts, act }} />
   {:else if block.kind === 'calendar'}
     <!-- CALENDAR, LANES, LINK, GALLERY AND EMBED, EACH WITH A DRAWER OF ITS OWN, and the path, BY KIND AND BEFORE THE
          PRIMITIVES, for `inputs`' reason: each sits on a primitive other kinds share, and asking here keeps a
          primitive's component from learning a kind it has no callback for. A drawer that does not know one of these
          kinds falls back to its primitive, which is why each is on one. -->
-    <Calendar {block} {opts} {onmenu} />
+    <Lazy kind="calendar" props={{ block, opts, onmenu }} />
   {:else if block.kind === 'lanes'}
-    <Lanes {block} {opts} />
+    <Lazy kind="lanes" props={{ block, opts }} />
   {:else if block.kind === 'link'}
     <Links {block} {opts} />
   {:else if block.kind === 'gallery'}
-    <Gallery {block} {opts} />
+    <Lazy kind="gallery" props={{ block, opts }} />
   {:else if block.kind === 'embed'}
-    <Embed {block} {opts} />
+    <Lazy kind="embed" props={{ block, opts }} />
   {:else if block.kind === 'steps' && block.form === 'path'}
     <!-- Here and not through `List`, because the stone's write is the path's alone and `List` has three of its own. -->
     <Path {block} {opts} {onpath} />

@@ -62,3 +62,5 @@ export { default as Instructions } from './Instructions.svelte';
    paint; see the module for the 54,786 hidden nodes that argument is about. */
 export { rowsAsCards } from './rows-as-cards.svelte.ts';
 export { default as Media } from './p/Media.svelte';
+/* The drawers few pages hold, fetched in the app when a page holds one (`lazy.ts`); it asks for a page's before drawing it. */
+export { preloadKinds } from './lazy.ts';

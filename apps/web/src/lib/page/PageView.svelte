@@ -56,7 +56,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
-  import { Filters } from 'braindog-render/svelte';
+  import { Filters, preloadKinds } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import { hueOf, iconFor } from '$lib/record/api.ts';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
@@ -222,6 +222,18 @@
     const blocks = heldOrder(clean.page.blocks, blockKeys(clean.page.blocks), before.keys);
     return blocks === clean.page.blocks ? clean : { ...clean, page: { ...clean.page, blocks: [...blocks] } };
   });
+  /* THE DRAWERS THIS PAGE'S KINDS NEED, FETCHED THE MOMENT THE PAGE ANSWERS AND WAITED FOR (`braindog-render/svelte`
+     `preloadKinds`): a forecast or a calendar drawn after the blocks under it pushed them down (CLS 0.45 on Forecast). A
+     page whose kinds are all in the shared chunk draws at once. Derived, so the first frame of an answer already
+     knows to wait (as an effect, the body was built once and then put back for the wait); asked again only when the
+     answer changes, so a drawer that did not come is not asked for in a loop (its block asks once more by itself). */
+  const drawersWait = $derived(preloadKinds((live?.page.blocks ?? []).map((b) => b.kind)));
+  let drawersCame = $state.raw<Promise<void> | null>(null);
+  $effect(() => {
+    const wait = drawersWait;
+    if (wait !== null) void wait.then(() => (drawersCame = wait));
+  });
+  const drawersIn = $derived(drawersWait === null || drawersCame === drawersWait);
   $effect.pre(() => {
     if (!live) return;
     const since = drawn?.visit === visit ? drawn.since : performance.now();
@@ -1153,7 +1165,7 @@
   <div class="pull" role="status" style:transform={`translateY(${pullBusy ? 16 : pulled - 24}px)`}>{pullBusy ? 'Refreshing' : pulled >= PULL_AT / 2 ? 'Let go to refresh' : 'Pull to refresh'}</div>
 {/if}
 
-{#if got === null || (got.from === 'live' && projectPage && (shapeBox.hold === null || !shapeOnce) && !partsFailed && !arranging)}
+{#if got === null || (got.from === 'live' && projectPage && (shapeBox.hold === null || !shapeOnce) && !partsFailed && !arranging) || !drawersIn}
   {#if railed}
     <!-- THE HEAD FROM THE RAIL'S OWN ENTRY, AND BARS ONLY FOR THE BLOCKS, until the record answers. -->
     <!-- A PAGE ONE ROW MADE (a project's) WAITS IN THE HEAD IT WILL HAVE: the way back and no name row, its hero holding

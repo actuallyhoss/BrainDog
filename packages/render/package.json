@@ -14,6 +14,9 @@
     "./widget-compose": "./src/widget-compose.ts",
     "./kinds-for": "./src/kinds-for.ts"
   },
+  "imports": {
+    "#drawers": "./svelte/drawers-held.ts"
+  },
   "publishConfig": {
     "access": "public",
     "exports": {

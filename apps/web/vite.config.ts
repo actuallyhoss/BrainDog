@@ -45,6 +45,15 @@ if (ENV !== '' && !(ENVIRONMENTS as readonly string[]).includes(ENV))
 const PALETTE = fileURLToPath(new URL(`../../packages/skin/${ENV === '' ? 'house' : ENV}.css`, import.meta.url));
 
 /**
+ * AND THE RARER BLOCK DRAWERS ARE FETCHED AS A PAGE NEEDS THEM, by the same means: the renderer's `#drawers` is every
+ * drawer in hand wherever nothing says otherwise (the site's finished HTML, the tests' strings), and here it is the
+ * file that fetches each as a chunk of its own (`packages/render/svelte/lazy.ts`). The shared drawers chunk every
+ * declared page and Today wait on went from 58.3 to 33.4 KB brotli; a page holding one of them waits for it
+ * (`PageView.svelte`), so nothing under its block moves when it lands.
+ */
+const DRAWERS = fileURLToPath(new URL('../../packages/render/svelte/drawers-fetched.ts', import.meta.url));
+
+/**
  * WHERE `/api` AND `/auth` GO WHEN VITE SERVES THIS APP: `BRAINDOG_API`, or a record on this machine.
  *
  * BOTH, BECAUSE SIGN-IN IS SAME-ORIGIN TOO. `/auth/*` sets the session cookie and `/api/*` reads it, so
@@ -409,7 +418,12 @@ process.env.PUBLIC_BRAINDOG_BUILD = process.env.BRAINDOG_BUILD ?? '';
 export default defineConfig({
   plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin, routeRuntimePlugin, routeMarksPlugin, hoistPlugin, preloadOncePlugin],
   define: { __BRAINDOG_ENV__: JSON.stringify(ENV) },
-  resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
+  resolve: {
+    alias: [
+      { find: '@braindog/skin/house.css', replacement: PALETTE },
+      { find: /^#drawers$/u, replacement: DRAWERS },
+    ],
+  },
   /* `/catalogue` AT THE ROOT, beside the pages: the app is served at the root (`svelte.config.js`) and asks for the
      catalogue there (`routes/packs/browse/catalogue.ts`). It was `/app/catalogue` while the app was under `/app`. The
      sign-in, the account and OAuth are the host's doors at the root, and so is the record for a tab with no slug. */

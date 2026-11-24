@@ -21,12 +21,8 @@
   import { barsCompare, drawnRows, gaugeFigure } from '../../src/html.ts';
   import Text from '../Text.svelte';
   import Trend from '../Trend.svelte';
-  import Split from '../Split.svelte';
-  import Bridge from '../Bridge.svelte';
-  import Series from '../Series.svelte';
-  import Lines from '../Lines.svelte';
+  import Lazy from '../Lazy.svelte';
   import Progress from '../Progress.svelte';
-  import Forecast from '../Forecast.svelte';
   import Ring from './Ring.svelte';
   import PartChip from './PartChip.svelte';
 
@@ -81,17 +77,17 @@
 </script>
 
 {#if block.kind === 'split'}
-  <Split {block} {opts} />
+  <Lazy kind="split" props={{ block, opts }} />
 {:else if block.kind === 'bridge'}
-  <Bridge {block} {opts} />
+  <Lazy kind="bridge" props={{ block, opts }} />
 {:else if block.kind === 'series'}
-  <Series {block} {opts} />
+  <Lazy kind="series" props={{ block, opts }} />
 {:else if block.kind === 'lines'}
-  <Lines {block} {opts} />
+  <Lazy kind="lines" props={{ block, opts }} />
 {:else if block.kind === 'progress'}
   <Progress {block} {opts} />
 {:else if block.kind === 'forecast'}
-  <Forecast {block} {opts} />
+  <Lazy kind="forecast" props={{ block, opts }} />
 {:else if block.kind === 'ring'}
   <Ring {block} {opts} />
 {:else}

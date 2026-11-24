@@ -55,8 +55,7 @@
   } from '../../src/timeline.ts';
   import { glyphName, glyphPath, glyphWaits } from '../../src/inline.ts';
   import { rowAt, rowKey, rowKeys } from '../../src/cursor.ts';
-  import Agents from '../Agents.svelte';
-  import Feed from '../Feed.svelte';
+  import Lazy from '../Lazy.svelte';
   import Queue from '../Queue.svelte';
   import Path from '../Path.svelte';
   import Roadmap from './Roadmap.svelte';
@@ -221,9 +220,9 @@
 <!-- `feed` is on this primitive and groups its rows, so it has a drawer of its own, as `cards` does on `grid`, and so
      does `roadmap`, which draws its rows on a time axis rather than as a list of them, and `steps path`. -->
 {#if block.kind === 'feed'}
-<Feed {block} {opts} {cursor} {onrowfocus} />
+<Lazy kind="feed" props={{ block, opts, cursor, onrowfocus }} />
 {:else if block.kind === 'agents'}
-<Agents {block} {opts} />
+<Lazy kind="agents" props={{ block, opts }} />
 {:else if block.kind === 'queue'}
 <Queue bind:this={queue} {block} {opts} {onact} {cursor} {onrowfocus} {onselect} {selected} />
 {:else if block.kind === 'roadmap'}

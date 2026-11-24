@@ -21,6 +21,7 @@
   import { page as route } from '$app/state';
   import { setContext, tick, untrack } from 'svelte';
   import PageView from '$lib/page/PageView.svelte';
+  import { preloadKinds } from 'braindog-render/svelte';
   import PageTabs from '$lib/page/PageTabs.svelte';
   import { tabsOf } from '$lib/page/tabs.ts';
   import { listen } from '$lib/page/listen.svelte.ts';
@@ -176,6 +177,9 @@
     if (desks.has('late')) code.push(import('$lib/home/LateNow.svelte'));
     if (desks.has('working')) code.push(import('$lib/home/WorkingNow.svelte'));
     if (desks.has('projects')) code.push(import('$lib/home/ProjectCards.svelte'));
+    /* And the rarer kinds' drawers, which `PageView` holds the body for (`preloadKinds`). */
+    const drawers = preloadKinds(blocks.flatMap((b) => (typeof b.kind === 'string' ? [b.kind] : [])));
+    if (drawers !== null) code.push(drawers);
     return Promise.all(code);
   }
   function fromLocal(asked: string, choice: Record<string, string>, drawn: () => void) {
