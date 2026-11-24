@@ -17,7 +17,7 @@
  * `eraseSlash` (`erase.ts`) is how it leaves again.
  */
 
-import { no, ok, type Clock, type Result, type Sql } from '@braindog/ports';
+import { firstJson, no, ok, type Clock, type Result, type Sql } from '@braindog/ports';
 
 import { PROMPTS, MODELS, fill, type ModelId, type PromptId } from './prompts.ts';
 import { scrubWords } from './health.ts';
@@ -731,7 +731,11 @@ export const core = (
       try {
         parsed = JSON.parse(reply.text);
       } catch {
-        return { ran: { model, ms, usage, served: true, out: no('PROPOSAL_SCHEMA', 'The model did not answer with JSON. Nothing was filed; ask again.') } };
+        /* THE FIRST OF SEVERAL VALUES IS THE ANSWER (`firstJson`), on any host's wire: a model that writes its step and then
+           the steps it imagines after it has answered the step. */
+        const head = firstJson(reply.text);
+        if (head === null) return { ran: { model, ms, usage, served: true, out: no('PROPOSAL_SCHEMA', 'The model did not answer with JSON. Nothing was filed; ask again.') } };
+        parsed = JSON.parse(head);
       }
 
       const fault = checkSchema(schema, parsed);

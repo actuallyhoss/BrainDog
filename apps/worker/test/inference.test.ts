@@ -474,3 +474,41 @@ test("A KEY OR A PERSON'S PROMPT IN THE PROVIDER'S MESSAGE NEVER REACHES `detail
   assert.equal(scrubRaw('bad input {"text":["Ada 0418"]} key sk-proj-ab12cd'), 'bad input {"text":"[cut]"} key [cut]');
   assert.equal(scrubRaw('API key invalid for this route'), 'API key invalid for this route', 'words that are no key stay');
 });
+
+/**
+ * `gpt-oss-120b` WRITES ITS STEP AND THEN THE STEPS IT IMAGINES AFTER IT. Measured 24 November on Slash's own "how is Kiln
+ * going?" through the production gateway: 8 of 10 streamed replies were two to four objects one to a line, the first the
+ * step asked for, and each was refused as not JSON, so the bar said the model was unavailable. Red before: refused.
+ */
+test('A REPLY OF SEVERAL JSON OBJECTS IS READ AS ITS FIRST, and the rest is dropped', async () => {
+  const several = answering(() => ({
+    choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoice","actionable":true}\n{"kind":"receipt","actionable":false}\n{"kind":"other"' }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 5, completion_tokens: 40 },
+  }));
+  const lines: string[] = [];
+  const got = await aiInference(several.env, { log: (l) => lines.push(l) }).complete(reasoned);
+  assert.ok(got.ok, fixOf(got));
+  assert.equal(got.value.text, '{"kind":"invoice","actionable":true}');
+  assert.match(lines.join('\n'), /wrote more after its answer/u);
+  /* A FIRST VALUE THAT BREAKS THE SCHEMA IS STILL REFUSED for what it breaks. */
+  const wrong = answering(() => ({
+    choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoice"}\n{"kind":"invoice","actionable":true}' }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 5, completion_tokens: 20 },
+  }));
+  assert.match(fixOf(await aiInference(wrong.env).complete(reasoned)), /missing actionable/u);
+});
+
+/**
+ * AND A REPLY WITH NO TEXT IS NO ANSWER, so the route asks its next model. `gpt-oss-120b` answered `content: null` with
+ * `stop_reason` 200012 (its tool-call token) on 2 of 10 whole replies: it stopped to call a tool it was not given. Refused
+ * as not JSON, that ended the ask; as no answer, the next model is asked. Red before: `PROPOSAL_SCHEMA`.
+ */
+test('A REPLY WITH NO TEXT IS A MODEL THAT DID NOT ANSWER, not an answer in the wrong shape', async () => {
+  const none = answering(() => ({
+    choices: [{ index: 0, message: { role: 'assistant', content: null, reasoning_content: 'Search for it.' }, finish_reason: 'stop', stop_reason: 200012 }],
+    usage: { prompt_tokens: 5, completion_tokens: 20 },
+  }));
+  const got = await aiInference(none.env).complete(reasoned);
+  assert.equal(codeOf(got), 'NOT_IN_THIS_BUILD');
+  assert.match(fixOf(got), /the provider did not answer/u);
+});

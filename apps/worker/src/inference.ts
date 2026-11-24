@@ -40,6 +40,7 @@
 
 import {
   budgetSpent,
+  firstJson,
   modelMissing,
   ok,
   REASONING_ROOM,
@@ -840,16 +841,26 @@ export function aiInference(env: AiEnv, deps: AiDeps = {}): StreamingInference {
       );
     }
 
+    /* ONE VALUE, OR THE FIRST OF SEVERAL (`firstJson`): `gpt-oss-120b` often writes the step it was asked for and then the
+       steps it imagines after it, and the first is the answer. A reply with no text at all is a model that answered
+       nothing, as `gpt-oss-120b` does when it stops to call a tool it was not given (`stop_reason` 200012, its call
+       token): no answer, so the route asks its next model, where a refusal for the shape would end the ask. */
+    if (text.trim() === '') return modelMissing<Completion>(req.model, 'the provider did not answer', 'it answered with no text, as when the model stops to call a tool it was not given');
+    let kept = text;
     let parsed: unknown;
     try {
       parsed = JSON.parse(text);
     } catch {
-      return schemaFailed<Completion>(req.model, 'it is not JSON at all');
+      const head = firstJson(text);
+      if (head === null) return schemaFailed<Completion>(req.model, 'it is not JSON at all');
+      kept = head;
+      parsed = JSON.parse(head);
+      deps.log?.(`ai: ${req.model} wrote more after its answer, and the first whole value was read`);
     }
     const wrong = unhonoured(parsed, req.schema);
     if (wrong !== null) return schemaFailed<Completion>(req.model, wrong);
 
-    return ok({ text, model: rate.provider, usage });
+    return ok({ text: kept, model: rate.provider, usage });
   };
 
   return {

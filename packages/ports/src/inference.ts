@@ -153,6 +153,43 @@ export const INCLUDED_FALLBACKS = ['gemma-4-26b-a4b'] as const;
 export const REASONING_ROOM = 600 as const;
 
 /**
+ * THE FIRST WHOLE JSON VALUE A REPLY BEGINS WITH, where the whole reply is not one: `null` when it does not begin with
+ * one that parses. `gpt-oss-120b` does not hold to a pinned schema on Workers AI: asked one step of Slash's conversation
+ * it often writes that step and then the steps it imagines after it, one object to a line. MEASURED 24 NOV 2026 on "how
+ * is Kiln going?": 8 of 10 streamed replies and 5 of 10 whole ones were two to four objects, the first the right step,
+ * and every one was refused as not JSON, so the turn said "Slash's model is unavailable". The first is the step asked
+ * for; what follows is the model talking to itself, and is dropped.
+ */
+export const firstJson = (text: string): string | null => {
+  const s = text.trimStart();
+  if (s[0] !== '{' && s[0] !== '[') return null;
+  let depth = 0;
+  let quoted = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quoted) {
+      if (c === '\\') i++;
+      else if (c === '"') quoted = false;
+      continue;
+    }
+    if (c === '"') quoted = true;
+    else if (c === '{' || c === '[') depth++;
+    else if (c === '}' || c === ']') {
+      depth--;
+      if (depth > 0) continue;
+      const head = s.slice(0, i + 1);
+      try {
+        JSON.parse(head);
+        return head;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+};
+
+/**
  * A batch of embeddings.
  *
  * `vectors` ARE `Int8Array` BECAUSE THE QUANTISATION IS THE ADAPTER'S, not the caller's:
