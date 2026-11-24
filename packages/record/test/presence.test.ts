@@ -204,3 +204,99 @@ test('A ROW SAYS WHERE IT IS AND WHAT IT DID: its app, its folder, how much it w
   assert.deepEqual([by.get(other)?.app, by.get(other)?.cwd, by.get(other)?.asked], [null, 'D:\\work', null]);
   sql.close();
 });
+
+/** How many times the record read a run's instructions and stamp (`changedSince`), counted from now on. */
+const stampReads = (api: Api): { n: number } => {
+  const k = api.kernel as unknown as { changedSince: (...a: unknown[]) => unknown };
+  const real = k.changedSince.bind(api.kernel);
+  const count = { n: 0 };
+  k.changedSince = (...a: unknown[]) => ((count.n += 1), real(...a));
+  return count;
+};
+const pulseAt = (sql: NodeSql, spoken: string): string | undefined => (JSON.parse(rowOf(sql, spoken).fields) as { pulse_at?: string }).pulse_at;
+
+/* 24 November: a pulse read the run's instructions, its stamp and its stop line about 10,000 times a day, nearly always to
+   answer that nothing had changed. */
+test('A QUIET PULSE ANSWERS FROM WHAT THE LAST ONE KEPT, still moves pulse_at, and hears the next instruction and stop at once', async () => {
+  const { api, sql, clock } = await record();
+  const ctx = agent('c-kept');
+  const run = await opened(api, ctx);
+  const reads = stampReads(api);
+  clock.advance(15_000);
+  const first = value<Pulse>(await api.pulse({}, ctx));
+  assert.equal(reads.n, 1);
+
+  /* THE SAME STAMP BACK AND NOTHING MOVED: the same answer, read from nothing, and the pulse still lands. */
+  clock.advance(15_000);
+  const quiet = value<Pulse>(await api.pulse({ stamp: first.stamp! }, ctx));
+  assert.equal(reads.n, 1, 'a quiet pulse read the instructions again');
+  assert.deepEqual(quiet, { ...first, changed: false, lines: [] });
+  assert.equal(pulseAt(sql, run), new Date(clock.now()).toISOString(), 'a quiet pulse did not move pulse_at');
+
+  /* A TELL LANDS: the very next pulse hears it, in his voice. */
+  value(await api.instruct({ said: 'Look at the bounce numbers', project: 'Portage', when: 'now' }, owner));
+  clock.advance(15_000);
+  const heard = value<Pulse>(await api.pulse({ stamp: quiet.stamp! }, ctx));
+  assert.equal(heard.changed, true);
+  assert.deepEqual(heard.pending.map((i) => i.id), ['IN1']);
+  assert.match(heard.lines[0]!, /^Teodor said in BrainDog \(IN1\)/u);
+  clock.advance(15_000);
+  const still = value<Pulse>(await api.pulse({ stamp: heard.stamp! }, ctx));
+  assert.deepEqual(still, { ...heard, changed: false, lines: [] });
+  const before = reads.n;
+
+  /* A STOP LANDS: the very next pulse hears it. */
+  value(await api.instruct({ said: 'Stop now', kind: 'stop', to_run: run }, owner));
+  clock.advance(15_000);
+  const stopped = value<Pulse>(await api.pulse({ stamp: still.stamp! }, ctx));
+  assert.equal(reads.n, before + 1);
+  assert.deepEqual(stopped.stop && [stopped.stop.kind, stopped.stop.id], ['stop', 'IN2']);
+  assert.match(stopped.lines[0]!, /^Teodor stopped this run in BrainDog \(IN2\)/u);
+
+  /* A STAMP THE PULSE WAS NOT GIVEN, OR ONE THAT SHOWS SOMETHING, IS READ WHOLE. */
+  clock.advance(15_000);
+  value(await api.pulse({}, ctx));
+  assert.equal(reads.n, before + 2);
+  sql.close();
+});
+
+test('A KEPT PULSE HEARS WHAT MOVES WITH NO LINE: a word for its next call once it calls, a word that ran out, and a helper its lead\'s stop', async () => {
+  const { api, sql, clock } = await record();
+  const lead = agent('c-lead-kept');
+  const leadRun = await opened(api, lead);
+  const helper = agent('c-helper-kept', { parent: leadRun });
+  await opened(api, helper);
+  clock.advance(2 * MIN);
+  const a = value<Pulse>(await api.pulse({}, lead));
+  const h = value<Pulse>(await api.pulse({}, helper));
+
+  /* "NEXT" REACHES AN OPEN RUN AT ITS NEXT CALL, which moves its `last_seen` in place, with no line. */
+  value(await api.instruct({ said: 'Write the release notes', project: 'Portage', when: 'next', waits_ms: 2 * MIN }, owner));
+  clock.advance(15_000);
+  const waiting = value<Pulse>(await api.pulse({ stamp: a.stamp! }, lead));
+  assert.deepEqual(waiting.pending, [], 'a word for the next call reached a run that has not called');
+  clock.advance(15_000);
+  assert.deepEqual(value<Pulse>(await api.pulse({ stamp: waiting.stamp! }, lead)).pending, []);
+  value(await api.beat({}, lead));
+  clock.advance(15_000);
+  const told = value<Pulse>(await api.pulse({ stamp: waiting.stamp! }, lead));
+  assert.deepEqual(told.pending.map((i) => i.id), ['IN1'], 'the call did not bring the word on the next pulse');
+  assert.equal(told.changed, true);
+
+  /* IT RUNS OUT WITH NOBODY WRITING, two minutes after he said it: the first pulse after that no longer lists it. */
+  clock.advance(15_000);
+  assert.deepEqual(value<Pulse>(await api.pulse({ stamp: told.stamp! }, lead)).pending.map((i) => i.id), ['IN1']);
+  clock.advance(MIN + 30_000);
+  const ran = value<Pulse>(await api.pulse({ stamp: told.stamp! }, lead));
+  assert.deepEqual(ran.pending, [], 'a word that ran out was still listed');
+  assert.equal(ran.changed, true);
+
+  /* A HELPER OBEYS ITS LEAD'S STOP, which is written on the lead's row: its next pulse hears it. */
+  clock.advance(15_000);
+  const hq = value<Pulse>(await api.pulse({ stamp: h.stamp! }, helper));
+  value(await api.instruct({ said: 'Hold on', kind: 'pause', to_run: leadRun }, owner));
+  clock.advance(15_000);
+  const held = value<Pulse>(await api.pulse({ stamp: hq.stamp! }, helper));
+  assert.equal(held.stop?.kind, 'pause', 'the helper did not hear its lead paused');
+  sql.close();
+});

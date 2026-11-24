@@ -208,6 +208,32 @@ export function methods(deps: RecordDeps) {
   };
 
   /**
+   * WHAT EACH RUN'S LAST FULL PULSE ANSWERED, AND WHAT IT WAS READ FROM (24 November), so a pulse on a record where
+   * nothing moved for the run answers from it and skips the instructions, the stamp and the stop line. A bridge pulses
+   * every 15 to 25 s and nearly every pulse brings back the stamp it was given, with nothing new.
+   *
+   * WHAT IT WAS READ FROM (`from`): the newest line of the log, by place and id; the token, and whether it is handed every
+   * instruction (`toldTo`); the run's row, its state and every field but `pulse_at`. Every instruction made, seen, taken,
+   * answered or withdrawn, and every stop, pause and resume (the instruction and the run's `stopped`, its parent's for a
+   * helper), is a kernel write and leaves a line, or moves the line it folds into to the end of the log, so the newest
+   * line moves. What moves with no line is a run's own `last_seen`, place and name, written in place on its own row,
+   * which is in `from`; and the clock, which ends an instruction at its `expires_at` (`until`). Anything else that moves
+   * with no line (a person's name in a line) is read again within `PULSE_KEPT_MS`.
+   *
+   * ONLY A PULSE THAT BRINGS BACK THE STAMP IT WAS GIVEN AND SHOWED NOTHING is answered from it, which is `changed: false`
+   * with no lines; any other is read whole, as before. In memory, so a restart reads once more.
+   */
+  type PulseKept = { from: string; until: number; stamp: string; pending: Pulse['pending']; stop: Stop | null };
+  const PULSE_KEPT_MS = 5 * 60_000;
+  const PULSES_KEPT_MOST = 256;
+  const pulsesKept = new Map<string, PulseKept>();
+  const pulseFrom = (ctx: CallContext, token: string, found: Entry): string => {
+    const head = sql.one<{ r: number; id: string }>('SELECT rowid AS r, id FROM event ORDER BY rowid DESC LIMIT 1');
+    const { pulse_at: _pulse, ...fields } = found.fields as Record<string, unknown>;
+    return JSON.stringify([head?.r ?? 0, head?.id ?? '', token, readable(ctx, INSTRUCTIONS) === null, found.state ?? null, fields]);
+  };
+
+  /**
    * The runs among the newest uses of one target, grouped by run, the run that used it last first.
    *
    * ONLY AN ACTOR THAT IS A RUN'S NAME: the prefix and then digits and nothing else. A person opening a key in a browser
@@ -354,16 +380,26 @@ export function methods(deps: RecordDeps) {
       const found = kernel.findRun(ctx.session ?? {}, p.id);
       if (found === null) return ok({ run: null, stamp: null, changed: false, pending: [], stop: null, lines: [] });
       const run = kernel.nameOf(found.id);
+      /* WHAT THIS PULSE IS READ FROM, before it writes: `pulse_at` and a profile once, in place, which `from` leaves out
+         or reads again on the next pulse. */
+      const from = pulseFrom(ctx, p.id, found);
       /* AND THE PROFILE ITS HEADERS NAME, written once onto a run that opened without one (migration 44). */
       kernel.pulseRun(run, undefined, ctx.session?.seat ?? null);
       const shown = (a.shown as string[] | undefined) ?? [];
       const how = (a.how as SeenHow | undefined) ?? 'prompt';
+      const was = typeof a.stamp === 'string' ? a.stamp : '';
+      /* NOTHING MOVED FOR THE RUN SINCE ITS LAST PULSE, which brings back the stamp it was given and showed nothing: the
+         same answer, read from what that pulse kept (`pulsesKept`). */
+      const kept = pulsesKept.get(found.id);
+      if (shown.length === 0 && kept !== undefined && kept.from === from && kept.stamp === was && clock.now() < kept.until)
+        return tail(ok({ run, stamp: kept.stamp, changed: false, pending: kept.pending.map((i) => ({ ...i })), stop: kept.stop && { ...kept.stop }, lines: [] }));
+      pulsesKept.delete(found.id);
       /* WHAT IT IS HANDED AND NO MORE (`toldTo`): a member's agent is never handed his words to his own agents, nor marks
          one seen by naming it. */
-      const handed = toldTo(readable, ctx, kernel.instructionFor({}, run));
+      const open = kernel.instructionFor({}, run);
+      const handed = toldTo(readable, ctx, open);
       const mine = new Set(handed.map((i) => i.id));
       for (const id of shown) if (mine.has(id) || readable(ctx, INSTRUCTIONS) === null) kernel.seenInstruction(id, run, how);
-      const was = typeof a.stamp === 'string' ? a.stamp : '';
       const delta = kernel.changedSince(run, was);
       const pending = handed.map((i) => toldOf(sql, i));
       const fresh = new Set(delta.pending.map((i) => i.id));
@@ -371,12 +407,20 @@ export function methods(deps: RecordDeps) {
       const lines = delta.changed
         ? [...(held === null ? [] : [held]), ...pending.filter((i: Told) => fresh.has(i.id) && i.kind !== 'stop' && i.kind !== 'pause').map((i) => i.line)]
         : [];
+      const said = pending.map((i) => ({ id: i.id, kind: i.kind, said: i.said, at: i.at, to: i.to, line: i.line }));
+      /* KEPT ONLY WHEN THIS PULSE WROTE NOTHING THAT LEAVES A LINE: one that showed an instruction marked it seen. Until the
+         first open instruction for the run ends, at most `PULSE_KEPT_MS`. */
+      if (shown.length === 0) {
+        if (pulsesKept.size >= PULSES_KEPT_MOST) pulsesKept.clear();
+        const ends = open.map((i) => (i.expires_at === null ? NaN : Date.parse(i.expires_at))).filter(Number.isFinite);
+        pulsesKept.set(found.id, { from, until: Math.min(clock.now() + PULSE_KEPT_MS, ...ends), stamp: delta.stamp, pending: said.map((i) => ({ ...i })), stop: delta.stop });
+      }
       return tail(
         ok({
           run,
           stamp: delta.stamp,
           changed: delta.changed,
-          pending: pending.map((i) => ({ id: i.id, kind: i.kind, said: i.said, at: i.at, to: i.to, line: i.line })),
+          pending: said,
           stop: delta.stop,
           lines,
         }),
