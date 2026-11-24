@@ -109,11 +109,13 @@ test('EVERY CALL GOES THROUGH THE GATEWAY WITH THE PAYLOAD LOG OFF, and an unnam
 
   const { seen, env } = answering(() => answer);
   await aiInference(env).complete(ask);
-  assert.deepEqual(seen[0]?.options, { gateway: { id: 'braindog-alpha', collectLog: false } });
+  assert.deepEqual(seen[0]?.options?.gateway, { id: 'braindog-alpha', collectLog: false });
+  /* AND THE CALL'S CLOCK, on every path: a model that does not answer in time is let go (`FIRST_BYTE_MS`). */
+  assert.ok(seen[0]?.options?.signal instanceof AbortSignal);
 
   const direct = answering(() => answer);
   await aiInference({ ...direct.env, AI_GATEWAY: '' }).complete(ask);
-  assert.deepEqual(direct.seen[0]?.options, {});
+  assert.deepEqual(Object.keys(direct.seen[0]?.options ?? {}), ['signal']);
 });
 
 test('AN ANSWER THAT DOES NOT HONOUR THE SCHEMA IS PROPOSAL_SCHEMA, in each of the four ways a model ignores one', async () => {
@@ -255,7 +257,7 @@ test('NOTHING TO EMBED IS NOT A CALL, and a count that does not match what was a
  * ADAPTER READ BOTH AS THOUGH THEY DID. Measured against `@cloudflare/workers-types`
  * 5.20260907.1, which is what `apps/worker/tsconfig.json` compiles against:
  * `"@cf/meta/llama-3.2-1b-instruct": BaseAiTextGeneration`, whose output is
- * `{ response?: string; tool_calls?; usage? }`, and `"@cf/zai-org/glm-5.3-flash":
+ * `{ response?: string; tool_calls?; usage? }`, and `"@cf/openai/gpt-oss-120b":
  * Base_Ai_Cf_Zai_Org_Glm_5_3_Flash`, whose output is `ChatCompletionsOutput`, which is OpenAI's
  * shape and has no `response` at all. Compiling `glm.response` against it answers
  * *"TS2339: Property 'response' does not exist on type 'ChatCompletionsOutput'"*.
@@ -272,7 +274,7 @@ test('THE CHAT-COMPLETIONS ROW IS READ OUT OF `choices`, because it does not ans
     id: 'chatcmpl-1',
     object: 'chat.completion',
     created: 1_758_326_400,
-    model: '@cf/zai-org/glm-5.3-flash',
+    model: '@cf/openai/gpt-oss-120b',
     choices: [
       {
         index: 0,
@@ -284,15 +286,15 @@ test('THE CHAT-COMPLETIONS ROW IS READ OUT OF `choices`, because it does not ans
     usage: { prompt_tokens: 412, completion_tokens: 12, total_tokens: 424 },
   }));
 
-  const got = await aiInference(env).complete({ ...ask, model: 'glm-5.3-flash' });
+  const got = await aiInference(env).complete({ ...ask, model: 'gpt-oss-120b' });
 
   assert.ok(got.ok, fixOf(got));
   assert.deepEqual(got.value, {
     text: '{"kind":"invoice","actionable":true}',
-    model: '@cf/zai-org/glm-5.3-flash',
+    model: '@cf/openai/gpt-oss-120b',
     usage: { in: 412, out: 12, neurons: null },
   });
-  assert.equal(seen[0]?.model, '@cf/zai-org/glm-5.3-flash');
+  assert.equal(seen[0]?.model, '@cf/openai/gpt-oss-120b');
 });
 
 /**
@@ -318,7 +320,7 @@ test('EACH ROW IS SENT THE `response_format` ITS OWN INPUT TYPE DECLARES, and th
     choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoice","actionable":true}' }, finish_reason: 'stop' }],
     usage: { prompt_tokens: 5, completion_tokens: 4 },
   }));
-  await aiInference(wrapped.env).complete({ ...ask, model: 'glm-5.3-flash' });
+  await aiInference(wrapped.env).complete({ ...ask, model: 'gpt-oss-120b' });
   assert.deepEqual(wrapped.seen[0]?.inputs['response_format'], {
     type: 'json_schema',
     json_schema: { name: 'answer', schema: TRIAGE, strict: true },
@@ -340,20 +342,20 @@ test('A CHAT-COMPLETIONS ANSWER THAT LANDS ON THE CEILING AND SAYS `stop` IS NOT
     choices: [{ index: 0, message: { role: 'assistant', content: good }, finish_reason: 'stop' }],
     usage: { prompt_tokens: 412, completion_tokens: 64 },
   }));
-  const fine = await aiInference(stopped.env).complete({ ...ask, model: 'glm-5.3-flash' });
+  const fine = await aiInference(stopped.env).complete({ ...ask, model: 'gpt-oss-120b' });
   assert.ok(fine.ok, fixOf(fine));
 
   const cut = answering(() => ({
     choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoi' }, finish_reason: 'length' }],
     usage: { prompt_tokens: 412, completion_tokens: 64 },
   }));
-  const got = await aiInference(cut.env).complete({ ...ask, model: 'glm-5.3-flash' });
+  const got = await aiInference(cut.env).complete({ ...ask, model: 'gpt-oss-120b' });
   assert.equal(codeOf(got), 'PROPOSAL_SCHEMA');
   assert.match(fixOf(got), /stopped at the 64-token ceiling/u);
 });
 
 /**
- * A ROW THAT REASONS IS ASKED TO THINK LITTLE, BECAUSE ITS THINKING IS SPENT FROM THE ANSWER'S CEILING. `glm-5.3-flash`
+ * A ROW THAT REASONS IS ASKED TO THINK LITTLE, BECAUSE ITS THINKING IS SPENT FROM THE ANSWER'S CEILING. `gpt-oss-120b`
  * reasons at `max` unless told otherwise, and the binding counts `reasoning_tokens` inside `completion_tokens`, so the
  * written brief, an answer of three short sentences, stopped at the 2,048-token ceiling every half hour on 22 and 23
  * October. Red before: no `reasoning_effort` was sent, and the sentence named the ceiling and not what spent it.
@@ -363,7 +365,7 @@ test('THE REASONING ROW IS SENT `reasoning_effort: low` AND A ROW THAT DOES NOT 
     choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoice","actionable":true}' }, finish_reason: 'stop' }],
     usage: { prompt_tokens: 5, completion_tokens: 4 },
   }));
-  await aiInference(chat.env).complete({ ...ask, model: 'glm-5.3-flash' });
+  await aiInference(chat.env).complete({ ...ask, model: 'gpt-oss-120b' });
   assert.equal(chat.seen[0]?.inputs['reasoning_effort'], 'low');
   assert.equal(chat.seen[0]?.inputs['max_tokens'], 64, 'the ceiling is the one asked for, thinking and answer together');
 
@@ -377,7 +379,7 @@ test('AN ANSWER CUT OFF AT THE CEILING SAYS HOW MUCH OF IT WAS THINKING, where t
     choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoi' }, finish_reason: 'length' }],
     usage: { prompt_tokens: 412, completion_tokens: 64, completion_tokens_details: { reasoning_tokens: 58 } },
   }));
-  const got = await aiInference(cut.env).complete({ ...ask, model: 'glm-5.3-flash' });
+  const got = await aiInference(cut.env).complete({ ...ask, model: 'gpt-oss-120b' });
   assert.equal(codeOf(got), 'PROPOSAL_SCHEMA');
   assert.match(fixOf(got), /stopped at the 64-token ceiling, 58 of them its reasoning, so what came back/u);
 
@@ -385,7 +387,7 @@ test('AN ANSWER CUT OFF AT THE CEILING SAYS HOW MUCH OF IT WAS THINKING, where t
     choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoi' }, finish_reason: 'length' }],
     usage: { prompt_tokens: 412, completion_tokens: 64 },
   }));
-  const plain = await aiInference(silent.env).complete({ ...ask, model: 'glm-5.3-flash' });
+  const plain = await aiInference(silent.env).complete({ ...ask, model: 'gpt-oss-120b' });
   assert.match(fixOf(plain), /stopped at the 64-token ceiling, so what came back/u, 'no count is no claim');
 });
 
@@ -411,12 +413,12 @@ test('A RAGGED OR UNREADABLE EMBEDDING ROW IS REFUSED, not quantised down to wha
 });
 
 test("THE PROVIDER'S OWN WORDS RIDE THE REFUSAL AS `detail`, beside the phrase, so the operator can tell route from account", async () => {
-  const said = '5016: AiError: Your account 0123456789abcdef0123456789abcdef has no access to @cf/zai-org/glm-5.3-flash';
+  const said = '5016: AiError: Your account 0123456789abcdef0123456789abcdef has no access to @cf/openai/gpt-oss-120b';
   const { env } = answering(() => { throw new Error(said); });
   const out = await aiInference(env).complete(ask);
   assert.ok(refused(out));
   assert.match(out.refusal.fix, /did not answer/u, 'the phrase stays the sentence a person reads');
-  assert.equal(out.refusal.detail, '5016: AiError: Your account [cut] has no access to @cf/zai-org/glm-5.3-flash');
+  assert.equal(out.refusal.detail, '5016: AiError: Your account [cut] has no access to @cf/openai/gpt-oss-120b');
 
   const embedded = await aiInference(env).embed(['one']);
   assert.ok(refused(embedded));

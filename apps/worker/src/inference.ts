@@ -17,6 +17,10 @@
  *   `glm-5.3-flash`  $0.150 in / $0.500 out   anything that emits structure over a projection, digest prose
  *   `glm-5.3`        $1.400 in / $4.400 out   NOT CARRIED HERE
  *
+ * (24 November 2026: Workers AI retired `glm-5.3-flash` on 20 November and `llama-3.2-1b` before it. Slash's included
+ * model is now `gpt-oss-120b` at $0.35 / $0.75, with `gemma-4-26b-a4b` at $0.10 / $0.30 asked after it, both named once
+ * as `INCLUDED_MODEL` and `INCLUDED_FALLBACKS` in `@braindog/ports`; the measurements are beside the rows below.)
+ *
  * `glm-5.3` is 9.3 times the input price and 8.8 times the output price of `glm-5.3-flash`, for
  * output that is read once by code and thrown away. `11 §3` has it as an opt-in for long write-ups
  * a person reads many times, and there is no such job on this adapter, so naming it is a refusal
@@ -56,7 +60,7 @@ import {
  * callers and tests keep the one import they had.
  */
 export type { Budget, Completion, CompleteRequest, Embeddings, Inference, JsonSchema, Missing, Msg, Usage } from '@braindog/ports';
-export { budgetSpent, modelMissing, schemaFailed } from '@braindog/ports';
+export { budgetSpent, INCLUDED_FALLBACKS, INCLUDED_MODEL, modelMissing, schemaFailed } from '@braindog/ports';
 
 /* ── The adapter ──────────────────────────────────────────────────────────────────────────────── */
 
@@ -82,7 +86,7 @@ export { budgetSpent, modelMissing, schemaFailed } from '@braindog/ports';
  * it. `SHAPES` below is where that knowledge now lives, and the only way to check a row is to
  * compile the call against the real binding, which `test/inference.test.ts` records the output of.
  */
-export type AiOptions = { gateway?: { id: string; collectLog?: boolean } | undefined };
+export type AiOptions = { gateway?: { id: string; collectLog?: boolean } | undefined; signal?: AbortSignal | undefined };
 export type AiBinding = { run(model: string, inputs: Record<string, unknown>, options?: AiOptions): Promise<unknown> };
 
 /** The two keys this reads off the Worker's env. `AI` is `Ai`; `AI_GATEWAY` is the gateway's name, per environment. */
@@ -95,8 +99,8 @@ export type AiEnv = {
   WORKERS_AI_TOKEN?: string | undefined;
 };
 
-/** What a test may swap: the fetch the REST path uses and where the one fault line goes. */
-export type AiDeps = { fetch?: typeof fetch | undefined; log?: ((line: string) => void) | undefined };
+/** What a test may swap: the fetch the REST path uses, where the one fault line goes, and how long a call may take. */
+export type AiDeps = { fetch?: typeof fetch | undefined; log?: ((line: string) => void) | undefined; timeoutMs?: number | undefined };
 
 /**
  * A model this host serves: what Workers AI calls it, and what it costs in neurons.
@@ -168,9 +172,12 @@ type Shape = 'text' | 'chat';
  * reasons by default; with it on, the same turn spent its whole ceiling thinking.
  */
 const MODELS: Record<string, Rate> = {
+  /* RETIRED BY WORKERS AI AND ON NO ROUTE (the router never asked `small`): the one `text` row, kept for its shape. */
   'llama-3.2-1b': { provider: '@cf/meta/llama-3.2-1b-instruct', shape: 'text', inPerM: 2_455, outPerM: 18_273 },
-  'glm-5.3-flash': { provider: '@cf/zai-org/glm-5.3-flash', shape: 'chat', inPerM: 13_636, outPerM: 45_455, effort: 'low' },
   'gemma-4-26b-a4b': { provider: '@cf/google/gemma-4-26b-a4b-it', shape: 'chat', inPerM: 9_091, outPerM: 27_273, thinks: false },
+  /* $0.35 IN / $0.75 OUT PER MILLION (the catalogue, read 24 November). It always reasons (`reasoning_effort` is
+     mandatory and `low` is its least), and its thinking is spent from `max_tokens` as `glm-5.3-flash`'s was. */
+  'gpt-oss-120b': { provider: '@cf/openai/gpt-oss-120b', shape: 'chat', inPerM: 31_818, outPerM: 68_182, effort: 'low' },
 };
 
 /**
@@ -198,6 +205,55 @@ const tokensIn = (text: string): number => Math.ceil(new TextEncoder().encode(te
 const NO_SUCH_MODEL = /no such model|model not found|not a valid model|unknown model/iu;
 
 /**
+ * WHAT WORKERS AI SAYS OF A MODEL IT HAS RETIRED, A KIND OF ITS OWN. On 20 November 2026 every call to `glm-5.3-flash`
+ * answered HTTP 410, `5028: AiError: Model has been deprecated: @cf/zai-org/glm-5.3-flash was deprecated on 2026-11-20`,
+ * and this file read it as "the provider did not answer": each call was tried twice (the gateway, then the binding), the
+ * route paused the model ten minutes after three failures and asked it again, and the mail read like provider weather.
+ * Retired is not served: one try, the next model at once, and the model passed over for a day (`NOT_SERVED_PAUSE`).
+ * The words are the platform's code and its sentence, never a bare "deprecated", which a parameter's notice can say.
+ */
+const RETIRED = /\b5028\b|model has been deprecated|deprecated on \d{4}-\d{2}-\d{2}|model has been retired|no longer (?:served|available) on/iu;
+
+/** A model the provider does not serve: not in its catalogue, or retired from it. */
+export const notServed = (said: string): boolean => NO_SUCH_MODEL.test(said) || RETIRED.test(said);
+
+/**
+ * HOW LONG A CALL MAY TAKE BEFORE THE NEXT MODEL IS ASKED, measured 24 November on Slash's own routes
+ * (`tools/model-checks/run.mjs --steps`): `gemma-4-26b-a4b` and `gpt-oss-120b` sent their first byte in 0.3 to 0.7 s and
+ * finished a chat step in 0.7 to 2.2 s, while a model having a bad minute sat 13 to 24 s before its first byte
+ * (`qwen3.8-27b`, `glm-4.7-flash`), and the retired `glm-5.3-flash` had reached 7 to 20 s. Nothing here timed out before.
+ *
+ * A STREAM, THE BAR'S CONVERSATION, IS HELD TO ITS FIRST BYTE: 12 s, ten times the slowest healthy first byte, and a
+ * person still waiting can be answered by the next model in a second or two. The stream's own reading is not cut, since
+ * words are already on the screen. A WHOLE ANSWER is held to 30 s, the self-host's own `SLASH_TIMEOUT_MS`: the record's
+ * background asks send up to about 20,000 tokens (a page draft took 9.8 s) and nobody is watching them arrive.
+ */
+export const FIRST_BYTE_MS = 12_000;
+export const WHOLE_ANSWER_MS = 30_000;
+
+/** The sentence a call that ran out of time throws, which every path below reads as the model's and never the gateway's. */
+const LATE = 'the model did not start answering in time';
+
+/**
+ * One try at `work`, given a signal that aborts it at `ms`, and a throw at `ms` whether or not the try heeds the signal.
+ */
+const inTime = async <T>(work: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> => {
+  const stop = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      stop.abort();
+      reject(new Error(`${LATE}: no first byte in ${String(Math.round(ms / 1000))} s`));
+    }, ms);
+  });
+  try {
+    return await Promise.race([work(stop.signal), late]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+};
+
+/**
  * A throw the model itself gave (overloaded, rate limited): another route to the same model would say the same, so none
  * is tried.
  *
@@ -205,7 +261,7 @@ const NO_SUCH_MODEL = /no such model|model not found|not a valid model|unknown m
  * later paths exist for: the call was thrown at once and the binding without the gateway, and REST, were never asked.
  * A 5xx that was the model's after all costs one more call that fails the same way.
  */
-const MODEL_SIDE = /\b429\b|overload|capacity|rate.?limit/iu;
+const MODEL_SIDE = /\b429\b|overload|capacity|rate.?limit|the model did not start answering in time/iu;
 
 const sayOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -288,22 +344,26 @@ export async function runModel(env: AiEnv, model: string, inputs: Record<string,
   if (ai === undefined) throw new Error('no AI binding');
   const log = deps.log ?? ((line: string) => console.warn(line));
   const options = through(env);
+  /* EACH PATH IN TIME (`FIRST_BYTE_MS`), and a call that ran out is the model's: the next path would wait as long. */
+  const ms = deps.timeoutMs ?? (inputs['stream'] === true ? FIRST_BYTE_MS : WHOLE_ANSWER_MS);
+  /* A RETIRED OR UNKNOWN MODEL, AND THE MODEL'S OWN NO, END THE CALL AT ONCE: another path to it would say the same. */
+  const final = (e: unknown): boolean => notServed(sayOf(e)) || MODEL_SIDE.test(sayOf(e));
   const failed: Heard[] = [];
   let first: unknown;
   try {
-    return await ai.run(model, inputs, options);
+    return await inTime((signal) => ai.run(model, inputs, { ...options, signal }), ms);
   } catch (e) {
     first = e;
-    if (NO_SUCH_MODEL.test(sayOf(e)) || MODEL_SIDE.test(sayOf(e))) throw e;
+    if (final(e)) throw e;
     failed.push({ path: options.gateway !== undefined ? 'gateway' : 'binding', said: scrubRaw(sayOf(e)) });
   }
   if (options.gateway !== undefined) {
     try {
-      const answer = await ai.run(model, inputs);
+      const answer = await inTime((signal) => ai.run(model, inputs, { signal }), ms);
       log(`ai: answered by binding-without-gateway; gateway ${env.AI_GATEWAY ?? ''} failed: ${failed[0]!.said}`);
       return answer;
     } catch (e) {
-      if (NO_SUCH_MODEL.test(sayOf(e)) || MODEL_SIDE.test(sayOf(e))) throw e;
+      if (final(e)) throw e;
       failed.push({ path: 'binding', said: scrubRaw(sayOf(e)) });
     }
   }
@@ -317,11 +377,16 @@ export async function runModel(env: AiEnv, model: string, inputs: Record<string,
     throw thrown();
   }
   try {
-    const res = await (deps.fetch ?? fetch)(`${base.endsWith('/') ? base : `${base}/`}${model}`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify(inputs),
-    });
+    const res = await inTime(
+      (signal) =>
+        (deps.fetch ?? fetch)(`${base.endsWith('/') ? base : `${base}/`}${model}`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+          body: JSON.stringify(inputs),
+          signal,
+        }),
+      ms,
+    );
     /* A STREAM ASKED FOR IS HANDED BACK AS THE BODY, as the binding hands back its own, once the status says it is one. */
     if (inputs['stream'] === true && res.ok && res.body !== null && (res.headers.get('content-type') ?? '').includes('event-stream')) {
       log(`ai: answered by rest; ${tell()}`);
@@ -686,7 +751,7 @@ export function aiInference(env: AiEnv, deps: AiDeps = {}): StreamingInference {
       return { answer: await runModel(env, provider, inputs, deps) };
     } catch (e) {
       const said = sayOf(e);
-      return { why: NO_SUCH_MODEL.test(said) ? 'the provider does not serve it' : 'the provider did not answer', raw: scrubRaw(said) };
+      return { why: notServed(said) ? 'the provider does not serve it' : 'the provider did not answer', raw: scrubRaw(said) };
     }
   };
 

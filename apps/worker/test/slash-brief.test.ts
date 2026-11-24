@@ -103,7 +103,7 @@ test('A BRIEFING PAST THE WORST ASK IS NEVER SENT, and throws as a headline past
   assert.equal(brief?.sent, false, 'a briefing past the worst ask was not marked as never sent');
   /* The same sentence, each with its own size: the two inputs are not the same length. */
   const sized = (said: string | undefined) => said?.replace(/about [0-9]+ neurons/u, 'about N neurons');
-  assert.match(brief?.message ?? '', /would spend about [0-9]+ neurons and its ceiling is 232\./u);
+  assert.match(brief?.message ?? '', /would spend about [0-9]+ neurons and its ceiling is 485\./u);
   assert.equal(sized(brief?.message), sized(headline?.message), 'the briefing is turned away in other words than a headline');
   assert.equal(headline?.sent, false);
   assert.deepEqual(fails, [], 'the ceiling saying no was told to the operator as a model that failed');

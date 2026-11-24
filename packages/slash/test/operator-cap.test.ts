@@ -30,15 +30,15 @@ import { createSlash, MODELS, type Ask, type Inference, type SlashOptions } from
 import { fakeRecord, fixedClock, NOW, OWNER, openSqlite } from './double.ts';
 
 const RATE: Ask = { rule: 'rate', step: 0, question: 'What rate applies to Gold?', shape: 'number' };
-const FLASH = MODELS['glm-5.3-flash'];
+const FLASH = MODELS['gpt-oss-120b'];
 
 /** A reply the included model would give, with the counts Workers AI reported in a probe. */
 const answering = (text: string): Inference => ({
-  complete: async () => ({ text, usage: { in: 700, out: 60 }, model: 'glm-5.3-flash' }),
+  complete: async () => ({ text, usage: { in: 700, out: 60 }, model: 'gpt-oss-120b' }),
 });
 
 /** What the Worker's adapter throws when the binding was called and threw: the sentence, the mark and the routing name. */
-const reachedError = (): Error => Object.assign(new Error('InferenceUpstreamError: 3043 internal server error'), { reached: true, model: 'glm-5.3-flash' });
+const reachedError = (): Error => Object.assign(new Error('InferenceUpstreamError: 3043 internal server error'), { reached: true, model: 'gpt-oss-120b' });
 
 const throwing = (e: () => Error): Inference & { calls(): number } => {
   let calls = 0;
@@ -66,19 +66,19 @@ const priced = (r: Pick<Row, 'tokens_in' | 'tokens_out'>): number => Math.round(
 
 test('(1) A HOST THAT PAYS FOR TIER byo IN NEURONS HAS ITS byo ROWS PRICED, at the same rate tier a is priced at', async () => {
   const { sql, slash, rows } = build(answering('{"registers":["obligations"],"where":null,"q":"rent"}'), { priced: ['a', 'b', 'byo'] });
-  assert.ok(slash.configure({ tier: 'byo', model: 'glm-5.3-flash' }, OWNER).ok);
+  assert.ok(slash.configure({ tier: 'byo', model: 'gpt-oss-120b' }, OWNER).ok);
   const out = await slash.read('what rent is open', OWNER);
   assert.ok(out.ok, JSON.stringify(out));
   const [row] = rows();
   assert.equal(row?.tier, 'byo');
-  /* 700 in and 60 out at 13,636 and 45,455 a million is 12.3, which is 12. RED: 0. */
-  assert.equal(row?.neurons, 12, `a byo call on the host's own neurons was priced ${row?.neurons}`);
+  /* 700 in and 60 out at 31,818 and 68,182 a million is 26.4, which is 26. RED: 0. */
+  assert.equal(row?.neurons, 26, `a byo call on the host's own neurons was priced ${row?.neurons}`);
   sql.close();
 });
 
 test("(2) A HOST THAT NAMES NOTHING KEEPS 46 §4.1: tier byo is priced at 0, because there it is not the host's money", async () => {
   const { sql, slash, rows } = build(answering('{"registers":["obligations"],"where":null,"q":"rent"}'));
-  assert.ok(slash.configure({ tier: 'byo', model: 'glm-5.3-flash' }, OWNER).ok);
+  assert.ok(slash.configure({ tier: 'byo', model: 'gpt-oss-120b' }, OWNER).ok);
   assert.ok((await slash.read('what rent is open', OWNER)).ok);
   assert.equal(rows()[0]?.neurons, 0);
   sql.close();
@@ -99,7 +99,7 @@ test('(3) ONE REACHED THROW, ONE SETTLEMENT: a read and an answer both keep the 
   assert.equal(all.length, 2);
   for (const row of all) {
     const path = row.question?.startsWith('rule.') === true ? 'answer' : 'read';
-    assert.equal(row.model, 'glm-5.3-flash', `the ${path} row was settled under ${row.model}`);
+    assert.equal(row.model, 'gpt-oss-120b', `the ${path} row was settled under ${row.model}`);
     assert.equal(row.code, 'UNREACHABLE');
     assert.ok(row.tokens_in > 0, 'the prompt estimate is the only count a throw leaves');
     assert.equal(row.tokens_out, 0);

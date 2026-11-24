@@ -67,7 +67,7 @@ import { PURPOSES, routeFor, type Candidate, type RouteFacts } from '@braindog/h
 import { SLASH_MENTIONS_INSTRUCTIONS, SLASH_RESOLVE_INSTRUCTIONS, type UnderstandModel } from '@braindog/host/understand';
 import { slashAskDoor, slashDayStop, type SlashAskDoor } from '@braindog/host';
 import type { SlashAnswer } from '@braindog/host/slash-answers';
-import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
+import { INCLUDED_FALLBACKS, INCLUDED_MODEL, no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SlashModel, TickBudget } from '@braindog/record';
 import { PLANS, PLAN_TABLE, type Plan } from '@braindog/record/plans';
 import type { Slash, SlashOptions } from '@braindog/slash';
@@ -152,8 +152,11 @@ export const includedMonthNeurons = (env: SlashEnv): number => {
   return v !== undefined && /^[0-9]+$/u.test(v) ? Number(v) : INCLUDED_MONTH_NEURONS;
 };
 
-/** The routing name the record's own asks go by: every template of the package asks the same (`prompts.ts`). */
-const INCLUDED_MODEL = 'glm-5.3-flash';
+/**
+ * THE MODELS THE RECORD'S OWN ASKS WALK, IN ORDER: the included model (`INCLUDED_MODEL`, which every template of the
+ * package asks too) and then each fallback (`INCLUDED_FALLBACKS`), both named once in `@braindog/ports`.
+ */
+const INCLUDED_WALK: readonly string[] = [INCLUDED_MODEL, ...INCLUDED_FALLBACKS];
 
 /** The record's `draft` and `form` send no `max_tokens` on the endpoint path; here one is needed, and this is the package's largest. */
 const RECORD_TOKENS = 2_048;
@@ -413,17 +416,25 @@ export type WorkerSlashModel = SlashModel & UnderstandModel & Partial<SlashBrief
 export function includedModel(env: SlashEnv, onFail?: OnModelFail): WorkerSlashModel | undefined {
   const inference = includedInference(env, recordAskMost, onFail);
   if (inference === undefined) return undefined;
+  /* THE WALK, AS THE ENGINE'S ROUTE WALKS (`includedRoute`): the headlines, the briefing, the written brief, Make's drafts
+     and who is who asked the included model alone, so when it was retired on 20 November every one of them failed with a
+     working model beside it. Each model in turn, and the next only where this one did not answer (`passedOn`). */
   const ask = async (instructions: string, input: unknown, schema: JsonSchema): Promise<unknown> => {
-    const reply = await inference.complete({
-      model: INCLUDED_MODEL,
-      maxTokens: RECORD_TOKENS,
-      jsonSchema: schema,
-      messages: [
-        { role: 'system', content: instructions },
-        { role: 'user', content: JSON.stringify(input) },
-      ],
-    });
-    return answerOf(reply.text);
+    const messages = [
+      { role: 'system' as const, content: instructions },
+      { role: 'user' as const, content: JSON.stringify(input) },
+    ];
+    let last: unknown;
+    for (const model of INCLUDED_WALK) {
+      try {
+        const reply = await inference.complete({ model, maxTokens: RECORD_TOKENS, jsonSchema: schema, messages });
+        return answerOf(reply.text);
+      } catch (e) {
+        if (!passedOn(e)) throw e;
+        last = e;
+      }
+    }
+    throw last;
   };
   return {
     name: 'included',
@@ -451,18 +462,37 @@ export function kennelNoteModel(env: SlashEnv): ((instructions: string, input: u
   const inference = includedInference(env);
   if (inference === undefined) return undefined;
   return async (instructions, input) => {
-    const reply = await inference.complete({
-      model: INCLUDED_MODEL,
-      maxTokens: 600,
-      jsonSchema: { type: 'object', properties: { note: { type: 'string' } }, required: ['note'], additionalProperties: false },
-      messages: [
-        { role: 'system', content: instructions },
-        { role: 'user', content: JSON.stringify(input) },
-      ],
-    });
-    return answerOf(reply.text);
+    let last: unknown;
+    for (const model of INCLUDED_WALK) {
+      try {
+        const reply = await inference.complete({
+          model,
+          maxTokens: 600,
+          jsonSchema: { type: 'object', properties: { note: { type: 'string' } }, required: ['note'], additionalProperties: false },
+          messages: [
+            { role: 'system', content: instructions },
+            { role: 'user', content: JSON.stringify(input) },
+          ],
+        });
+        return answerOf(reply.text);
+      } catch (e) {
+        if (!passedOn(e)) throw e;
+        last = e;
+      }
+    }
+    throw last;
   };
 }
+
+/**
+ * Whether a record ask's walk asks the next model after this throw: a model that was sent and did not answer (`Reached`:
+ * retired, unknown, out of time, down), or one never sent to (`NotSent`). That includes the per-call ceiling, which is
+ * this model's price for this ask: a large record's headlines that `gpt-oss-120b` may not be sent at `recordAskMost` fit
+ * on `gemma-4-26b-a4b` at a third of the rate, and the month's own ceiling is `operatorCeiling`'s and is never reached
+ * here. A reply that broke its schema (`SlashAnsweredError`, billed and final) and anything else end the walk, as the
+ * engine's own walk ends on them (`packages/slash/src/call.ts` `passedOver`).
+ */
+const passedOn = (e: unknown): boolean => e instanceof Reached || e instanceof NotSent;
 
 /**
  * How a request leaves this Worker and how a sealed key is opened. Both are injected so a test needs no network and no KEK.
@@ -659,9 +689,14 @@ export const CLOUD_TIERS = ['a', 'b'] as const;
 
 /* ── the route ─────────────────────────────────────────────────────────────────────────────────────────── */
 
-/** The included model's two rows (`inference.ts` `MODELS`), as the router names them. Tier `a`: the operator's account. */
+/**
+ * The included model and its fallbacks (`@braindog/ports`), as the router names them. Tier `a`: the operator's account.
+ * The first fallback is `second`, the router's own slot; any after it follow it in order (`more`).
+ *
+ * `small` IS GONE: it named `llama-3.2-1b`, which `routeFor` never asked and Workers AI has retired.
+ */
 const FLASH: Candidate = { id: 'flash', model: INCLUDED_MODEL, tier: 'a', source: 'included' };
-const SMALL: Candidate = { id: 'small', model: 'llama-3.2-1b', tier: 'a', source: 'included' };
+const SECONDS: readonly Candidate[] = INCLUDED_FALLBACKS.map((model, i) => ({ id: i === 0 ? 'second' : `second-${String(i + 1)}`, model, tier: 'a', source: 'included' }));
 
 /** The operator's second provider as its four settings say it, or `null` while any one of them is missing. */
 const fallbackOf = (env: SlashEnv): { url: string; model: string; provider: 'openai' | 'anthropic' } | null => {
@@ -675,10 +710,10 @@ const fallbackOf = (env: SlashEnv): { url: string; model: string; provider: 'ope
 /**
  * What the Cloud may try for an ask on the included model, in `routeFor`'s terms, or `undefined` where that model is off.
  *
- * "RULES ARE THE FALLBACK, NOT THE ENGINE". When the included model fails, the next model the operator set is
- * asked before the rules speak. The table has two rows and no second chat row: which model would be second is the model
- * checks' to choose (`tools/model-checks/run.mjs --routes`), so today the answering route is flash alone, and the operator's
- * provider after it once he sets all four of its settings.
+ * "RULES ARE THE FALLBACK, NOT THE ENGINE". When the included model fails, its fallbacks are asked in order
+ * (`INCLUDED_FALLBACKS`, chosen by `tools/model-checks/run.mjs --steps`), then the operator's provider once he sets all
+ * four of its settings, and only then do the rules speak. Until 24 November there was no second row, and when Workers AI
+ * retired the one model on 20 November nothing on the Cloud answered for four days.
  *
  * THE LARGER MODEL STAYS OFF. `large` carries the operator's yes (`SLASH_LARGE`), and the table holds no large row, so even a yes
  * names none: the row is added beside the model checks that price it, never here.
@@ -693,7 +728,8 @@ export function includedCandidates(env: SlashEnv): RouteFacts | undefined {
     form: 'included',
     models: {
       flash: FLASH,
-      small: SMALL,
+      ...(SECONDS[0] === undefined ? {} : { second: SECONDS[0] }),
+      ...(SECONDS.length > 1 ? { more: SECONDS.slice(1) } : {}),
       ...(second === null ? {} : { provider: { id: 'provider', model: second.model, tier: 'a', source: 'included' } satisfies Candidate }),
     },
     large: env.SLASH_LARGE === 'yes',
@@ -1002,17 +1038,20 @@ function keyOnly(engine: Slash, sql: Sql): Slash {
 
 /**
  * The most one package call can spend on the included model, in neurons: every template at its own input cap and its own
- * output ceiling, at its own model's rate. 232 today, a `propose` of 12,000 tokens in and 1,500 out.
+ * output ceiling, at the rate of each model its walk may reach, the included model and every fallback (`INCLUDED_WALK`).
+ * 485 today, a `propose` of 12,000 tokens in and 1,500 out answered by `gpt-oss-120b`; on `gemma-4-26b-a4b` it is 151.
  *
  * READ OFF THE PACKAGE AND NOT WRITTEN HERE, so a template whose caps grow moves the ceiling's count of asks with it. It
  * takes the module as an argument because `46 §5.1` has this Worker import it only once an engine is being built.
  */
 const worstAsk = (slash: Pick<typeof import('@braindog/slash'), 'PROMPTS' | 'MODELS'>): number =>
   Math.max(
-    ...Object.values(slash.PROMPTS).map((t) => {
-      const rate = slash.MODELS[t.model];
-      return Math.ceil((t.capIn * rate.in + t.maxTokens * rate.out) / 1_000_000);
-    }),
+    ...Object.values(slash.PROMPTS).flatMap((t) =>
+      (t.model === INCLUDED_MODEL && t.walks !== false ? INCLUDED_WALK : [t.model]).map((model) => {
+        const rate = slash.MODELS[model as keyof typeof slash.MODELS];
+        return rate === undefined ? 0 : Math.ceil((t.capIn * rate.in + t.maxTokens * rate.out) / 1_000_000);
+      }),
+    ),
   );
 
 /**

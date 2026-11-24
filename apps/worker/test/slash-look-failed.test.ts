@@ -119,7 +119,7 @@ async function woken(run: (model: string) => Promise<unknown>) {
   assert.ok(await workerSlashEngine(env, () => api, { sql: own, clock }));
   own.exec(
     `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, purpose, spends)
-     VALUES ('old-look', ?, 'read', 'a', 'glm-5.3-flash', 0, 0, 0, 0, 'error', 'UNREACHABLE', 'an old look', 'headline', 'background')`,
+     VALUES ('old-look', ?, 'read', 'a', 'gpt-oss-120b', 0, 0, 0, 0, 'error', 'UNREACHABLE', 'an old look', 'headline', 'background')`,
     new Date(T0 - 7 * 86_400_000).toISOString(),
   );
   const slashModel = workerSlashModel(env, () => api, { store: () => own });
@@ -221,7 +221,7 @@ test("THE SECOND PROVIDER'S 401 IS ASKED ONCE: the walk reads it off its own wir
     const engine = await workerSlashEngine({ AI: ai.AI, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes', ...FALLBACK }, () => record, { sql: own, clock, send });
     assert.ok(engine);
     const out = await engine.answer({ rule: 'r_quote', step: 0, question: 'Is the quote ready to send?', shape: 'text' });
-    assert.equal(ai.runs.length, 1, 'the included model was asked once');
+    assert.deepEqual(ai.runs, ['@cf/openai/gpt-oss-120b', '@cf/google/gemma-4-26b-a4b-it'], 'the included model and its fallback were each asked once');
     assert.equal(sent.length, 1, 'the second provider was asked more than once');
     /* A STATUS NO RETRY MENDS, read off the provider's own wire: never `UNREACHABLE`, which the ladder asks again. */
     assert.equal(out.ok, false);

@@ -31,6 +31,7 @@ import {
   SLASH_PLAN_INSTRUCTIONS,
 } from '../src/slash.ts';
 import { createSlash, MODELS } from '../../slash/src/index.ts';
+import { INCLUDED_MODEL } from '@braindog/ports';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const FAKE_KEY = 'fake-key-for-tests-only';
@@ -160,14 +161,14 @@ test('A MODEL THE OWNER NAMED REACHES THE ENDPOINT, and SLASH_MODEL stands in on
      would have stored a model that nothing sends. */
   await inference.complete(ask('llama3:8b'));
   assert.equal(sentModel(net, 0), 'llama3:8b');
-  /* THE PACKAGE'S OWN TABLE AND NOT A COPY OF IT, so a sixth model added there and not to `ROUTING_NAMES` is red here. */
+  /* THE PACKAGE'S OWN TABLE AND NOT A COPY OF IT, so a model added there and not to `ROUTING_NAMES` is red here. */
   const shorts = Object.keys(MODELS);
-  assert.equal(shorts.length, 5);
+  assert.equal(shorts.length, 6);
   for (const short of shorts) await inference.complete(ask(short));
-  assert.deepEqual([1, 2, 3, 4, 5].map((i) => sentModel(net, i)), ['ENV_MODEL', 'ENV_MODEL', 'ENV_MODEL', 'ENV_MODEL', 'ENV_MODEL']);
+  assert.deepEqual(shorts.map((_, i) => sentModel(net, i + 1)), shorts.map(() => 'ENV_MODEL'));
   /* WITH NO SLASH_MODEL EVERY NAME PASSES THROUGH, the short ones included. */
   await endpointInference({ url: 'http://localhost:11434/v1/chat/completions', send: net.send }).complete(ask('glm-5.3'));
-  assert.equal(sentModel(net, 6), 'glm-5.3');
+  assert.equal(sentModel(net, shorts.length + 1), 'glm-5.3');
 });
 
 /* A STATUS THAT IS NOT `ok` IS A MODEL THAT DID NOT ANSWER, the retry default taken for the
@@ -239,7 +240,7 @@ test('A TIER a STATUS NAMES THE MODEL THAT ANSWERS, which on a host with SLASH_M
   /* AND A HOST WITH NO SLASH_MODEL SHOWS THE SHORT NAME, which is what its endpoint is sent. */
   assert.equal(slashModelNameOf(slashFromEnv({ SLASH_ENDPOINT: 'http://localhost:1/v1' })), undefined);
   const bare = slashNamedEngine(createSlash({ sql: openSqlite(), clock, inference, record: slashRecord(api) }), undefined);
-  assert.equal(bare.status().model, 'glm-5.3-flash');
+  assert.equal(bare.status().model, INCLUDED_MODEL);
   sql.close();
   own.close();
 });

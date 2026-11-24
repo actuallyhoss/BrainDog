@@ -92,7 +92,7 @@ test('(1) A READ WHOSE ROWS THE RECORD REFUSED AFTER THE MODEL DRAFTED IS A ROW,
 
     assert.equal(codeOf(out), 'FORBIDDEN', 'the record refusal is no longer the answer');
     assert.equal(inference.seen.length, 1);
-    assert.deepEqual(calls(), [{ kind: 'read', status: 'error', code: 'FORBIDDEN', model: 'glm-5.3-flash' }]);
+    assert.deepEqual(calls(), [{ kind: 'read', status: 'error', code: 'FORBIDDEN', model: 'gpt-oss-120b' }]);
     assert.equal(slash.status().asks.used, 1);
   } finally {
     sql.close();
@@ -105,7 +105,7 @@ test('(2) A PROJECTION THAT THREW AFTER THE MODEL DRAFTED STILL THROWS, AND THE 
     inference.say(PREDICATE);
     await assert.rejects(slash.read('what is still open', OWNER), /fell over mid-projection/u);
 
-    assert.deepEqual(calls(), [{ kind: 'read', status: 'error', code: 'RECORD_UNAVAILABLE', model: 'glm-5.3-flash' }]);
+    assert.deepEqual(calls(), [{ kind: 'read', status: 'error', code: 'RECORD_UNAVAILABLE', model: 'gpt-oss-120b' }]);
     assert.equal(slash.status().asks.used, 1);
   } finally {
     sql.close();
@@ -134,7 +134,7 @@ test('(4) A PROPOSE WITH NO ask_id DRAFTS THROUGH THE SAME PATH: its drafting ca
 
     assert.equal(codeOf(out), 'FORBIDDEN');
     assert.equal(inference.seen.length, 1);
-    assert.deepEqual(calls(), [{ kind: 'read', status: 'error', code: 'FORBIDDEN', model: 'glm-5.3-flash' }]);
+    assert.deepEqual(calls(), [{ kind: 'read', status: 'error', code: 'FORBIDDEN', model: 'gpt-oss-120b' }]);
     assert.equal(slash.status().asks.used, 1);
   } finally {
     sql.close();
@@ -154,8 +154,8 @@ test('(5) A PROPOSAL WHOSE MODEL ANSWERED AND WHOSE FILING THEN THREW IS SETTLED
     await assert.rejects(slash.propose('what is still open', OWNER, undefined, askId), /fell over while filing/u);
 
     assert.deepEqual(calls(), [
-      { kind: 'read', status: 'ok', code: null, model: 'glm-5.3-flash' },
-      { kind: 'propose', status: 'error', code: 'RECORD_UNAVAILABLE', model: 'glm-5.3-flash' },
+      { kind: 'read', status: 'ok', code: null, model: 'gpt-oss-120b' },
+      { kind: 'propose', status: 'error', code: 'RECORD_UNAVAILABLE', model: 'gpt-oss-120b' },
     ]);
     /* THE PROPOSAL ROW IS STILL WRITTEN, SETTLED AND AUDITABLE; IT IS NOT COUNTED. One question is one ask:
        the `read` above is this question's ask, and pass 2's own row is no longer a second. */

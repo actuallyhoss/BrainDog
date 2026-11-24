@@ -5,16 +5,16 @@
  * `answer` rows all read the name the host says it sent (`test/slash-ledger-model.test.ts`). `proposePattern` in
  * `src/jobs.ts` is the fourth and was left on `ran.model`, which `core.run` takes from the template. A probe
  * measured it through the host's real `endpointInference` with `model: 'llama3'` and read one row:
- * `{"kind":"pattern","model":"glm-5.3-flash","tokens_in":1000000,...,"code":"PROPOSAL_SCHEMA"}`. No door reaches
+ * `{"kind":"pattern","model":"gpt-oss-120b","tokens_in":1000000,...,"code":"PROPOSAL_SCHEMA"}`. No door reaches
  * `proposePattern` today (`slash-ask.ts` leaves it out on purpose), so no stored row is wrong; the day one does, every
  * pattern row would be.
  *
  * THE HOST'S REAL `endpointInference`, REACHED BY A RELATIVE PATH as `slash-ledger-model.test.ts` reaches it, because
  * what the host says it sent is the host's decision and a hand-written double would test the double.
  *
- * RED BEFORE THE REPAIR: four tests, one passes, three fail. Case 1 read `glm-5.3-flash` on the row and
- * on the proposal it returned; case 2, the probe, read `glm-5.3-flash` on a `PROPOSAL_SCHEMA` row; case 3 read
- * `glm-5.3-flash` on the row a reply that was not JSON left. Case 4 passed before and after, which is its job: an adapter
+ * RED BEFORE THE REPAIR: four tests, one passes, three fail. Case 1 read `gpt-oss-120b` on the row and
+ * on the proposal it returned; case 2, the probe, read `gpt-oss-120b` on a `PROPOSAL_SCHEMA` row; case 3 read
+ * `gpt-oss-120b` on the row a reply that was not JSON left. Case 4 passed before and after, which is its job: an adapter
  * that names nothing keeps the template's name.
  */
 
@@ -112,8 +112,8 @@ test('(4) AN ADAPTER THAT NAMES NOTHING KEEPS THE TEMPLATE NAME, which is what e
   try {
     const out = await slash.proposePattern(SAMPLES, OWNER);
     assert.ok(out.ok, JSON.stringify(out));
-    assert.equal(out.value.model, 'glm-5.3-flash');
-    assert.deepEqual(rows(), [{ kind: 'pattern', model: 'glm-5.3-flash', code: null }]);
+    assert.equal(out.value.model, 'gpt-oss-120b');
+    assert.deepEqual(rows(), [{ kind: 'pattern', model: 'gpt-oss-120b', code: null }]);
   } finally {
     sql.close();
   }

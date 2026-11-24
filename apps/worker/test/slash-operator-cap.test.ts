@@ -8,7 +8,7 @@
  * Worker holds every record's engine under it: a save above it is refused, and a cap already stored above it no longer
  * lets an ask through.
  *
- * THE byo TIER. Tier `byo` with `model: glm-5.3-flash` on a Worker with no endpoint ran on the binding and the ledger
+ * THE byo TIER. Tier `byo` with `model: gpt-oss-120b` on a Worker with no endpoint ran on the binding and the ledger
  * priced it `neurons: 0`.
  *
  * A BINDING THROW. One binding throw was priced 9 and counted on a read, and settled under `-`, priced 0 and uncounted on an
@@ -93,9 +93,9 @@ async function withEngine(ai: ReturnType<typeof fakeAi>, neurons?: string) {
   return { clock, sql, own, api, engine, done };
 }
 
-/* 232 NEURONS IS THE PACKAGE'S WORST CALL: a propose, 12,000 tokens in and 1,500 out at 13,636 and 45,455 a million, is
-   231.8. So 2,320 neurons is ten asks, and the default of 300,000 is 1,293. */
-const TEN_ASKS = '2320';
+/* 485 NEURONS IS THE PACKAGE'S WORST CALL: a propose, 12,000 tokens in and 1,500 out at 31,818 and 68,182 a million, is
+   484.1. So 4,850 neurons is ten asks, and the default of 300,000 is 618. */
+const TEN_ASKS = '4850';
 
 test('(1) AN OWNER CANNOT RAISE THE CAP PAST THE OPERATOR: ask_cap 1,000,000,000 is refused and names the ceiling', async () => {
   const ai = fakeAi(PREDICATE);
@@ -104,9 +104,9 @@ test('(1) AN OWNER CANNOT RAISE THE CAP PAST THE OPERATOR: ask_cap 1,000,000,000
   /* RED: `{ ok: true }`, the probe's `saved: true`. */
   assert.equal(set.ok, false, 'an owner saved a cap a billion asks high');
   assert.equal(set.refusal?.code, 'VALUE_MALFORMED');
-  assert.match(set.refusal?.fix ?? '', /1,293/u);
+  assert.match(set.refusal?.fix ?? '', /618/u);
   /* AND THE CEILING ITSELF IS A CAP AN OWNER MAY SAVE, and anything under it. */
-  assert.ok((engine.configure({ ask_cap: 1_293 }, OWNER) as Refused).ok);
+  assert.ok((engine.configure({ ask_cap: 618 }, OWNER) as Refused).ok);
   assert.equal((engine.configure({ ask_cap: 1_294 }, OWNER) as Refused).ok, false);
   done();
 });
@@ -135,7 +135,7 @@ test("(3) AN AUTOMATION'S QUESTION IS HELD UNDER THE SAME CEILING, in the run's 
   const own = openSqlite();
   const api = await createRecordApi({ sql, clock });
   const ai = fakeAi('{"answer":4.25}');
-  const answer = workerSlashAnswers(prod(ai, '464'), () => api, { sql: own, clock })!;
+  const answer = workerSlashAnswers(prod(ai, '970'), () => api, { sql: own, clock })!;
   const codes: string[] = [];
   for (let i = 0; i < 3; i++) {
     const out = (await answer(ASK)) as Refused;
@@ -210,9 +210,9 @@ test('(6) A RECORD SAVED ON byo IS READ AS THE INCLUDED MODEL ON THE CLOUD: answ
   assert.equal(ai.runs(), 1);
   const rows = own.all<{ tier: string; neurons: number }>('SELECT tier, neurons FROM slash_call').map((r) => ({ ...r }));
   /* 700 in and 60 out is 12.3. */
-  assert.deepEqual(rows, [{ tier: 'a', neurons: 12 }]);
+  assert.deepEqual(rows, [{ tier: 'a', neurons: 26 }]);
   assert.equal((engine.status() as Status).asks.used, 1);
-  const saved = engine.configure({ tier: 'byo', model: 'glm-5.3-flash' }, OWNER) as Refused & { refusal?: { allowed?: unknown } };
+  const saved = engine.configure({ tier: 'byo', model: 'gpt-oss-120b' }, OWNER) as Refused & { refusal?: { allowed?: unknown } };
   assert.equal(saved.refusal?.code, 'ENUM_VALUE_UNKNOWN');
   assert.deepEqual(saved.refusal?.allowed, ['a', 'b']);
   done();
@@ -237,7 +237,7 @@ test('(9) WHERE THE CEILING IS THE CAP STATUS NAMES, THE COUNT IS THE CEILING\'S
   const { own, engine, done } = await withEngine(ai, TEN_ASKS);
   own.exec('UPDATE slash_settings SET ask_cap = 1000000000 WHERE singleton = 1');
   for (let i = 0; i < 8; i++) await engine.read(`open tasks ${i}`, OWNER);
-  own.exec("UPDATE slash_settings SET tier = 'byo', model = 'glm-5.3-flash', ask_cap = 1000000000 WHERE singleton = 1");
+  own.exec("UPDATE slash_settings SET tier = 'byo', model = 'gpt-oss-120b', ask_cap = 1000000000 WHERE singleton = 1");
   for (let i = 0; i < 3; i++) await engine.read(`more tasks ${i}`, OWNER);
   assert.equal(ai.runs(), 10);
   const { asks } = engine.status() as Status;
@@ -260,15 +260,17 @@ test('(8) ONE BINDING THROW, ONE SETTLEMENT: the read and the answer both keep t
     ['read', own.all<Row>(sel), own],
     ['answer', own2.all<Row>(sel), own2],
   ] as const) {
-    assert.equal(rows.length, 1);
-    const row = rows[0]!;
-    /* RED ON THE ANSWER: `{ model: '-', neurons: 0 }`. */
-    assert.equal(row.model, 'glm-5.3-flash', `the ${path} row was settled under ${row.model}`);
-    assert.equal(row.code, 'UNREACHABLE');
-    assert.equal(row.tokens_out, 0);
-    assert.equal(row.neurons, Math.round((row.tokens_in * 13_636) / 1e6), `the ${path} row was priced off the rule`);
+    /* ONE ROW AN ATTEMPT: the included model, passed over, and its fallback, which ended the walk (`INCLUDED_FALLBACKS`). */
+    assert.deepEqual(rows.map((r) => r.model), ['gpt-oss-120b', 'gemma-4-26b-a4b'], `the ${path} rows: ${JSON.stringify(rows)}`);
+    for (const row of rows) {
+      /* RED ON THE ANSWER: `{ model: '-', neurons: 0 }`. */
+      assert.equal(row.code, 'UNREACHABLE');
+      assert.equal(row.tokens_out, 0);
+      const rate = row.model === 'gpt-oss-120b' ? 31_818 : 9_091;
+      assert.equal(row.neurons, Math.round((row.tokens_in * rate) / 1e6), `the ${path} row was priced off the rule`);
+    }
     const counted = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND model <> '-'")!.n;
-    assert.equal(counted, 1, `the ${path} row is not a call the operator's count reads`);
+    assert.equal(counted, rows.length, `the ${path} rows are not calls the operator's count reads`);
   }
   /* AND NOT ONE OF HIS: a binding that threw keeps its neurons on the row and spends none of his month (`spends = 'none'`). */
   assert.equal((engine.status() as Status).asks.used, 0);

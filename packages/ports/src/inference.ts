@@ -123,6 +123,25 @@ export type CompleteRequest = {
 export type Completion = { text: string; model: string; usage: Usage };
 
 /**
+ * SLASH'S INCLUDED MODEL BY ITS ROUTING NAME, AND THE MODELS ASKED AFTER IT WHEN IT DOES NOT ANSWER, IN ORDER. Every
+ * template of `@braindog/slash`, the Worker's route, its record asks, its meter and its daily probe read these two and
+ * spell no model of their own, so a model the provider retires is swapped in this one place. Each name is a row of the
+ * Worker's `MODELS` (`apps/worker/src/inference.ts`), which alone knows the provider's id for it.
+ *
+ * CHOSEN 24 NOV 2026, when Workers AI retired `glm-5.3-flash` (5028, "deprecated on 2026-11-20") and Slash had no second
+ * model, over ten candidates with `tools/model-checks/run.mjs --steps` (a chat step that must call the right tool, one
+ * that must fill its arguments, one that must answer from a result, a headline, a digest's prose) and `--suite slash`.
+ * Both kept here got all five steps right: `gpt-oss-120b`, first byte about 0.5 s and about 50 neurons a chat step, and
+ * `gemma-4-26b-a4b` from another provider family, 0.3 to 0.7 s at about 15. On the thirty questions of the older
+ * read-and-propose doors, which every candidate found hard, `gpt-oss-120b` scored 20 (19 filters parsed) and
+ * `gemma-4-26b-a4b` 17 (14 parsed, and twice it wrote to its ceiling for 30 s), so the dearer model is asked first.
+ * `glm-5.3` named a tool that is none, `gpt-oss-20b` and `glm-4.7-flash` scored 17 on the short suite against 100, and
+ * `qwen3.8-27b` took 17 and 24 s to its first byte.
+ */
+export const INCLUDED_MODEL = 'gpt-oss-120b' as const;
+export const INCLUDED_FALLBACKS = ['gemma-4-26b-a4b'] as const;
+
+/**
  * A batch of embeddings.
  *
  * `vectors` ARE `Int8Array` BECAUSE THE QUANTISATION IS THE ADAPTER'S, not the caller's:

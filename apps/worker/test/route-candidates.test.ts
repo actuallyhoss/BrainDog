@@ -14,6 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { routeFor } from '@braindog/host/infer';
+import { INCLUDED_FALLBACKS, INCLUDED_MODEL } from '@braindog/ports';
 import { createRecordApi } from '@braindog/record';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
@@ -74,30 +75,31 @@ test('NO INCLUDED MODEL, NO FACTS: AI unbound, or bound and not switched on, nam
   assert.equal(includedRoute({ SLASH_INCLUDED: 'yes' }), undefined);
 });
 
-test('THE INCLUDED MODEL ALONE: flash answers and nothing else is on the answering route', () => {
+test('THE INCLUDED MODEL AND ITS FALLBACK: flash, then second, and nothing else is on the answering route', () => {
   const facts = includedCandidates(included());
   assert.ok(facts);
   assert.equal(facts.form, 'included');
-  assert.equal(facts.models.flash?.model, 'glm-5.3-flash');
-  assert.equal(facts.models.small?.model, 'llama-3.2-1b');
+  assert.equal(facts.models.flash?.model, INCLUDED_MODEL);
+  /* THE FALLBACK IS SECOND (`INCLUDED_FALLBACKS`): until 24 November there was none, and a retired model left nothing. */
+  assert.equal(facts.models.second?.model, INCLUDED_FALLBACKS[0]);
+  assert.equal(facts.models.small, undefined, 'the small row named a retired model the router never asked');
   assert.equal(facts.models.provider, undefined);
   assert.deepEqual([facts.large, facts.machine], [false, false]);
-  assert.deepEqual(ids(included()), ['flash']);
-  /* PROSE IS ON FLASH, as a pattern is: the small model holds no JSON schema, so it is no longer on the route
-     `digestProse` walks (`core.routeOf`). */
-  assert.deepEqual(ids(included(), 'pattern'), ['flash']);
-  assert.deepEqual(ids(included(), 'prose'), ['flash']);
+  assert.deepEqual(ids(included()), ['flash', 'second']);
+  /* PROSE IS ON FLASH, as a pattern is, and on its fallback after it. */
+  assert.deepEqual(ids(included(), 'pattern'), ['flash', 'second']);
+  assert.deepEqual(ids(included(), 'prose'), ['flash', 'second']);
 });
 
 test("THE OPERATOR'S SECOND PROVIDER IS SECOND, only when its three settings and its secret are all set", () => {
   const env = { ...included(), ...FALLBACK };
-  assert.deepEqual(ids(env), ['flash', 'provider']);
+  assert.deepEqual(ids(env), ['flash', 'second', 'provider']);
   assert.equal(includedCandidates(env)?.models.provider?.model, 'second-chat-model');
   for (const gone of Object.keys(FALLBACK)) {
     const short = { ...env, [gone]: '' };
-    assert.deepEqual(ids(short), ['flash'], `${gone} left empty still named the second provider`);
+    assert.deepEqual(ids(short), ['flash', 'second'], `${gone} left empty still named the second provider`);
   }
-  assert.deepEqual(ids({ ...env, SLASH_FALLBACK_PROVIDER: 'another' }), ['flash'], 'a provider shape this host has no wire for');
+  assert.deepEqual(ids({ ...env, SLASH_FALLBACK_PROVIDER: 'another' }), ['flash', 'second'], 'a provider shape this host has no wire for');
   /* AND THE KEY IS NOWHERE IN WHAT THE ROUTER IS HANDED: the facts name a model, never the secret. */
   assert.doesNotMatch(JSON.stringify(includedCandidates(env)), new RegExp(FALLBACK_KEY, 'u'));
 });
@@ -112,7 +114,7 @@ test("SLASH_LARGE yes IS THE OPERATOR'S YES AND STILL NAMES NO LARGER MODEL, bec
   assert.equal(includedCandidates({ ...included(), SLASH_LARGE: 'no' })?.large, false);
 });
 
-test('THE INCLUDED MODEL FAILS AND THE SECOND ANSWERS: two calls, two rows, one ask counted, and the key on no row', async () => {
+test("THE INCLUDED MODEL AND ITS FALLBACK FAIL AND THE OPERATOR'S PROVIDER ANSWERS: three calls, three rows, one ask counted, and the key on no row", async () => {
   const ai = fakeAi(true);
   const sent: { url: string; auth: string | null; model: unknown }[] = [];
   const send = async (input: URL, init: RequestInit): Promise<Response> => {
@@ -132,7 +134,7 @@ test('THE INCLUDED MODEL FAILS AND THE SECOND ANSWERS: two calls, two rows, one 
     assert.ok(engine, 'no engine over the included model');
     const read = (await engine.read('What is still open?', OWNER)) as { ok: boolean };
     assert.ok(read.ok, JSON.stringify(read));
-    assert.deepEqual(ai.runs, ['@cf/zai-org/glm-5.3-flash'], 'the included model was asked once');
+    assert.deepEqual(ai.runs, ['@cf/openai/gpt-oss-120b', '@cf/google/gemma-4-26b-a4b-it'], 'the included model and its fallback were each asked once');
     assert.equal(sent.length, 1, 'the second provider was asked once');
     assert.equal(sent[0]?.url, `${FALLBACK_URL}/chat/completions`);
     assert.equal(sent[0]?.model, 'second-chat-model');
@@ -143,7 +145,8 @@ test('THE INCLUDED MODEL FAILS AND THE SECOND ANSWERS: two calls, two rows, one 
       )
       .map((r) => ({ ...r }));
     assert.deepEqual(rows, [
-      { model: 'glm-5.3-flash', status: 'error', code: 'UNREACHABLE', spends: 'none', candidate: 'flash' },
+      { model: 'gpt-oss-120b', status: 'error', code: 'UNREACHABLE', spends: 'none', candidate: 'flash' },
+      { model: 'gemma-4-26b-a4b', status: 'error', code: 'UNREACHABLE', spends: 'none', candidate: 'second' },
       { model: 'second-chat-model', status: 'ok', code: null, spends: 'person', candidate: 'provider' },
     ]);
     assert.equal((engine.status() as { asks: { used: number } }).asks.used, 1, 'one question is one ask, whatever it took');
@@ -183,7 +186,7 @@ test('A RECORD ON HIS OWN KEY WALKS NO ROUTE: his key failing asks neither the i
   }
 });
 
-test('WITH NO SECOND PROVIDER THE ONE CALL IS AS IT WAS: the included model is asked once, then the rules speak', async () => {
+test("WITH NO OPERATOR'S PROVIDER THE WALK ENDS AT THE FALLBACK: the included model and its fallback asked once each, then the rules speak", async () => {
   const ai = fakeAi(true);
   const clock = fixedClock(Date.UTC(2026, 9, 14, 9));
   const sql = openSqlite();
@@ -193,13 +196,16 @@ test('WITH NO SECOND PROVIDER THE ONE CALL IS AS IT WAS: the included model is a
   try {
     const engine = await workerSlashEngine(included(ai), () => api, { sql: own, clock, send: async () => assert.fail('nothing else may be asked') });
     assert.ok(engine);
-    /* THE RULES SPEAK AFTER THE ONE MODEL ON THE ROUTE, as they always did: one run, one row, nothing else asked. */
+    /* THE RULES SPEAK AFTER THE LAST MODEL ON THE ROUTE: one run and one row a model, nothing else asked. */
     await engine.read('What is still open?', OWNER);
-    assert.equal(ai.runs.length, 1, 'a route of one asked the same model twice');
+    assert.deepEqual(ai.runs, ['@cf/openai/gpt-oss-120b', '@cf/google/gemma-4-26b-a4b-it'], 'a model on the route was asked twice');
     const rows = own
       .all<{ model: string; code: string | null; candidate: string | null }>("SELECT model, code, candidate FROM slash_call WHERE kind = 'read'")
       .map((r) => ({ ...r }));
-    assert.deepEqual(rows, [{ model: 'glm-5.3-flash', code: 'UNREACHABLE', candidate: 'flash' }]);
+    assert.deepEqual(rows, [
+      { model: 'gpt-oss-120b', code: 'UNREACHABLE', candidate: 'flash' },
+      { model: 'gemma-4-26b-a4b', code: 'UNREACHABLE', candidate: 'second' },
+    ]);
   } finally {
     sql.close();
     own.close();

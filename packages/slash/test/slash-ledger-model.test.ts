@@ -7,7 +7,7 @@
  * and `answer.ts` read that name back. `propose.ts` did not: the drafting `read` row and the `propose` row were both written
  * under `ran.model`, which `core.run` takes from the template. So on one self-host with `SLASH_MODEL=llama3`, an
  * automation's row read `llama3` and a person's read and proposal, sent to the same endpoint as the same `llama3`, read
- * `glm-5.3-flash`, a model nothing was asked of.
+ * `gpt-oss-120b`, a model nothing was asked of.
  *
  * THE COUNT WAS CLAMPED BELOW AND NOT ABOVE. The first `counted` made a count whole and not negative, and `1e300` is both:
  * `Number.isInteger(1e300)` is true, so it passed, and SQLite stored it as a REAL in `tokens_in INTEGER NOT NULL`, with
@@ -16,8 +16,8 @@
  * THE HOST'S REAL `endpointInference`, REACHED BY A RELATIVE PATH as `slash-status-retried.test.ts` reaches it, because
  * what the host says it sent is the host's decision and a hand-written double would test the double.
  *
- * RED ON 23 SEPTEMBER, BEFORE THE REPAIR: five tests, two pass, three fail. Case 1 read `glm-5.3-flash` on both rows and
- * on the proposal it returned; case 2 read `glm-5.3-flash` on the row a proposal that answered unreadably left; case 4
+ * RED ON 23 SEPTEMBER, BEFORE THE REPAIR: five tests, two pass, three fail. Case 1 read `gpt-oss-120b` on both rows and
+ * on the proposal it returned; case 2 read `gpt-oss-120b` on the row a proposal that answered unreadably left; case 4
  * read `tokens_in` and `tokens_out` as `real` 1e300 and `neurons` as `real`. Cases 3 and 5 passed before and after, which
  * is their job: a throw that carries no name, and an adapter that names nothing, keep the template's name.
  */
@@ -119,7 +119,7 @@ test('(3) A READ THAT REACHED NOTHING KEEPS THE TEMPLATE NAME, because a refused
     };
     const out = await slash.read('what is still open', OWNER, refused);
     assert.ok(out.ok, JSON.stringify(out));
-    assert.deepEqual(rows(), [{ kind: 'read', model: 'glm-5.3-flash', code: 'UNREACHABLE' }]);
+    assert.deepEqual(rows(), [{ kind: 'read', model: 'gpt-oss-120b', code: 'UNREACHABLE' }]);
   } finally {
     sql.close();
   }
@@ -127,7 +127,7 @@ test('(3) A READ THAT REACHED NOTHING KEEPS THE TEMPLATE NAME, because a refused
 
 /* 1e300 IS WHOLE AND NOT NEGATIVE, so the first clamp let it through. It is the body's `usage` a provider or anything
    between it and this host wrote, and nothing checks it but `counted`. Tier `a` with no `SLASH_MODEL`, so the row is
-   under `glm-5.3-flash`, which has a rate, and `neurons` is computed from the count as well. */
+   under `gpt-oss-120b`, which has a rate, and `neurons` is computed from the count as well. */
 test('(4) A COUNT OF 1e300 REACHES THE LEDGER AS A WHOLE NUMBER UNDER THE CEILING, in an INTEGER column, and so do its neurons', async () => {
   const { sql, slash } = build();
   try {
@@ -139,7 +139,7 @@ test('(4) A COUNT OF 1e300 REACHES THE LEDGER AS A WHOLE NUMBER UNDER THE CEILIN
     assert.deepEqual(
       { ...row },
       {
-        model: 'glm-5.3-flash',
+        model: 'gpt-oss-120b',
         tokens_in: SLASH_TOKENS_CEILING,
         tokens_out: SLASH_TOKENS_CEILING,
         tin: 'integer',
@@ -160,10 +160,10 @@ test('(5) AN ADAPTER THAT NAMES NO MODEL KEEPS THE TEMPLATE NAME on the read row
     model.say(PROPOSAL);
     const out = await slash.propose('what is still open', OWNER);
     assert.ok(out.ok, JSON.stringify(out));
-    assert.equal(out.value.model, 'glm-5.3-flash');
+    assert.equal(out.value.model, 'gpt-oss-120b');
     assert.deepEqual(rows(), [
-      { kind: 'read', model: 'glm-5.3-flash', code: null },
-      { kind: 'propose', model: 'glm-5.3-flash', code: null },
+      { kind: 'read', model: 'gpt-oss-120b', code: null },
+      { kind: 'propose', model: 'gpt-oss-120b', code: null },
     ]);
   } finally {
     sql.close();

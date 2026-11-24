@@ -36,7 +36,7 @@
  * one the projection listed, the confidence is not the model's to set, and a person decides.
  */
 
-import { no, ok, refused, type Result } from '@braindog/ports';
+import { INCLUDED_MODEL, no, ok, refused, type Result } from '@braindog/ports';
 
 import { thrownRaw, type CallStatus, type Charge, type Core } from './call.ts';
 import { LAST_ROWS_SQL, NOT_SERVED, PASSED_WORDS, pausedFor, type LastRow } from './paused.ts';
@@ -441,7 +441,7 @@ const PROSE_SCHEMA = {
  */
 export const PROSE: PromptTemplate = {
   purpose: 'prose',
-  model: 'glm-5.3-flash',
+  model: INCLUDED_MODEL,
   /* Two sentences and the low thinking before them: 120 left the reasoning model no room to think first. */
   maxTokens: LOW_THINKING_ROOM,
   capIn: 4000,

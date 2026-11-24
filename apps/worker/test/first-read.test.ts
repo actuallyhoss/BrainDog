@@ -38,9 +38,9 @@ const fakeAi = () => {
 
 /** A reader that asks the model it is handed once and answers what it said, as `readSetup` does without its checks. */
 const fakeRead: ReadSetup = async (ask, model) => {
-  const reply = await model.complete({ model: 'glm-5.3-flash', messages: [{ role: 'user', content: ask.said }], maxTokens: 200, jsonSchema: {} });
+  const reply = await model.complete({ model: 'gpt-oss-120b', messages: [{ role: 'user', content: ask.said }], maxTokens: 200, jsonSchema: {} });
   const said = JSON.parse(reply.text) as { name: string; summary: string };
-  return ok({ name: said.name, summary: said.summary, usecase: ask.offer.usecases[0]?.id ?? null, also: [], modules: [], currency: null, heard: [], names: [], rows: [], draft: null, by: 'glm-5.3-flash' });
+  return ok({ name: said.name, summary: said.summary, usecase: ask.offer.usecases[0]?.id ?? null, also: [], modules: [], currency: null, heard: [], names: [], rows: [], draft: null, by: 'gpt-oss-120b' });
 };
 
 /** The Directory's count as the port says it: one more by key and day, within `most`. */
@@ -183,7 +183,7 @@ const hearingRead = (seen: SetupOffer[]): ReadSetup => async (ask) => {
   seen.push(ask.offer);
   const said = ask.said.toLowerCase();
   const pick = ask.offer.usecases.find((u) => ((u as { signals?: readonly string[] }).signals ?? []).some((w) => said.includes(w)));
-  return ok({ name: null, summary: 'A reading.', usecase: pick?.id ?? null, also: [], modules: [], currency: null, heard: [], names: [], rows: [], draft: null, by: 'glm-5.3-flash' });
+  return ok({ name: null, summary: 'A reading.', usecase: pick?.id ?? null, also: [], modules: [], currency: null, heard: [], names: [], rows: [], draft: null, by: 'gpt-oss-120b' });
 };
 
 const askSaying = (said: string, ip = '203.0.113.9'): Request =>

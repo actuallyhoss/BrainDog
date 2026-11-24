@@ -2,7 +2,7 @@
  * A model that does not answer is told to the operator, in the provider's own words.
  *
  * MEASURED BEFORE THIS FILE: on his record the night's `infer.resolve` failed eight times as "No model answered for
- * 'glm-5.3-flash': the provider did not answer", filed as a question to him, and the platform's own sentence was thrown
+ * 'gpt-oss-120b': the provider did not answer", filed as a question to him, and the platform's own sentence was thrown
  * away in `inference.ts`, so nobody could say whether the route table, the gateway or the account was at fault. No mail
  * went: the operator was mailed for `crash` and `refuse` only.
  *
@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import { workerSlashModel, type ModelFail } from '../src/slash.ts';
 import { cloud } from './cloud-harness.ts';
 
-const FLASH = '@cf/zai-org/glm-5.3-flash';
+const FLASH = '@cf/openai/gpt-oss-120b';
 const PROMPT = 'Ada wrote: my card ending 7731 was charged twice';
 const noGrants = () => ({ kernel: { grants: () => [] } }) as never;
 /* WHAT A PROVIDER MAY QUOTE BACK FROM THE CALL'S HEADERS, each of which must be cut before the log line or the mail. */
@@ -43,23 +43,26 @@ const throwingAi = () => {
 /** Workers AI answering prose where JSON was pinned, which is a schema break the platform billed. */
 const proseAi = { run: async () => ({ choices: [{ message: { role: 'assistant', content: 'not json' }, finish_reason: 'stop' }], usage: { prompt_tokens: 9, completion_tokens: 3 } }) };
 
-test('A THROW REACHES onFail ONCE, with the phrase, the provider id and its own words scrubbed of the prompt and cut', async () => {
+test('A THROW REACHES onFail ONCE A MODEL, with the phrase, the provider id and its own words scrubbed of the prompt and cut', async () => {
   const ai = throwingAi();
   const fails: ModelFail[] = [];
   const model = workerSlashModel({ AI: ai.AI, SLASH_INCLUDED: 'yes' }, noGrants, { onFail: (f) => fails.push(f) });
   await assert.rejects(model!.draft({ said: PROMPT } as never));
-  assert.equal(ai.runs(), 1);
-  assert.equal(fails.length, 1);
-  const [fail] = fails;
-  assert.equal(fail!.model, 'glm-5.3-flash');
-  assert.equal(fail!.provider, FLASH);
-  assert.equal(fail!.why, 'the provider did not answer');
-  assert.equal(fail!.sent, true);
-  assert.equal(fail!.whose, 'operator');
-  assert.match(fail!.raw, /^5016: AiError: account \[cut\] with Authorization: \[cut\] \[cut\] API key provided: \[cut\] aws \[cut\] "x-api-key": \[cut\] refused the request/u);
-  assert.ok(!fail!.raw.includes('7731') && !fail!.raw.includes('Ada wrote'), fail!.raw);
-  assert.deepEqual(leaked(fail!.raw), [], fail!.raw);
-  assert.ok(fail!.raw.length <= 300);
+  /* THE INCLUDED MODEL, THEN ITS FALLBACK (`INCLUDED_FALLBACKS`): one call each, one failure each. */
+  assert.equal(ai.runs(), 2);
+  assert.deepEqual(fails.map((f) => [f.model, f.provider]), [
+    ['gpt-oss-120b', FLASH],
+    ['gemma-4-26b-a4b', '@cf/google/gemma-4-26b-a4b-it'],
+  ]);
+  for (const fail of fails) {
+    assert.equal(fail.why, 'the provider did not answer');
+    assert.equal(fail.sent, true);
+    assert.equal(fail.whose, 'operator');
+    assert.match(fail.raw, /^5016: AiError: account \[cut\] with Authorization: \[cut\] \[cut\] API key provided: \[cut\] aws \[cut\] "x-api-key": \[cut\] refused the request/u);
+    assert.ok(!fail.raw.includes('7731') && !fail.raw.includes('Ada wrote'), fail.raw);
+    assert.deepEqual(leaked(fail.raw), [], fail.raw);
+    assert.ok(fail.raw.length <= 300);
+  }
 });
 
 test('A SCHEMA BREAK COUNTS ITS STREAK, and a hook that throws never takes the call down with it', async () => {

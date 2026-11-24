@@ -14,11 +14,13 @@
  * RED WITHOUT THE METER, measured by taking the `slashMeter` line out of `Record$.#open`: 7 binding calls
  * at a ceiling of 0 (5 presses, the look, the plan), and the two palette doors refused.
  *
- * A PRESS AT THE WORST CALL. The ceiling turns neurons into asks at the package's worst call, 232 (`worstAsk`), and a press was
- * held only by `INCLUDED_NEURONS_PER_CALL`, 2,500, while its input is the record's own reading and grows with it. A probe
- * measured a record of 300 lists: a prompt of 52,310 bytes, a worst case of 272 neurons, counted as one ask of 232.
- * The record's two asks are now held to the same worst call the ceiling counts them at. RED BEFORE THAT, measured:
- * this file 1 pass, 1 fail, "a press may spend 274 neurons and the ceiling counts every call at 232".
+ * A PRESS AT THE WORST CALL. The ceiling turns neurons into asks at the package's worst call, 485 today (`worstAsk`, 232 on
+ * the retired `glm-5.3-flash`), and a press was held only by `INCLUDED_NEURONS_PER_CALL`, 2,500, while its input is the
+ * record's own reading and grows with it. A probe measured a record of 300 lists: a prompt of 52,310 bytes, a worst case of
+ * 272 neurons, counted as one ask of 232. The record's two asks are now held to the same worst call the ceiling counts
+ * them at. RED BEFORE THAT, measured: this file 1 pass, 1 fail, "a press may spend 274 neurons and the ceiling counts every
+ * call at 232". On 300 lists today the included model's worst is past 485, so it is never sent, and its fallback, a third
+ * of the rate, is asked within it.
  *
  * THE LOOK IS A BACKGROUND ASK THE WORKER COUNTS. `workerSlashMeter` had a `hold` and no `background`, so the record
  * answered "This host cannot count an ask against the background allowance" and the daily look and every skill draft fell
@@ -36,8 +38,8 @@
  *
  * AND THE TWO TOGETHER STAY INSIDE THE MONTH'S BUDGET (ceiling-total-57-58). Held apart, each side could spend the whole
  * ceiling, so one record could cost the operator twice the number he set. The joint cases make every call cost its worst,
- * 232 neurons, at a budget of 696: his asks and the background's are asked in turn until both are turned away, and the
- * ledger's bill is never past 696. RED WITHOUT THE JOINT CAP, measured with it switched off: three
+ * 485 neurons, at a budget of 1,455: his asks and the background's are asked in turn until both are turned away, and the
+ * ledger's bill is never past 1,455. RED WITHOUT THE JOINT CAP, measured with it switched off: three
  * cases fail, each on a read that was answered past the budget.
  *
  * THE CLOCK IS MOCKED, because a press on a record younger than two weeks asks no model at all, and the Worker's clock
@@ -69,20 +71,29 @@ type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string
  * the record's new words to it, on the background allowance and outside the ceiling (`callsMade`). This fake used to read
  * `messages` off it and throw, so the call was never counted here, and it left a failed row in the ledger.
  */
+/* EACH MODEL AT ITS OWN RATE (`MODELS` in `src/inference.ts`): the included model and the fallback its asks walk to. */
+const RATES: Record<string, { in: number; out: number }> = {
+  '@cf/openai/gpt-oss-120b': { in: 31_818, out: 68_182 },
+  '@cf/google/gemma-4-26b-a4b-it': { in: 9_091, out: 27_273 },
+};
 const fakeAi = () => {
   const worst: number[] = [];
+  const models: string[] = [];
   const embeds: string[][] = [];
   return {
     worst,
+    models,
     embeds,
     AI: {
-      run: async (_model: string, inputs: { messages: { content: string }[]; max_tokens: number; text?: string[] }) => {
+      run: async (model: string, inputs: { messages: { content: string }[]; max_tokens: number; text?: string[] }) => {
         if (inputs.text !== undefined) {
           embeds.push(inputs.text);
           return { shape: [inputs.text.length, 4], data: inputs.text.map(() => [0.1, 0.2, 0.3, 0.4]) };
         }
         const tokens = inputs.messages.reduce((n, m) => n + Math.ceil(new TextEncoder().encode(m.content).length / 4), 0);
-        worst.push(Math.ceil((tokens * 13_636 + inputs.max_tokens * 45_455) / 1_000_000));
+        const rate = RATES[model] ?? { in: 31_818, out: 68_182 };
+        models.push(model);
+        worst.push(Math.ceil((tokens * rate.in + inputs.max_tokens * rate.out) / 1_000_000));
         return { choices: [{ message: { role: 'assistant', content: '{"drafts":[]}' }, finish_reason: 'stop' }], usage: { prompt_tokens: 700, completion_tokens: 60 } };
       },
     },
@@ -182,26 +193,23 @@ test('AT A CEILING OF 0 NO ASK REACHES THE BINDING, only the hourly embedding: f
   for (const out of doors) assert.equal(out.refusal?.code, 'SLASH_BUDGET_SPENT', JSON.stringify(out));
 });
 
-test('A PRESS NEVER SPENDS MORE THAN THE ASK THE CEILING COUNTS IT AS: on 300 lists the model is not asked, on 1 it is', async (t) => {
+test('A PRESS NEVER SPENDS MORE THAN THE ASK THE CEILING COUNTS IT AS: on 300 lists the included model is not asked and its fallback is, on 1 it is', async (t) => {
   const { ai, c, post } = await recordOver(t, '900000', 300);
   const out = await post('slashPropose', {});
   assert.ok(out.ok, JSON.stringify(out));
   /* AND THE DAILY LOOK THE PRESS WOKE, which is the alarm's (`slashDue`, `wake`). */
   await c.wake(REC);
-  assert.equal((out.value as { by: string }).by, 'rules');
-  for (const w of ai.worst) assert.ok(w <= 232, `a press may spend ${w} neurons and the ceiling counts every call at 232`);
-  assert.equal(ai.worst.length, 0, 'the press and the daily look on 300 lists are both past 232, so neither is sent');
-  /* AND NOTHING LEFT BEHIND IN THE LEDGER: a call never sent is released, so it spends none of the month's asks. */
-  const rows = (await ledger(c)).filter((r) => r.purpose !== 'embed');
-  assert.equal(rows.length, 0, JSON.stringify(rows));
-  assert.equal(ai.worst.length, 0, 'the look finished after the press and was sent past 232');
+  for (const w of ai.worst) assert.ok(w <= 485, `a press may spend ${w} neurons and the ceiling counts every call at 485`);
+  /* THE INCLUDED MODEL'S WORST ON 300 LISTS IS PAST 485, SO IT IS NEVER SENT; the fallback's is under it, and it is asked. */
+  assert.ok(ai.worst.length >= 1, 'the press on 300 lists reached no model, though the fallback fits under the ceiling');
+  assert.deepEqual([...new Set(ai.models)], ['@cf/google/gemma-4-26b-a4b-it'], `the included model was sent past its worst: ${JSON.stringify(ai.models)}`);
   t.mock.timers.reset();
 
   /* THE CONTROL: an ordinary record's press is still asked of the model, so the cap is not a switch that turned it off. */
   const small = await recordOver(t, '900000', 1);
   assert.ok((await small.post('slashPropose', {})).ok);
   assert.ok(small.ai.worst.length >= 1, 'a press on a record of one list never reached the model');
-  for (const w of small.ai.worst) assert.ok(w <= 232, `a press may spend ${w} neurons`);
+  for (const w of small.ai.worst) assert.ok(w <= 485, `a press may spend ${w} neurons`);
 });
 
 
@@ -215,14 +223,14 @@ test("UNDER THE CEILING THE DAILY LOOK ASKS THE BINDING ONCE, and its row spends
 
   const rows = await ledger(c, (now) => now.some((r) => r.question === "Slash's daily look"));
   const looks = rows.filter((r) => r.question === "Slash's daily look");
-  assert.deepEqual(looks, [{ question: "Slash's daily look", purpose: 'look', spends: 'background', status: 'ok', model: 'glm-5.3-flash', code: null }], JSON.stringify(rows));
+  assert.deepEqual(looks, [{ question: "Slash's daily look", purpose: 'look', spends: 'background', status: 'ok', model: 'gpt-oss-120b', code: null }], JSON.stringify(rows));
   /* ONE BINDING CALL FOR EACH ROW THAT NAMES A MODEL, so nothing reached Workers AI beside the ledger: the asks and the
      embeddings each to their own rows. */
   const named = rows.filter((r) => r.model !== '-');
   assert.equal(ai.worst.length + ai.embeds.length, named.length, `${ai.worst.length} Workers AI calls, ${ai.embeds.length} embeddings and ${named.length} rows that name a model: ${JSON.stringify(rows)}`);
   assert.equal(ai.worst.length, named.filter((r) => r.purpose !== 'embed').length, JSON.stringify(rows));
   assert.equal(rows.filter((r) => r.spends === 'person').length, 0, `the look spent one of his asks: ${JSON.stringify(rows)}`);
-  for (const w of ai.worst) assert.ok(w <= 232, `a background ask may spend ${w} neurons and the ceiling counts every call at 232`);
+  for (const w of ai.worst) assert.ok(w <= 485, `a background ask may spend ${w} neurons and the ceiling counts every call at 485`);
 });
 
 const INCLUDED = { AI: fakeAi().AI, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes' };
@@ -285,7 +293,7 @@ const TASKS = {
 type Refused = { ok: boolean; refusal?: { code: string; fix: string } };
 type Status = { asks: { used: number; cap: number } };
 
-/** The worst ask the ceiling counts every call as, 12,000 tokens in and 1,500 out: 232 neurons on the included model. */
+/** The worst ask the ceiling counts every call as, 12,000 tokens in and 1,500 out: 485 neurons on the included model. */
 const DEAR = { in: 12_000, out: 1_500 };
 const CHEAP = { in: 100, out: 10 };
 
@@ -323,7 +331,7 @@ async function paletteAndBackground(neurons: string, reply = { prompt_tokens: 70
 }
 
 test('A CEILING OF THREE ASKS, FIVE BACKGROUND ASKS, AND THE PALETTE STILL ANSWERS: the two are counted and held apart', async () => {
-  const { engine, background, own, at, runs, done } = await paletteAndBackground('696');
+  const { engine, background, own, at, runs, done } = await paletteAndBackground('1455');
   try {
     /* FIVE OF THE RECORD'S OWN: the look, the headlines, a skill draft, the reading of who is who, and the look again. */
     const asked: Refused[] = [];
@@ -362,7 +370,7 @@ test('A CEILING OF THREE ASKS, FIVE BACKGROUND ASKS, AND THE PALETTE STILL ANSWE
 });
 
 test('HIS ASKS SPENT DO NOT TURN THE BACKGROUND AWAY: three reads at a ceiling of three, and the daily look is still held', async () => {
-  const { engine, background, done } = await paletteAndBackground('696');
+  const { engine, background, done } = await paletteAndBackground('1455');
   try {
     for (let i = 0; i < 3; i++) assert.ok(((await engine.read(`open tasks ${i}`, OWNER_CTX)) as Refused).ok);
     assert.equal(((await engine.read('one more', OWNER_CTX)) as Refused).refusal?.code, 'SLASH_BUDGET_SPENT');
@@ -375,9 +383,9 @@ test('HIS ASKS SPENT DO NOT TURN THE BACKGROUND AWAY: three reads at a ceiling o
 });
 
 test('A BACKGROUND ASK NO MODEL ANSWERED IS STILL THE BACKGROUND\'S: three looks that never reached a model leave his three asks whole', async () => {
-  const { engine, own, at, done } = await paletteAndBackground('696');
+  const { engine, own, at, done } = await paletteAndBackground('1455');
   try {
-    const env = { SLASH_ENDPOINT: '', AI: { run: async () => ({}) }, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes', SLASH_INCLUDED_MONTH_NEURONS: '696' };
+    const env = { SLASH_ENDPOINT: '', AI: { run: async () => ({}) }, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes', SLASH_INCLUDED_MONTH_NEURONS: '1455' };
     const meter = workerSlashMeter(env, noGrants, { sql: own, clock: at });
     /* THE ROW KEEPS ITS MODEL'S NAME AND SAYS `none` (`@braindog/host` `settled`), so only its purpose says whose it was. */
     for (let i = 0; i < 3; i++) {
@@ -400,7 +408,7 @@ test('A BACKGROUND ASK NO MODEL ANSWERED IS STILL THE BACKGROUND\'S: three looks
 
 test("THE LOOK, A HEADLINE AND THE READING OF WHO IS WHO EACH LEAVE HIS MONTH WHOLE, answered or not: six of the record's own and his asks read 0", async () => {
   /* A CEILING OF TEN, so nothing here is turned away and every one of the six leaves its row. */
-  const { engine, background, own, at, done } = await paletteAndBackground('2320');
+  const { engine, background, own, at, done } = await paletteAndBackground('4850');
   try {
     for (const kind of ['look', 'headline', 'understand'] as const) {
       const answered = await background(kind);
@@ -431,7 +439,7 @@ test("THE LOOK, A HEADLINE AND THE READING OF WHO IS WHO EACH LEAVE HIS MONTH WH
 });
 
 test('WITH SLASH READING ON ITS OWN SWITCHED OFF NOTHING OF THE BACKGROUND IS HELD, and his own ask is answered: no row, no model, and on again it is held', async () => {
-  const { engine, background, own, api, runs, done } = await paletteAndBackground('2320');
+  const { engine, background, own, api, runs, done } = await paletteAndBackground('4850');
   try {
     api.kernel.setPref('slash', 'slash.reads', false);
     for (const kind of ['look', 'headline', 'skill', 'understand'] as const) {
@@ -455,7 +463,7 @@ test('WITH SLASH READING ON ITS OWN SWITCHED OFF NOTHING OF THE BACKGROUND IS HE
 const SAMPLES = [1, 2, 3].map((n) => ({ id: `raw_${n}`, channel: 'email' as const, ts: '2026-09-20T10:00:00.000Z', from: 'billing@acme.test', subject: `Invoice ${n}`, body: `Invoice ${n} for 120.00 EUR` }));
 
 test("THE RECORD'S OWN DRAFT IS HELD OVER THE BACKGROUND'S COUNT: asked after his three are spent, turned away after the background's three", async () => {
-  const { engine, background, own, runs, done } = await paletteAndBackground('696');
+  const { engine, background, own, runs, done } = await paletteAndBackground('1455');
   /* THE DOOR'S TYPE NAMES WHAT A PERSON ASKS; the draft is the model-jobs pass's, on the same engine object. */
   const drafts = engine as unknown as { draftPattern: (samples: typeof SAMPLES) => Promise<unknown> };
   try {
@@ -481,7 +489,7 @@ test("THE RECORD'S OWN DRAFT IS HELD OVER THE BACKGROUND'S COUNT: asked after hi
 /* ── the two together, inside the month's budget (ceiling-total-57-58) ───────────────────────────────────────────────── */
 
 const DEAR_REPLY = { prompt_tokens: DEAR.in, completion_tokens: DEAR.out };
-const BUDGET = 696;
+const BUDGET = 1455;
 
 test("HIS ASKS AND THE BACKGROUND'S TOGETHER NEVER SPEND PAST THE MONTH'S BUDGET: every call at its worst, and the bill stops at the ceiling", async () => {
   const { engine, background, billed, runs, done } = await paletteAndBackground(String(BUDGET), DEAR_REPLY);
@@ -491,7 +499,7 @@ test("HIS ASKS AND THE BACKGROUND'S TOGETHER NEVER SPEND PAST THE MONTH'S BUDGET
     assert.ok((await background('look', false, DEAR)).ok);
     assert.ok(((await engine.read('open tasks', OWNER_CTX)) as Refused).ok);
     assert.equal(runs(), 2);
-    assert.ok(billed() > BUDGET - 232 && billed() <= BUDGET, `three calls at their worst billed ${billed()} of ${BUDGET}`);
+    assert.ok(billed() > BUDGET - 485 && billed() <= BUDGET, `three calls at their worst billed ${billed()} of ${BUDGET}`);
 
     /* NEITHER COUNT IS REACHED, his two of three and the background's one of three, AND BOTH ARE TURNED AWAY. */
     for (let i = 0; i < 5; i++) {
@@ -531,7 +539,7 @@ test('AN ASK IN FLIGHT IS TAKEN AT ITS WORST UNTIL ITS BILL IS IN: three held an
   try {
     const held = [await inFlight('look'), await inFlight('headline'), await inFlight('skill')];
     assert.deepEqual(held.map((h) => h.ok), [true, true, true], JSON.stringify(held));
-    /* NO NEURON IS BILLED YET AND EACH MAY STILL COST 232, so a fourth call could end the month past its budget. */
+    /* NO NEURON IS BILLED YET AND EACH MAY STILL COST 485, so a fourth call could end the month past its budget. */
     const early = (await engine.read('What is still open?', OWNER_CTX)) as Refused;
     assert.equal(early.refusal?.code, 'SLASH_BUDGET_SPENT', JSON.stringify(early));
     assert.equal(runs(), 0);
@@ -552,7 +560,7 @@ test('WHOSE A CALL IS COMES FROM THE PURPOSES TABLE: an unanswered call of every
     const ts = new Date(at.now()).toISOString();
     for (const purpose of Object.keys(PURPOSES))
       own.exec(
-        "INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, purpose, spends) VALUES (?, ?, 'read', 'a', 'glm-5.3-flash', 0, 0, 0, 0, 'error', 'UNREACHABLE', ?, 'none')",
+        "INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, purpose, spends) VALUES (?, ?, 'read', 'a', 'gpt-oss-120b', 0, 0, 0, 0, 'error', 'UNREACHABLE', ?, 'none')",
         `call_${purpose}`,
         ts,
         purpose,

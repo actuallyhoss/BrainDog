@@ -161,6 +161,8 @@ export type RouteFacts = {
   models: {
     flash?: Candidate | undefined;
     second?: Candidate | undefined;
+    /** Further fallbacks after `second`, in the order they are asked. */
+    more?: readonly Candidate[] | undefined;
     small?: Candidate | undefined;
     large?: Candidate | undefined;
     /** The operator's second provider, set only when its variables and its secret are. */
@@ -196,11 +198,12 @@ export const routeFor = (purpose: InferPurpose, facts: RouteFacts): Route => {
     if (cls === 'embed') return [m.embed];
     if (facts.form === 'key') return [m.key];
     if (facts.form === 'selfhost') return [m.endpoint, m.fallback];
-    if (cls === 'answer') return [m.flash, m.second, m.provider];
-    if (composing) return [facts.machine ? m.machine : undefined, m.large, m.flash, m.second];
+    const more = m.more ?? [];
+    if (cls === 'answer') return [m.flash, m.second, ...more, m.provider];
+    if (composing) return [facts.machine ? m.machine : undefined, m.large, m.flash, m.second, ...more];
     /* PROSE ON THE FLASH MODEL: digest prose is asked for a JSON object, and the small model is not one Workers AI
        holds to a JSON schema, so a plain-text answer was set aside with nothing to fall to. */
-    return [m.flash, m.second];
+    return [m.flash, m.second, ...more];
   })();
   const seen = new Set<string>();
   const candidates = order.filter((c): c is Candidate => {

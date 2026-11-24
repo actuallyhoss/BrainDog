@@ -82,7 +82,7 @@ test(
 
       assert.equal(inference.seen.length, 1);
       /* RED AT `b7409d2d`: `[]`, one model call and no row that says so. */
-      assert.deepEqual(calls(), [{ kind: 'pattern', status: 'error', code: 'RECORD_UNAVAILABLE', model: 'glm-5.3-flash' }]);
+      assert.deepEqual(calls(), [{ kind: 'pattern', status: 'error', code: 'RECORD_UNAVAILABLE', model: 'gpt-oss-120b' }]);
     } finally {
       sql.close();
     }
@@ -97,7 +97,7 @@ test('(2) A PATTERN WHOSE FILING THE RECORD REFUSED IS A ROW UNDER THE REFUSAL, 
 
     assert.equal(out.ok, false);
     assert.equal(inference.seen.length, 1);
-    assert.deepEqual(calls(), [{ kind: 'pattern', status: 'refused', code: 'FORBIDDEN', model: 'glm-5.3-flash' }]);
+    assert.deepEqual(calls(), [{ kind: 'pattern', status: 'refused', code: 'FORBIDDEN', model: 'gpt-oss-120b' }]);
   } finally {
     sql.close();
   }

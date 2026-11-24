@@ -75,7 +75,7 @@ test('(1) AN AUTOMATION\'S QUESTION IS ANSWERED BY `answer`, spends one ask, and
 
     assert.deepEqual(out, { ok: true, value: { text: '5005' } });
     assert.equal(inference.seen.length, 1);
-    assert.equal(inference.seen[0]?.model, 'glm-5.3-flash');
+    assert.equal(inference.seen[0]?.model, 'gpt-oss-120b');
     /* THE FIELDS CAME WITH THE JOB. A projection here would be a second read of the record the kernel already made. */
     assert.equal(record.projected.length, 0);
     assert.equal(slash.status().asks.used, 1);
@@ -310,7 +310,7 @@ test('ON TIER `b` THE ANSWER IS THE HOST\'S MODEL, handed in for this job, and i
     assert.deepEqual(out, { ok: true, value: { text: 'Rent looks steady.' } });
     assert.deepEqual([inference.seen.length, hosts.seen.length], [0, 1]);
     /* THE INCLUDED MODEL'S NAME AND NOT THE OWNER'S, by default: tier `b`'s own key is never opened unattended. */
-    assert.equal(hosts.seen[0]?.model, 'glm-5.3-flash');
+    assert.equal(hosts.seen[0]?.model, 'gpt-oss-120b');
     /* `kind = 'read' AND tier IN ('b', 'byo')` is what `slashGuardedEngine`'s `drafted()` counts in `packages/host`. */
     assert.deepEqual(
       rows().map((r) => [r.kind, r.tier, r.status, r.question]),

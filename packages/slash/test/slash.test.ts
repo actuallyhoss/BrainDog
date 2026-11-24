@@ -49,7 +49,7 @@ test('status is the included source on tier a, the routing table model, and a ca
     source: 'included',
     tier: 'a',
     provider: null,
-    model: 'glm-5.3-flash',
+    model: 'gpt-oss-120b',
     asks: { used: 0, cap: 80, resets: '2026-12-01T00:00:00.000Z', capped: true },
     background: { used: 0, cap: 600 },
     deep: { key: false, model: DEEP_MODEL, harder: DEEP_HARDER, cap_cents: DEEP_CAP_CENTS_DEFAULT, spent_cents: 0 },
@@ -90,7 +90,7 @@ test('the meter counts tier a asks in this month, reads and patterns alike, and 
   const put = (kind: string, tier: string, ts: string): void =>
     sql.exec(
       `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, purpose, spends)
-       VALUES (?, ?, ?, ?, 'glm-5.3-flash', 1, 1, 1, 1, 'ok', 'ask', ?)`,
+       VALUES (?, ?, ?, ?, 'gpt-oss-120b', 1, 1, 1, 1, 'ok', 'ask', ?)`,
       `${kind}${tier}${ts}`,
       ts,
       kind,
@@ -173,7 +173,7 @@ test('going back to tier a drops the model, because the routing table decides th
   assert.equal(slash.status().model, 'llama-local');
   const back = slash.configure({ tier: 'a' }, OWNER);
   assert.equal(back.ok && back.value.model, null);
-  assert.equal(slash.status().model, 'glm-5.3-flash');
+  assert.equal(slash.status().model, 'gpt-oss-120b');
 });
 
 test('byo needs a model name, because nothing here knows what the endpoint answers with', () => {

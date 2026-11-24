@@ -51,7 +51,7 @@ import { routeFor, type Candidate, type RouteFacts } from '@braindog/host/infer'
 import type { ModelJobInference, SlashAnswer } from '@braindog/host/slash-answers';
 import { understandingOver } from '@braindog/host/understand';
 import type { ModelJobEmbed, ModelJobEmbeddings } from '@braindog/host/model-jobs';
-import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
+import { INCLUDED_MODEL, no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
 import type { Slash, SlashCandidate, SlashRoute } from '@braindog/slash';
 
@@ -123,7 +123,7 @@ const FALLBACK_ID = 'fallback';
  * The model the package's templates ask for, sent to this host's endpoint as it is where `SLASH_MODEL` names none, which
  * is what `endpointInference`'s `modelSent` does with it today; with `SLASH_MODEL` set, that name is the candidate's.
  */
-const TEMPLATE_MODEL = 'glm-5.3-flash';
+const TEMPLATE_MODEL: string = INCLUDED_MODEL;
 
 /**
  * What the router knows on this host (`@braindog/host/infer` `RouteFacts`), or nothing where no endpoint is configured.

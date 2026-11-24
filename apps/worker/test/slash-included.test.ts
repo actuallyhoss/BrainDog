@@ -24,19 +24,19 @@ import { workerSlashAnswers, workerSlashDoor, workerSlashEngine, workerSlashMode
 
 const URL_ = 'https://gateway.example.test/v1/chat/completions';
 const FAKE_KEK = '0'.repeat(64);
-const FLASH = '@cf/zai-org/glm-5.3-flash';
+const FLASH = '@cf/openai/gpt-oss-120b';
 const OWNER = { principal: { kind: 'person' as const, id: 'p_owner', level: 'owner' as const } };
 const ASK = { run: 'run_1', step: 0, rule: 'rate', question: 'What rate applies?', shape: 'number' as const };
 
-type Run = { model: string; inputs: Record<string, unknown>; options: unknown };
+type Run = { model: string; inputs: Record<string, unknown>; options: { gateway?: unknown; signal?: unknown } | undefined };
 
-/** Workers AI's `run`, answering each queued completion once in the chat shape `glm-5.3-flash` answers in. */
+/** Workers AI's `run`, answering each queued completion once in the chat shape `gpt-oss-120b` answers in. */
 const fakeAi = (answers: string[]) => {
   const runs: Run[] = [];
   return {
     runs,
     AI: {
-      run: async (model: string, inputs: Record<string, unknown>, options?: unknown) => {
+      run: async (model: string, inputs: Record<string, unknown>, options?: Run['options']) => {
         runs.push({ model, inputs, options });
         const content = answers.shift() ?? '{}';
         return { choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 700, completion_tokens: 60 } };
@@ -66,7 +66,7 @@ test('DARK AS SHIPPED: AI bound and SLASH_INCLUDED unset is no model, no engine,
   deps.sql.close();
 });
 
-test('SWITCHED ON WITH NO ENDPOINT, the record has a model named included, and one draft is one run on glm-5.3-flash', async () => {
+test('SWITCHED ON WITH NO ENDPOINT, the record has a model named included, and one draft is one run on gpt-oss-120b', async () => {
   const ai = fakeAi(['{"drafts":[]}', '{"plan":{}}']);
   const model = workerSlashModel(switchedOn(ai), noGrants);
   /* RED BEFORE THIS: `undefined`, the probe's `"no model"`. */
@@ -76,7 +76,9 @@ test('SWITCHED ON WITH NO ENDPOINT, the record has a model named included, and o
   assert.equal(ai.runs.length, 1);
   assert.equal(ai.runs[0]!.model, FLASH);
   /* `collectLog: false` IS WHAT KEEPS A RECORD'S OWN SENTENCES OUT OF THE GATEWAY'S LOG (`inference.ts` `through`). */
-  assert.deepEqual(ai.runs[0]!.options, { gateway: { id: 'braindog', collectLog: false } });
+  assert.deepEqual(ai.runs[0]!.options?.gateway, { id: 'braindog', collectLog: false });
+  /* AND THE CALL'S CLOCK (`FIRST_BYTE_MS`, `WHOLE_ANSWER_MS` in `src/inference.ts`): a model that does not answer is let go. */
+  assert.ok(ai.runs[0]!.options?.signal instanceof AbortSignal);
   const messages = ai.runs[0]!.inputs['messages'] as { role: string; content: string }[];
   assert.deepEqual(messages.map((m) => m.role), ['system', 'user']);
   assert.match(messages[0]!.content, /^You are Slash, the manager of one BrainDog/u);
@@ -186,11 +188,11 @@ test('HIS KEY ON ANTHROPIC IS ASKED IN MESSAGES: x-api-key, the version header, 
 /**
  * THE ASK IS BILLED ON TIER `a`, WHICH IS WHAT THE MONTHLY CAP READS. The package prices a ledger row by looking its
  * `model` up in its own `MODELS`, keyed by routing name (`packages/slash/src/call.ts` `account`), and reads that name off
- * the reply (`nameIn`). `aiInference` answers the provider id, `@cf/zai-org/glm-5.3-flash`, which `MODELS` does not hold,
+ * the reply (`nameIn`). `aiInference` answers the provider id, `@cf/openai/gpt-oss-120b`, which `MODELS` does not hold,
  * so handing its `model` through bills every row at 0 neurons: measured by making exactly that change, this case reads
- * `[0, 0]` where it expects `[12, 12]`. 700 tokens in and 60 out at 13,636 and 45,455 a million is 12.3, rounded to 12.
+ * `[0, 0]` where it expects `[12, 12]`. 700 tokens in and 60 out at 31,818 and 68,182 a million is 12.3, rounded to 12.
  */
-test('THE DOOR BUILDS THE INCLUDED ENGINE, and each call is a ledger row billed in neurons under glm-5.3-flash', async () => {
+test('THE DOOR BUILDS THE INCLUDED ENGINE, and each call is a ledger row billed in neurons under gpt-oss-120b', async () => {
   const clock = fixedClock(Date.UTC(2026, 8, 23, 9));
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock });
@@ -210,8 +212,8 @@ test('THE DOOR BUILDS THE INCLUDED ENGINE, and each call is a ledger row billed 
   assert.deepEqual(
     own.all<{ kind: string; tier: string; model: string; neurons: number }>('SELECT kind, tier, model, neurons FROM slash_call ORDER BY rowid').map((r) => ({ ...r })),
     [
-      { kind: 'read', tier: 'a', model: 'glm-5.3-flash', neurons: 12 },
-      { kind: 'propose', tier: 'a', model: 'glm-5.3-flash', neurons: 12 },
+      { kind: 'read', tier: 'a', model: 'gpt-oss-120b', neurons: 26 },
+      { kind: 'propose', tier: 'a', model: 'gpt-oss-120b', neurons: 26 },
     ],
   );
   sql.close();
@@ -223,7 +225,7 @@ test('THE PER-CALL CEILING REFUSES A RUNAWAY BEFORE THE RUN: a reading too large
   const model = workerSlashModel(switchedOn(ai), noGrants);
   assert.ok(model);
   /* ABOUT 200,000 TOKENS IN, which at 13,636 neurons a million is some 2,700 before a token comes out. */
-  await assert.rejects(model.draft({ usage: { note: 'x'.repeat(800_000) } } as never), /neurons and its ceiling is 232/u);
+  await assert.rejects(model.draft({ usage: { note: 'x'.repeat(800_000) } } as never), /neurons and its ceiling is 485/u);
   assert.equal(ai.runs.length, 0, 'a call over the ceiling reached the binding');
 });
 
@@ -247,7 +249,7 @@ test('A BAD ANSWER IS BILLED AND ENDS THE RUN: prose from the included model is 
   assert.equal(ai.runs.length, 1);
   assert.deepEqual(
     own.all<{ model: string; tokens_in: number; tokens_out: number; neurons: number }>('SELECT model, tokens_in, tokens_out, neurons FROM slash_call').map((r) => ({ ...r })),
-    [{ model: 'glm-5.3-flash', tokens_in: 700, tokens_out: 60, neurons: 12 }],
+    [{ model: 'gpt-oss-120b', tokens_in: 700, tokens_out: 60, neurons: 26 }],
   );
   sql.close();
   own.close();

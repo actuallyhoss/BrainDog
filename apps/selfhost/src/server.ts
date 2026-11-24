@@ -128,7 +128,7 @@ import { crashed } from '@braindog/host';
 import { PREVIEW_READ_ONLY } from '@braindog/host';
 import { fileModelSign } from '@braindog/host/sign-model';
 import { classOf, limitKey, refusedFor, windowLimiter, type LimitClass, type LimitDoor, type Limiter } from '@braindog/host/limits';
-import { guarded } from '@braindog/ports';
+import { guarded, INCLUDED_MODEL } from '@braindog/ports';
 import { readSetup } from '@braindog/slash/propose';
 
 /** A statement that opens, ends or names a transaction, as `guard` in `@braindog/ports` reads one. */
@@ -1489,7 +1489,7 @@ export async function start(options: {
         meterEngine = null;
         throw e;
       })),
-    model: 'glm-5.3-flash',
+    model: INCLUDED_MODEL,
     /* HIS SWITCH FOR SLASH READING ON ITS OWN, read each time a background ask is about to be held. */
     reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
   });

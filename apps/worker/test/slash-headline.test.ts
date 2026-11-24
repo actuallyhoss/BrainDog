@@ -123,7 +123,7 @@ test('THE DAILY LOOK ARRANGES A PAGE ON THE CLOUD: the compose answer\'s lead an
     /* ASKED UNDER THE COMPOSE INSTRUCTIONS AND THE LOOK'S OWN SCHEMA, once, on the included model. */
     const composed = ai.runs.filter((r) => r.system === SLASH_COMPOSE_INSTRUCTIONS);
     assert.equal(composed.length, 1, 'the record\'s step never asked for the pages\' looks');
-    assert.equal(composed[0]!.model, '@cf/zai-org/glm-5.3-flash');
+    assert.equal(composed[0]!.model, '@cf/openai/gpt-oss-120b');
     assert.deepEqual(composed[0]!.schema, LOOK, 'the look was not asked under its own schema');
     /* WITH ROOM FOR THE ANSWER THE RECORD SIZED THE ASK TO AND AS MUCH AGAIN FOR THE MODEL'S THINKING, which it was told to
        keep low: on 23 October the ask's thinking at its default and an answer for every page ran its 2,048 out. */

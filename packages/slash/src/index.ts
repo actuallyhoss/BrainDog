@@ -42,7 +42,7 @@
  * hands each ask an `Inference` over it, so the third boundary above still holds on his own key.
  */
 
-import { no, ok, type Result } from '@braindog/ports';
+import { INCLUDED_MODEL, no, ok, type Result } from '@braindog/ports';
 
 import { answering } from './answer.ts';
 import { chats } from './chat.ts';
@@ -289,7 +289,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
       /* ON TIER `a` THE ROUTING TABLE DECIDES AND `settings.model` IS NULL, so the name a person is
          shown is the model that would actually answer their next ask rather than an empty box. The one name tier `a`
          keeps is the one a self-host's owner typed for its own endpoint under "Included" (`modelKept` in `configure`). */
-      model: s.model ?? 'glm-5.3-flash',
+      model: s.model ?? INCLUDED_MODEL,
       /* ONE COUNT FOR WHAT IS SHOWN AND WHAT STOPS AN ASK. On the included model it is the count `spent()` refuses on
          (`propose.ts`); on his own key it is the same kinds of row on his tier, listed and never a limit. */
       asks: { used: key ? keyedAsks() : core.asksUsed(), cap: s.ask_cap, resets: core.resets(), capped: !key },

@@ -1248,7 +1248,9 @@ export const chats = (core: Core): Chat => {
               handOff = true;
               break;
             }
-            failed = codeOf(ran.out) === 'UNREACHABLE' ? "Slash couldn't reach its model just now. Try again in a moment." : "Slash's model answered in a shape it could not read. Try asking again.";
+            /* NO MODEL ANSWERED AT ALL, the included model and every fallback the route walked: said as it is. "Couldn't
+               reach its model just now" was all the bar said for four days while the model was retired. */
+            failed = codeOf(ran.out) === 'UNREACHABLE' ? "Slash's model is unavailable right now. Try again in a little while." : "Slash's model answered in a shape it could not read. Try asking again.";
             if (mode === 'auto') mac = true;
             break;
           }

@@ -55,7 +55,7 @@ export type Embedding = { model: string; dims: number; vectors: Int8Array[]; usa
 /**
  * One model call.
  *
- * `model` IS A SHORT NAME AND NEVER A PROVIDER ID. The adapter maps `glm-5.3-flash` onto whatever
+ * `model` IS A SHORT NAME AND NEVER A PROVIDER ID. The adapter maps `gemma-4-26b-a4b` onto whatever
  * the host is actually talking to, so no provider is named anywhere in this package and a
  * self-host swapping providers changes no line here. It is `string` rather than `ModelId` for the
  * one case that is not ours to name: on tiers `b` and `byo` the model is whatever the owner typed
@@ -75,7 +75,7 @@ export type InferenceReply = {
   usage: { in: number; out: number };
 };
 
-export type ModelId = 'llama-3.2-1b' | 'glm-5.3-flash' | 'glm-5.3' | 'bge-m3' | 'gemma-4-26b-a4b';
+export type ModelId = 'llama-3.2-1b' | 'glm-5.3-flash' | 'glm-5.3' | 'bge-m3' | 'gemma-4-26b-a4b' | 'gpt-oss-120b';
 /** Neurons per million tokens, `08 §6`. */
 export type ModelRate = { in: number; out: number };
 

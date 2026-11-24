@@ -139,7 +139,7 @@ test('tier a out of asks refuses before any model call', async () => {
   for (let i = 0; i < 80; i++)
     sql.exec(
       `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
-       VALUES (?, '2026-11-03T00:00:00.000Z', 'read', 'a', 'glm-5.3-flash', 1, 1, 1, 1, 'ok')`,
+       VALUES (?, '2026-11-03T00:00:00.000Z', 'read', 'a', 'gpt-oss-120b', 1, 1, 1, 1, 'ok')`,
       `c${i}`,
     );
   const out = await slash.read('what is open', OWNER);
@@ -171,7 +171,7 @@ test('pass 2 with an ask id re-projects the stored predicate and does not draft 
 
   assert.equal(out.ok, true);
   assert.equal(inference.seen.length, 2);
-  assert.equal(inference.seen[1]?.model, 'glm-5.3-flash');
+  assert.equal(inference.seen[1]?.model, 'gpt-oss-120b');
   assert.deepEqual(record.projected[2], {
     registers: ['obligations'],
     where: { all: [{ field: 'state', is: 'open' }] },
@@ -326,7 +326,7 @@ test('the model is named on every answer, and the fold travels with it', async (
   inference.say(PREDICATE);
   inference.say(options());
   const out = await slash.propose('what is still open', OWNER);
-  assert.equal(out.ok && out.value.model, 'glm-5.3-flash');
+  assert.equal(out.ok && out.value.model, 'gpt-oss-120b');
   assert.deepEqual(out.ok ? out.value.read.at(-1) : null, { register: 'grant', rows: 0, predicate: 'refused' });
 });
 
@@ -370,8 +370,8 @@ test('tier a bills neurons from the table and the provider usage', async () => {
   inference.say(options(), { in: 5000, out: 300 });
   await slash.propose('what is still open', OWNER);
   const propose = calls().find((c) => c.kind === 'propose');
-  /* 5000 × 13,636 / 1e6 + 300 × 45,455 / 1e6, rounded: the `glm-5.3-flash` row of `08 §6`. */
-  assert.equal(propose?.neurons, Math.round((5000 * 13636) / 1e6 + (300 * 45455) / 1e6));
+  /* 5000 × 13,636 / 1e6 + 300 × 45,455 / 1e6, rounded: the `gpt-oss-120b` row of `08 §6`. */
+  assert.equal(propose?.neurons, Math.round((5000 * 31818) / 1e6 + (300 * 68182) / 1e6));
 });
 
 test('no call this package makes carries a tool, and every one carries a schema', async () => {

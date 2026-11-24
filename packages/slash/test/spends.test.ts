@@ -89,7 +89,7 @@ test('(1) ONE BACKGROUND ASK ON THE INCLUDED MODEL LEAVES HIS COUNT WHERE IT WAS
     await slash.digestProse({ digest: 'weekly', name: 'The week', text: 'late: 2\npaid: 1' });
     sql.exec(
       `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, question, purpose, spends)
-       VALUES ('h_1', ?, 'pattern', 'a', 'glm-5.3-flash', 700, 60, 9, 40, 'ok', 'Slash''s page headlines', 'headline', 'background')`,
+       VALUES ('h_1', ?, 'pattern', 'a', 'gpt-oss-120b', 700, 60, 9, 40, 'ok', 'Slash''s page headlines', 'headline', 'background')`,
       new Date(NOW).toISOString(),
     );
     assert.equal(his(), 1);
@@ -111,7 +111,7 @@ test(`(2) THE BACKGROUND ALLOWANCE IS ITS OWN ${BACKGROUND_ASKS_MONTH}, his reco
     for (let i = 0; i < BACKGROUND_ASKS_MONTH; i++)
       sql.exec(
         `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, purpose, spends)
-         VALUES (?, ?, 'pattern', 'a', 'glm-5.3-flash', 700, 60, 9, 40, 'ok', 'look', 'background')`,
+         VALUES (?, ?, 'pattern', 'a', 'gpt-oss-120b', 700, 60, 9, 40, 'ok', 'look', 'background')`,
         `b_${i}`,
         new Date(NOW).toISOString(),
       );
@@ -151,7 +151,7 @@ test('(3) A FAILED ATTEMPT MOVES NEITHER COUNT: a model that could not be reache
 test('(4) A FAILED ATTEMPT KEEPS ITS NEURONS: a binding that was called and threw is priced for the operator and is not one of his asks', async () => {
   const { sql, inference, slash, his, rows } = build();
   try {
-    const threw = (): Error => marked('InferenceUpstreamError: 3043 internal server error', { reached: true, model: 'glm-5.3-flash' });
+    const threw = (): Error => marked('InferenceUpstreamError: 3043 internal server error', { reached: true, model: 'gpt-oss-120b' });
     /* THE LADDER'S RUNGS, three of them at a cap of two: every one reaches the model, because none was an ask of his. */
     assert.ok(slash.configure({ ask_cap: 2 }, OWNER).ok);
     for (let i = 0; i < 3; i++) {
@@ -161,7 +161,7 @@ test('(4) A FAILED ATTEMPT KEEPS ITS NEURONS: a binding that was called and thre
     }
     assert.equal(inference.seen.length, 3);
     for (const row of rows()) {
-      assert.equal(row.model, 'glm-5.3-flash');
+      assert.equal(row.model, 'gpt-oss-120b');
       assert.equal(row.spends, 'none');
       assert.ok(row.neurons > 0, 'the attempt a platform may have billed lost its neurons');
     }
@@ -174,7 +174,7 @@ test('(4) A FAILED ATTEMPT KEEPS ITS NEURONS: a binding that was called and thre
 test('(5) AN UNREADABLE REPLY AND A TIMEOUT COUNT ONCE: the model ran, so the ask is spent, on a rule\'s question and on his own', async () => {
   const { sql, inference, slash, his, rows } = build();
   try {
-    const ranOut = (): Error => marked('The model took longer than 30 seconds.', { answered: true, model: 'glm-5.3-flash', usage: { in: 700, out: 0 } });
+    const ranOut = (): Error => marked('The model took longer than 30 seconds.', { answered: true, model: 'gpt-oss-120b', usage: { in: 700, out: 0 } });
     inference.say(ranOut());
     const answered = await slash.answer(RATE);
     assert.equal(codeOf(answered), 'ANSWER_UNREADABLE');
@@ -212,7 +212,7 @@ test("(6) AN AUTOMATION'S ASK SPENDS HIS ALLOWANCE, and the cap of his asks turn
     assert.equal(codeOf(refused), 'SLASH_BUDGET_SPENT');
     assert.equal(inference.seen.length, 1);
     assert.deepEqual(rows().map((r) => [r.purpose, r.model, r.spends]), [
-      ['automation', 'glm-5.3-flash', 'person'],
+      ['automation', 'gpt-oss-120b', 'person'],
       ['automation', '-', 'none'],
     ]);
     assert.equal(his(), 1);

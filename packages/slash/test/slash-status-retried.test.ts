@@ -144,7 +144,7 @@ test('(4) AN ADAPTER THAT NAMES NO MODEL KEEPS THE TEMPLATE\'S NAME on the row',
     const bare: Inference = { complete: async () => ({ text: '{"answer":4.25}', usage: { in: 300, out: 8 } }) };
 
     assert.equal((await slash.answer(RATE, bare)).ok, true);
-    assert.deepEqual(rows(), [{ model: 'glm-5.3-flash', tokens_in: 300, tokens_out: 8, status: 'ok', code: null }]);
+    assert.deepEqual(rows(), [{ model: 'gpt-oss-120b', tokens_in: 300, tokens_out: 8, status: 'ok', code: null }]);
   } finally {
     sql.close();
   }

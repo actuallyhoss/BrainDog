@@ -27,8 +27,8 @@ const SLUG = 'pressing';
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 1, 9);
 
-/* 232 NEURONS IS THE PACKAGE'S WORST CALL (`slash-operator-cap.test.ts`), so 696 is a ceiling of three asks. */
-const THREE_ASKS = '696';
+/* 485 NEURONS IS THE PACKAGE'S WORST CALL (`slash-operator-cap.test.ts`), so 1,455 is a ceiling of three asks. */
+const THREE_ASKS = '1455';
 
 type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string } };
 type Filed = { by: string; dropped: string[] };
@@ -130,10 +130,10 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
      through, so a person got two. It is a background ask, held to the ceiling over the background's own count. */
   assert.deepEqual(calls.map((r) => r.question).sort(), ["Slash's daily look", "Slash's press", "Slash's press", "Slash's press"], JSON.stringify(calls));
   for (const r of calls) {
-    assert.deepEqual([r.kind, r.model, r.status, r.code], [r.question === "Slash's daily look" ? 'pattern' : 'read', 'glm-5.3-flash', 'ok', null]);
+    assert.deepEqual([r.kind, r.model, r.status, r.code], [r.question === "Slash's daily look" ? 'pattern' : 'read', 'gpt-oss-120b', 'ok', null]);
     /* PRICED AT THE INCLUDED MODEL'S RATE, the one the package prices the door's asks at, never 0. */
     assert.ok(r.tokens_in > 0 && r.tokens_out > 0, JSON.stringify(r));
-    assert.equal(r.neurons, Math.round((r.tokens_in * 13_636) / 1e6 + (r.tokens_out * 45_455) / 1e6));
+    assert.equal(r.neurons, Math.round((r.tokens_in * 31_818) / 1e6 + (r.tokens_out * 68_182) / 1e6));
   }
 
   /* THE PRESS PAST THE CEILING STILL ANSWERS, drafted by the rules, and says why the model was not asked. */

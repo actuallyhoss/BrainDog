@@ -18,7 +18,9 @@
  * its own fence.
  */
 
-export type ModelId = 'llama-3.2-1b' | 'glm-5.3-flash' | 'glm-5.3' | 'bge-m3' | 'gemma-4-26b-a4b';
+import { INCLUDED_MODEL } from '@braindog/ports';
+
+export type ModelId = 'llama-3.2-1b' | 'glm-5.3-flash' | 'glm-5.3' | 'bge-m3' | 'gemma-4-26b-a4b' | 'gpt-oss-120b';
 export type ModelRate = { in: number; out: number };
 export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' | 'mapping' | 'chat' | 'turn' | 'drafts';
 /**
@@ -51,7 +53,7 @@ export type PromptTemplate = {
 /**
  * Neurons per million tokens, `08 §6`, for the meter.
  *
- * FOUR MODELS AND THE RATES ARE THE CORPUS'S, not a provider's price list: the account row multiplies
+ * THE RATES ARE THE CORPUS'S, not a provider's price list: the account row multiplies
  * `usage` by these and the cost gate sums a modelled month out of the result. A rate that is wrong
  * makes a budget that is wrong and nothing else, which is why it is a table a reader can check
  * rather than a number buried in a call site.
@@ -63,6 +65,8 @@ export const MODELS: Readonly<Record<ModelId, ModelRate>> = {
   'bge-m3': { in: 1075, out: 0 },
   /* $0.10 IN / $0.30 OUT PER MILLION (Workers AI's catalogue, read 1 November), at $0.011 per 1,000 neurons. */
   'gemma-4-26b-a4b': { in: 9091, out: 27273 },
+  /* $0.35 IN / $0.75 OUT PER MILLION (the catalogue, read 24 November): the included model's fallback. */
+  'gpt-oss-120b': { in: 31818, out: 68182 },
 };
 
 /**
@@ -603,8 +607,9 @@ const CHAT_SCHEMA = {
  * predicate that does not validate costs a second projection and a fallback to keyword search.
  */
 /**
- * The least ceiling a row on `glm-5.3-flash` is sent: it always reasons, at `low` here (`apps/worker/src/inference.ts`
- * `Effort`), and that thinking is spent from the same ceiling, so 200 tokens left a short answer cut off before it began.
+ * The least ceiling a row is sent. The included model (`INCLUDED_MODEL`, `@braindog/ports`) reasons, at `low` here
+ * (`apps/worker/src/inference.ts` `Effort`), and that thinking is spent from the same ceiling: on `glm-5.3-flash`, which
+ * reasoned the same way, 200 tokens left a short answer cut off before it began.
  */
 export const LOW_THINKING_ROOM = 600;
 
@@ -618,7 +623,7 @@ export type Routed = PromptTemplate & { purpose: TemplatePurpose };
 export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
   predicate: {
     purpose: 'ask',
-    model: 'glm-5.3-flash',
+    model: INCLUDED_MODEL,
     maxTokens: LOW_THINKING_ROOM,
     capIn: 1200,
     system: SYSTEM,
@@ -628,7 +633,7 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
   },
   propose: {
     purpose: 'ask',
-    model: 'glm-5.3-flash',
+    model: INCLUDED_MODEL,
     maxTokens: 1500,
     capIn: 12000,
     system: SYSTEM,
@@ -638,7 +643,7 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
   },
   pattern: {
     purpose: 'pattern',
-    model: 'glm-5.3-flash',
+    model: INCLUDED_MODEL,
     maxTokens: 2048,
     capIn: 8000,
     system: SYSTEM,
@@ -651,7 +656,7 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
      what comes off the end when a row's are longer than that. */
   answer: {
     purpose: 'automation',
-    model: 'glm-5.3-flash',
+    model: INCLUDED_MODEL,
     maxTokens: LOW_THINKING_ROOM,
     capIn: 3000,
     system: ANSWER_SYSTEM,
@@ -664,7 +669,7 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
      stay under `propose`'s worst case, so the Worker's ceiling counts no fewer asks for them (`worstAsk`). */
   setup: {
     purpose: 'plan',
-    model: 'glm-5.3-flash',
+    model: INCLUDED_MODEL,
     maxTokens: 1200,
     capIn: 6000,
     system: SETUP_SYSTEM,
@@ -705,7 +710,7 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
   },
   mapping: {
     purpose: 'ask',
-    model: 'glm-5.3-flash',
+    model: INCLUDED_MODEL,
     maxTokens: 800,
     capIn: 6000,
     system: SETUP_SYSTEM,
@@ -718,7 +723,7 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
      itself, oldest turns first, so nothing is cut out of the middle of a result. */
   chat: {
     purpose: 'ask',
-    model: 'glm-5.3-flash',
+    model: INCLUDED_MODEL,
     maxTokens: 1500,
     capIn: 8000,
     system: CHAT_SYSTEM,

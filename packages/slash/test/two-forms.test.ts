@@ -43,7 +43,7 @@ test('on a host that runs no typed model, included drops the name, as the routin
   const out = slash.configure({ source: 'included', tier: 'byo', model: 'qwen-local' }, OWNER);
   assert.ok(out.ok, JSON.stringify(out));
   assert.deepEqual({ ...row() }, { tier: 'a', model: null });
-  assert.equal(slash.status().model, 'glm-5.3-flash');
+  assert.equal(slash.status().model, 'gpt-oss-120b');
   sql.close();
 });
 

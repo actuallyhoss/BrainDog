@@ -70,7 +70,7 @@ test('(1) A 200 OVER THE SIZE SLASH READS IS SETTLED UNDER THE MODEL, WITH THE T
       fixOf(out),
       "rule.rate asked Slash at step 1, and the model answered with something Slash could not read: The Slash endpoint answered more than Slash reads. The run stopped there rather than ask it again.",
     );
-    assert.deepEqual(rows(), [{ model: 'glm-5.3-flash', tokens_in: 415, tokens_out: 16_000, status: 'error', code: 'ANSWER_UNREADABLE' }]);
+    assert.deepEqual(rows(), [{ model: 'gpt-oss-120b', tokens_in: 415, tokens_out: 16_000, status: 'error', code: 'ANSWER_UNREADABLE' }]);
     assert.equal(slash.status().asks.used, 1);
   } finally {
     sql.close();
@@ -84,7 +84,7 @@ test('(2) AN ANSWERED THROW WITH NO COUNT KEEPS THE PROMPT ESTIMATE, UNDER THE M
 
     assert.equal(codeOf(out), 'ANSWER_UNREADABLE', fixOf(out));
     const [row] = rows();
-    assert.equal(row?.model, 'glm-5.3-flash');
+    assert.equal(row?.model, 'gpt-oss-120b');
     assert.equal(row?.tokens_out, 0);
     assert.ok((row?.tokens_in ?? 0) > 0, 'the estimate was not billed as tokens_in');
     assert.equal(slash.status().asks.used, 1);
@@ -131,7 +131,7 @@ test('(5) AN ANSWERED THROW WITH HALF A COUNT KEEPS THE ESTIMATE, and does not b
 
     assert.equal(codeOf(out), 'ANSWER_UNREADABLE', fixOf(out));
     const [row] = rows();
-    assert.equal(row?.model, 'glm-5.3-flash');
+    assert.equal(row?.model, 'gpt-oss-120b');
     assert.notEqual(row?.tokens_in, 415, 'the half count was billed');
     assert.ok((row?.tokens_in ?? 0) > 0, 'the estimate was not billed as tokens_in');
   } finally {

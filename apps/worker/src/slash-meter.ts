@@ -10,13 +10,13 @@
  *
  * THE ENGINE IS `workerSlashEngine`, SO THE OPERATOR'S CEILING IS WHAT `status()` READS. On the included model that engine
  * is wrapped in `operatorCeiling`, whose `status()` names the ceiling's count and cap wherever the ceiling binds, and whose
- * count is every `call` row of his this month with a model's name: the meter's hold row carries `glm-5.3-flash`, so a press
+ * count is every `call` row of his this month with a model's name: the meter's hold row carries `INCLUDED_MODEL`, so a press
  * spends the same asks a read and an automation's question do. A background ask's row is not one of his and is counted
  * apart (`slash.ts` `callsMade`). One more engine over the same two tables, as the door and
  * `workerSlashAnswers` already are; it holds nothing of its own between asks.
  *
  * PRICED ONLY WHERE THE OPERATOR PAYS. On the included model every call is Workers AI on his account, so the row is
- * priced at the package's own rate for it (`MODELS['glm-5.3-flash']`). On the owner's own key the model is his provider on
+ * priced at the package's own rate for it (`MODELS[INCLUDED_MODEL]`, the routing name `@braindog/ports` names). On the owner's own key the model is his provider on
  * his own bill: the engine's `status()` says `capped: false` there, and `slashRecordMeter` lists the press under his model's
  * name, priced 0 and held to no cap, as every other ask on his key is.
  *
@@ -29,14 +29,12 @@
 import { slashRecordMeter, type SlashRecordMeter } from '@braindog/host';
 import type { UnderstandLedger } from '@braindog/host/understand';
 import { METER_TRIES } from '@braindog/host/actions';
-import type { Result, Sql } from '@braindog/ports';
+import { INCLUDED_MODEL, type Result, type Sql } from '@braindog/ports';
 import type { RecordApi, SlashMeter } from '@braindog/record';
 import { SLASH_DAYS, type SlashDay, type SlashTally } from '@braindog/record/directory';
 
 import { HIS_CALL, includedCeilingReached, includedInference, workerSlashEngine, type SlashEngineDeps, type SlashEnv } from './slash.ts';
 
-/** The routing name the package's own tier `a` rows carry, and so the one the ceiling and `status()` count under. */
-const INCLUDED_MODEL = 'glm-5.3-flash';
 
 /** The ledger over this object's engine, built once on the first ask. */
 function meterBuilder(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): () => Promise<SlashRecordMeter> {

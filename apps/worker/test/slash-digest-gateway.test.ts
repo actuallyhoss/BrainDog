@@ -85,7 +85,7 @@ test('WHERE THE BINDING FAILS WITHOUT THE GATEWAY TOO, THE LEDGER AND HEALTH SAY
   assert.match(engineSaid(h, T0).text, /^Slash's model has not answered since 22 October\./);
 });
 
-/* THE DIGEST'S ASK AS THE BINDING HEARS IT. `glm-5.3-flash` reasons and spends its thinking from `max_tokens`, so
+/* THE DIGEST'S ASK AS THE BINDING HEARS IT. `gpt-oss-120b` reasons and spends its thinking from `max_tokens`, so
    the digest is sent the low effort and the room for it (`LOW_THINKING_ROOM`): at 120 tokens the thinking ran the
    ceiling out before the two sentences began. */
 test('A DIGEST IS ASKED OF THE FLASH MODEL WITH reasoning_effort LOW AND ROOM TO THINK, as the binding hears it', async () => {
@@ -95,7 +95,7 @@ test('A DIGEST IS ASKED OF THE FLASH MODEL WITH reasoning_effort LOW AND ROOM TO
   assert.ok(out.ok, JSON.stringify(out));
   const sent = ai.runs.filter((r) => !r.gateway);
   assert.equal(sent.length, 1);
-  assert.equal(sent[0]!.model, '@cf/zai-org/glm-5.3-flash');
+  assert.equal(sent[0]!.model, '@cf/openai/gpt-oss-120b');
   assert.equal(sent[0]!.inputs['reasoning_effort'], 'low');
   assert.equal(sent[0]!.inputs['max_tokens'], LOW_THINKING_ROOM);
 });
