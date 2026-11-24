@@ -2511,6 +2511,17 @@
     letter-spacing: -0.005em;
   }
 
+  /* THE FIELD'S HEIGHT IS THE BAR'S OWN, AT EVERY POINTER (audit of 24 Nov, 13): `MentionField` gives a coarse pointer a
+     44px field on a 24px line with -9px margins, which here put a 42px textarea in a 24px box and the words above the
+     well. The bar's air is its own `--mf-pad`, so the line sits in the middle of the well. */
+  .palette .p-ask-input :global(.mf) {
+    --mf-pad: inherit;
+  }
+
+  .palette .p-ask-input :global(:is(.mf-mirror, .mf-input)) {
+    margin-block: 0;
+  }
+
   /* A LONG SENTENCE GROWS DOWN: the glyph and the buttons stay on its first line. */
   .palette[data-mode='ask'] .p-head {
     align-items: flex-start;
