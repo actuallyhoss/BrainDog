@@ -518,6 +518,9 @@ export const TOOLS: readonly Tool[] = [
        The three calls are the examples, because an agent copies an example before it reads a sentence. */
     /* AND AN SG HE TOLD YOU TO ANSWER, with `option` and his words in `said` (`wordAnswer`, the owner's decision of 27
        October): the one example that says it, paid for out of the budget's last tokens. */
+    /* AND A REPLY HE SENT INSIDE A THREAD (24 Nov) IS SAID BY ITS OWN LINE, "replied in BrainDog on IN2 (IN5)", with the
+       call that answers it, and `reply IN2` answers the newest such reply too; the description is at the ceiling's last
+       token, so the prompts say it (`instructions.ts`). */
     description: 'What the person told you. Empty reads; take IN4 starts; reply IN4 with said, state; answer SG9 with option and said decides on their word.',
     /* AND `answer` ALONE, A QUESTION HIS ORDER NAMED, given as he said: the line he sent says the call. */
     input: obj({

@@ -22,7 +22,7 @@
 
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { INSTRUCTIONS, MACHINE_NAME, SEAT_NAME, type Instr, type JobEvent, type RunnerHeard } from '@braindog/kernel';
+import { INSTRUCTIONS, MACHINE_NAME, SEAT_NAME, threadMessages, type Instr, type JobEvent, type RunnerHeard } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import { readSight } from '../sight.ts';
@@ -625,11 +625,21 @@ export function methods(deps: RecordDeps) {
       const id = text(a.id);
       const note = text(a.note);
       if (note === null) return no('REQUIRED_MISSING', 'Say what to add.', { at: 'note' });
-      const first = id === null ? null : kernel.instruction(id);
-      if (first === null) return no('ROW_UNKNOWN', `There is no request called ${(id ?? '').slice(0, 40)}.`, { at: 'id' });
-      const head = `Following up ${first.id}: `;
-      const said = [...`${head}${note}`].slice(0, 2_000).join('');
-      const carried = { said, attach: first.attach, ...(first.may_change === null ? {} : { may_change: first.may_change }), ...(first.project === null ? {} : { project: first.project }) };
+      const asked = id === null ? null : kernel.instruction(id);
+      if (asked === null) return no('ROW_UNKNOWN', `There is no request called ${(id ?? '').slice(0, 40)}.`, { at: 'id' });
+      /* A REPLY IS THE THREAD'S NEXT WORD (`thread` on the instruction), in his words alone: "Following up IN2: check" was
+         a new instruction titled by its plumbing. It goes where the thread's newest word went: the run that took it while
+         that run is open, its job while that job runs, else the same way. */
+      const words = threadMessages(sql, asked.id);
+      const first = [...words].reverse().find((w) => w.taken_by !== null || w.job !== null) ?? words.at(-1) ?? asked;
+      const said = [...note].slice(0, 2_000).join('');
+      const carried = {
+        said,
+        thread: words[0]?.id ?? asked.id,
+        attach: first.attach,
+        ...(first.may_change === null ? {} : { may_change: first.may_change }),
+        ...(first.project === null ? {} : { project: first.project }),
+      };
       const where = { ...(first.repo === null ? {} : { repo: first.repo }), ...(first.machine === null ? {} : { machine: first.machine }), ...(first.seat === null ? {} : { seat: first.seat }) };
 
       /* THE RUN THAT TOOK IT, WHILE IT IS OPEN: a session hears it at its next step, a job's run when it asks again. */

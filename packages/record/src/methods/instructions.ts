@@ -41,6 +41,8 @@ import {
   ANSWERS_MOST,
   agentOf as kindOf,
   instructionsTakenBy,
+  threadMessages,
+  REPLIED_FIELD,
   placesHeard,
   askedKeyOf,
   tokenOfRun,
@@ -115,7 +117,11 @@ function askedSaid(question: string | null, given: string): string {
   return `"${words.length > 80 ? `${words.slice(0, 79)}…` : words}" (${given})`;
 }
 
-export function lineOf(i: Instr, by: string): string {
+/**
+ * The line an instruction reaches an agent as. A REPLY HE SENT INSIDE A THREAD says the thread it follows, and the run's
+ * own last word there (`earlier`), so a bare "yes" arrives as the answer to the question it answers.
+ */
+export function lineOf(i: Instr, by: string, earlier: string | null = null): string {
   const said = i.said.replace(/\s+/gu, ' ').trim();
   if (i.kind === 'stop') return `${by} stopped this run in BrainDog (${i.id}): ${quotedEnd(said)} Reply with instructions, then end.`;
   if (i.kind === 'pause') return `${by} paused this run in BrainDog (${i.id}): ${quotedEnd(said)} Wait; reply with instructions if you must.`;
@@ -127,7 +133,19 @@ export function lineOf(i: Instr, by: string): string {
   /* WHAT HE SENT WITH IT AND WHETHER IT MAY CHANGE FILES, said in the same line, so every path hands both on. */
   const rows = (i.attach ?? []).length === 0 ? '' : ` ${by} sent ${i.attach.join(', ')} with it: read each with get.`;
   const leave = i.may_change === true ? ' You may change files for it.' : i.may_change === false ? ' Change no file for it; propose what should change instead.' : '';
+  if (i.thread !== null) {
+    const before = (earlier ?? '').replace(/\s+/gu, ' ').trim();
+    const your = before === '' ? '' : ` Your last word there: "${before.length > 140 ? `${before.slice(0, 139)}…` : before}".`;
+    return `${by} replied in BrainDog on ${i.thread} (${i.id}): ${quotedEnd(said)}${your}${rows}${leave} ${answer}${named}`;
+  }
   return `${by} said in BrainDog (${i.id}): ${quotedEnd(said)}${rows}${leave} ${answer}${named}`;
+}
+
+/** The run's newest reply in the thread `i` replies inside, before `i`: what his words there answer. */
+export function earlierReply(sql: Sql, i: Instr): string | null {
+  if (i.thread === null) return null;
+  const before = threadMessages(sql, i.thread).filter((x) => x.id !== i.id && Number(x.id.slice(INSTRUCTION_PREFIX.length)) < Number(i.id.slice(INSTRUCTION_PREFIX.length)));
+  return before.reverse().find((x) => x.reply !== null)?.reply ?? null;
 }
 
 /** An instruction as `Told`, its maker named once. */
@@ -145,7 +163,7 @@ export function toldTo(readable: RecordDeps['readable'], ctx: CallContext, open:
 
 export function toldOf(sql: Sql, i: Instr): Told {
   const by = personNamed(sql, i.by);
-  return { ...i, by_name: by, line: lineOf(i, by) };
+  return { ...i, by_name: by, line: lineOf(i, by, earlierReply(sql, i)) };
 }
 
 /** What stops a run, as its one line: `null` while nothing does. */
@@ -266,7 +284,7 @@ export function inHandAt(held: readonly Instr[], ts: string, nowIso: string): In
 const INSTRUCT_TAKES = ['said', 'kind', 'when', 'to', 'to_run', 'to_agent', 'project', 'task', 'repo', 'machine', 'seat', 'replaces', 'waits_ms', 'answers'] as const;
 
 /** What `instructionList` takes. */
-const LIST_TAKES = ['state', 'project', 'task', 'run', 'limit', 'cursor'] as const;
+const LIST_TAKES = ['state', 'project', 'task', 'run', 'thread', 'limit', 'cursor'] as const;
 
 /**
  * What `instructionsMine` takes: nothing (what is pending), `take`, `reply` with `said` and `state`, `seen`, or `answer`,
@@ -294,7 +312,34 @@ const SEEN_MOST = 50;
 const BROWSER_ONLY = 'Only a person tells an agent, signed in to BrainDog. An agent answers with instructions.';
 
 /** One thread of `instructionList`: the instruction, who was shown it and how, and what the run did while it held it. */
-export type Thread = Told & { seen: { run: string; how: SeenHow; at: string }[]; receipts: Receipts | null };
+export type Thread = Told & { seen: { run: string; how: SeenHow; at: string }[]; receipts: Receipts | null; replies: Reply[] };
+
+/**
+ * One answer the run gave, as the log keeps it: its words, the state it answered with and when. A run that asked him
+ * (Needs you) and then finished answered twice, and the row holds only the second; his thread draws both.
+ */
+export type Reply = { said: string; state: 'done' | 'needs_you' | 'declined'; at: string };
+
+/** The most answers one thread message lists. */
+const REPLIES_MOST = 12;
+
+/** Every answer the run gave one instruction, oldest first: the lines each answer left on its row (`REPLIED_FIELD`). */
+export function repliesOf(sql: Sql, i: Instr): Reply[] {
+  const out: Reply[] = [];
+  for (const l of sql.all<{ ts: string; to_v: string | null }>(`SELECT ts, to_v FROM event WHERE target = ? AND kind = 'note' AND field = ? ORDER BY rowid`, `entry:${i.row}`, REPLIED_FIELD)) {
+    try {
+      const v = JSON.parse(l.to_v ?? '') as { said?: unknown; state?: unknown };
+      const state = v.state === 'needs_you' || v.state === 'declined' ? v.state : 'done';
+      if (typeof v.said === 'string' && v.said.trim() !== '') out.push({ said: v.said, state, at: l.ts });
+    } catch {
+      /* A LINE OF ANOTHER SHAPE SAYS NOTHING. */
+    }
+  }
+  /* AN ANSWER GIVEN BEFORE THE LINES WERE KEPT is still the row's own. */
+  if (out.length === 0 && i.reply !== null && i.replied_at !== null)
+    out.push({ said: i.reply, state: i.state === 'needs_you' || i.state === 'declined' ? i.state : 'done', at: i.replied_at });
+  return out.slice(-REPLIES_MOST);
+}
 
 /**
  * The machines and Claude Code profiles an instruction may be aimed at, by name, as runs say them: those on the runs
@@ -419,6 +464,21 @@ export function methods(deps: RecordDeps) {
 
   /** What is open for one run now, a stop or a pause first, each as `Told`, as its caller may be handed them (`toldTo`). */
   const pendingFor = (run: string, ctx: CallContext): Told[] => toldTo(readable, ctx, kernel.instructionFor({}, run)).map((i) => toldOf(sql, i));
+
+  /**
+   * THE WORD OF A THREAD A RUN MEANS BY `ref`: `ref` itself while it is open and the run's to answer, else the newest reply
+   * he sent inside its thread that waits for this run. So `reply IN2` after he wrote back in IN2's thread answers his
+   * reply (IN5), and an id the thread does not explain is handed on as it was, for the kernel's own refusal.
+   */
+  const inThread = (run: string, ref: string, ctx: CallContext): string => {
+    const i = kernel.instruction(ref);
+    if (i === null) return ref;
+    const open = i.state === 'sent' || i.state === 'seen' || i.state === 'working' || i.state === 'needs_you';
+    if (open && (i.taken_by === null || i.taken_by === run)) return ref;
+    const root = i.thread ?? i.id;
+    const later = pendingFor(run, ctx).filter((x) => x.id !== i.id && (x.thread ?? x.id) === root);
+    return later.at(-1)?.id ?? ref;
+  };
 
   /** Marks each of `ids` seen by `run`, `how`; an id that is not the run's is passed over, since a list may be old. */
   const markSeen = (ids: readonly string[], run: string, how: SeenHow): void => {
@@ -763,6 +823,17 @@ export function methods(deps: RecordDeps) {
       if (stray) return stray;
       const id = text(a.id);
       if (id === null) return no('REQUIRED_MISSING', 'Say which instruction to close, as IN4.', { at: 'id' });
+      /* A THREAD CLOSES WHOLE: every word of it that is over, the one named last, so nothing of it is left on his list.
+         One still open, or waiting on him, keeps the thread open and is named. */
+      const all = threadMessages(sql, id);
+      const open = all.find((i) => i.state === 'sent' || i.state === 'seen' || i.state === 'working' || i.state === 'needs_you');
+      if (all.length > 1 && open !== undefined) return no('TRANSITION_ILLEGAL', `${open.id} in this thread is not finished yet, so it stays open.`, { at: 'id' });
+      const named = all.find((i) => i.id === id || i.row === id);
+      for (const i of all) {
+        if (i === named || sql.one<{ c: string | null }>("SELECT json_extract(fields, '$.closed_at') AS c FROM entry WHERE id = ?", i.row)?.c) continue;
+        const shut = kernel.closeInstruction(personOf(ctx), i.id);
+        if (!shut.ok) return tail(shut as Result<never>);
+      }
       const out = kernel.closeInstruction(personOf(ctx), id);
       return tail(out.ok ? ok(toldOf(sql, out.value)) : out);
     },
@@ -776,7 +847,7 @@ export function methods(deps: RecordDeps) {
      * with the page, so the box he tells an agent in needs no read of its own.
      */
     async instructionList(
-      args: { state?: string; project?: string; task?: string; run?: string; limit?: number; cursor?: string } | undefined,
+      args: { state?: string; project?: string; task?: string; run?: string; thread?: string; limit?: number; cursor?: string } | undefined,
       ctx: CallContext,
     ): Promise<Result<{ rows: Thread[]; cursor: string | null; places: Places }>> {
       const stop = guard(ctx, 'owner');
@@ -801,6 +872,14 @@ export function methods(deps: RecordDeps) {
       const run = text(a.run);
       const runRow = run === null ? null : ((r) => (r !== null && sight.admits(ctx, r) ? r : null))(kernel.get(run, { includeDeleted: true }));
       const runSaid = run === null ? null : runRow === null ? run : kernel.nameOf(runRow.id);
+      const now = nowIso();
+      const threadOf = (i: Instr): Thread => ({ ...toldOf(sql, i), seen: kernel.instructionSeen(i.id), receipts: receiptsOf(sql, kernel, i, now, ctx, sight), replies: repliesOf(sql, i) });
+      /* ONE THREAD WHOLE, oldest first: its first instruction and every reply he sent inside it. */
+      const threadSaid = text(a.thread);
+      if (threadSaid !== null) {
+        if (!/^IN[1-9][0-9]*$/u.test(threadSaid)) return no('VALUE_MALFORMED', 'thread is an instruction of the thread, as IN2.', { at: 'thread' });
+        return ok({ rows: threadMessages(sql, threadSaid).map(threadOf), cursor: null, places: placesFor(ctx) });
+      }
 
       const where: string[] = ["register = 'instructions'", 'deleted_at IS NULL', "json_extract(fields, '$.closed_at') IS NULL"];
       const params: (string | number)[] = [];
@@ -828,11 +907,17 @@ export function methods(deps: RecordDeps) {
         params.push(Number(cursor.slice(2)));
       }
       const seqs = sql.all<{ seq: number }>(`SELECT seq FROM entry WHERE ${where.join(' AND ')} ORDER BY seq DESC LIMIT ?`, ...params, limit + 1);
-      const now = nowIso();
       const rows = seqs.slice(0, limit).flatMap(({ seq }) => {
         const i = kernel.instruction(`IN${String(seq)}`);
-        return i === null ? [] : [{ ...toldOf(sql, i), seen: kernel.instructionSeen(i.id), receipts: receiptsOf(sql, kernel, i, now, ctx, sight) }];
+        return i === null ? [] : [threadOf(i)];
       });
+      /* AND THE FIRST OF EACH THREAD A REPLY ON THIS PAGE FOLLOWS, where the page does not hold it: a thread is drawn whole
+         from its first word, never from his "check" alone. Only with no narrowing by state, so Needs you counts what waits. */
+      const firsts = state === null ? [...new Set(rows.map((r) => r.thread).filter((t): t is string => t !== null && !rows.some((x) => x.id === t)))] : [];
+      for (const id of firsts.slice(0, LIST_PAGE)) {
+        const i = kernel.instruction(id);
+        if (i !== null && (projectSaid === null || i.project === projectSaid)) rows.push(threadOf(i));
+      }
       return ok({ rows, cursor: seqs.length > limit ? `IN${String(seqs[limit - 1]!.seq)}` : null, places: placesFor(ctx) });
     },
 
@@ -884,8 +969,9 @@ export function methods(deps: RecordDeps) {
       if (typeof a.answer === 'string') return tail(await orderAnswer(run.value, a.answer.trim(), ctx));
       if (typeof a.take === 'string') {
         /* ONLY ONE IT IS HANDED (`toldTo`): an agent that may not read his instructions guessed `IN4` and took it whole. The
-           sentence is the kernel's for an instruction that is not this run's to take. */
-        const asked = a.take.trim();
+           sentence is the kernel's for an instruction that is not this run's to take. A THREAD'S NAME TAKES ITS NEWEST
+           REPLY (`inThread`), so an agent holding IN2 takes his follow-up there by the id it knows. */
+        const asked = inThread(run.value, a.take.trim(), ctx);
         if (readable(ctx, INSTRUCTIONS) !== null && !pendingFor(run.value, ctx).some((i) => i.id === asked))
           return tail(no('ROW_UNKNOWN', `There is no open instruction called ${asked} for this run.`, { at: 'take' }));
         const taken = kernel.takeInstruction(asked, run.value);
@@ -893,7 +979,7 @@ export function methods(deps: RecordDeps) {
         return tail(ok(mineOf(run.value, ctx, { instruction: toldOf(sql, taken.value) })));
       }
       if (typeof a.reply === 'string') {
-        const answered = kernel.replyInstruction(a.reply.trim(), run.value, {
+        const answered = kernel.replyInstruction(inThread(run.value, a.reply.trim(), ctx), run.value, {
           said: typeof a.said === 'string' ? a.said : '',
           ...(a.state === undefined ? {} : { state: a.state as (typeof REPLY_STATES)[number] }),
         });

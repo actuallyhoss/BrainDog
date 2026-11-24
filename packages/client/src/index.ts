@@ -2918,7 +2918,7 @@ export function createClient(options: ClientOptions) {
      * What he told agents, newest first, each with who saw it and how and the receipts: in one state (`open` is Sent,
      * Seen and Working), on a project or task, or to or by a run. `cursor` is the one the page above answered with. READ+.
      */
-    instructionList: (args: { state?: string; project?: string; task?: string; run?: string; limit?: number; cursor?: string } = {}) =>
+    instructionList: (args: { state?: string; project?: string; task?: string; run?: string; thread?: string; limit?: number; cursor?: string } = {}) =>
       call<Answer<'instructionList'>>('instructionList', args as Record<string, unknown>),
     /**
      * Send to…: who he can send a request to from a row now (`row`, or a `project`), each with its `id` for `sendTo`.

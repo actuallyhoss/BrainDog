@@ -85,13 +85,13 @@ const PROMPT_TEXT: Readonly<Record<string, (args: Record<string, string>) => str
     [
       'Start this session with BrainDog:',
       '1. Call context. Its first lines are what the person told you, if anything. With no folder, pass topic: what the person is working on, in a few words.',
-      '2. If something was told to you, call instructions with {take:"<its id>"} before you start on it.',
+      '2. If something was told to you, call instructions with {take:"<its id>"} before you start on it. A line that says "replied in BrainDog on IN2" is the person answering you inside that thread: read it as the next word of it.',
       '3. Say your plan in one line with handoff {doing:"<verb first>"}, then work.',
     ].join('\n'),
   wrap: () =>
     [
       'Wrap up this session with BrainDog:',
-      '1. If you took an instruction, answer it: instructions {reply:"<its id>", said:"<what you did, one line>", state:"done"}, or needs_you or declined with why.',
+      '1. If you took an instruction, answer it: instructions {reply:"<its id>", said:"<what you did, one line>", state:"done"}, or needs_you with the one question you have, or declined with why. Their answer comes back in the same thread.',
       '2. Call handoff with {next:"<the one next step>"}, and tried for each dead end. If you finished a task, handoff {done:"<task>", note:"<how>"}.',
       '3. If you fixed a surprise or hit a dead end a later session would repeat, create a learning with topic, the skill it bears on, and the failure in because.',
     ].join('\n'),

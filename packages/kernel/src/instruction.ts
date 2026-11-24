@@ -150,6 +150,11 @@ export type Instr = {
    */
   answers: InstrAnswer[];
   answered: string[];
+  /**
+   * The thread it belongs to, by its first instruction's spoken name (`IN2`), for a reply he sent inside one; `null` for
+   * the first of a thread and every instruction sent on its own.
+   */
+  thread: string | null;
   /** Who made it: the actor of its `create` line, a person's id. */
   by: string | null;
   /** When he said it. */
@@ -180,6 +185,23 @@ export const MAY_CHANGE_FIELD = 'may_change';
 /** The most rows one instruction may carry, and the longest ref of one. */
 export const ATTACH_MOST = 20;
 export const ATTACH_REF_MOST = 120;
+
+/**
+ * THE LINE ON A REPLY HE SENT INSIDE A THREAD (`field`), the thread's first instruction in `to_v` (`IN2`). A reply is a
+ * new instruction, because a closed one is never opened again (migration 42), and this line is what makes it the next
+ * word of the same conversation: his list draws them as one thread and the run is told which one it follows.
+ */
+export const THREAD_FIELD = 'thread';
+
+/**
+ * THE LINE EACH ANSWER OF THE RUN'S LEAVES ON THE ROW (`field`), its words and the state it answered with in `to_v`. The
+ * row's `reply` holds only the newest, and a run that asked him (Needs you) and then finished answered twice: his thread
+ * draws both from these lines. Stamped fields write no line of their own, so this is the only record of the first.
+ */
+export const REPLIED_FIELD = 'replied';
+
+/** An instruction's spoken name, as a thread is named by its first. */
+const SPOKEN_INSTRUCTION = /^IN[1-9][0-9]*$/u;
 
 /** A job's id, as `createJob` mints it. */
 const JOB_REF = /^j_[0-9A-Z]{26}$/u;
@@ -240,6 +262,11 @@ export type InstructInput = {
   attach?: string[] | undefined;
   /** Whether the run may change files for it. Only on a tell. */
   may_change?: boolean | undefined;
+  /**
+   * The thread it replies inside: any instruction of it, by spoken name or row id (`IN2`). It is kept under the thread's
+   * first, and a question the run asked him there (Needs you) is answered by it. Only on a tell.
+   */
+  thread?: string | undefined;
 };
 
 /* ── the writes, wired by the record ─────────────────────────────────────── */
@@ -276,6 +303,7 @@ type Row = {
   answered?: string | null;
   attach?: string | null;
   may_change?: string | null;
+  thread?: string | null;
 };
 
 /** A line's JSON, or `null` when it is not what it should be. */
@@ -307,7 +335,8 @@ const COLUMNS = `e.id, e.seq, e.state, e.fields, e.created_at, e.updated_at,
   (SELECT to_v FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${ANSWERS_FIELD}' ORDER BY rowid DESC LIMIT 1) AS answers,
   (SELECT json_group_array(to_v) FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${ANSWERED_FIELD}') AS answered,
   (SELECT to_v FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${ATTACH_FIELD}' ORDER BY rowid DESC LIMIT 1) AS attach,
-  (SELECT to_v FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${MAY_CHANGE_FIELD}' ORDER BY rowid DESC LIMIT 1) AS may_change`;
+  (SELECT to_v FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${MAY_CHANGE_FIELD}' ORDER BY rowid DESC LIMIT 1) AS may_change,
+  (SELECT to_v FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${THREAD_FIELD}' ORDER BY rowid DESC LIMIT 1) AS thread`;
 
 function instrOf(row: Row): Instr {
   const f = JSON.parse(row.fields) as Record<string, Json>;
@@ -340,6 +369,7 @@ function instrOf(row: Row): Instr {
     may_change: ((v) => (typeof v === 'boolean' ? v : null))(parsed(row.may_change)),
     answers: answersIn(row.answers),
     answered: ((v) => (Array.isArray(v) ? v.filter((q): q is string => typeof q === 'string') : []))(parsed(row.answered)),
+    thread: typeof row.thread === 'string' && SPOKEN_INSTRUCTION.test(row.thread) ? row.thread : null,
     by: row.by,
     at: row.created_at,
     updated_at: row.updated_at,
@@ -378,6 +408,25 @@ export function instructionsTakenBy(sql: Sql, run: string): Instr[] {
       `SELECT ${COLUMNS} FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND json_extract(e.fields, '$.taken_by') = ? ORDER BY e.seq`,
       INSTRUCTIONS,
       run,
+    )
+    .map(instrOf);
+}
+
+/**
+ * Every instruction of one thread, oldest first: the first, named by its spoken name or row id, and each reply he sent
+ * inside it (`THREAD_FIELD`). Empty when there is no such instruction. Given a reply, it is that reply's whole thread.
+ */
+export function threadMessages(sql: Sql, ref: string): Instr[] {
+  const was = instructionOf(sql, ref);
+  if (!was) return [];
+  const root = was.thread ?? was.id;
+  return sql
+    .all<Row>(
+      `SELECT ${COLUMNS} FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND (e.seq = ? OR EXISTS (
+         SELECT 1 FROM event v WHERE v.target = 'entry:' || e.id AND v.kind = 'note' AND v.field = '${THREAD_FIELD}' AND v.to_v = ?)) ORDER BY e.seq`,
+      INSTRUCTIONS,
+      Number(root.slice(INSTRUCTION_PREFIX.length)),
+      root,
     )
     .map(instrOf);
 }
@@ -657,6 +706,10 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
     return no('VALUE_MALFORMED', 'Only an instruction to do something carries rows, a job or leave to change files.', { at: job !== null ? 'job' : attach.length > 0 ? 'attach' : 'may_change' });
   if (job !== null && d.sql.one('SELECT 1 AS y FROM job WHERE id = ?', job) === undefined)
     return no('ROW_UNKNOWN', 'There is no such job here.', { at: 'job' });
+  /* THE THREAD IT REPLIES INSIDE, on a tell alone, kept under the thread's first instruction. */
+  const threadSaid = typeof input.thread === 'string' ? input.thread.trim() : '';
+  if (input.thread !== undefined && input.thread !== null && threadSaid === '') return no('VALUE_MALFORMED', 'thread names an instruction of the thread, as IN2.', { at: 'thread' });
+  if (threadSaid !== '' && kind !== 'tell') return no('VALUE_MALFORMED', 'Only an instruction to do something replies inside a thread.', { at: 'thread' });
 
   const place: { machine?: string; seat?: string } = {};
   for (const [key, grammar, fix] of [
@@ -672,6 +725,11 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
   return d.sql.transactionSync((): Result<Instr> => {
     let replaced: Instr | null = null;
     let runName: string | null = null;
+    let thread: Instr[] = [];
+    if (threadSaid !== '') {
+      thread = threadMessages(d.sql, threadSaid);
+      if (thread.length === 0) return no('ROW_UNKNOWN', `There is no instruction called ${threadSaid}.`, { at: 'thread' });
+    }
     if (kind === 'redirect') {
       const ref = typeof input.replaces === 'string' ? input.replaces.trim() : '';
       if (ref === '') return no('REQUIRED_MISSING', 'A redirect names the instruction it replaces.', { at: 'replaces' });
@@ -753,6 +811,18 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
         JSON.stringify(input.may_change),
         input.may_change ? 'May change files for it.' : 'Changes no file for it.',
       );
+
+    /* A REPLY INSIDE A THREAD: the line that makes it the thread's next word, and the question the run asked him there,
+       answered by it. Needs you moves to Done, since he has answered; the run is told his words in this one. */
+    if (thread.length > 0) {
+      const root = thread[0]!.id;
+      d.sql.exec(line, d.mint(), iso(d.now), actor, `entry:${i.row}`, THREAD_FIELD, root, `Follows ${root}.`);
+      for (const asked of thread)
+        if (asked.state === 'needs_you') {
+          const answered = d.write(asked.row, { patch: { state: 'done' }, stamp: {}, note: `Answered in ${i.id}.`, actor });
+          if (!answered.ok) return answered;
+        }
+    }
 
     if (replaced) {
       const closed = d.write(replaced.row, { patch: { state: 'declined' }, stamp: {}, note: `Redirected: ${i.id}.`, actor });
@@ -920,6 +990,17 @@ export function replyInstruction(d: InstructionDeps, ref: string, runRef: string
     if (said !== '') stamp.reply = said;
     const answered = d.write(i.row, { patch: i.state === state ? {} : { state }, stamp, note: null, actor: run.spoken });
     if (!answered.ok) return answered;
+    if (said !== '')
+      d.sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, note) VALUES (?, ?, ?, 'note', ?, 'entry', ?, ?, ?)",
+        d.mint(),
+        iso(d.now),
+        run.spoken,
+        `entry:${i.row}`,
+        REPLIED_FIELD,
+        JSON.stringify({ said, state }),
+        `${run.spoken} answered ${i.id}.`,
+      );
     if (state !== 'needs_you' && run.fields.instruction === i.id) {
       /* THE ONE IT HELD BEFORE IS IN HAND AGAIN: answering the newer of two leaves the run working the older. */
       const before = instructionsTakenBy(d.sql, run.spoken)

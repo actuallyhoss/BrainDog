@@ -114,12 +114,14 @@ test('TO A RUN: that run alone, taken as it first sees it, answered by it, and i
   assert.deepEqual([done.state, done.reply], ['done', 'Merged W1-A..E, 3 commits, check green.']);
   assert.equal(k.get(s1)?.fields.instruction, undefined);
   assert.deepEqual(ids(k.instructionFor({}, s1)), []);
-  /* SIGNED BY THE RUN, never as his press. */
-  const lines = sql.all<{ actor: string; kind: string }>(
-    "SELECT actor, kind FROM event WHERE target = ? ORDER BY rowid",
+  /* SIGNED BY THE RUN, never as his press; AND THE ANSWER LEAVES A LINE OF ITS OWN (`REPLIED_FIELD`), so his thread
+     keeps every answer and not only the newest the row holds. */
+  const lines = sql.all<{ actor: string; kind: string; field: string | null }>(
+    "SELECT actor, kind, field FROM event WHERE target = ? ORDER BY rowid",
     `entry:${done.row}`,
   );
-  assert.deepEqual(lines.map((l) => l.actor), ['p_1', s1, s1]);
+  assert.deepEqual(lines.map((l) => l.actor), ['p_1', s1, s1, s1]);
+  assert.deepEqual({ ...lines.at(-1) }, { actor: s1, kind: 'note', field: 'replied' });
   sql.close();
 });
 
