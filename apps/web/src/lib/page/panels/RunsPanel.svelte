@@ -59,8 +59,17 @@
   let projects = $state.raw<Map<string, Project>>(new Map());
   let rulesMonth = $state(0);
 
+  /* RECENT RUNS LOADED FOREVER (24 Nov): any read that threw left `drew` at `null`, so its skeleton stood for good, and on
+     his record it waited on scripts and every rule's runs it then threw away. It now asks only what it keeps
+     (`agentsOnly`), and a read that fails draws the tile out rather than holding the skeleton up. */
   async function load(): Promise<void> {
-    const out = await readAllRuns(apiBase(), recordNow());
+    let out: Awaited<ReturnType<typeof readAllRuns>>;
+    try {
+      out = await readAllRuns(apiBase(), recordNow(), { agentsOnly: true });
+    } catch {
+      if (drew === null) drew = false;
+      return;
+    }
     if (out.from === 'refused') {
       lines = [];
       drew = false;

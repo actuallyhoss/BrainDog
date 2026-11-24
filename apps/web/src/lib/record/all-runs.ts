@@ -245,7 +245,13 @@ export type AllRuns =
   | { from: 'refused'; fix: string };
 
 /** Reads every source side by side and merges them, newest first. */
-export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
+/**
+ * `agentsOnly`, THE AGENTS' RUNS AND JOBS AND NOTHING THEY WOULD BE THROWN AWAY FOR (the Agents page of 24 Nov): Recent
+ * runs keeps agents' runs and jobs and the month's count of rules, and on a big record it waited on the scripts and
+ * three pages of their history and twenty reads of each rule's last runs, five round trips in a row, before drawing a
+ * line. With it, the scripts, the scheduled actions and each rule's runs are not asked at all.
+ */
+export async function readAllRuns(base: string, now: number, { agentsOnly = false }: { agentsOnly?: boolean } = {}): Promise<AllRuns> {
   const client = createClient({ base });
   /* EVERY READ GOES THROUGH THE ONE CLIENT, so the reads asked at once go as one `reads` (scope 2026-10-24): the rules and
      the scheduled actions went by a fetch of their own, and each rule's last runs after them, twenty requests in a wave
@@ -258,10 +264,11 @@ export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
   const rules = async (): Promise<Opened> => opened(await client.call<unknown>('automations'), rulesOf);
   const scheduled = async (): Promise<Opened<ActionRow[]>> =>
     opened(await client.call<unknown>('actions'), (raw) => (Array.isArray(raw) ? (raw as ActionRow[]) : []));
+  const none = <T>(): Opened<T> => ({ first: { ok: true, value: [] as unknown as T }, absent: false });
   const [autos, actions, scripts, sessions, jobs] = await Promise.all([
     rules(),
-    scheduled(),
-    readScripts(base),
+    agentsOnly ? none<ActionRow[]>() : scheduled(),
+    agentsOnly ? ({ ok: true, value: [] } as Awaited<ReturnType<typeof readScripts>>) : readScripts(base),
     client.list({ register: 'session', limit: AGENTS, order: [{ field: 'last_seen', dir: 'desc' }] }),
     readJobs(base),
   ]);
@@ -285,7 +292,7 @@ export async function readAllRuns(base: string, now: number): Promise<AllRuns> {
 
   /* A RULE THAT RAN, by its last run or by the record's count of it (`last_at`), when it keeps no last run. */
   const lastOf = (a: AutomationRow): number => Date.parse(a.last?.at ?? (a as Counted).last_at ?? '');
-  const deep = autoRows
+  const deep = (agentsOnly ? [] : autoRows)
     .filter((a) => Number.isFinite(lastOf(a)))
     .sort((a, b) => lastOf(b) - lastOf(a))
     .slice(0, DEEP);
