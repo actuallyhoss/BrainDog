@@ -1,37 +1,33 @@
 <!--
   What agents asked him back, of what he told them (agents and MCP plan §2.3, §7.2: "Needs you, which counts in Needs you
-  and Today"), as one tile on the Needs you page over the questions: one row each, "Claude needs you on “Merge wave 1”",
-  the agent's question under it, and Answer, which opens the agents, where the thread and the box to tell it are.
+  and Today"), as one tile on the Needs you page over the questions: one card each, the question on one line in the
+  agent's words, who asks and on which project, and the answer in place (`AgentAsk`): Yes and No for a yes or no
+  question, a box for anything else. The thread it lands in is a press away on the Agents page.
 
   FROM THE SHELL'S READ (`told-now.svelte.ts`), so it says the rows the badge counts and asks the record nothing. Nothing
-  waiting draws nothing. Red only for what needs him: the Answer word.
+  waiting draws nothing.
 -->
 <script lang="ts">
   import { page } from '$app/state';
-  import { at } from '$lib/at.ts';
   import { heldPage } from '$lib/nav/rail.ts';
   import Tile from '$lib/ui/Tile.svelte';
+  import AgentAsk from '$lib/agents/AgentAsk.svelte';
   import type { ToldNeed } from '$lib/record/told-live.ts';
 
   let { rows }: { rows: readonly ToldNeed[] } = $props();
 
-  const words = { title: 'Agents asking you', answer: 'Answer' } as const;
+  const words = { title: 'Agents asking you' } as const;
 
-  /* ANSWERED ON THE AGENTS PAGE, WHERE THE RECORD HOLDS IT (`heldPage`): without the agents add-on there is no thread to
-     open, so the row says who asks and what, and no Answer lands on a page that is not there. */
-  const answerAt = $derived(heldPage((page.data as { pages?: readonly string[] } | undefined)?.pages, 'agents'));
+  /* THE THREAD IS ON THE AGENTS PAGE, WHERE THE RECORD HOLDS IT (`heldPage`); without the agents add-on the card still
+     answers, and links nowhere. */
+  const threadAt = $derived(heldPage((page.data as { pages?: readonly string[] } | undefined)?.pages, 'agents'));
 </script>
 
 {#if rows.length > 0}
   <Tile icon="session" title={words.title} count={rows.length} data-told-needs>
     <ul class="tn-list">
       {#each rows as r (r.key)}
-        <li class="tn-row">
-          <span class="tn-words"
-            ><span class="tn-what" dir="auto">{r.line}</span>{#if r.reply}<span class="tn-reply" dir="auto">{r.reply}</span>{/if}</span
-          >
-          {#if answerAt}<a class="tn-go tap" href={at(answerAt)}>{words.answer}</a>{/if}
-        </li>
+        <li class="tn-row"><AgentAsk need={r} thread={threadAt} /></li>
       {/each}
     </ul>
   </Tile>
@@ -46,11 +42,8 @@
   }
 
   .tn-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: var(--sp-3);
     padding-block: var(--sp-3);
+    min-inline-size: 0;
   }
 
   .tn-row + .tn-row {
@@ -59,48 +52,5 @@
 
   .tn-row:first-child {
     padding-block-start: 0;
-  }
-
-  .tn-words {
-    display: grid;
-    gap: 2px;
-    min-inline-size: 0;
-  }
-
-  .tn-what {
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 600;
-    line-height: calc(22px * var(--type, 1));
-  }
-
-  .tn-reply {
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    line-height: calc(18px * var(--type, 1));
-    overflow-wrap: anywhere;
-  }
-
-  .tn-go {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: 36px;
-    color: var(--red);
-    font-size: var(--fs-body);
-    font-weight: 500;
-    text-decoration: none;
-  }
-
-  @media (width < 900px) {
-    .tn-go {
-      min-block-size: 44px;
-    }
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .tn-go:hover {
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
   }
 </style>

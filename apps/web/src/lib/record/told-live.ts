@@ -14,6 +14,7 @@ import { createClient } from '@braindog/client';
 import type { Fetch } from './boot-live.ts';
 import type { Thread } from './instruct.ts';
 import { AGENT_NAMES } from './names.ts';
+import { askOf } from '../agents/threads.ts';
 
 export { TOLD_LIST, toldReadable } from '../home/need-you.ts';
 export { recordNow } from './boot-live.ts';
@@ -78,11 +79,23 @@ const dayOf = (ms: number, zone?: string): string =>
   new Intl.DateTimeFormat('en-CA', { ...(zone ? { timeZone: zone } : {}), year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
 
 /** The threads finished today, on the record's clock: what Handled lists beside what BrainDog did by itself. */
-export const doneToday = (done: readonly Thread[], now: number, zone?: string): Thread[] =>
-  done.filter((t) => {
+export function doneToday(done: readonly Thread[], now: number, zone?: string): Thread[] {
+  const today = done.filter((t) => {
     const at = Date.parse(t.replied_at ?? t.updated_at);
     return Number.isFinite(at) && dayOf(at, zone) === dayOf(now, zone);
   });
+  /* ONE LINE A CONVERSATION (the Agents page of 24 Nov): his answer inside a thread is its next word, so a thread he
+     answered once finished twice, as "finished “yes”" over "finished “Merge wave 1”" with the question as its reply.
+     Its newest finished word stands for it, under the words that opened it. */
+  const roots = new Map(done.map((t) => [t.id, t]));
+  const newest = new Map<string, Thread>();
+  for (const t of today) {
+    const key = t.thread ?? t.id;
+    const was = newest.get(key);
+    if (!was || (t.replied_at ?? t.updated_at) > (was.replied_at ?? was.updated_at)) newest.set(key, t);
+  }
+  return today.filter((t) => newest.get(t.thread ?? t.id) === t).map((t) => (t.thread && roots.has(t.thread) ? { ...t, said: roots.get(t.thread)!.said } : t));
+}
 
 /** The agent that answered, by name: "Claude", or "An agent" where neither the thread nor its run says which. */
 export function answeredBy(t: Pick<Thread, 'to_agent' | 'taken_by'>, agents: Readonly<Record<string, string>>): string {
@@ -97,11 +110,15 @@ export const saidShort = (said: string, most = 60): string => {
   return one.length > most ? `${one.slice(0, most - 1).trimEnd()}…` : one;
 };
 
-/** A thread waiting on him, as Today's Needs you and the Needs you page say it. */
-export type ToldNeed = { key: string; line: string; reply: string | null };
+/**
+ * A QUESTION AN AGENT ASKED HIM, as Today's Needs you and the Needs you page draw it (the Agents page of 24 Nov): the
+ * question on one line in the agent's words (`line`), who asks (`who`, the agent by name) and on which project (by its
+ * handle, named where it is drawn), and what one press answers (`quick`, Yes and No for a yes or no question). Never the
+ * agent's whole message: "Claude needs you on “Following up IN2: check”" over the reply in full was the old card.
+ */
+export type ToldNeed = { key: string; line: string; who: string; agent: string | null; project: string | null; quick: string[]; about: string };
 
-export const toldNeedOf = (t: Thread, agents: Readonly<Record<string, string>>): ToldNeed => ({
-  key: t.id,
-  line: `${answeredBy(t, agents)} needs you on “${saidShort(t.said)}”`,
-  reply: t.reply?.replace(/\s+/gu, ' ').trim() || null,
-});
+export const toldNeedOf = (t: Thread, agents: Readonly<Record<string, string>>): ToldNeed => {
+  const ask = askOf(t, agents);
+  return { key: t.id, line: ask.question, who: answeredBy(t, agents), agent: ask.agent, project: t.project, quick: ask.quick, about: saidShort(t.said) };
+};

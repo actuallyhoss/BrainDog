@@ -86,14 +86,24 @@ test('what was finished today is today on the record’s clock', () => {
   assert.deepEqual(doneToday([today, before], NOW).map((t) => t.id), ['IN5']);
 });
 
+test('a thread he answered inside finishes once, its newest word under the words that opened it', () => {
+  const root = thread({ id: 'IN5', state: 'done', reply: 'Should I merge now?', replied_at: '2026-09-03T08:00:00Z' });
+  const yes = thread({ id: 'IN6', said: 'yes', state: 'done', thread: 'IN5', reply: 'Merged.', replied_at: '2026-09-03T09:00:00Z' });
+  const got = doneToday([yes, root], NOW);
+  assert.deepEqual(got.map((t) => [t.id, t.said, t.reply]), [['IN6', 'Merge wave 1, then stop', 'Merged.']]);
+});
+
 test('a line names the agent, never the run, and says his words short and on one line', () => {
   assert.equal(answeredBy(thread(), { S1: 'claude' }), 'Claude');
   assert.equal(answeredBy(thread({ to_agent: 'codex' }), {}), 'Codex');
   assert.equal(answeredBy(thread({ taken_by: null }), {}), 'An agent');
+  /* THE QUESTION ON ONE LINE, IN THE AGENT'S WORDS, with who asks, and Yes and No where it is a yes or no question
+     (24 Nov): never his own words titled "needs you on", nor the agent's whole message under it. */
   const need = toldNeedOf(thread(), { S1: 'claude' });
-  assert.equal(need.line, 'Claude needs you on “Merge wave 1, then stop”');
-  assert.equal(need.reply, 'Merged. Should I rehearse it on a copy first?');
-  assert.doesNotMatch(`${need.line} ${need.reply}`, /\bS1\b|\bIN4\b|—/u);
+  assert.equal(need.line, 'Merged. Should I rehearse it on a copy first?');
+  assert.equal(need.who, 'Claude');
+  assert.deepEqual(need.quick, ['Yes', 'No']);
+  assert.doesNotMatch(`${need.line} ${need.who}`, /\bS1\b|\bIN4\b|—/u);
   assert.equal(saidShort('x'.repeat(80), 20).length, 20);
   assert.match(saidShort('x'.repeat(80), 20), /…$/u);
 });

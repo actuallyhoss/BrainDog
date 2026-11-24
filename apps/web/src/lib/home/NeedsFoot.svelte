@@ -4,8 +4,8 @@
   - The late bills with no question about them, as one line in red with its money: "4 payments are late, £10,540 in all",
     opening the late work (`/?work&late`). The questions about money owed to you lead the tile above it.
   - What BrainDog did by itself today: "BrainDog handled 15 itself today. Review", opening Needs you's Handled.
-  - What an agent asked him back, of what he told it (agents and MCP plan §7.2): "Claude needs you on “Merge wave 1”",
-    its question under it, and Answer, which opens the agents and the run's thread; these count in Needs you's number.
+  - What an agent asked him back, of what he told it (agents and MCP plan §7.2): the question on one line, who asks and
+    on which project, and the answer in place (`AgentAsk`); these count in Needs you's number.
   - What agents finished of what he told them today: "Claude finished what you told it. Review", opening Handled.
   - What he has shared out, as one quiet line opening People & sharing: a share made today
     by its own words, "You shared Kiln with priya@studio.co. Not you? Stop it", and otherwise how many it is with,
@@ -24,6 +24,7 @@
   import { heldPage } from '$lib/nav/rail.ts';
   import { WORK } from '$lib/nav.ts';
   import type { ToldNeed } from '$lib/record/told-live.ts';
+  import AgentAsk from '$lib/agents/AgentAsk.svelte';
   import { sharedLine, type SharedOut } from './shared-line.ts';
 
   let {
@@ -68,7 +69,6 @@
     handled: (n: number) => `BrainDog handled ${n.toLocaleString('en-GB')} today`,
     review: 'Review',
     waits: 'When a bill is late or an agent asks, it waits here.',
-    answer: 'Answer',
     finished: (who: readonly string[]) =>
       who.length === 1 ? `${who[0]!} finished what you asked` : `Agents finished ${who.length.toLocaleString('en-GB')} asks today`,
   } as const;
@@ -99,23 +99,9 @@
     {#if any}
       <ul class="nf-lines">
         {#each told as t (t.key)}
-          <li>
-            <!-- ANSWERED ON THE AGENTS PAGE, WHERE THE RECORD HOLDS IT (`heldPage`). Without the agents add-on there is no
-                 thread to open, so the line says who asks and what, and offers no Answer that lands nowhere. -->
-            {#if answerAt}
-              <a class="nf-line nf-told" href={at(answerAt)} data-told>
-                <Icon name="session" size="s" /><span class="nf-words"
-                  ><span class="nf-what" dir="auto">{t.line}</span>{#if t.reply}<span class="nf-reply" dir="auto">{t.reply}</span>{/if}</span
-                ><span class="nf-go" data-needs>{words.answer}</span>
-              </a>
-            {:else}
-              <p class="nf-line nf-told" data-told>
-                <Icon name="session" size="s" /><span class="nf-words"
-                  ><span class="nf-what" dir="auto">{t.line}</span>{#if t.reply}<span class="nf-reply" dir="auto">{t.reply}</span>{/if}</span
-                >
-              </p>
-            {/if}
-          </li>
+          <!-- AN AGENT'S QUESTION, ANSWERED HERE (`AgentAsk`): the question on one line, who asks and where, and Yes, No or a
+               box; the thread it lands in is on the Agents page, where the record holds it (`heldPage`). -->
+          <li class="nf-ask" data-told><AgentAsk need={t} thread={answerAt} compact /></li>
         {/each}
         {#if late && late.count > 0}
           <li>
@@ -248,11 +234,6 @@
     transition: color var(--d-state) var(--ease-out);
   }
 
-  /* A line with nowhere to go (an agent's question on a record with no agents page) is words, not a link. */
-  p.nf-line {
-    margin: 0;
-  }
-
   .nf-words {
     flex: 1 1 auto;
     min-inline-size: 0;
@@ -264,7 +245,6 @@
   }
 
   .nf-handled > :global(.icon),
-  .nf-told > :global(.icon),
   .nf-shared > :global(.icon) {
     color: var(--ink-3);
   }
@@ -284,38 +264,12 @@
     color: var(--ink);
   }
 
-  /* AN AGENT'S QUESTION: what it is on in the ink, its question under it in the second ink, two lines at most. */
-  .nf-told {
-    align-items: start;
+  /* AN AGENT'S QUESTION, ANSWERED IN PLACE: the card's own padding, on the tile's rule like every line here. */
+  .nf-ask {
     padding-block: var(--sp-3);
   }
 
-  .nf-told > :global(.icon) {
-    margin-block-start: 3px;
-  }
 
-  .nf-what,
-  .nf-reply {
-    display: block;
-  }
-
-  .nf-what {
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  .nf-reply {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    line-height: calc(18px * var(--type, 1));
-  }
-
-  .nf-go[data-needs],
   .nf-shared[data-needs] .nf-go {
     color: var(--red);
   }
@@ -336,7 +290,6 @@
   @media (hover: hover) and (pointer: fine) {
     .nf-line:hover .nf-words,
     .nf-handled:hover .nf-go,
-    .nf-told:hover .nf-go,
     .nf-shared:hover .nf-go {
       text-decoration: underline;
       text-underline-offset: 3px;
