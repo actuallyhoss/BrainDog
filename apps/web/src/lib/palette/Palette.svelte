@@ -91,7 +91,7 @@
   import { widgetRows } from '../board/palette-rows.ts';
   import { todayOffer } from '../board/offer.svelte.ts';
   import { FILL, asked as pageAsked, maker as pageMaker, paging, pressed as pagePressed, rowTitle as pageRow, whoOf, type Paging } from './new-page.ts';
-  import { apply as applyChange, keptNow, lookNow, pageMenu } from './customise-apply.ts';
+  import { apply as applyChange, keptNow, lookNow, openPageMenu, pageMenu } from './customise-apply.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
   import { addonActions, addonCommandRows, runAddon, type AddonCommand, type AddonCommandRow } from '../market/addon-actions.ts';
   import { said as voiced } from '../voice.svelte.ts';
@@ -1913,11 +1913,11 @@
   /**
    * A CUSTOMISE ROW, PRESSED. The writes are `customise-apply.ts`'s, through the writers Settings uses. Quiet hours go to
    * their one area; "Customise this page" opens the page's own menu, once the dialog has closed and handed focus back,
-   * so the menu opens over the page with focus in it.
+   * so the menu opens over the page with focus in it, or its Change this page sheet where no menu is drawn (a board).
    */
   function customiseRun(change: Change) {
     if (change.kind === 'go') return void goto(at(change.href));
-    if (change.kind === 'page') return void setTimeout(() => pageMenu()?.click(), 0);
+    if (change.kind === 'page') return void setTimeout(openPageMenu, 0);
     applyChange(change);
   }
 

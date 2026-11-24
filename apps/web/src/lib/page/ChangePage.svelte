@@ -56,7 +56,7 @@
     type Headed,
   } from './look.ts';
   import { words as pageWords } from './words.ts';
-  import { CHANGE_PAGE_EVENT } from './slash-entry.ts';
+  import { CHANGE_PAGE_EVENT, OPEN_CHANGE_EVENT } from './slash-entry.ts';
   import { answerVerbs } from '$lib/things/page-verbs.ts';
   import type { SayBlock, SayIn, SayList } from './say-page.ts';
 
@@ -180,6 +180,27 @@
     addEventListener(CHANGE_PAGE_EVENT, on);
     return () => removeEventListener(CHANGE_PAGE_EVENT, on);
   });
+
+  /* "CUSTOMISE THIS PAGE" FROM THE BAR WHERE THE ⋯ IS NOT DRAWN (a board hides it): the sheet opens straight away, empty.
+     The first menu to take it says so, so a second one on the same screen stays shut. */
+  $effect(() => {
+    if (!mayChange) return;
+    const on = (e: Event) => {
+      if (e.defaultPrevented) return;
+      e.preventDefault();
+      line = undefined;
+      open = true;
+    };
+    addEventListener(OPEN_CHANGE_EVENT, on);
+    return () => removeEventListener(OPEN_CHANGE_EVENT, on);
+  });
+
+  /* THE SHEETS ARE DRAWN AT THE END OF THE PAGE: the ⋯ may sit in a row a board hides (`.home-tools`), and a modal sheet
+     inside it opened at 0 by 0 and left the page taking no clicks (audit of 24 Nov, 7). */
+  const toBody = (node: HTMLElement) => {
+    document.body.appendChild(node);
+    return () => node.remove();
+  };
 
   /**
    * WHAT THE RULES READ A LINE AGAINST (`say-page.ts`), read as the line is sent and not before: the page's own body as
@@ -427,6 +448,7 @@
 </span>
 {/if}
 
+<div class="change-sheets" {@attach toBody}>
 {#if setting}
   {#await import('./SettingHere.svelte') then { default: SettingHere }}<SettingHere bind:open={settingOpen} what={setting} onchanged={reread} />{/await}
 {/if}
@@ -443,9 +465,11 @@
     {/key}
   </Sheet>
 {/if}
+</div>
 
 <style>
-  .page-more {
+  .page-more,
+  .change-sheets {
     display: contents;
   }
 

@@ -39,6 +39,9 @@ export function sayLine(text: string): SlashLine | null {
 /** The window event a page's ⋯ menu listens for, carrying a line about the whole page: no block was in focus. */
 export const CHANGE_PAGE_EVENT = 'braindog:change-page';
 
+/** The window event that opens a page's Change this page sheet with nothing typed: the bar's "Customise this page". */
+export const OPEN_CHANGE_EVENT = 'braindog:open-change-page';
+
 /** Where the line goes: the page the person is on, or Today (`/`) for a make with none. A change needs a page. */
 export function entryHref(entry: SlashLine, here: string | null): string | null {
   if (entry.verb === 'change' && here === null) return null;

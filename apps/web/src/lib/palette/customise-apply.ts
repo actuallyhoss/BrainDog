@@ -10,6 +10,7 @@
  */
 
 import { copy } from '../copy.ts';
+import { OPEN_CHANGE_EVENT } from '../page/slash-entry.ts';
 import { navPrefs, type Saved } from '../nav-prefs.svelte.ts';
 import * as pref from '../pref.ts';
 import { redraw } from '../theme/draw.ts';
@@ -62,6 +63,16 @@ export const keptNow = (): 'record' | 'pending' | 'device' => pref.whereKept();
  */
 export const pageMenu = (): HTMLElement | null =>
   typeof document === 'undefined' ? null : document.querySelector<HTMLElement>('.page-more .menu-trigger');
+
+/**
+ * "CUSTOMISE THIS PAGE", PRESSED: the page's ⋯ where it is drawn, else its Change this page sheet, opened straight away
+ * (`ChangePage.svelte`). A board draws no ⋯ (`.home-tools` is hidden there), and pressing the hidden one did nothing.
+ */
+export function openPageMenu(): void {
+  const menu = pageMenu();
+  if (menu?.checkVisibility()) return void menu.click();
+  dispatchEvent(new CustomEvent(OPEN_CHANGE_EVENT, { cancelable: true }));
+}
 
 /** A refusal is the record's own sentence; a change it kept says what it came to, with the way back. */
 function said(saved: Saved, done: string, undo: () => void): void {
