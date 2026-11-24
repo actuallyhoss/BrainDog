@@ -246,8 +246,9 @@ export function fitBoard(board: HTMLElement): Animation[] {
  */
 function closeUp(board: HTMLElement, frames: readonly HTMLElement[]): void {
   const resting = board.dataset.cols !== '2' && !board.closest('[data-editing]');
-  const moves = new Map<HTMLElement, number>();
-  const grows = new Map<HTMLElement, number>();
+  let moves = new Map<HTMLElement, number>();
+  let grows = new Map<HTMLElement, number>();
+  const own = new Map<HTMLElement, number>();
   let margin = '';
   if (resting && frames.length > 0) {
     const gap = parseFloat(getComputedStyle(board).rowGap) || 0;
@@ -261,52 +262,85 @@ function closeUp(board: HTMLElement, frames: readonly HTMLElement[]): void {
       f.style.maxBlockSize = '';
       f.style.marginBlockEnd = '';
     }
-    const laid = frames
-      .map((f) => {
-        const css = getComputedStyle(f);
-        const from = parseInt(css.gridColumnStart, 10);
-        const to = parseInt(css.gridColumnEnd, 10);
-        return { f, row: parseInt(css.gridRowStart, 10) || 0, end: parseInt(css.gridRowEnd, 10) || 0, from, to, top: f.offsetTop, bottom: f.offsetTop + f.offsetHeight, height: f.offsetHeight };
-      })
-      .filter((l) => Number.isFinite(l.from) && Number.isFinite(l.to) && l.to > l.from && l.height > 0)
-      .sort((a, b) => a.row - b.row || a.from - b.from);
-    const floor = new Map<number, number>();
-    let lowest = -Infinity;
-    for (const l of laid) {
-      let above = -Infinity;
-      for (let c = l.from; c < l.to; c += 1) above = Math.max(above, floor.get(c) ?? -Infinity);
-      const want = Number.isFinite(above) ? Math.min(l.top, above + gap) : l.top;
-      const up = l.top - want >= 1 ? Math.round(l.top - want) : 0;
-      const bottom = l.bottom - up;
-      for (let c = l.from; c < l.to; c += 1) floor.set(c, bottom);
-      lowest = Math.max(lowest, bottom);
-      if (up > 0) moves.set(l.f, up);
+    for (const f of frames) own.set(f, f.offsetHeight);
+    let plan = closing(frames, own, gap);
+    /* AND THE MOVES ARE READ AGAIN WITH THE GROWTH ON (24 Nov): the grid shares its rows out otherwise while a band's foot
+       is grown, so Property: next parts stood 309 from the board's top with the growth off and 224 with it on, and the
+       110 it was moved up by was drawn over Needs you's answers. The moves drawn are the ones read on the board drawn. */
+    for (let round = 0; round < 2 && plan.grows.size > 0; round += 1) {
+      grown(frames, own, plan.grows);
+      const again = closing(frames, own, gap);
+      const same = again.grows.size === plan.grows.size && [...again.grows].every(([f, n]) => plan.grows.get(f) === n);
+      plan = again;
+      if (same) break;
     }
-    /* THE FOOT OF A BAND (`data-foot`, `feet` in `pack.ts`) IS DRAWN DOWN TO THE LOWEST FOOT ON ITS LINE, so the shorter of
-       two columns ends level with the taller and no hole stands above the wide tile that follows. Its height grows and a
-       negative margin takes the growth back out of its row, so the grid keeps the rows it had; its content stays at its top. */
-    for (const l of laid) {
-      if (!l.f.hasAttribute('data-foot')) continue;
-      let low = -Infinity;
-      for (const g of laid) if (g.end === l.end && g.f.hasAttribute('data-foot')) low = Math.max(low, g.bottom - (moves.get(g.f) ?? 0));
-      const drawn = l.bottom - (moves.get(l.f) ?? 0);
-      if (low - drawn >= 1) grows.set(l.f, Math.round(low - drawn));
-    }
+    moves = plan.moves;
+    grows = plan.grows;
     /* THE BOARD GIVES BACK WHAT ITS FOOT NO LONGER HOLDS, by its own laid height (a margin never moves it). */
-    const slack = Math.round(board.offsetHeight - lowest);
+    const slack = Math.round(board.offsetHeight - plan.lowest);
     if (moves.size > 0 && slack > 0) margin = `${-slack}px`;
   }
   for (const f of frames) {
     const up = moves.get(f);
     const want = up === undefined ? '' : `0px ${-up}px`;
     if (f.style.translate !== want) f.style.translate = want;
+  }
+  grown(frames, own, grows);
+  if (board.style.marginBlockEnd !== margin) board.style.marginBlockEnd = margin;
+}
+
+/**
+ * Each frame's move up, each band foot's growth, and the lowest foot, read off the board as it is laid now, every frame
+ * at its own height (`own`, its growth left out).
+ */
+function closing(frames: readonly HTMLElement[], own: ReadonlyMap<HTMLElement, number>, gap: number): { moves: Map<HTMLElement, number>; grows: Map<HTMLElement, number>; lowest: number } {
+  const moves = new Map<HTMLElement, number>();
+  const grows = new Map<HTMLElement, number>();
+  const laid = frames
+    .map((f) => {
+      const css = getComputedStyle(f);
+      const from = parseInt(css.gridColumnStart, 10);
+      const to = parseInt(css.gridColumnEnd, 10);
+      const height = own.get(f) ?? f.offsetHeight;
+      return { f, row: parseInt(css.gridRowStart, 10) || 0, end: parseInt(css.gridRowEnd, 10) || 0, from, to, top: f.offsetTop, bottom: f.offsetTop + height, height };
+    })
+    .filter((l) => Number.isFinite(l.from) && Number.isFinite(l.to) && l.to > l.from && l.height > 0)
+    .sort((a, b) => a.row - b.row || a.from - b.from);
+  const floor = new Map<number, number>();
+  let lowest = -Infinity;
+  for (const l of laid) {
+    let above = -Infinity;
+    for (let c = l.from; c < l.to; c += 1) above = Math.max(above, floor.get(c) ?? -Infinity);
+    const want = Number.isFinite(above) ? Math.min(l.top, above + gap) : l.top;
+    const up = l.top - want >= 1 ? Math.round(l.top - want) : 0;
+    const bottom = l.bottom - up;
+    for (let c = l.from; c < l.to; c += 1) floor.set(c, bottom);
+    lowest = Math.max(lowest, bottom);
+    if (up > 0) moves.set(l.f, up);
+  }
+  /* THE FOOT OF A BAND (`data-foot`, `feet` in `pack.ts`) IS DRAWN DOWN TO THE LOWEST FOOT ON ITS LINE, so the shorter of
+     two columns ends level with the taller and no hole stands above the wide tile that follows. Its height grows and a
+     negative margin takes the growth back out of its row; its content stays at its top. */
+  for (const l of laid) {
+    if (!l.f.hasAttribute('data-foot')) continue;
+    let low = -Infinity;
+    for (const g of laid) if (g.end === l.end && g.f.hasAttribute('data-foot')) low = Math.max(low, g.bottom - (moves.get(g.f) ?? 0));
+    const drawn = l.bottom - (moves.get(l.f) ?? 0);
+    if (low - drawn >= 1) grows.set(l.f, Math.round(low - drawn));
+  }
+  return { moves, grows, lowest };
+}
+
+/** Each band foot drawn `grows` taller than its own height, and every other frame at its own. */
+function grown(frames: readonly HTMLElement[], own: ReadonlyMap<HTMLElement, number>, grows: ReadonlyMap<HTMLElement, number>): void {
+  for (const f of frames) {
     const grow = grows.get(f);
-    const [h, tall, give] = grow === undefined ? ['', '', ''] : [`${f.offsetHeight + grow}px`, `${f.offsetHeight + grow}px`, `${-grow}px`];
+    const height = own.get(f) ?? f.offsetHeight;
+    const [h, tall, give] = grow === undefined ? ['', '', ''] : [`${height + grow}px`, `${height + grow}px`, `${-grow}px`];
     if (f.style.minBlockSize !== h) f.style.minBlockSize = h;
     if (f.style.maxBlockSize !== tall) f.style.maxBlockSize = tall;
     if (f.style.marginBlockEnd !== give) f.style.marginBlockEnd = give;
   }
-  if (board.style.marginBlockEnd !== margin) board.style.marginBlockEnd = margin;
 }
 
 /** Where a widget's whole list is: its head's link to its source, or its own door ("All agents", "All numbers"). */
