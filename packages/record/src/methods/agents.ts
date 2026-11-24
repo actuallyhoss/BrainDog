@@ -156,6 +156,14 @@ export type PresenceRow = {
   asked: string | null;
   /** Its key reads and nothing more, so it can write nothing: a look, never a run at work. */
   looks: boolean;
+  /**
+   * WHAT IT IS DOING NOW, AS ITS OWN WORDS SAY IT (the Agents page of 24 Nov): when its `doing` was last written by a
+   * handoff, and its newest note with when that was written. A session says what it is doing once, at its start, and
+   * notes as it goes, so the newer of the two is what it is at; `null` where the log holds no line of either.
+   */
+  doing_at: string | null;
+  note: string | null;
+  note_at: string | null;
 };
 
 /** What `presence` takes: one project or one repository. */
@@ -494,6 +502,17 @@ export function methods(deps: RecordDeps) {
           const said = /^S[1-9][0-9]*$/u.test(by) ? kernel.question(String(s.id)) : null;
           if (said) asked.set(by, said);
         }
+      /* WHEN EACH RUN LAST SAID WHAT IT IS DOING, AND LAST NOTED SOMETHING, from the log: a few lines a run, read once. */
+      const said = new Map<string, { doing: string | null; notes: string | null }>();
+      if (rows.length > 0)
+        for (const l of sql.all<{ target: string; field: string; at: string }>(
+          `SELECT target, field, max(ts) AS at FROM event WHERE target IN (SELECT 'entry:' || value FROM json_each(?)) AND field IN ('doing', 'notes') GROUP BY target, field`,
+          JSON.stringify(rows.map((r) => r.id)),
+        )) {
+          const id = l.target.slice('entry:'.length);
+          const was = said.get(id) ?? { doing: null, notes: null };
+          said.set(id, l.field === 'doing' ? { ...was, doing: l.at } : { ...was, notes: l.at });
+        }
       const out: PresenceRow[] = rows
         .filter((r) => (projectSaid === null || of(r.fields, 'project') === projectSaid) && (repoSaid === null || of(r.fields, 'repo') === repoSaid))
         .map((r) => {
@@ -529,6 +548,9 @@ export function methods(deps: RecordDeps) {
             wrote: typeof f.wrote === 'number' ? f.wrote : null,
             asked: asked.get(spoken(r)) ?? null,
             looks: readOnly.has(of(f, 'token_id') ?? ''),
+            doing_at: said.get(r.id)?.doing ?? null,
+            note: ((n) => (typeof n === 'string' && n.trim() !== '' ? n.trim() : null))(Array.isArray(f.notes) ? f.notes.at(-1) : null),
+            note_at: said.get(r.id)?.notes ?? null,
           };
         });
       return ok(out);

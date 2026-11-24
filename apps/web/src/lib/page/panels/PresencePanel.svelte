@@ -1,26 +1,23 @@
 <!--
-  The agents working now on the Agents page (`panel: presence`, agents and MCP plan §4.4, §7.1): one run row each, a
-  helper folded under the run it works for, and for the owner Tell, Pause and Stop.
+  The agents working now on the Agents page (`panel: presence`, agents and MCP plan §4.4, §7.1): one row a live session,
+  a helper folded under the run it works for, and for the owner Tell, Pause and Stop.
 
-  THE HOST'S HALF ONLY. braindog-render's `Presence` draws; `$lib/record/instruct.ts` words each row and makes the
-  writes. Tell aims the composer above (`aim`); a stop, a pause or a resume is an instruction the record applies at once,
-  and the other panel is told to read again (`told`).
+  THE HOST'S HALF ONLY. `$lib/record/instruct.ts` and `$lib/agents/threads.ts` word each row and make the writes. Tell
+  aims the composer above (`aim`); a stop, a pause or a resume is an instruction the record applies at once, and the
+  other panel is told to read again (`told`).
 
-  ON THE AGENTS PAGE, ONE LINE A RUN (`openNow`): each run is named by its app and where it
-  works ("Claude Code in Lanternfish", "Claude in the Developer folder"), with the last thing it did under it ("Asked you: …",
-  "Wrote 3 changes"), how many changes it wrote and when it was last heard. Only those runs are counted. The ones open
-  with nothing written fold into one line ("2 open, nothing written") that opens onto them; each machine silent over an
-  hour is one quiet row ("Windows PC, 3 Claude sessions on D:\"); a run whose key only reads is never counted and is
-  said once at the foot. Tell, Pause and Stop are behind one More press, which a mouse finds on hover; what each reaches
-  is said in the ask before it is sent. The machines the runs are on are one quiet line at the foot. With nothing open
-  the tile says so in one line.
+  ON THE AGENTS PAGE, ONE ROW A LIVE SESSION, LED BY ITS PROJECT (the Agents page of 24 Nov): the project's mark and
+  name, what the session is doing now in its own words (the newer of its last `doing` and its newest note, never the
+  first thing it said, `nowOf`), and when it was last heard. The sessions silent over an hour or open with nothing
+  written fold into one "3 quiet" line. No machine, no profile, no folder: where a session runs is on its own page.
+  Tell, Pause and Stop are behind one More press; a pause or a stop asks once, in place, with what it will do.
 
   READ BY ANYONE WHO READS THE RUNS (`level: read`); the presses are drawn for the owner alone, since only a person
   signed in as the owner can instruct.
 
   SCOPED WHERE ANOTHER SCREEN HOLDS IT: `run` draws that one run (Today's run sheet), `project` the runs on
   that project (a project's "Working here now"), and `oncount` tells the host how many it draws, for its heading. Both
-  keep the full row with its presses, since there the run is what the screen is about.
+  keep the full row with its presses (braindog-render's `Presence`), since there the run is what the screen is about.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
@@ -34,26 +31,25 @@
   import {
     NO_PLACES,
     aim,
-    changesSaid,
+    agentNamed,
+    agoSaid,
     control,
-    heardSaid,
-    idleSaid,
+    doingSaid,
+    folderSaid,
     isAtWork,
     lastSaid,
-    looksSaid,
     openNow,
     presenceOf,
-    quietSaid,
-    runTitle,
     scopedLeads,
-    standsSaid,
     told,
     type LiveRun,
     type Project,
     type Thread,
   } from '$lib/record/instruct.ts';
-  import { UNNAMED, machinesOf } from './machines.ts';
   import NamedAgents from '$lib/agents/NamedAgents.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import { initialOf, slotOf } from '$lib/ui/face.ts';
+  import { nowOf } from '$lib/agents/threads.ts';
   import RunSkeleton from '$lib/agents/RunSkeleton.svelte';
   import { keepCount, lastCount } from '$lib/agents/last-size.ts';
 
@@ -80,10 +76,8 @@
     resume: 'Resume',
     open: 'Open its page',
     none: 'No agent has a run open.',
-    quiet: 'Quiet',
-    /* WHERE THEY RUN, said as a sentence (1 Nov): "On MacBook Pro" stood alone under the runs and read as a stray label. */
-    on: (said: string) => `Running on ${said}`,
-    unnamed: 'a machine with no name',
+    nobody: 'Nobody is working right now.',
+    quietN: (n: number) => `${n.toLocaleString('en')} quiet`,
   } as const;
 
   const io = control(apiBase());
@@ -120,6 +114,7 @@
 
   listen(load, () => pressing.size > 0);
 
+  const rowsByKey = $derived(new Map(rows.map((r) => [r.run, r])));
   const viewOf = (r: LiveRun): PresenceView => {
     /* ONE RUN ALONE (Today's sheet) SAYS NO PROFILE AND NO BRANCH. */
     const v = presenceOf(r, rows, projects, threads, { bare: run !== null });
@@ -128,59 +123,48 @@
     return { ...v, ...(project !== null ? { project: null } : {}), href: v.href ? at(v.href) : null, busy: pressing.has(r.run) };
   };
 
-  /* THE ONE-LINE ROW: who and where ("Claude Code in Lanternfish"), the last thing it did under it,
-     how many changes it wrote, and when it was last heard; never "Working now" again on every row. */
-  const projectOf = (r: LiveRun): string | null => (r.project === null ? null : (projects.get(r.project)?.name ?? null));
-  /* ONE LINE FOR WHO AND WHERE, ONE FOR WHAT IT IS DOING (Q44 of 29 October): "Wrote 2 changes" over "2 changes heard
-     just now" said the count twice, so the count stands beside when it was heard only when the line above says
-     something else (a question, what it is doing). */
-  const lineOf = (r: LiveRun): PresenceView => {
-    const last = lastSaid(r);
-    const counted = typeof r.wrote === 'number' && r.wrote > 0 && !last.startsWith('Wrote ');
+  /* WHO IS OPEN NOW (`openNow`): the sessions that did something lately lead, and the ones silent over an hour or open
+     with nothing written fold into "3 quiet"; a session whose key only reads is never counted. */
+  const open = $derived(line ? openNow(rows) : { shown: [], idle: [], quiet: [], looks: [] });
+  const quietRuns = $derived([...open.idle, ...open.quiet.flatMap((q) => q.runs)]);
+  /* THE AGENT'S NAME BESIDE THE PROJECT ONLY WHERE TWO KINDS ARE LIVE: on a record of Claude alone, "Claude" on every
+     row said nothing the mark does not. */
+  const kinds = $derived(new Set([...open.shown, ...quietRuns].map((r) => r.agent ?? 'other')).size);
+
+  /** One live session, worded: its project and mark, what it is doing now, and when it was last heard. */
+  type LiveRow = { key: string; title: string; letter: string; slot: string | null; now: string; when: string; working: boolean; held: string | null; href: string | null; busy: boolean };
+  const liveOf = (r: LiveRun): LiveRow => {
+    const p = r.project === null ? null : (projects.get(r.project) ?? null);
+    const folder = folderSaid(r.cwd);
+    const where = p?.name ?? r.repo ?? (folder ? folder.charAt(0).toUpperCase() + folder.slice(1) : 'No project');
+    const who = agentNamed(r.agent);
+    const own = (d: string) => doingSaid({ doing: d, agent: r.agent, repo: r.repo, branch: r.branch, name: r.name }) !== d;
+    const working = isAtWork(r);
     return {
-      ...viewOf(r),
-      project: null,
-      name: runTitle(r, projectOf(r)),
-      last,
-      doing: null,
-      time: counted ? changesSaid(r.wrote!) : '',
-      stands: r.stopped ? standsSaid(r) : heardSaid(r),
+      key: r.run,
+      title: kinds > 1 && who ? `${where} · ${who}` : where,
+      letter: initialOf(where),
+      slot: p ? slotOf(p.hue) : null,
+      now: nowOf(r, own) ?? lastSaid({ ...r, doing: null }),
+      /* WHEN IT WAS LAST HEARD, every row: "Working now" under a tile called Working now said nothing; the dot says it. */
+      when: `Heard ${agoSaid(r.heard_s)}`,
+      working,
+      held: r.stopped === 'stop' ? 'Stopped by you' : r.stopped === 'pause' ? 'Paused by you' : null,
+      href: /^S[1-9][0-9]*$/u.test(r.run) ? `/r/session/${r.run.slice(1)}` : null,
+      busy: pressing.has(r.run),
     };
   };
-
-  /* WHO IS OPEN NOW (`openNow`): the runs that did something, then the ones that wrote nothing folded into a line, then
-     each machine silent over an hour as one quiet row; a run whose key only reads is never counted. */
-  const open = $derived(line ? openNow(rows) : { shown: [], idle: [], quiet: [], looks: [] });
-  const shownViews = $derived(open.shown.map(lineOf));
-  const idleViews = $derived(open.idle.map(lineOf));
-  /* THE MACHINES THE RUNS DRAWN ARE ON, in one quiet line: "On MacBook Pro, as work". */
-  const foot = $derived.by((): string | null => {
-    if (!line) return null;
-    const drawnRuns = [...open.shown, ...open.idle];
-    const m = machinesOf(drawnRuns.filter(isAtWork), drawnRuns.filter((r) => !isAtWork(r)), NO_PLACES);
-    /* A MACHINE WITH NO NAME IS SAID MID-SENTENCE IN LOWER CASE (domains lane, 2 Nov): "Running on A machine not named". */
-    const named = (name: string) => (name === UNNAMED ? words.unnamed : name);
-    /* A MACHINE WITH NO NAME AND NO PROFILE SAYS NOTHING (3 Nov): "Running on a machine with no name" stood alone under
-       the runs of a record that has one computer, a line that told nobody anything. */
-    if (m.lines.every((l) => l.name === UNNAMED && l.seats.length === 0)) return null;
-    const on = m.lines.map((l) => `${named(l.name)}${l.seats.length > 0 ? `, as ${l.seats.join(', ')}` : ''}`);
-    return on.length === 0 ? null : words.on(on.join(' and '));
-  });
-  const quietRows = $derived(
-    open.quiet.map((q) => {
-      const said = quietSaid(q);
-      return { key: q.machine ?? '', name: q.said, title: q.machine !== null && q.machine !== q.said ? q.machine : undefined, runs: q.runs.length, what: said.what, said: said.said };
-    }),
-  );
+  const shownRows = $derived(open.shown.map(liveOf));
+  const quietRows = $derived(quietRuns.map(liveOf));
   const views = $derived(line ? [] : scopedLeads(rows, { run, project }).map(viewOf));
   /* THE TILE'S SIZE, KEPT FOR ITS NEXT OPEN (3 Nov): the lines it drew, so its skeleton stands at that size while it
-     reads, where the whole tile came in late and pushed Recent runs down. Only the Agents page's own tile. */
+     reads, where the whole tile came in late and pushed the next tile down. Only the Agents page's own tile. */
   const SIZE = 'at-work';
   const lastSize = $derived(line ? lastCount(SIZE) : null);
   $effect(() => {
-    if (line && read) keepCount(SIZE, Math.max(1, shownViews.length + (idleViews.length > 0 ? 1 : 0) + quietRows.length));
+    if (line && read) keepCount(SIZE, Math.max(1, shownRows.length + (quietRows.length > 0 ? 1 : 0)));
   });
-  const drawn = $derived(line ? open.shown.length + open.idle.length + open.quiet.length : views.length);
+  const drawn = $derived(line ? shownRows.length + quietRows.length : views.length);
 
   $effect(() => oncount?.(line ? open.shown.length : views.length));
 
@@ -195,12 +179,15 @@
     told.say();
   }
 
-  /* THE ROW'S MENU: the run it is for, where it opens, and the list whose row asks before a stop or a pause. */
+  /* THE ROW'S MENU: the run it is for, and where it opens. A pause or a stop asks under the row it is for. */
   let menu = $state<{ key: string; group: string; at: { x: number; y: number; height: number } } | null>(null);
   let menuOpen = $state(false);
   let lists = $state<Record<string, { confirm(key: string, kind: 'stop' | 'pause'): void } | undefined>>({});
   const menuRun = $derived(menu ? (rows.find((r) => r.run === menu!.key) ?? null) : null);
   const menuView = $derived(menuRun ? viewOf(menuRun) : null);
+  let asking = $state<{ key: string; kind: 'stop' | 'pause' } | null>(null);
+  let why = $state('');
+  const uid = $props.id();
 
   function openMenu(group: string, key: string, rect: { x: number; y: number; height: number }): void {
     menu = { key, group, at: rect };
@@ -208,7 +195,16 @@
   }
 
   const ask = (kind: 'stop' | 'pause') => {
-    if (menu) lists[menu.group]?.confirm(menu.key, kind);
+    if (!menu) return;
+    if (line) {
+      asking = { key: menu.key, kind };
+      why = '';
+    } else lists[menu.group]?.confirm(menu.key, kind);
+  };
+
+  const rectOf = (e: MouseEvent): { x: number; y: number; height: number } => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return { x: r.left, y: r.top, height: r.height };
   };
 </script>
 
@@ -225,6 +221,39 @@
   />
 {/snippet}
 
+{#snippet live(rows: readonly LiveRow[])}
+  <ul class="live" aria-label="Agents working now">
+    {#each rows as r (r.key)}
+      {@const run = rowsByKey.get(r.key)}
+      <li class="live-row" data-working={r.working ? '' : undefined} aria-busy={r.busy ? 'true' : undefined}>
+        <span class="live-mark"><IconWell letter={r.letter} slot={(r.slot ?? undefined) as never} size="l" />{#if r.working}<span class="live-dot" aria-hidden="true"></span>{/if}</span>
+        <span class="live-words">
+          {#if r.href}<a class="live-title" href={at(r.href)}>{r.title}</a>{:else}<span class="live-title">{r.title}</span>{/if}
+          <span class="live-now" title={r.now}>{r.now}</span>
+        </span>
+        <span class="live-when" data-held={r.held ? '' : undefined}>{r.held ?? r.when}</span>
+        {#if owner && run}
+          <button type="button" class="live-more" aria-haspopup="menu" aria-label={words.menu(r.title)} disabled={r.busy} onclick={(e) => openMenu('line', r.key, rectOf(e))}
+            ><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25" /><circle cx="8" cy="8" r="1.25" /><circle cx="12.5" cy="8" r="1.25" /></svg></button
+          >
+        {/if}
+        {#if asking?.key === r.key && run}
+          {@const v = viewOf(run)}
+          <form class="live-ask" aria-label={asking.kind === 'stop' ? words.stop : words.pause} onsubmit={(e) => (e.preventDefault(), void hold(r.key, asking!.kind, why.trim()), (asking = null))}>
+            <p class="live-sure" role="status">{asking.kind === 'stop' ? v.confirm.stop : v.confirm.pause}</p>
+            <label class="live-why" for="{uid}-why">Why, if you want to say (it reads this)</label>
+            <input id="{uid}-why" class="live-input" type="text" bind:value={why} autocomplete="off" enterkeyhint="send" maxlength="400" />
+            <div class="live-do">
+              <button type="button" class="live-btn" onclick={() => (asking = null)}>Keep it going</button>
+              <button type="submit" class="live-btn" data-weight="primary">{asking.kind === 'stop' ? 'Stop it' : 'Pause it'}</button>
+            </div>
+          </form>
+        {/if}
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
 {#if line}
   {#if !read}
     <!-- NOT READ YET: rows shaped like the ones it drew last time, at that count, or where it has never been seen here,
@@ -236,30 +265,13 @@
     {#if owner}<NamedAgents />{/if}
   {:else}
     <div class="at-work">
-      {#if shownViews.length > 0}{@render list('shown', shownViews)}{/if}
-      {#if idleViews.length > 0}
-        <!-- OPEN AND NOTHING WRITTEN, ONE LINE: the runs are a press away, each with its presses. -->
-        <details class="fold">
-          <summary class="fold-head">{idleSaid(idleViews.length)}</summary>
-          {@render list('idle', idleViews)}
-        </details>
-      {/if}
+      {#if shownRows.length > 0}{@render live(shownRows)}{:else}<p class="at-work-none">{words.nobody}</p>{/if}
       {#if quietRows.length > 0}
-        <h3 class="part-head">{words.quiet}<span class="machine-n num">{quietRows.reduce((n, q) => n + q.runs, 0).toLocaleString('en')}</span></h3>
-        <ul class="quiet">
-          {#each quietRows as q (q.key)}
-            <li class="quiet-row">
-              <span class="quiet-face" aria-hidden="true"><Icon name="monitor" size="s" /></span>
-              <span class="quiet-body">
-                <span class="quiet-head"><b class="quiet-name" title={q.title}>{q.name}</b> <span class="quiet-what">{q.what}</span></span>
-                <span class="quiet-said">{q.said}</span>
-              </span>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-      {#if foot || open.looks.length > 0}
-        <p class="at-work-foot">{[foot, open.looks.length > 0 ? looksSaid(open.looks.length) : null].filter((x) => x !== null).join(' ')}</p>
+        <!-- THE QUIET ONES, ONE LINE: silent over an hour, or open with nothing written; each a press away. -->
+        <details class="fold">
+          <summary class="fold-head">{words.quietN(quietRows.length)}</summary>
+          {@render live(quietRows)}
+        </details>
       {/if}
     </div>
   {/if}
@@ -298,25 +310,7 @@
     container-type: inline-size;
   }
 
-  /* QUIET, over the machines silent for an hour: the meta size in the third ink, how many runs at its end. */
-  .part-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    font-weight: var(--fw-medium);
-    line-height: calc(18px * var(--type, 1));
-  }
-
-  .machine-n {
-    margin-inline-start: auto;
-    color: var(--ink-3);
-    font-weight: var(--fw-regular, 400);
-  }
-
-  /* OPEN AND NOTHING WRITTEN: one quiet line that opens onto the runs. */
+  /* THE QUIET ONES: one quiet line that opens onto them. */
   .fold {
     min-inline-size: 0;
   }
@@ -336,62 +330,204 @@
     outline-offset: 2px;
   }
 
-  /* ONE ROW A QUIET MACHINE: its glyph, its name and what is open on it, and what they did and how long it is silent. */
-  .quiet {
+  /* ONE ROW A LIVE SESSION: its project's mark, the project and what it is doing now, when it was last heard, More. */
+  .live {
     display: grid;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .quiet-row {
+  .live-row {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr);
-    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
     gap: 0 var(--sp-3);
-    padding-block: var(--sp-1);
+    padding-block: var(--sp-2);
   }
 
-  .quiet-row + .quiet-row {
+  .live-row + .live-row {
     border-block-start: 1px solid var(--rule);
   }
 
-  .quiet-face {
+  .live-mark {
+    position: relative;
     display: inline-grid;
-    place-items: center;
-    inline-size: 24px;
-    block-size: 24px;
-    color: var(--ink-3);
   }
 
-  .quiet-body {
+  /* AT WORK IS A DOT on the mark's corner, cut out of it by the tile's own ground. */
+  .live-dot {
+    position: absolute;
+    inset-block-end: -2px;
+    inset-inline-end: -2px;
+    inline-size: 10px;
+    block-size: 10px;
+    border: 2px solid var(--tile);
+    border-radius: 50%;
+    background: var(--live, var(--good));
+  }
+
+  .live-words {
     display: grid;
+    gap: 1px;
     min-inline-size: 0;
   }
 
-  .quiet-head {
-    min-inline-size: 0;
+  .live-title {
     overflow: hidden;
-    color: var(--ink-2);
+    color: var(--ink);
     font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
     line-height: calc(22px * var(--type, 1));
+    text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .quiet-name {
-    color: var(--ink);
-    font-weight: var(--fw-medium);
+  .live-now {
+    overflow: hidden;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: calc(18px * var(--type, 1));
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .quiet-said {
+  .live-when {
     color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: calc(18px * var(--type, 1));
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .live-row[data-working] .live-when {
+    color: var(--ink-2);
+  }
+
+  .live-when[data-held] {
+    color: var(--warn, var(--ink-2));
+  }
+
+  .live-more {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: transparent;
+    color: var(--ink-3);
+    cursor: pointer;
+  }
+
+  .live-more svg {
+    inline-size: 16px;
+    block-size: 16px;
+    fill: currentColor;
+  }
+
+  .live-more:focus-visible,
+  .live-btn:focus-visible,
+  .live-input:focus-visible,
+  .live-title:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .live-more:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
+
+    a.live-title:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  /* A PAUSE OR A STOP ASKS ONCE, UNDER ITS ROW, the whole width. */
+  .live-ask {
+    display: grid;
+    grid-column: 1 / -1;
+    gap: var(--sp-2);
+    margin-block: var(--sp-2) 0;
+    padding: var(--sp-3);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+  }
+
+  .live-sure,
+  .live-why {
+    margin: 0;
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: calc(18px * var(--type, 1));
   }
 
-  .at-work-none,
-  .at-work-foot {
+  .live-input {
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-2);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--tile);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-body);
+  }
+
+  .live-do {
+    display: flex;
+    gap: var(--sp-2);
+  }
+
+  .live-btn {
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--tile);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+  }
+
+  .live-btn[data-weight='primary'] {
+    background: var(--red-fill);
+    color: var(--on-red);
+  }
+
+  @media (pointer: coarse) {
+    .live-more {
+      inline-size: var(--tap, 44px);
+      block-size: var(--tap, 44px);
+    }
+  }
+
+  /* ON A NARROW TILE WHEN IT WAS HEARD GOES UNDER WHAT IT IS DOING, so the words keep the width. */
+  @container (width < 420px) {
+    .live-row {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .live-when {
+      grid-column: 2;
+      grid-row: 2;
+    }
+
+    .live-more {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+    }
+  }
+
+  .at-work-none {
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
