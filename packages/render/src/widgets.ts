@@ -331,12 +331,23 @@ export function distill(t: Pick<WidgetTemplate, 'rows' | 'block'>, drawn: unknow
     const m = b.measures[0] as Record<string, unknown>;
     const now = Array.isArray(m.now) ? (m.now as unknown[]).map((v) => (typeof v === 'number' ? v : null)) : [];
     const cols = Array.isArray(t.block.columns) ? (t.block.columns as unknown[]) : [];
-    const money = cols.some((c) => isBag(c) && typeof c.field === 'string' && /amount|paid|value|total|price/u.test(c.field));
+    /* A LINE IN A CURRENCY IS MONEY IN IT, as the record read it (`measures.ts`): Gold price's preview said "5,801.7" for
+       EGP 5,801.68 a gram, its unit dropped and its money read as a plain number. */
+    const code = typeof m.unit === 'string' && /^[A-Z]{3}$/u.test(m.unit) ? m.unit : null;
+    const money = code !== null || cols.some((c) => isBag(c) && typeof c.field === 'string' && /amount|paid|value|total|price/u.test(c.field));
+    const valued = (v: number): number => (code === null ? v : Math.round(v * 10 ** exponentOf(code)));
+    const line = now.filter((v) => v !== null).length > 2 ? { line: now.slice(-PREVIEW_POINTS) } : {};
+    /* A LINE OF DAYS IS ITS NEWEST READING: "This week" and "Last week" over two days, and nought for a day not read yet. */
+    if (m.bucket === 'day') {
+      const newest = [...now].reverse().find((v): v is number => v !== null);
+      const figures: ReadFigure[] = newest === undefined ? [] : [{ label: 'Latest', value: valued(newest), unit: code, format: money ? 'money' : 'decimal', met: null, ...line }];
+      return { figures, count: now.length, empty: figures.length > 0 ? null : empty, ...(fix ? { fix } : {}) };
+    }
     const per = m.bucket === 'month' ? 'month' : 'week';
-    const at = (i: number): number => now.at(i) ?? 0;
+    const at = (i: number): number => valued(now.at(i) ?? 0);
     const figures: ReadFigure[] = [
-      { label: `This ${per}`, value: at(-1), unit: null, format: money ? 'money' : 'decimal', met: null, ...(now.filter((v) => v !== null).length > 2 ? { line: now.slice(-PREVIEW_POINTS) } : {}) },
-      { label: `Last ${per}`, value: at(-2), unit: null, format: money ? 'money' : 'decimal', met: null },
+      { label: `This ${per}`, value: at(-1), unit: code, format: money ? 'money' : 'decimal', met: null, ...line },
+      { label: `Last ${per}`, value: at(-2), unit: code, format: money ? 'money' : 'decimal', met: null },
     ];
     return { figures, count: now.length, empty: now.some((v) => v !== null) ? null : empty, ...(fix ? { fix } : {}) };
   }

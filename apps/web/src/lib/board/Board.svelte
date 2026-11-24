@@ -815,6 +815,20 @@
     }
   }
 
+  /* A LINE'S FOLD OF POINTS IS THE PAGE'S, NOT A WIDGET'S: in a frame it is kept where a keyboard and a screen reader
+     reach it and out of sight otherwise, as it is on touch (`BlockSlot.svelte`), so the frame ends under the dates and not
+     under 44px of a toggle that waits for the pointer. */
+  .board :global([data-board-key] .lines-numbers:not([open], :focus-within)) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   /* A ROW ITS FRAME CANNOT HOLD WHOLE IS NOT DRAWN (`fit.ts`), and the frame's foot rises to meet what is. */
   .board:not([data-fit-measure]) :global([data-board-key] [data-cut]) {
     display: none;

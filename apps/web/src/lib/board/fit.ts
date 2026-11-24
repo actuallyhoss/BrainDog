@@ -33,8 +33,11 @@ const saidBy = (el: HTMLElement): string => {
  * A CHART'S OWN PARTS ARE NOT ROWS: its bars, scale, ticks and legend are list items and its numbers a table, and read as
  * rows they were hidden one by one and counted, a weekly chart drawn as its title and "36 more" (the validator's recheck
  * of 30 October, N1). A chart is drawn whole and the frame clips it, as any picture is.
+ * A LINE IS ONE TOO (`.lines`, Gold price on Today, 24 Nov): its date ticks and its fold's points were read as rows, the
+ * first tick kept as a line and the frame let in to it, so the phone cut the plot under its figure and the laptop the
+ * dates at the frame's foot. As a frame of no rows it is let as tall as it is drawn, as a figure's bars are.
  */
-const CHART = '.series, [role="img"], svg';
+const CHART = '.series, .lines, [role="img"], svg';
 /**
  * CARDS STAND ON THE BOARD WITH NO TILE ROUND THEM (`BlockSlot`'s `.project-cards`), so a count under them has no padding
  * to sit in and no room the frame keeps: Projects on Maya's Today drew one card and said nothing of the other three at
