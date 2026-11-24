@@ -195,6 +195,7 @@ import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, set
 import { COST_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { drawTraceOf, HELD_SHORT_MS, HeldReadings, notice, noticeDraw, shifted, traceOf, within, withinDraw, type DrawSeen, type DrawTrace, type ReadTrace } from './held-readings.ts';
+import { HeldDeclarations } from './held-declarations.ts';
 import { HeldSigns, heldOn, noticeSign, signTraceOf, tablesWritten, wroteNothing, type SignHeldOn, type SignTrace } from './held-signs.ts';
 import { localDays, readableZone } from './measures.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type ReadMemo, type Reading } from './metrics.ts';
@@ -1899,41 +1900,99 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /* WHETHER THE TRANSACTION OPEN NOW HAS WRITTEN (`transaction`): one that has only read reads what is committed, so what it
      reads may be held (`holdAcross`), as `boot`'s read of its one moment is. */
   let txWrote = false;
+  /* THE READS OF THE DECLARATIONS AND OF THE RECORD'S OWN ROW, HELD WHILE NEITHER MOVES (`held-declarations.ts`): stamped
+     with the lists' reload, the writes counted on either table, every write this could not read the table of, and every
+     write made on the connection past this `Sql`. */
+  let reloads = 0;
+  /* A WRITE PAST THE KERNEL IS TOLD FROM ITS OWN BY SQLITE'S COUNT OF THE ROWS THE CONNECTION HAS CHANGED
+     (`total_changes()`). While anything is held the count is read before and after each statement the kernel sends, and
+     around each transaction's start and end, where the search index writes what it kept back (measured: every create
+     moved the count at its commit). What moved between is the kernel's own; any other move is a write that came another
+     way (a host's own write, a test's), which moves the stamp. A test retired a rule with its own `UPDATE declaration`
+     and the runner went on reading it live. */
+  let changesVouched: number | null = null;
+  let changedPast = 0;
+  /* A PORT THAT CANNOT SAY IS ANSWERED A COUNT THAT NEVER MATCHES, so nothing is held over it. */
+  const changesNow = (): number => {
+    try {
+      return Number(raw.one<{ n: number }>('SELECT total_changes() AS n')?.n ?? Number.NaN);
+    } catch {
+      return Number.NaN;
+    }
+  };
+  const pastChecked = (): void => {
+    const n = changesNow();
+    if (n === changesVouched) return;
+    changedPast++;
+    changesVouched = n;
+  };
+  /* Whether what is about to be sent is told apart from a write past the kernel (`vouched` after it): while anything is held. */
+  const vouching = (): boolean => {
+    if (!declarationsHeld.holding()) return false;
+    pastChecked();
+    return true;
+  };
+  const vouched = (): void => {
+    changesVouched = changesNow();
+  };
+  const declarationsHeld = new HeldDeclarations(() => {
+    pastChecked();
+    return `${reloads}:${changedPast}:${writesAny}:${writes.get('declaration') ?? 0}:${writes.get('record') ?? 0}`;
+  });
   const sql: Sql = {
     exec: (text, ...params) => {
       txWrote = true;
       moment?.drop();
-      if (/^\s*ROLLBACK\b/iu.test(text)) dropHeld();
+      if (/^\s*ROLLBACK\b/iu.test(text)) {
+        dropHeld();
+        declarationsHeld.drop();
+      }
       for (const t of traces) t.whole = true;
       for (const t of drawTraces) t.whole = true;
       wrote(text);
+      const vouch = vouching();
       raw.exec(text, ...params);
+      if (vouch) vouched();
     },
     all: <T = Row>(text: string, ...params: Param[]): T[] => {
       if (traces.length > 0 || signTraces.length > 0 || drawTraces.length > 0) noted(text, params);
-      if (reads(text)) return raw.all<T>(text, ...params);
+      if (reads(text)) return declarationsHeld.holds(text) ? declarationsHeld.read(text, params, () => raw.all<T>(text, ...params)) : raw.all<T>(text, ...params);
       txWrote = true;
       moment?.drop();
+      const vouch = vouching();
       const out = raw.all<T>(text, ...params);
+      if (vouch) vouched();
       wrote(text, out.length);
       return out;
     },
     one: <T = Row>(text: string, ...params: Param[]): T | undefined => {
       if (traces.length > 0 || signTraces.length > 0 || drawTraces.length > 0) noted(text, params);
-      if (reads(text)) return raw.one<T>(text, ...params);
+      if (reads(text)) return declarationsHeld.holds(text) ? declarationsHeld.read(text, params, () => raw.one<T>(text, ...params)) : raw.one<T>(text, ...params);
       txWrote = true;
       moment?.drop();
+      const vouch = vouching();
       const out = raw.one<T>(text, ...params);
+      if (vouch) vouched();
       wrote(text, out === undefined ? 0 : 1);
       return out;
     },
     transactionSync: (fn) => {
+      const vouch = vouching();
+      let out: ReturnType<typeof fn>;
       try {
-        return raw.transactionSync(fn);
+        out = raw.transactionSync(() => {
+          if (vouch) vouched();
+          const value = fn();
+          if (declarationsHeld.holding()) pastChecked();
+          return value;
+        });
       } catch (e) {
         dropHeld();
+        declarationsHeld.drop();
         throw e;
       }
+      if (declarationsHeld.holding()) vouched();
+      return out;
     },
   };
   /* THE INSTANT `backdate` HOLDS, while a history is being written, and `null` the rest of the time. */
@@ -1968,13 +2027,34 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   let personalMemo: string[] | null = null;
   const lensCache = new LensCache<Held | null>(256);
 
+  /**
+   * AN INDEX ON EACH LIST'S TITLE FIELD, which `refByTitle` reads every row bearing a name by (`thing is Kiln`), one for
+   * each field some list titles its rows with. Not partial, because that read takes deleted rows too. Sent past the
+   * counted writes, as `keepSplitIndexes` sends its own: an index moves no row. It only speeds a read, so one that cannot
+   * be made leaves the read going through the list as before.
+   */
+  function keepTitleIndexes(): void {
+    /* NEVER OVER A REFUSED SCHEMA, whose tables this build cannot vouch for (`openRecord`). */
+    if (state.refusal) return;
+    const titles = new Set([...registers.values()].map((r) => r.title).filter((t): t is string => typeof t === 'string' && /^[a-z_][a-z0-9_]*$/u.test(t)));
+    for (const t of titles)
+      try {
+        raw.exec(`CREATE INDEX IF NOT EXISTS entry_title_${t} ON entry (register, json_extract(fields, '$.${t}'))`);
+      } catch {
+        /* Read through the list, as before. */
+      }
+  }
+
   function reload(opts: { copied?: true } = {}): void {
     const had = revision === 0 || opts.copied === true ? null : new Set(registers.keys());
     const before = had === null ? null : [...had].sort().join('\u0000');
+    /* FIRST, so the lists are read again from the table and not from what was held of it. */
+    reloads++;
     ({ registers, prefixes } = listsOf(
       sql.all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0"),
     ));
     revision++;
+    keepTitleIndexes();
     catalogMemo = null;
     kernelMemo = null;
     personalMemo = null;
@@ -9528,11 +9608,24 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         key,
         JSON.stringify(payload),
       ),
+    /* EACH LIVE RULE'S LIST READ ONCE WHILE NO DECLARATION MOVES (`declarationsHeld`), and only the rules on this list
+       parsed for the write: every write read and parsed every rule the record holds to keep the ones on its list. */
     rules: (register) =>
-      sql
-        .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")
-        .map((r) => JSON.parse(r.body) as RuleDecl)
-        .filter((r) => r.register === register),
+      (
+        declarationsHeld
+          .memo('rules by list', () => {
+            const by = new Map<string, string[]>();
+            for (const r of sql.all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")) {
+              const on = (JSON.parse(r.body) as RuleDecl).register;
+              if (typeof on !== 'string') continue;
+              const bodies = by.get(on);
+              if (bodies === undefined) by.set(on, [r.body]);
+              else bodies.push(r.body);
+            }
+            return by as ReadonlyMap<string, readonly string[]>;
+          })
+          .get(register) ?? []
+      ).map((body) => JSON.parse(body) as RuleDecl),
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     /* A REF NAMING NO ROW MATCHES NO ROW HERE, AND IS NOT A RULE THAT CANNOT BE READ. The rule was
        allowed to install over a row nobody had written, and `matches` then read the `REF_UNKNOWN` on

@@ -32,7 +32,9 @@ import type { KernelParts } from '../parts.ts';
 export function extension(parts: KernelParts) {
   /** A figure declared on this record, by the id without its `metric.`, or `null`; its body is read as it is held. */
   const figure = (id: string): MetricDecl | null => {
-    const held = parts.declarations().find((d) => d.kind === 'metric' && d.id === `metric.${id}`);
+    /* ONE ROW BY ITS ID, which the kernel holds while no declaration moves (`held-declarations.ts`), and not every live
+       declaration read and searched for each figure a walk opens. */
+    const held = parts.sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
     return held ? (JSON.parse(held.body) as MetricDecl) : null;
   };
   return {
