@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 import adapter from '@sveltejs/adapter-static';
 
@@ -52,6 +52,16 @@ const atBase = {
   async adapt(builder) {
     rmSync(OUT, { recursive: true, force: true });
     await shipped.adapt(builder);
+    /* THE SHELL'S NOTES STAY IN `app.html` AND OUT OF THE BYTES. The template's comments were 14 KB of the 35 KB every
+       cold open downloads before anything else (11.8 KB brotli, 6.7 KB without them). Only comments outside a
+       `<script>` or `<style>` go, so no hashed inline body changes and the policy's hashes still match. */
+    const shell = `${OUT}/index.html`;
+    const html = readFileSync(shell, 'utf8');
+    const lean = html
+      .split(/(<(?:script|style)\b[\s\S]*?<\/(?:script|style)>)/)
+      .map((part, i) => (i % 2 === 1 ? part : part.replace(/<!--(?!\[|\])[\s\S]*?-->\s*/g, '')))
+      .join('');
+    writeFileSync(shell, lean);
   },
 };
 
