@@ -59,6 +59,7 @@ export const words = {
   /* EACH BLOCK'S OWN EMPTY LINE, for the blocks that stay drawn when they hold nothing. */
   nothingWaiting: 'Nothing is waiting on you.',
   nothingDue: 'Nothing falls due in the next two weeks.',
+  nothingDueMonth: 'Nothing falls due in the next month.',
   nothingNew: 'Nothing new since you last looked.',
   nothingDueWork: 'No work falls due this week.',
   nothingLate: 'Nothing is late or due today.',

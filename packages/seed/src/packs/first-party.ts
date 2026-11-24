@@ -1067,12 +1067,15 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   of their own after Waiting on you, under Parked and closed, grouped Parked then Closed, folded past four and open
  *   over four or fewer. Four blocks added to one page and no id added or taken away, so a minor step that keeps every
  *   row.
+ * - money-core 3.42.2 (24 Nov, the founder's Today): the Coming up widget looks 30 days ahead, where it looked 14, as a
+ *   founder's default Today does (`apps/web/src/lib/home/default-home.ts`), and says so in its line and its empty words.
+ *   A widget only, so no declaration moves and the fingerprint is 3.42.1's; a patch step that keeps every row.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.33.0',
   people: '4.8.0',
-  'money-core': '3.42.1',
+  'money-core': '3.42.2',
   estate: '2.8.1',
   work: '1.26.2',
 };

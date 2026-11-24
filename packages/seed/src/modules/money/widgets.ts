@@ -95,12 +95,12 @@ export const MONEY_WIDGETS = {
       fills: FILLS,
     },
     /* COMING UP, ONE WIDGET FOR WHAT FALLS DUE WITH MONEY ON IT (audit of 30 October, 33): Bills coming up folded in,
-       and read as Today's Coming up reads it (`amount is set` over the next 14 days), so the two are one. */
+       and read as a founder's Today reads it (`amount is set` over the next 30 days, money-core 3.42.2), so the two are one. */
     {
       id: 'coming-up',
       alike: ['coming-up'],
       title: 'Coming up',
-      says: 'Bills and other money due in the next two weeks, soonest first.',
+      says: 'Bills and other money due in the next month, soonest first.',
       group: 'money',
       for: 'both',
       icon: 'calendar',
@@ -110,10 +110,10 @@ export const MONEY_WIDGETS = {
         icon: 'calendar',
         source: 'deadlines',
         where: 'amount is set, day after -1d',
-        horizon: 14,
+        horizon: 30,
         columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
         limit: 8,
-        empty: 'Nothing falls due in the next two weeks.',
+        empty: 'Nothing falls due in the next month.',
       },
       sizes: ALL,
       size: 'tall',

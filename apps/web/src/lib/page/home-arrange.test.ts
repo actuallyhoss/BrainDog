@@ -57,6 +57,23 @@ test("Today's body is built from what the shell says the record holds", () => {
   assert.deepEqual(holdsOf({ lists: [{ id: 'notes', name: 'Notes' }], pages: [], me: owner }, {}), { tasks: false, adds: false, money: false, quiet: true, runs: true });
 });
 
+test('WHAT THE RECORD OWNS is read off the rail\'s counts: holdings or instalments with a row, and none where both are empty', async () => {
+  const owner = { level: 'owner', owner: true, person: 'p_1', lists: null } as never;
+  const rail = (holdings: number, installments: number) =>
+    ({ registers: [{ id: 'holdings', name: 'Holdings', count: holdings, icon: 'rows', views: [] }, { id: 'installments', name: 'Instalments', count: installments, icon: 'rows', views: [] }] }) as never;
+  const shell = { lists: [{ id: 'tasks', name: 'Tasks' }], pages: ['money'], me: owner };
+  assert.equal(holdsOf({ ...shell, index: rail(0, 0) }, {}).wealth, undefined);
+  assert.equal(holdsOf(shell, {}).wealth, undefined, 'a shell with no counts owns nothing');
+  assert.deepEqual(holdsOf({ ...shell, index: rail(3, 0) }, {}).wealth, { holdings: true, installments: false });
+  assert.deepEqual(holdsOf({ ...shell, index: rail(0, 9) }, {}).wealth, { holdings: false, installments: true });
+  /* A TODAY KEPT BY A FIRST DONE KEEPS THE TILES. */
+  const kept = await previewedBody('today', holdsOf({ ...shell, index: rail(3, 9) }, {}));
+  assert.deepEqual((kept?.blocks ?? []).flatMap((b) => {
+    const key = (b as unknown as { key?: string }).key ?? '';
+    return ['worth', 'gold', 'property-next'].includes(key) ? [key] : [];
+  }), ['worth', 'gold', 'property-next']);
+});
+
 test("who is working and the projects are Today's blocks where the reader may read the runs and the record keeps projects", () => {
   const member = { level: 'member', owner: false, person: 'p_2', lists: ['session'], levels: { session: 'read' } } as never;
   assert.equal(holdsOf({ lists: [], pages: [], me: member }, {}).runs, true, 'a reader of the runs is shown who is working');

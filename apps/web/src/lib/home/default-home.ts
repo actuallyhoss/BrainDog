@@ -85,6 +85,12 @@ export const FIRST_TODAY_MOST = 8;
 export const COMING_UP_DAYS = 14;
 
 /**
+ * HOW FAR AHEAD IT LOOKS WHERE THE RECORD HOLDS WHAT IT OWNS (`Holds.wealth`): a month, so a part of a flat or a yearly
+ * bill is seen before it is close. Money's own Coming up widget looks as far (`packages/seed/src/modules/money/widgets.ts`).
+ */
+export const COMING_UP_DAYS_OWNED = 30;
+
+/**
  * How many things "Coming up" draws: the next few, read on their own, so the late ones above never use up its rows.
  * Past it the count is the door to the rest, as on every other tile.
  */
@@ -155,6 +161,12 @@ export type Holds = {
    * named by, which Today declares its projects' cards over. Left out where it keeps none.
    */
   projects?: { register: string; title: string; name: string } | undefined;
+  /**
+   * WHAT THE RECORD OWNS AND STILL PAYS FOR, where its lists hold rows: holdings (gold, a fund, a certificate) and the
+   * instalments left on a plan. Today then says what is owned (`worthTiles`) and Coming up looks a month ahead. Left out
+   * where neither list holds a row, and Today is as it was.
+   */
+  wealth?: { holdings: boolean; installments: boolean } | undefined;
 };
 
 /** The fewest days a figure's line is drawn from (a chart has at least three points, else the tile shows the number). */
@@ -632,6 +644,8 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
     ...(holds.health ? signsLine() : []),
     /* WHAT STOPPED ARRIVING, where the record reads it for this reader. Not drawn when nothing is quiet. */
     ...(holds.quiet ? [quietTile()] : []),
+    /* WHAT IS OWNED, THE GOLD AND THE NEXT PARTS OF A FLAT, where the record holds them: above the key numbers. */
+    ...(holds.wealth ? worthTiles(holds.wealth) : []),
     /* THE FEW KEY NUMBERS THAT LEAD: drawn only where the record keeps one. */
     numbersTile(),
     /* AND THE MONEY TOLD BEFORE AN ACCOUNT, where no week says it already (`toldMoney`). */
@@ -650,10 +664,10 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       icon: 'calendar',
       source: 'deadlines',
       where: `${DUE_WITH_MONEY}, day after -1d`,
-      horizon: COMING_UP_DAYS,
+      horizon: holds.wealth ? COMING_UP_DAYS_OWNED : COMING_UP_DAYS,
       columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
       limit: COMING_UP_LIMIT,
-      empty: voice.nothingDue,
+      empty: holds.wealth ? words.nothingDueMonth : voice.nothingDue,
     } as PageBlock,
     /* THE WORK THAT FALLS DUE THIS WEEK, under Work's own heading (audit Q10), ticked where it is drawn. Not the late,
        which Late holds. */
@@ -689,12 +703,61 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
 const DUE_WITH_MONEY = 'amount is set';
 
 /**
+ * WHAT IS OWNED, AS A FOUNDER'S TODAY SAYS IT (his record's plan of 24 Nov, section 6.1): net worth with its twelve weeks,
+ * what the holdings are worth and what is still to pay over time; the holdings themselves, worth most first; and the
+ * next parts left to pay on a plan. Each only where its list holds rows, so no tile reads a list the record lacks.
+ */
+export function worthTiles(w: { holdings: boolean; installments: boolean }): PageBlock[] {
+  const cells = [
+    { label: 'Net worth', metric: 'net-worth', trend: '12w' },
+    ...(w.holdings ? [{ label: 'Gold and investments', metric: 'holdings-value' }] : []),
+    ...(w.installments ? [{ label: 'Still to pay on property', metric: 'owed-over-time' }] : []),
+  ];
+  const worth = { key: 'worth', kind: 'stat', heading: 'What you own', icon: 'chart-pie', size: 'wide', cells } as unknown as PageBlock;
+  const gold = {
+    key: 'gold',
+    kind: 'table',
+    heading: 'Gold and investments',
+    icon: 'vault',
+    size: 'tall',
+    source: 'register.holdings',
+    columns: [
+      { field: 'label', label: 'Holding' },
+      { field: 'qty', label: 'How many', align: 'end' },
+      { field: 'value', label: 'Worth now', align: 'end' },
+      { field: 'gain', label: 'Gain', align: 'end' },
+    ],
+    order: [{ field: 'value', dir: 'desc' }],
+    limit: 5,
+    empty: 'Nothing held yet.',
+  } as unknown as PageBlock;
+  const next = {
+    key: 'property-next',
+    kind: 'table',
+    heading: 'Property: next parts',
+    icon: 'calendar',
+    size: 'tall',
+    source: 'register.installments',
+    where: 'state is open',
+    columns: [
+      { field: 'what', label: 'Part' },
+      { field: 'due', label: 'Due' },
+      { field: 'amount', label: 'Amount', align: 'end' },
+    ],
+    order: [{ field: 'due', dir: 'asc' }],
+    limit: 4,
+    empty: 'No part left to pay.',
+  } as unknown as PageBlock;
+  return [worth, ...(w.holdings ? [gold] : []), ...(w.installments ? [next] : [])];
+}
+
+/**
  * THE PHONE'S OWN TODAY (the Bento phone board, now the board's `phone`): what needs you first, then what is late and
  * urgent, who is at work, cash with its week, and what is next. The few key numbers, the projects, what arrived and the
  * people are a tab away (Projects, Money, Activity), so the phone's Today is about two screens and not six. The lists
  * that are a narrow column on the laptop are the phone's whole width.
  */
-const PHONE_ORDER = ['needs-you', 'late', 'working', 'cash', 'week-money', 'week-due', 'coming-up', 'work-due', 'signs', 'quiet'];
+const PHONE_ORDER = ['needs-you', 'late', 'working', 'cash', 'worth', 'property-next', 'gold', 'week-money', 'week-due', 'coming-up', 'work-due', 'signs', 'quiet'];
 const PHONE_HIDDEN = ['numbers', 'projects', 'faces', 'arrivals'];
 const PHONE_SIZES: Readonly<Record<string, WidgetSize>> = { 'coming-up': 'large', 'work-due': 'large', cash: 'large', working: 'wide' };
 

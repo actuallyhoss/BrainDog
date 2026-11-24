@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
 
-import { COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, NUMBERS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, homeDrawn, numbersTile, onDesk, peopleOf, quietHeld, railed, slashLineOf, todayHome, weekMoney, weekOf, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
+import { COMING_UP_DAYS, COMING_UP_DAYS_OWNED, COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, NUMBERS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, homeDrawn, numbersTile, onDesk, peopleOf, quietHeld, railed, slashLineOf, todayHome, weekMoney, weekOf, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { WithRows } from './home-rows.ts';
@@ -931,4 +931,44 @@ test('MONEY TOLD BEFORE AN ACCOUNT IS ON TODAY (audit 31 Oct m, AM3): the week\'
   assert.deepEqual(told[0]!.when, { all: [{ metric: 'settled-in-7d', gte: -Number.MAX_SAFE_INTEGER }, { metric: 'accounts-open', is: 0 }] });
   assert.deepEqual(keyed({ tasks: true, adds: true, money: false }), [], 'no Money, no money tile');
   assert.equal(keyed({ tasks: false, adds: false, money: true, week: WEEK }).length, 1, 'a week says its money once');
+});
+
+test('A RECORD THAT OWNS SOMETHING OPENS ON WHAT IT OWNS: worth, the holdings and the next parts, and Coming up looks a month ahead', () => {
+  type B = { key?: string; kind: string; source?: string; cells?: { metric: string; trend?: string }[]; horizon?: number; empty?: string; where?: string; order?: unknown };
+  const of = (wealth?: Holds['wealth']) => todayHome({ tasks: true, adds: true, money: true, ...(wealth ? { wealth } : {}) });
+  const bs = (body: { blocks: unknown }) => body.blocks as B[];
+  const keys = (body: { blocks: unknown }) => bs(body).map((b) => b.key ?? b.kind);
+  const coming = (body: { blocks: unknown }) => bs(body).find((b) => b.key === 'coming-up')!;
+
+  /* NOTHING OWNED: Today is as it was, two weeks ahead. */
+  assert.deepEqual(of(), DEFAULT_HOME);
+  assert.equal(coming(of()).horizon, COMING_UP_DAYS);
+
+  /* BOTH LISTS HOLD ROWS: three tiles, before the key numbers, and Coming up looks thirty days ahead. */
+  const both = of({ holdings: true, installments: true });
+  const k = keys(both);
+  assert.deepEqual(k.slice(k.indexOf('worth'), k.indexOf('numbers') + 1), ['worth', 'gold', 'property-next', 'numbers']);
+  const worth = bs(both).find((b) => b.key === 'worth')!;
+  assert.deepEqual(worth.cells!.map((c) => c.metric), ['net-worth', 'holdings-value', 'owed-over-time']);
+  assert.equal(worth.cells![0]!.trend, '12w');
+  assert.equal(bs(both).find((b) => b.key === 'gold')!.source, 'register.holdings');
+  const next = bs(both).find((b) => b.key === 'property-next')!;
+  assert.equal(next.source, 'register.installments');
+  assert.equal(next.where, 'state is open');
+  assert.deepEqual(next.order, [{ field: 'due', dir: 'asc' }]);
+  assert.equal(coming(both).horizon, COMING_UP_DAYS_OWNED);
+  assert.equal(COMING_UP_DAYS_OWNED, 30);
+  assert.equal(coming(both).empty, 'Nothing falls due in the next month.');
+
+  /* ONE LIST ONLY: no tile reads the list the record lacks, and no cell either. */
+  const gold = of({ holdings: true, installments: false });
+  assert.ok(keys(gold).includes('gold') && !keys(gold).includes('property-next'));
+  assert.deepEqual(bs(gold).find((b) => b.key === 'worth')!.cells!.map((c) => c.metric), ['net-worth', 'holdings-value']);
+  const parts = of({ holdings: false, installments: true });
+  assert.ok(keys(parts).includes('property-next') && !keys(parts).includes('gold'));
+  assert.deepEqual(bs(parts).find((b) => b.key === 'worth')!.cells!.map((c) => c.metric), ['net-worth', 'owed-over-time']);
+
+  /* ON A PHONE THEY COME AFTER CASH. */
+  const order = both.phone!.order!;
+  assert.deepEqual(order.slice(order.indexOf('cash'), order.indexOf('cash') + 4), ['cash', 'worth', 'property-next', 'gold']);
 });

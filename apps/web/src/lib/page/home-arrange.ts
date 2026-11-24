@@ -82,7 +82,7 @@ export function keptAs(slug: string, pages: readonly string[]): Kept | null {
  * drawn only where that page is, and only for the owner: a count of the record's insides is not a member's to be told. AND WHAT WENT QUIET (`quietTile`), which is the owner's as the vital signs are: the record shows that source only to a reader of every list, and the shell says that for certain only of the owner. Home hands the week in for Today's own body; the arrange mode hands it in too, or Today kept by a first Done
  * lost "Orders due this week" and the week's money on the day it was arranged.
  */
-export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Labels = labels(), week?: Week): Holds {
+export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'> & { index?: Pick<Shell['index'], 'registers'> }, heard: Labels = labels(), week?: Week): Holds {
   const list = shell.lists.find((l) => l.id === TASKS);
   const tasks = list !== undefined;
   const bare = REGISTERS[TASKS] ?? (list ? { id: TASKS, name: list.name, one: singularOf(list.name) } : undefined);
@@ -90,6 +90,7 @@ export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Lab
   /* WHO IS WORKING AND THE PROJECTS ARE BLOCKS OF TODAY'S BODY: runs only for a reader who may read them, and the
      projects over the list this tab has learnt keeps them. */
   const projects = projectsHeld(shell.lists);
+  const wealth = wealthHeld(shell.index?.registers ?? []);
   return {
     tasks,
     adds: tasks && may(shell, 'append', TASKS),
@@ -100,7 +101,18 @@ export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Lab
     ...(week ? { week } : {}),
     ...(may(shell, 'read', SESSION_LIST) ? { runs: true } : {}),
     ...(projects ? { projects } : {}),
+    ...(wealth ? { wealth } : {}),
   };
+}
+
+/**
+ * WHAT THE RECORD OWNS AND STILL PAYS FOR, read off the rail's counts: its holdings and its instalments, each where the
+ * list holds a row. `undefined` where neither does, so Today's body stays as it was.
+ */
+export function wealthHeld(registers: readonly { id: string; count: number }[]): Holds['wealth'] {
+  const has = (id: string) => registers.some((r) => r.id === id && r.count > 0);
+  const w = { holdings: has('holdings'), installments: has('installments') };
+  return w.holdings || w.installments ? w : undefined;
 }
 
 /**
@@ -212,7 +224,7 @@ export function whileHeld(body: PageBody): PageBody {
 export async function previewedBody(slug: string, holds: Holds): Promise<PageBody | null> {
   if (slug === 'today') {
     const { todayHome } = await import('../home/default-home.ts');
-    return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true, ...(holds.health ? { health: true } : {}), ...(holds.quiet ? { quiet: true } : {}), ...(holds.week ? { week: holds.week } : {}) }, HOUSE_VOICE)));
+    return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true, ...(holds.health ? { health: true } : {}), ...(holds.quiet ? { quiet: true } : {}), ...(holds.week ? { week: holds.week } : {}), ...(holds.wealth ? { wealth: holds.wealth } : {}) }, HOUSE_VOICE)));
   }
   if (slug === 'decide') return plainBody((await import('../../routes/decide/views.ts')).decideHome());
   /* SCRIPTS IS THE PEOPLE ADD-ON'S PAGE, drawn from that body until the record keeps one. */

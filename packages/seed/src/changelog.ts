@@ -229,6 +229,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.42.2', notes: 'Coming up shows what falls due in the next month, where it showed the next two weeks.' },
     { version: '3.42.1', notes: 'A cancelled plan no longer has a page under Money. The plan and its parts stay on Plans, and opening it again brings its page back.' },
     { version: '3.42.0', notes: 'A new Ledger line is filed by a filing rule that fits it even where two rules name it for the same category, a pending line is filed when it arrives, and no rule is offered for a line a rule already files.' },
     { version: '3.41.0', notes: "Accounts and each book's page show what you hold beyond cash and your net worth under the accounts, once you hold something; Accounts links to Investments and gold." },
