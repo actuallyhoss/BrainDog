@@ -1058,12 +1058,16 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   account, and the ladder reads a tie as no answer. `script.learn_category` now asks no rule where one that is on
  *   already fits the entry, `script.file_back` reads a tie of one category as that category, as the record's ladder now
  *   does, and `rule.txn-categorise` files a pending line too. No id added or taken away, a minor step that keeps every row.
+ * - money-core 3.42.1 (24 Nov, his record: two plan pages, `sodic-3` and `noor-4`, for plans closed as twins of Sodic and
+ *   Noor): `page.money-plan` is drawn for every plan that is not cancelled (`for.where`), where it was drawn for every
+ *   plan. The cancelled rows and their parts stay, read on Plans; only their pages go, and a plan opened again has its
+ *   page back. No id added or taken away, a patch step that keeps every row.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.32.0',
   people: '4.8.0',
-  'money-core': '3.42.0',
+  'money-core': '3.42.1',
   estate: '2.8.1',
   work: '1.26.2',
 };

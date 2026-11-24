@@ -93,7 +93,10 @@ const summary = (when: unknown, cells: Record<string, unknown>[]): Record<string
 export const MONEY_PLAN_PAGE: SeedPage = {
   page: 'money-plan',
   title: '{{name}}',
-  for: { register: 'plans' },
+  /* NO PAGE FOR A CANCELLED PLAN, SINCE money-core 3.42.1 (24 Nov, his record): a plan closed as a twin of another
+     (`one_with`) or cancelled by hand kept its page under Money, so "Sodic" and "Sodic 3" stood side by side. The row
+     stays, with its parts, and is read on Plans; only its page goes. A paid plan keeps its page, which says it is paid. */
+  for: { register: 'plans', where: 'state is not cancelled' },
   /* AFTER THE BOOKS, which are 20: the books say where money is kept, and a plan is one thing being paid for. */
   nav: { section: 'Money', order: 30 },
   icon: 'calendar',

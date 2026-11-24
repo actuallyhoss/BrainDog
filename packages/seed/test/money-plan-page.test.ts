@@ -173,12 +173,32 @@ const toComeOf = (blocks: Block[]): Block => blocks.find((b) => b.kind === 'tabl
 test('the page is one page a plan, under Money, and needs the list of plans', () => {
   assert.equal(MONEY_PLAN_PAGE.page, 'money-plan');
   assert.equal(MONEY_PLAN_PAGE.title, '{{name}}');
-  assert.deepEqual(MONEY_PLAN_PAGE.for, { register: 'plans' });
+  /* A CANCELLED PLAN HAS NO PAGE, SINCE money-core 3.42.1. */
+  assert.deepEqual(MONEY_PLAN_PAGE.for, { register: 'plans', where: 'state is not cancelled' });
   assert.equal((MONEY_PLAN_PAGE.nav as { section: string }).section, 'Money');
   assert.equal(MONEY_PLAN_PAGE.pack, 'money-core');
   const requires = MONEY_PLAN_PAGE.requires as string[];
   assert.ok(requires.includes('register.plans'), 'a record with no list of plans has no such page');
   assert.ok(requires.includes('register.installments'));
+});
+
+test('a cancelled plan has no page, and its row and its parts stay where they were', async () => {
+  const k = await moneyCore();
+  write(k, 'Sodic', SIX);
+  write(k, 'Sodic 3', ['paid', 'open']);
+  write(k, 'Noor', ['paid', 'paid']);
+  const twin = (k.list({ register: 'plans', limit: 10 }) as unknown as { ok: true; value: { rows: Entry[] } }).value.rows.find((r) => r.fields.name === 'Sodic 3')!;
+  value(k.update('plans', twin.id, { state: 'cancelled' }, OWNER));
+  const titles = (): string[] => (k.pages() as unknown as { title: string; template: string | null }[]).filter((p) => p.template === MONEY_PLAN_PAGE.page).map((p) => p.title).sort();
+  /* A PAID PLAN KEEPS ITS PAGE, which says nothing is left. */
+  assert.deepEqual(titles(), ['Noor', 'Sodic']);
+  /* NOTHING IS DELETED: the plan is still a row, cancelled, with both its parts. */
+  assert.equal(k.get(twin.id)?.fields.state, 'cancelled');
+  const parts = (k.list({ register: 'installments', where: { field: 'plan', is: 'Sodic 3' }, limit: 10 } as never) as unknown as { ok: true; value: { rows: Entry[] } }).value.rows;
+  assert.equal(parts.length, 2);
+  /* AND OPENED AGAIN, IT HAS ITS PAGE BACK. */
+  value(k.update('plans', twin.id, { state: 'open' }, OWNER));
+  assert.deepEqual(titles(), ['Noor', 'Sodic', 'Sodic 3']);
 });
 
 test('every figure of one plan is read once a plan, by the name its parts share', () => {
