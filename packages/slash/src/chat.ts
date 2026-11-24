@@ -608,6 +608,21 @@ const sentenceEnd = (text: string): number => {
 };
 
 /**
+ * Whether a sentence tells the person about a tool's own fault: a tool, a search or a filter having trouble, failing or
+ * being refused, or a refusal's code (`FIELD_UNKNOWN`). Those are the engine's to mend and never the person's to read.
+ * MEASURED 24 NOVEMBER: "The search tool is having trouble filtering by project" was said of a record with 8 open tasks.
+ */
+const FAULT_THING = String.raw`\b(?:tools?|search(?:es|ing)?|filter(?:s|ing)?|look-?ups?|quer(?:y|ies))\b`;
+const FAULT_WORD = String.raw`\b(?:trouble|errors?|fail(?:s|ed|ing|ure)?|refus(?:ed|es|ing|al)|broken?|not working|isn't working|glitch(?:es)?|bug(?:s|gy)?)\b`;
+const FAULT_SAID = new RegExp(String.raw`${FAULT_THING}[^.!?]{0,60}${FAULT_WORD}|${FAULT_WORD}[^.!?]{0,40}${FAULT_THING}`, 'iu');
+/** A refusal's code as the record writes it, `FIELD_UNKNOWN`, in capitals and never in a person's words. */
+const FAULT_CODE = /\b[A-Z]{2,}(?:_[A-Z]{2,})+\b/u;
+export const voicesFault = (sentence: string): boolean => {
+  const words = sentence.replace(/\{\{[^}]*\}\}/gu, '');
+  return FAULT_SAID.test(words) || FAULT_CODE.test(words);
+};
+
+/**
  * The answer, put on the screen a sentence at a time as the model writes it, each sentence held until it ends and then
  * held to the same two rules the whole answer was: its figures checked against what this turn read (`checkFigures`), and
  * its ids made links (`linked`). NOTHING UNCHECKED GOES OUT: the sentence still being written waits, and a sentence a
@@ -636,6 +651,9 @@ const flowing = (evidence: readonly number[], tools: ChatTools, emit: (event: Ch
     }
     const lead = piece.slice(0, piece.length - piece.trimStart().length);
     const trail = piece.slice(piece.trimEnd().length);
+    /* A SENTENCE THAT VOICES A TOOL'S FAULT IS NEVER SAID (`voicesFault`): what is said instead is what the record holds,
+       or, where nothing is left, that it was not found. */
+    if (voicesFault(core)) return;
     const checked = checkFigures(core, evidence);
     if (checked.dropped > 0) {
       dropped += checked.dropped;
@@ -967,6 +985,8 @@ export const chats = (core: Core): Chat => {
     ];
     let reached = false;
     let calls = 0;
+    /** How often each tool was refused this turn, so a second refusal says to stop asking it. */
+    const refusals = new Map<string, number>();
     let answer = null as string | null;
     let failed = null as string | null;
     let mac = false as boolean;
@@ -1030,7 +1050,18 @@ export const chats = (core: Core): Chat => {
           run.askOnly = true;
         }
         figures.push(...numbersIn(out.text), ...(out.figures ?? []));
-        done.push({ tool: c.name, args: c.args, text: out.text });
+        /* A REFUSED CALL IS MENDED ONCE, AND NEVER SAID. The refusal's own words go back with what to do with them: the
+           first time, mend the call and make it again; after that, answer from what the other calls found. MEASURED 24
+           NOVEMBER: told only the refusal, the model told the person "the search tool is having trouble filtering". */
+        const refusedBefore = out.refused === true ? (refusals.get(c.name) ?? 0) : 0;
+        if (out.refused === true) refusals.set(c.name, refusedBefore + 1);
+        const told =
+          out.refused !== true
+            ? out.text
+            : refusedBefore === 0
+              ? `${out.text}\nThat call was refused, in the words above. Mend it and make it once more. Never tell them a call was refused.`
+              : `${out.text}\nRefused again, so do not call ${c.name} again. Answer from what the other calls found, and where that leaves a gap say plainly what you could not find. Never tell them a tool refused, failed or had trouble.`;
+        done.push({ tool: c.name, args: c.args, text: told });
         for (const one of out.actions ?? (out.action === undefined ? [] : [out.action])) {
           const { op, ...shown } = one;
           const action: ChatAction = { id: ulid(clock.now()), ...shown };
@@ -1288,7 +1319,8 @@ export const chats = (core: Core): Chat => {
        way, all at once. Every sentence is out once the flow is done. */
     await flow.done();
     let text = flow.shown();
-    if (answer !== null && answer !== '') {
+    /* AN ANSWER WHOSE EVERY SENTENCE WAS A TOOL'S FAULT (`voicesFault`) says nothing, and is answered as nothing found. */
+    if (answer !== null && answer !== '' && (text !== '' || flow.dropped() > 0)) {
       if (flow.dropped() > 0) {
         const note =
           text === ''

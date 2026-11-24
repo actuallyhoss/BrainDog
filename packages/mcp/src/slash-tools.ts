@@ -41,6 +41,8 @@ export type SlashToolRan = {
   actions?: SlashToolAction[];
   navigate?: { href: string; label: string };
   step?: string;
+  /** The read was refused: `text` says why, for the model to mend its call once (`chat.ts` reads it). */
+  refused?: true;
 };
 
 /** How the engine's run stands when a tool is called (`ChatRun` in `@braindog/slash`). */
@@ -215,6 +217,34 @@ export const figureScore = (words: readonly string[], id: string, name: string):
 };
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
+
+/** The record's tests (`OPERATORS` in `@braindog/where`), which a leaf holds beside its `field`. */
+const TESTS: ReadonlySet<string> = new Set(['is', 'not', 'in', 'not_in', 'gt', 'gte', 'lt', 'lte', 'before', 'after', 'between', 'contains', 'matches', 'starts', 'ends', 'empty', 'present', 'has', 'lacks', 'near']);
+/** The keys a `where` node is already in the record's shape by. */
+const SHAPED: ReadonlySet<string> = new Set(['field', 'pointed', 'matches', 'via']);
+
+/**
+ * A `where` IN EITHER SHAPE A MODEL WRITES, as the record reads it. The record's is `{"field":"state","is":"open"}`, and a
+ * model as often writes a map of field to test, `{"state":{"is":"open"}}`, or of field to value, `{"state":"open"}`, or a
+ * list of either. MEASURED 24 NOVEMBER: asked "what tasks are still open there?" after "how is Kiln going?", the model
+ * wrote `{"thing":{"is":...}}`, the record answered FIELD_UNKNOWN twice, and Slash told the person "the search tool is
+ * having trouble" though Kiln had 8 open tasks. Each field of a map is one leaf, several are `all` of them; a value that
+ * is a list is `in` it; anything else is passed as it came, for the record to say what is wrong with it.
+ */
+export const whereShape = (where: unknown): unknown => {
+  if (Array.isArray(where)) return where.length === 1 ? whereShape(where[0]) : { all: where.map(whereShape) };
+  if (!isObject(where)) return where;
+  for (const group of ['all', 'any', 'none'] as const) if (Array.isArray(where[group])) return { ...where, [group]: (where[group] as unknown[]).map(whereShape) };
+  const keys = Object.keys(where);
+  if (keys.length === 0 || keys.some((k) => SHAPED.has(k) || TESTS.has(k))) return where;
+  const leaves = keys.map((field) => {
+    const v = where[field];
+    if (isObject(v) && Object.keys(v).length > 0 && Object.keys(v).every((k) => TESTS.has(k) || k === 'via')) return { field, ...v };
+    if (Array.isArray(v)) return { field, in: v };
+    return { field, is: v };
+  });
+  return leaves.length === 1 ? leaves[0] : { all: leaves };
+};
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 const clip = (s: string, most: number): string => (s.length <= most ? s : `${s.slice(0, most - 1)}…`);
 
@@ -662,6 +692,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
             break;
           }
         }
+        if (!found.result.ok) return { text: said, refused: true, step: `Searching for “${clip(q, 40)}”` };
         const held = heldRows(said, hitsOf(found));
         return { text: held.text, outside: held.outside, step: `Searching for “${clip(q, 40)}”` };
       }
@@ -674,8 +705,10 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         const one = await listNamed(text(args['list'] ?? args['register']));
         if (one === null) return { text: `There is no list called ${text(args['list']) || 'that'}. The lists are named before the tools.` };
         const limit = typeof args['limit'] === 'number' ? Math.min(Math.max(1, Math.floor(args['limit'])), 30) : 20;
-        const got = await agent.answer('list', { register: one.id, limit, ...(isObject(args['where']) ? { where: args['where'] } : {}) }, ctx);
-        const rows = got.result.ok && isObject(got.result.value) && Array.isArray(got.result.value.rows) ? got.result.value.rows : [];
+        const where = isObject(args['where']) || Array.isArray(args['where']) ? whereShape(args['where']) : undefined;
+        const got = await agent.answer('list', { register: one.id, limit, ...(where === undefined ? {} : { where }) }, ctx);
+        if (!got.result.ok) return { text: got.text, refused: true, step: `Reading ${one.name}` };
+        const rows = isObject(got.result.value) && Array.isArray(got.result.value.rows) ? got.result.value.rows : [];
         return { ...heldRows(got.text, rows), step: `Reading ${one.name}` };
       }
       case 'open': {

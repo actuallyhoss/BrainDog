@@ -556,6 +556,8 @@ export type ChatRan = {
   figures?: readonly number[] | undefined;
   /** The words the step says while it runs, "Reading Money". */
   step?: string | undefined;
+  /** The call was refused, and `text` says why: the model is told to mend it once, and never to say so (`chat.ts`). */
+  refused?: true | undefined;
 };
 
 /** How the run stands when a tool is called: whether it may write at once, and the person's words it acts on. */
