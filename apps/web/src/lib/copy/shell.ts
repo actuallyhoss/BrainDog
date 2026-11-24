@@ -167,7 +167,9 @@ export const shell = {
       action: 'Try again',
     }),
     rolling: { title: 'BrainDog is updating', body: 'Back in a minute.', action: 'Try again' },
-    broken: { title: 'This screen did not load', body: 'Nothing was changed.', action: 'Try again' },
+    /* A PAGE, OR ITS CODE, THAT DID NOT LOAD (24 November): its name says all of it. It said "Nothing was changed." under
+       "This screen did not load", which is a refused write's sentence on a page that only failed to arrive. */
+    broken: { title: "This page didn't load", body: '', action: 'Try again' },
     stuck: (address: string) => `Still not working? Write to ${address}.`,
     home: 'Go to Today',
     /** An address that leads to nothing (`NotFound.svelte`). */

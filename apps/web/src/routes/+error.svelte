@@ -18,10 +18,16 @@
     offline ? words.offline : page.status === 429 ? words.wait(wait) : page.status === 503 ? words.rolling : words.broken,
   );
   const stuck = $derived(said === words.broken);
+  const missing = $derived(page.status === 404 && !offline);
 
-  /* THE PAGE'S NAME IS THE FAILURE, SO THE CARD UNDER IT SAYS THE NEXT THING (UI pass, 3 Nov): the bar and the card both
-     said "No page here", and "This screen did not load" twice. The card's line is what follows from the name. */
+  /* A MISSING PAGE'S NAME IS THE FAILURE, SO THE CARD UNDER IT SAYS THE NEXT THING (UI pass, 3 Nov): the bar and the
+     card both said "No page here". The card's line is what follows from the name. */
   const missingWhy = 'The address may have a typo, or the page is gone.';
+
+  /* ANY OTHER FAILURE IS SAID WHOLE IN THE CARD, its name and its line (24 November), and the bar says only where you
+     are: on a place of the rail it said "Today" over a card reading "Nothing was changed.", which named no failure at
+     all, and elsewhere it said the failure's name over the card's. The tab still names it. */
+  const barTitle = $derived(missing ? words.missing : '');
 
   /* A FILE OF THE APP'S OWN CODE THAT DID NOT ARRIVE (`page.error.chunk`, `hooks.client.ts`) RELOADS THE PAGE ONCE, onto
      the address it failed at, and nothing is drawn meanwhile: the person sees the page arrive, not a failure flash before
@@ -31,11 +37,11 @@
 </script>
 
 <!-- A TAB AND A SCREEN READER ARE TOLD WHERE THEY ARE, HERE TOO: a page that failed in its load left the title empty. -->
-<svelte:head>{#if !quiet}<title>{titleOf(page.status === 404 && !offline ? words.missing : said.title)}</title>{/if}</svelte:head>
+<svelte:head>{#if !quiet}<title>{titleOf(missing ? words.missing : said.title)}</title>{/if}</svelte:head>
 
 {#if !quiet}
   <!-- THE PHONE'S BAR, with the mark, the bell and the face, over the page's own words; on a desk the crumb says it. -->
-  <PageHead title={page.status === 404 && !offline ? words.missing : said.title} headless />
+  <PageHead title={barTitle} headless />
   <div class="page">
     <!--
       ONE SENTENCE IN THE HOUSE VOICE, AND IT WAS TWO. `page.error.message` is SvelteKit's string and
@@ -54,34 +60,40 @@
       every call and the host echoes and logs it (19 §6); there is nothing to look up for a path
       that was never a route.
     -->
-    {#if page.status === 404 && !offline}
+    {#if missing}
       <NotFound title={missingWhy} />
     {:else}
       <!-- NO REQUEST ID HERE: it was a ten-character string a person could do nothing with. The Worker still logs one per call. -->
-      <Empty kind="error" heading title={said.body}>
+      <Empty kind="error" heading title={said.title} body={said.body || undefined}>
         {#snippet actions()}
+          <!-- A WHOLE RELOAD, NEVER A SECOND NAVIGATION: a file of the app's code that failed stays failed in this
+               document's module map, so only a new document can fetch it again. -->
           <Button weight="primary" onclick={() => location.reload()}>{said.action}</Button>
-          <!-- THE OTHER WAY ON (first F13): a page that will not load is not the only place to be. -->
-          <Button href="/">{words.home}</Button>
+          <!-- THE OTHER WAY ON (first F13): a page that will not load is not the only place to be. After a file that did
+               not arrive, Today is loaded whole too, for the same reason. -->
+          <Button href="/" data-sveltekit-reload={page.error?.chunk ? '' : undefined}>{words.home}</Button>
+          <!-- SUPPORT, IN THE CARD UNDER ITS TWO WAYS ON and centred with them, only under the failure a retry cannot
+               mend. It sat under the card at the page's start edge. -->
+          {#if stuck}<p class="stuck">{words.stuck(SUPPORT_EMAIL)}</p>{/if}
         {/snippet}
       </Empty>
-      {#if stuck}<p class="stuck">{words.stuck(SUPPORT_EMAIL)}</p>{/if}
     {/if}
   </div>
 {/if}
 
 <style>
-  /* ON THE GROUND AND NOTHING ELSE, as the spoken-id resolver's not-found is (`[id]/+page.svelte`): the page's gutter,
-     12 from the top of the work where a title row would stand, and `Empty` keeping its own words to the measure. No
-     tile: a failure is a sentence, its request id and the two ways on, not a card. */
+  /* ON THE GROUND, as the spoken-id resolver's not-found is (`[id]/+page.svelte`): the page's gutter, 12 from the top of
+     the work where a title row would stand, and `Empty` drawing the one tile with everything the failure says in it. */
   .page {
     padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
-  /* Support, only under the failure a retry cannot mend; the muted text token and the page's own measure. */
+  /* Support: a line of its own across the card's action row, 8 under the buttons, in the muted ink at the meta size. */
   .stuck {
-    margin: var(--sp-4) 0 0;
+    flex-basis: 100%;
+    margin: var(--sp-2) 0 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    max-width: 40ch;
+    line-height: var(--lead-meta);
+    text-align: center;
   }
 </style>
