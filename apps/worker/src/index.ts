@@ -3685,6 +3685,33 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
 }
 
 /**
+ * THE DIRECTORY'S TWO ANSWERS EVERY BEARER CALL ASKS, KEPT IN THIS ISOLATE A SHORT WHILE (24 November). `knows` is asked
+ * first and alone, and the lapse beside the record's `admit`, so every `/api` and `/mcp` call made two trips to the one
+ * Directory object, about 10,000 each a day, nearly all of them agents' pulses. Only a `true` from `knows` is kept, for
+ * `KNOWN_MS`; a lapse, either way, for `LAPSE_MS`; at most `KEPT_MOST` ids each, and a full map starts again empty.
+ * A deleted record stays known for up to 30 s, and its object refuses it anyway; a lapse lands within 60 s.
+ * `directoryKept.on` false asks every time, as before, for a test that must see a change at once.
+ */
+const KNOWN_MS = 30_000;
+const LAPSE_MS = 60_000;
+const KEPT_MOST = 2_000;
+const knownKept = new Map<string, number>();
+const lapseKept = new Map<string, { until: number; lapsed: boolean }>();
+const keptAs = <V,>(m: Map<string, V>, id: string, v: V): void => {
+  if (m.size >= KEPT_MOST && !m.has(id)) m.clear();
+  m.set(id, v);
+};
+export const directoryKept = {
+  on: true,
+  knownKept,
+  lapseKept,
+  clear: (): void => {
+    knownKept.clear();
+    lapseKept.clear();
+  },
+};
+
+/**
  * The bearer path's three calls, over this deployment's objects.
  *
  * WHERE A CALL CAME FROM IS THE BRANCH THE ROUTER TOOK, never the path read again. A path is the caller's
@@ -3692,14 +3719,30 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
  * in the one place a person decides what to revoke.
  *
  * `clock`, WHEN GIVEN, IS ADDED THE TIME OF EACH TRIP `bearerOf` MAKES: `knows`, the lapse (`billing`) and `admit`.
+ *
+ * `knows` AND THE LAPSE ARE ANSWERED FROM THIS ISOLATE WHILE THEY ARE KEPT (`directoryKept`), so a trip is made only when
+ * the kept answer is missing or out.
  */
 function bearerDeps(env: Env, clock?: BearerClock): BearerDeps {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   return {
-    knows: (id) => clocked(clock, 'knows', () => directory.knows(id)),
+    knows: async (id) => {
+      if (directoryKept.on && (knownKept.get(id) ?? 0) > Date.now()) return true;
+      const yes = await clocked(clock, 'knows', () => directory.knows(id));
+      if (!directoryKept.on) return yes;
+      if (yes) keptAs(knownKept, id, Date.now() + KNOWN_MS);
+      else knownKept.delete(id);
+      return yes;
+    },
     /* THE DIRECTORY'S ROW AND NOT THE OBJECT'S FLAG, as the session's `lapsed` is, so both doors cap on one fact. A record
        with no billing row answers `false` and is never capped. */
-    lapsed: (id) => clocked(clock, 'billing', async () => ((await directory.billing({ op: 'lapsed', record: id })) as unknown) === true),
+    lapsed: async (id) => {
+      const kept = directoryKept.on ? lapseKept.get(id) : undefined;
+      if (kept !== undefined && kept.until > Date.now()) return kept.lapsed;
+      const lapsed = await clocked(clock, 'billing', async () => ((await directory.billing({ op: 'lapsed', record: id })) as unknown) === true);
+      if (directoryKept.on) keptAs(lapseKept, id, { until: Date.now() + LAPSE_MS, lapsed });
+      return lapsed;
+    },
     verify: (id, bearer, surface, build) => held(env, id, (record) => record.verify(bearer, surface, build)),
     access: (id, person, token) => held(env, id, (record) => (token === undefined ? record.access(person) : record.access(person, token))),
     /* THE TWO ABOVE IN ONE TRIP TO THE RECORD, which is what the bearer path asks (`Record$.admit`). */
