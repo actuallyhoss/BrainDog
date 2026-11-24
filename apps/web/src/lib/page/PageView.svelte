@@ -98,7 +98,7 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { may } from '$lib/record/may.ts';
   import { words } from './words.ts';
-  import { heldTo, holdsOf, inVoice, keptAs, previewedBody, readToArrange, weekHeld, type ToArrange } from './home-arrange.ts';
+  import { heldTo, holdsOf, inVoice, keptAs, previewedBody, readToArrange, voicedOn, weekHeld, type ToArrange } from './home-arrange.ts';
   import { said } from '$lib/voice.svelte.ts';
   import BatchBar from './BatchBar.svelte';
   import { filterOf, filterQuery, filtersOf } from './filters.ts';
@@ -911,9 +911,10 @@
   /**
    * The blocks the page is laid out from: the home's body while it is arranged, else what the record answered.
    *
-   * AS THIS READER IS DRAWN THEM, wherever the page is read rather than previewed (`home-arrange.ts`): a house heading
-   * in the voice that speaks, so a home kept from Today still says Settings › Words' lines, and no line to add a row to a
-   * list this reader may not add to. Each block stays at its place, so every write still finds it.
+   * AS THIS READER IS DRAWN THEM, wherever the page is read rather than previewed (`home-arrange.ts`): on Today's pages
+   * alone (`voicedOn`), a house heading in the voice that speaks, so a home kept from Today still says Settings › Words'
+   * lines, and no line to add a row to a list this reader may not add to. Each block stays at its place, so every write
+   * still finds it.
    */
   const laidFrom = $derived.by<LiveBlock[]>(() => {
     const blocks = declaredOnly(toArrange ? toArrange.blocks : (live?.page.blocks ?? []));
@@ -922,7 +923,7 @@
     /* BEFORE THE RECORD HAS ANSWERED `boot` THE SHELL IS THE LAST ONE'S WITHOUT ITS LEVELS (`me.levels` has none), so a line the
        kept page drew for this reader is not taken out for want of them: Money's Add an account was drawn a second late, under
        the page's first paint, and moved everything below it. The record answers a press either way. */
-    const drawn = heldTo(inVoice(blocks, said), (list) => !shell?.me || Object.keys(shell.me.levels ?? {}).length === 0 || may(shell, 'append', list));
+    const drawn = heldTo(voicedOn(mode, slug) ? inVoice(blocks, said) : blocks, (list) => !shell?.me || Object.keys(shell.me.levels ?? {}).length === 0 || may(shell, 'append', list));
     /* A BLOCK THE PROJECT'S SHAPE SAYS ALREADY IS LEFT OUT, by the source it declares (`repeatOf`), once the shape has it. */
     /* ON A PROJECT'S PAGE, WHAT THE HERO AND ITS TILES SAY IS NOT SAID AGAIN, and More about is folded (`project-page.ts`).
        Not while the page is arranged, which moves the blocks as they are declared. */

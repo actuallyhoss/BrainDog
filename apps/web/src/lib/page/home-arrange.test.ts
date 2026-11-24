@@ -16,7 +16,7 @@ import { openRecord } from '@braindog/kernel';
 import '../record/fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { VOICE_LINES, type VoiceKey } from '../voice.ts';
-import { heldTo, holdsOf, inVoice, keptAs, previewedBody, readToArrange, unkeep, voiceOf, whileHeld } from './home-arrange.ts';
+import { heldTo, holdsOf, inVoice, keptAs, previewedBody, readToArrange, unkeep, voicedOn, voiceOf, whileHeld } from './home-arrange.ts';
 
 const BASE = 'http://record.test';
 
@@ -190,6 +190,14 @@ test('a kept heading is said in the voice that speaks, words somebody wrote are 
   assert.equal(out[2]?.heading, 'Due soon');
   assert.equal(out[3], blocks[3], 'a block with nothing to say again is the same block');
   assert.deepEqual(inVoice(out, said), out, 'twice is once');
+});
+
+test("the voice says Today's headings on Today's pages only, and the Agents page keeps its own Working now", () => {
+  assert.equal(voicedOn('home', 'home-founder'), true);
+  assert.equal(voicedOn('page', 'home'), true);
+  assert.equal(voicedOn('page', 'home-founder'), true);
+  assert.equal(voicedOn('page', 'agents'), false);
+  assert.equal(voicedOn('page', 'homes'), false);
 });
 
 test('the line to add a task is not drawn for a reader who may not add one, and stays at its place', () => {

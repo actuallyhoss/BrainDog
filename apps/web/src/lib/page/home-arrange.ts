@@ -164,6 +164,14 @@ const keyOf = (line: unknown, keys: readonly VoiceKey[]): VoiceKey | null =>
   typeof line === 'string' ? (keys.find((k) => VOICE_LINES[k] === line) ?? null) : null;
 
 /**
+ * WHETHER A PAGE IS ONE OF TODAY'S, whose house headings the voice says (`inVoice`): Home as drawn (`mode: 'home'`), and
+ * a home page the record holds read at its own address (`home`, `home-founder`). ONLY THERE (25 Nov): the voice's lines
+ * are Home's headings, and said on every page the Agents page's own "Working now" read "Agents at work" on a founder's
+ * record, the heading the founder's Today gives its tile of the same runs.
+ */
+export const voicedOn = (mode: string, slug: string): boolean => mode === 'home' || slug === 'home' || slug.startsWith('home-');
+
+/**
  * THE BLOCKS IN THE VOICE THAT SPEAKS: a heading or an empty line that is a house line Today asks the voice for is said
  * the voice's way. A heading somebody wrote in words of their own is not a house line and is left as they wrote it, and
  * a block already in the voice is unchanged, so this may run on a page twice.
