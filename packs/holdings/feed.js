@@ -18,8 +18,10 @@
  *
  * WHAT IT WRITES. A gram of 24k is an ounce over 31.1034768 grams, plus the premium; each other karat is that times
  * its karat over 24, as `holdings_cost` already prices a karat with no rate of its own. One row a karat, dated the day
- * the price is of, `from` set to `feed`, for 24k and for each karat the record's gold or its gold rates are in, so a
- * karat nobody holds is not written every day. `holdings_cost` marks the newest a karat as in use, as it does for a
+ * the price is of, `from` set to `feed`, for 24k and for each karat the record's holdings (and so their buys) are in, or
+ * a rate somebody typed in the last 30 days, so a karat nobody holds is not written every day. A RATE THE FEED WROTE KEEPS NO
+ * KARAT ALIVE, SINCE 3.8.1: it counted every karat any rate was in, so the 21k rates it had written kept it writing 21k
+ * every day after the last 21k gold became 24k. `holdings_cost` marks the newest a karat as in use, as it does for a
  * rate typed by hand, and works every gold holding out again.
  *
  * A RATE A PERSON TYPED IS NEVER WRITTEN OVER, OR OUTRUN ON ITS OWN DAY. A karat that holds a rate set by hand (`from`
@@ -73,10 +75,22 @@ export function currencyOf(set, rates, gold) {
   return null;
 }
 
-/** The karats to write: 24k, and each one the record's gold or its gold rates are in. */
-export function karatsOf(rates, gold) {
+/** How far back a rate somebody typed keeps its karat written. */
+const TYPED_DAYS = 30;
+
+/** The day `days` before `day`, both as YYYY-MM-DD. */
+export function daysBefore(day, days) {
+  return new Date(Date.parse(`${day}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * The karats to write: 24k, each one a holding is in (and so each its buys are in), and each one a rate typed by hand
+ * (`from` empty or `hand`) on `since` or later is in. A rate the feed wrote counts for nothing here.
+ */
+export function karatsOf(holdings, rates, since) {
   const held = new Set(['24k']);
-  for (const r of [...rates, ...gold]) if (typeof r.fields.karat === 'string' && PURITY[r.fields.karat] !== undefined) held.add(r.fields.karat);
+  const typed = rates.filter((r) => r.fields.from !== 'feed' && typeof r.fields.on === 'string' && r.fields.on >= since);
+  for (const r of [...holdings, ...typed]) if (typeof r.fields.karat === 'string' && PURITY[r.fields.karat] !== undefined) held.add(r.fields.karat);
   return Object.keys(PURITY).filter((k) => held.has(k));
 }
 
@@ -188,7 +202,18 @@ export default async function run(ctx) {
   }
   const today = ctx.today();
   const day = got.day !== null && got.day <= today ? got.day : today;
-  const prices = gramsOf(got.ounce, currency, set.premium, karatsOf(rates, gold));
+  /* WHAT IS HELD, AND WHAT WAS TYPED THIS MONTH, asked a karat at a time, so a first page of 24k gold or of the feed's
+     own rows never hides a karat somebody holds. A buy's karat is its holding's, read through the link and kept on no
+     row, so the holdings say every karat a buy is in. */
+  const typedSince = daysBefore(day, TYPED_DAYS);
+  const held = [];
+  const typed = [];
+  for (const karat of Object.keys(PURITY)) {
+    if (karat === '24k') continue;
+    held.push(...(await ctx.record.list('holdings', { field: 'karat', is: karat })).slice(0, 1));
+    typed.push(...(await ctx.record.list('gold_rates', { all: [{ field: 'karat', is: karat }, { field: 'on', gte: typedSince }, { field: 'from', not: 'feed' }] })));
+  }
+  const prices = gramsOf(got.ounce, currency, set.premium, karatsOf([...gold, ...held], typed, typedSince));
   const note = set.premium === 0 ? 'World price' : `World price, plus ${set.premium}%`;
 
   const since = await ctx.record.list('gold_rates', { field: 'on', gte: day });

@@ -142,7 +142,7 @@ const SPREAD_MS = 15 * 60_000;
 test('THE FILE IS 2.0.0, Investments and gold, and every field and kind 1.4.2 held is still there as it was', () => {
   const doc = file();
   const old = v142();
-  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.8.0', 'Investments and gold']);
+  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.8.1', 'Investments and gold']);
   assert.equal(old.version, '1.4.2', 'the frozen 1.4.2 moved');
   assert.equal(v100().version, '1.0.0', 'the frozen 1.0.0 moved');
   assert.deepEqual(doc.requires, old.requires);
@@ -233,13 +233,13 @@ test('INSTALLED FROM THE FILE: three lists, five rules, three scripts, twenty-tw
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), ADDS);
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.8.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.8.1');
   close();
 });
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.8.0']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.8.1']);
 });
 
 test('NO FILE OF THIS ADD-ON NAMES A CURRENCY IN A FORMAT, so every amount reads in the money somebody chose', () => {
@@ -684,7 +684,7 @@ async function upgraded(doc: Doc, rows: readonly Body[] = HELD): Promise<Awaited
   const diff = await planOf(made.api, file());
   assert.deepEqual(diff.conflicts, [], 'the update met a conflict');
   said(await put(made.api, file()));
-  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.8.0');
+  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.8.1');
   return { ...made, ids, before };
 }
 
@@ -1015,6 +1015,23 @@ test('A RATE TYPED BY HAND FOR THE DAY IS KEPT, and the feed\'s own rate that da
   /* AND RUN AGAIN AT THE SAME PRICE, NOTHING IS WRITTEN. */
   const again = await feed({ gold_source: 'world_price' }, { holdings: [GOLD_21K], gold_rates: [rates[0]!, row(6, { ...rates[1]!.fields, per_gram: egp(643_015) })] }, WORLD);
   assert.deepEqual(again.writes, []);
+});
+
+test('A KARAT NOBODY HOLDS IS NO LONGER WRITTEN: the feed\'s own old rates keep nothing alive, a rate typed this month does', async () => {
+  /* THE OWNER'S GOLD WAS 21k AND IS 24k NOW: thirty days of the feed's 21k rates, an old 18k rate typed by hand, and a
+     22k rate typed three days ago. */
+  const bars = row(1, { label: 'Gold 24k', kind: 'gold', karat: '24k', qty: 80 });
+  const fed = Array.from({ length: 30 }, (_, i) => row(10 + i, { karat: '21k', per_gram: egp(551_595), on: `2026-09-${String(i + 1).padStart(2, '0')}`, from: 'feed', note: 'World price' }));
+  const old = row(50, { karat: '18k', per_gram: egp(470_000), on: '2026-07-01', from: 'hand' });
+  const typed = row(51, { karat: '22k', per_gram: egp(590_000), on: '2026-09-22' });
+  const ran = await feed({ gold_source: 'world_price' }, { holdings: [bars], gold_rates: [...fed, old, typed] }, WORLD);
+  assert.deepEqual(
+    ran.writes.map((w) => (w as { fields: Body }).fields.karat),
+    ['24k', '22k'],
+  );
+  /* AND WITH NOTHING TYPED, ONLY 24k. */
+  const only = await feed({ gold_source: 'world_price' }, { holdings: [bars], gold_rates: fed }, WORLD);
+  assert.deepEqual(only.writes.map((w) => (w as { fields: Body }).fields.karat), ['24k']);
 });
 
 test('SPOT IN DOLLARS IS TURNED INTO POUNDS BY MONEY\'S OWN RATE, and with no rate it writes nothing and asks nobody', async () => {

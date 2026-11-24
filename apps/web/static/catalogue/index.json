@@ -3470,8 +3470,60 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "3.8.0",
+      "latest": "3.8.1",
       "versions": [
+        {
+          "version": "3.8.1",
+          "checksum": "7b056fc038fec7fc8253fa2c0335f6c6dd6dad6d4518c1148288e2d13e2e1181",
+          "bytes": 68615,
+          "published_at": "2026-11-24T16:27:55.875Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "latest.currency-api.pages.dev",
+                "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
+                "key": null
+              }
+            ],
+            "widgets": [
+              "Gold price"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.fx",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "The gold feed stops writing a rate for a karat you no longer hold. It writes 24k, each karat your gold is in, and any karat you typed a rate for in the last 30 days.",
+          "preview": true
+        },
         {
           "version": "3.8.0",
           "checksum": "b1689b1df481564ff98eca7aacbecbfc0c5df2944509cb802dc6e8c485bb5311",

@@ -89,8 +89,9 @@ test('THE PACK DECLARES ITS LIST UNDER ITS OWN NAME, with the four 1.x kinds fir
   assert.equal(doc.pack, 'holdings');
   /* 3.3.0 SINCE round 1030: gold valued from the newest rate of any karat, and the rate box beside the gold rates. 3.7.2
      SINCE 3 November (3ea2e541c), through what has no price or no cost left out of the figures (d60db4101, 1767124b5).
-     3.8.0 SINCE 24 November: each buy's worth now and gain, and Gold, worth now. */
-  assert.equal(doc.version, '3.8.0');
+     3.8.0 SINCE 24 November: each buy's worth now and gain, and Gold, worth now; 3.8.1 the same day, the feed writing only
+     the karats held. */
+  assert.equal(doc.version, '3.8.1');
   const lists = doc.declarations.filter((d) => typeof d.register === 'string' && d.rule === undefined);
   assert.deepEqual(lists.map((d) => [d.register, d.pack]), [['holdings', 'holdings'], ['holding_buys', 'holdings'], ['gold_rates', 'holdings']]);
   const kind = (lists[0]!.fields as Field[]).find((f) => f.id === 'kind')!;
@@ -123,7 +124,7 @@ test('A RECORD ON 1.8.0 HOLDING ROWS UPDATES TO 2.0.0 AND TAKES THE PACK, every 
   assert.deepEqual(snapshot(k, ids), before, 'a row, its id or its history moved');
   assert.equal(k.count('holdings'), 14);
   const packs = k.packs().filter((p) => p.id === 'holdings' || p.id === 'money-core').map((p) => [p.id, p.version]);
-  assert.deepEqual(packs, [['holdings', '3.8.0'], ['money-core', FIRST_PARTY_VERSIONS['money-core']]]);
+  assert.deepEqual(packs, [['holdings', '3.8.1'], ['money-core', FIRST_PARTY_VERSIONS['money-core']]]);
 
   /* AND THE RECORD GOES ON TAKING GOLD, now the pack's word, and every 1.x kind. */
   assert.ok(k.create('holdings', { kind: 'gold', label: 'Gold 21c', qty: 1, unit_cost: { amount: 480_000, currency: 'EGP' } } as never, { actor: 'p_1' }).ok);
