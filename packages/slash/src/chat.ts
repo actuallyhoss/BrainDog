@@ -589,6 +589,20 @@ const deepFailed = (e: unknown): string => {
   return "Deep couldn't reach Anthropic just now. Try again in a moment.";
 };
 
+/** Why Deep did not answer a turn it was asked: it declined, or the call to Anthropic threw. */
+type DeepDown = { refused: true } | { thrown: unknown };
+
+/**
+ * Said beside an answer Slash's own model gave because Deep did not (audit finding 14: a decline ended the turn as "Deep
+ * declined to answer that one." with no answer at all). A key Anthropic refused still says what to mend.
+ */
+export const deepFellBack = (down: DeepDown): string => {
+  if ('refused' in down) return "Deep declined this one, so Slash's own model answered it.";
+  const status = typeof down.thrown === 'object' && down.thrown !== null ? (down.thrown as { refused?: unknown }).refused : undefined;
+  if (status === 401 || status === 403) return "Anthropic refused your key for Deep, so Slash's own model answered this one. Check the key in Keys.";
+  return "Deep couldn't answer just now, so Slash's own model answered this one.";
+};
+
 /** The sentence when Deep has no key here: the two ways it can answer. */
 const NO_DEEP_KEY = 'Deep answers on your own Anthropic key, and none is set. Add one in Settings › Agents, or send this to Claude on your Mac.';
 
@@ -945,6 +959,8 @@ export const chats = (core: Core): Chat => {
     }
     const model = s.model ?? PROMPTS.chat.model;
     const holds: string[] = goDeep ? [] : [core.reserve('read', s.tier, model, ASKED)];
+    /* QUICK'S FIRST STEP SETTLES THIS HOLD: the one above, or the one taken when Deep did not answer and Quick answers. */
+    let quickHold = holds[0];
 
     const thread = rethink ? { id: input.thread!, fresh: false } : threadFor(input.thread, person);
     emit({ type: 'thread', id: thread.id });
@@ -990,6 +1006,10 @@ export const chats = (core: Core): Chat => {
     let answer = null as string | null;
     let failed = null as string | null;
     let mac = false as boolean;
+    /* WHY DEEP DID NOT ANSWER, where it declined or its call threw, and whether Slash's own model then answered instead. */
+    let deepDown = null as DeepDown | null;
+    let deepSaid = null as string | null;
+    let fell = false as boolean;
     const says = (): Partial<Kept> => ({
       ...(writing.steps.length > 0 ? { steps: writing.steps } : {}),
       ...(writing.go.length > 0 ? { go: writing.go } : {}),
@@ -1145,6 +1165,7 @@ export const chats = (core: Core): Chat => {
           if (answered)
             core.account({ id, kind: 'read', tier: 'b', model: deepModel, usage: usage ?? { in: 0, out: 0 }, ms: clock.now() - started, status: 'error', code: 'UNREACHABLE', purpose: 'ask', spends: step === 0 ? 'person' : 'none', served: true });
           failed = deepFailed(e);
+          deepDown = { thrown: e };
           return;
         }
         const u = reply.usage;
@@ -1165,6 +1186,7 @@ export const chats = (core: Core): Chat => {
 
         if (reply.stop === 'refusal') {
           failed = 'Deep declined to answer that one.';
+          deepDown = { refused: true };
           return;
         }
         const text = reply.content
@@ -1209,7 +1231,18 @@ export const chats = (core: Core): Chat => {
       if (goDeep) {
         if (mode === 'auto') emit({ type: 'step', text: 'Thinking harder…' });
         await deepLoop(brain!, rethink ? DEEP_HARDER : DEEP_MODEL);
-      } else {
+        /* DEEP DECLINED OR ITS CALL THREW BEFORE ANY WORD WAS SHOWN: Slash's own model answers, where it may, with the month's
+           check and the hold taken together as above, and a plain note says so beside the answer. */
+        if (deepDown !== null && answer === null && flow.shown() === '' && !quickClosed && !(s.tier === 'a' && core.asksUsed() >= s.ask_cap)) {
+          quickHold = core.reserve('read', s.tier, model, ASKED);
+          holds.push(quickHold);
+          fell = true;
+          deepSaid = failed;
+          failed = null;
+          emit({ type: 'step', text: "Deep didn't answer, so Slash's own model is answering." });
+        }
+      }
+      if (!goDeep || fell) {
         emit({ type: 'brain', depth: 'quick' });
         /* `auto` HANDS A TURN QUICK CANNOT FINISH TO DEEP: one that would have to answer because its steps or calls ran out,
            or whose model failed, before any word of it was shown. */
@@ -1217,7 +1250,7 @@ export const chats = (core: Core): Chat => {
         for (let step = 0; step < STEPS_MOST && answer === null; step++) {
           const last = step === STEPS_MOST - 1 || calls >= CALLS_MOST;
           if (last && mode === 'auto') {
-            if (brain !== null) {
+            if (brain !== null && !fell) {
               handOff = true;
               break;
             }
@@ -1240,7 +1273,7 @@ export const chats = (core: Core): Chat => {
             text = prompt();
           }
 
-          const id = step === 0 ? holds[0]! : core.reserve('read', s.tier, model, STEPPED);
+          const id = step === 0 ? quickHold! : core.reserve('read', s.tier, model, STEPPED);
           if (step > 0) holds.push(id);
           /* THE LAST STEP CAN ONLY ANSWER: its schema has no calls, so a model that would have called again says what it has,
              where before it called again, the calls were dropped and the person was told nothing was found. */
@@ -1275,7 +1308,7 @@ export const chats = (core: Core): Chat => {
             raw: ran.raw,
           });
           if (!ran.out.ok) {
-            if (mode === 'auto' && brain !== null && flow.shown() === '') {
+            if (mode === 'auto' && brain !== null && !fell && flow.shown() === '') {
               handOff = true;
               break;
             }
@@ -1332,6 +1365,13 @@ export const chats = (core: Core): Chat => {
     } else if (failed === null && text === '') {
       text = actions.length > 0 ? 'Done.' : "I couldn't find that in the record.";
       emit({ type: 'delta', text });
+    }
+    /* AN ANSWER SLASH'S OWN MODEL GAVE FOR DEEP says so beside it; where that failed too, both are said. */
+    if (fell && failed !== null) failed = `${deepSaid ?? ''} ${failed}`.trim();
+    else if (fell && deepDown !== null && text !== '') {
+      const note = ` (${deepFellBack(deepDown)})`;
+      emit({ type: 'delta', text: note });
+      text += note;
     }
 
     if (failed !== null) emit({ type: 'error', text: failed });
