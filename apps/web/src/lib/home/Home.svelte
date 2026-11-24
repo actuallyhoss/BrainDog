@@ -1150,7 +1150,10 @@
     /* URGENT WORK AND WORK HANDED BACK STAND IN THE LATE BAND, under the late lines, each with its tick: their
        own tiles are not drawn, and with nothing late the first of them carries the band. */
     const bandAt = board ? band.at : [];
-    const lateTile = bandShown.length > 0 ? (lateShown.length > 0 ? lateAt[0] : bandAt[0]) : undefined;
+    /* THE BAND TAKES LATE'S CELL ONLY WHILE NOTHING ELSE DRAWN THERE HOLDS IT: Late drawn as a plain list keeps its cell,
+       and two cards were drawn in one. */
+    const lateHeld = lateShown.length === 0 && shaped.blocks.some((b, n) => b.key === 'late' && b.drawn && !bandAt.includes(n) && !lateAt.includes(n));
+    const lateTile = bandShown.length > 0 && !lateHeld ? (lateShown.length > 0 ? lateAt[0] : bandAt[0]) : undefined;
     const named = (id: string): string => data.lists.find((l) => l.id === id)?.name ?? '';
     const lateMost = DESK_SHOWS[boardModel.sizeNow('late')];
     const sized = (k: string): number => DESK_SHOWS[boardModel.sizeNow(k)];
@@ -1163,7 +1166,7 @@
            board stands as it last stood and the answer lands without moving it. */
         if (isPending(b)) return { ...b, drawn: skelKeys.has(b.key ?? '') };
         if (n === lateTile) return { ...b, drawn: true, desk: { kind: 'late', lines: bandShown, heading: band.lines.length > 0 ? bandHeading(bandShown, late?.more ?? 0, words.band) : late?.heading || voice.overdue, more: late?.more ?? 0, most: board ? lateMost : phone.current ? 3 : 5 } };
-        if (lateAt.includes(n) || bandAt.includes(n)) return { ...b, drawn: false };
+        if (lateAt.includes(n) || (bandAt.includes(n) && lateTile !== undefined)) return { ...b, drawn: false };
         /* WHAT ARRIVED IS HOME'S OWN READING (`Landed.svelte`), drawn in the place of the feed it stands for. */
         if (board && b.key === 'arrivals') return { ...b, drawn: false };
         /* A VITAL SIGN READING RED IS SAID UNDER WHAT NEEDS YOU, in its tile (`signsSaid`), not as a tile of its own. */
@@ -1796,7 +1799,11 @@
   const lateLines = $derived(late ? onceEach(late.lines, (line) => verbOf(line, (list) => may(data, 'write', list)) !== null) : []);
   const queued = $derived(shaped?.blocks.find((b) => b.key === 'needs-you')?.queue ?? []);
   const lateShown = $derived(inBriefOrder(unasked(lateLines, queued)));
-  const band = $derived(board && shaped ? bandOf(shaped.blocks, { urgent: words.urgent, back: words.toCheck }, { urgent: words.urgentWhy, back: words.backWhy }, new Set(lateLines.map((l) => l.key))) : { lines: [], at: [] });
+  /* A HANDED BACK OR AN URGENT HE SIZED IS A WIDGET OF ITS OWN, drawn in its own cell and not in Late's (`bandOf`). */
+  const ownTiles = $derived(new Set(boardWidgets.map((w) => w.key)));
+  const band = $derived(
+    board && shaped ? bandOf(shaped.blocks, { urgent: words.urgent, back: words.toCheck }, { urgent: words.urgentWhy, back: words.backWhy }, new Set(lateLines.map((l) => l.key)), ownTiles) : { lines: [], at: [] },
+  );
   const bandShown = $derived([...lateShown, ...unasked(band.lines, queued)]);
 
   /* WHERE A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD LANDS (`landing.ts`), and `null` for everybody else. */

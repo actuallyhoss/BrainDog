@@ -1083,6 +1083,7 @@ export function homeDrawn(
      over nothing goes with its blocks here as it does on the page. */
   const out = emptyHidden(fed);
   for (const at of lateAt) lateTile(out, at, today, voice);
+  lateAlone(out, today, voice);
   /* WHAT COMES UP, A DAY AT A TIME, each day a chip with what falls due on it beside it. */
   for (const [n, b] of out.entries())
     if (b.drawn && !says(b) && isDue(b) && b.kind === 'timeline' && aligned(b) && !(b as WithRows).homeRows)
@@ -1473,18 +1474,38 @@ function lateTile(blocks: LiveBlock[], at: number, today: string, voice: HomeVoi
     if (owes) blocks[at] = { ...money, homeRows: { kind: 'late', lines: lateLines([money], today), more: { tasks: 0, money: beyond(money) } } } as WithRows;
     return;
   }
+  blocks[at - 1] = lateList(tasks, owes ? money : null, today, voice);
+  if (owes) blocks[at] = { ...money, drawn: false };
+}
+
+/** The late tasks as the late list, with the late money after them where there is any. */
+function lateList(tasks: LiveBlock, money: LiveBlock | null, today: string, voice: HomeVoice): WithRows {
   const heading = tasks.heading === voice.overdue && tasks.entries.some((e) => dayIn(tasks, e.fields as Record<string, unknown>) === today) ? words.lateOrToday : tasks.heading;
-  const both = owes ? [tasks, money] : [tasks];
-  blocks[at - 1] = {
+  const both = money ? [tasks, money] : [tasks];
+  return {
     ...tasks,
     ...(heading === undefined ? {} : { heading }),
     /* EACH HALF'S OWN COUNT PAST WHAT IT DREW, which the one count of both below cannot say (`LateMore`). */
-    homeRows: { kind: 'late', lines: lateLines(both, today), more: { tasks: beyond(tasks), money: owes ? beyond(money) : 0 } },
+    homeRows: { kind: 'late', lines: lateLines(both, today), more: { tasks: beyond(tasks), money: money ? beyond(money) : 0 } },
     shown: both.reduce((n, b) => n + b.rows.length, 0),
     total: both.reduce((n, b) => n + b.total, 0),
   } as WithRows;
-  if (owes) blocks[at] = { ...money, drawn: false };
 }
+
+/**
+ * THE LATE WORK IS THE LATE LIST WHEREVER IT STANDS (24 Nov). It became one only from the money block after it, so on his
+ * Today, arranged with the late money taken off and Late moved, Late was drawn as a plain list under the key the late band
+ * also took, and Home drew the two cards in one cell with Handed back over the late lines.
+ */
+function lateAlone(blocks: LiveBlock[], today: string, voice: HomeVoice): void {
+  for (const [n, b] of blocks.entries()) {
+    if (b.key !== LATE_KEY || (b as WithRows).homeRows || !lateTasks(b, today) || !aligned(b)) continue;
+    blocks[n] = lateList(b, null, today, voice);
+  }
+}
+
+/** The key Today's late work is declared under, which Home draws the late band on (`boardKeyOf`). */
+const LATE_KEY = 'late';
 
 /** A clause that keeps a day column before a day: `by before +1d`, `day before today`. */
 const BEFORE = /^\s*([a-z][a-z0-9_]*)\s+before\s+(\S+)\s*$/u;

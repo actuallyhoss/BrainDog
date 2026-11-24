@@ -110,13 +110,22 @@ export type BandHeadings = { urgent: string; back: string };
  * down a laptop and 6,600px down a phone. Each drawn `todo` block declared under one of the two headings gives its rows
  * as lines, each with its tick and how it got here in words; a row already in the late list is not said twice. `at` is
  * where each such block stands, so the page marks it not drawn.
+ *
+ * AND ONLY WHERE THE BLOCK IS NO WIDGET OF ITS OWN (`own`, 24 Nov): a Handed back given a size and a place on the board is
+ * a tile he put there, drawn in its own cell. Folded into Late as well, it was drawn in Late's cell over the late lines.
  */
-export function bandOf(blocks: readonly LiveBlock[], headings: BandHeadings, said: { urgent: string; back: string }, already: ReadonlySet<string>): { lines: HomeLine[]; at: number[] } {
+export function bandOf(
+  blocks: readonly LiveBlock[],
+  headings: BandHeadings,
+  said: { urgent: string; back: string },
+  already: ReadonlySet<string>,
+  own: ReadonlySet<string> = new Set(),
+): { lines: HomeLine[]; at: number[] } {
   const lines: HomeLine[] = [];
   const at: number[] = [];
   const seen = new Set(already);
   blocks.forEach((b, n) => {
-    if (!b.drawn || b.kind !== 'todo') return;
+    if (!b.drawn || b.kind !== 'todo' || (typeof b.key === 'string' && own.has(b.key))) return;
     const mark = b.heading === headings.urgent ? 'urgent' : b.heading === headings.back ? 'back' : null;
     if (mark === null) return;
     at.push(n);

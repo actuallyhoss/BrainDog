@@ -8,7 +8,7 @@ import { test } from 'node:test';
 
 import type { LiveBlock } from '../record/page-live.ts';
 import type { HomeLine } from './home-rows.ts';
-import { NAMED_MOST, bandHeading, briefOf, greetingOf, inBriefOrder, lateFigure, lateOf, onceEach, unasked } from './today-brief.ts';
+import { NAMED_MOST, bandHeading, bandOf, briefOf, greetingOf, inBriefOrder, lateFigure, lateOf, onceEach, unasked } from './today-brief.ts';
 
 const money = (key: string, title: string, when: string, href = `/r/${key.replace('#', '/')}`): HomeLine => ({
   key,
@@ -145,4 +145,15 @@ test('the late tile is named for every kind it holds (live check of 30 October, 
   assert.equal(bandHeading([urgent, back], 0, said), 'Urgent and handed back');
   assert.equal(bandHeading([back], 2, said), 'Late and handed back');
   assert.equal(bandHeading([bill, urgent], 0, said), 'Late and urgent');
+});
+
+test('HANDED BACK GIVEN A CELL OF ITS OWN IS DRAWN THERE, not folded into Late as well (his Today, 24 Nov)', () => {
+  const todo = (key: string, heading: string, seq: number) =>
+    ({ key, kind: 'todo', heading, drawn: true, source: 'register.tasks', rows: [{ key: '', cells: ['Try it on a phone'] }], entries: [{ seq, fields: { what: 'Try it on a phone' } }] }) as unknown as LiveBlock;
+  const blocks = [todo('late', 'Late', 1), todo('to-check', 'Handed back to you', 2)];
+  const heads = { urgent: 'Urgent', back: 'Handed back to you' };
+  const said = { urgent: 'urgent', back: 'handed back to you' };
+  assert.deepEqual(bandOf(blocks, heads, said, new Set()).at, [1]);
+  const own = bandOf(blocks, heads, said, new Set(), new Set(['to-check']));
+  assert.deepEqual([own.at, own.lines.length], [[], 0]);
 });

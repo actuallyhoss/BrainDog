@@ -403,6 +403,18 @@ test('THE LATE LIST SAYS WHICH HALF RAN PAST ITS LIMIT, so the door under it ope
   assert.deepEqual(more([money(9)]), [[9, 2, { tasks: 0, money: 7 }]]);
 });
 
+test('LATE IS THE LATE LIST WITH NO LATE MONEY AFTER IT, so his Today with the money taken off draws one Late (24 Nov)', () => {
+  const late = block({ kind: 'todo', key: 'late', heading: 'Late', source: 'register.tasks', columns: day('by') as never }, [{ by: '2026-09-30' }, { by: '2026-10-01' }], [4, 5]);
+  const back = block({ kind: 'todo', key: 'to-check', heading: 'Handed back to you', source: 'register.tasks' }, [{ what: 'Check it' }], [9]);
+  const due = block({ kind: 'timeline', key: 'coming-up', heading: 'Coming up', source: 'deadlines' }, [{ row: 'obligations#2', day: '2026-10-05' }]);
+  const out = homeDrawn([late, back, due], NOW).blocks;
+  const rows = (out.find((b) => b.key === 'late') as WithRows).homeRows;
+  assert.equal(rows?.kind, 'late');
+  assert.equal(rows?.kind === 'late' ? rows.lines.length : 0, 2);
+  /* HANDED BACK IS NOT TAKEN FOR THE LATE TASKS, though it stands before what comes up. */
+  assert.equal((out.find((b) => b.key === 'to-check') as WithRows).homeRows, undefined);
+});
+
 test('COMING UP IS A FEW DAYS, each a chip with what falls due on it, and a feed never ends on a bare number', () => {
   const due = block({ kind: 'timeline', heading: 'Coming up', source: 'deadlines' }, [
     { row: 'obligations#2', day: '2026-10-02' },
