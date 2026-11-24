@@ -302,7 +302,9 @@ test('TRY AGAIN ASKS THE SAME WORDS WITH THE DRAFT TURNED DOWN, answers another,
   /* AND ANSWERS ONLY THE OTHER: the first, offered again, is left out with a sentence, never drawn. */
   assert.deepEqual(again.drafts.map((d) => d.question), ['A desk of my launch as a board?']);
   assert.notDeepEqual(again.drafts[0]!.change.to, first.drafts[0]!.change.to);
-  assert.ok(again.dropped.includes('Proposal 1 was the draft you turned down again, so it was left out.'), JSON.stringify(again.dropped));
+  /* AND SAYS NOTHING OF IT IN THE RECORD'S WORDS ("Proposal 1 was the draft you turned down again"): the sheet keeps the
+     first draft beside the new one, and the record's reasons are never a person's to read (`plainDropped`). */
+  assert.ok(!again.dropped.some((d) => /^Proposal \d/u.test(d)), JSON.stringify(again.dropped));
   /* NOTHING IS FILED, the first draft no more than the second. */
   assert.equal(suggestions(sql), 0);
   /* A NOT THAT IS NO LIST OF DRAFTS IS REFUSED BEFORE ANY ASK. */

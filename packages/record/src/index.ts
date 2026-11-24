@@ -2448,8 +2448,11 @@ export type Build = {
  * step that checks the count, so a press in flight is already counted by the next one.
  */
 export type SlashMeter = {
-  /** `draft` for a press or a description, `form` for a first plan. A refusal's `fix` is the sentence the owner is shown. */
-  hold(kind: 'draft' | 'form'): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
+  /**
+   * `draft` for a press or a description, `form` for a first plan. A refusal's `fix` is the sentence the owner is shown.
+   * `again` is a Try again on a description already asked: its asks are held and settled, and spend none of his.
+   */
+  hold(kind: 'draft' | 'form', opts?: { again?: boolean }): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
   /**
    * One ask of the background allowance (`BACKGROUND_ASKS_MONTH`, 600 a month), never one of his: everything the daily
    * look asks on its own, its draft, a skill's next version and the pages' headlines, each named by `kind`. OPTIONAL, AND
@@ -4326,7 +4329,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * note. The ask is counted exactly; its price is an estimate until `SlashModel` answers usage too.
    */
   const slashTokens = (value: unknown): number => Math.ceil(new TextEncoder().encode(JSON.stringify(value) ?? '').length / 3);
-  const slashAsked = async <I>(kind: 'draft' | 'form' | SlashBackground, input: I, ask: (input: I) => Promise<unknown>): Promise<{ raw: unknown } | { spent: string }> => {
+  const slashAsked = async <I>(kind: 'draft' | 'form' | SlashBackground, input: I, ask: (input: I) => Promise<unknown>, again = false): Promise<{ raw: unknown } | { spent: string }> => {
     let held: SlashHeld | undefined;
     const meter = deps.slashMeter;
     if (meter) {
@@ -4335,7 +4338,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const background = kind !== 'draft' && kind !== 'form';
       if (background && !meter.background) return { spent: 'This host cannot count an ask against the background allowance, so its model was not asked.' };
       /* A LEDGER THAT CANNOT BE READ IS A CAP THAT CANNOT BE CHECKED, so the model is not asked: the side a spend errs on. */
-      const hold = await (background ? meter.background!(kind, input) : meter.hold(kind)).catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
+      const hold = await (background ? meter.background!(kind, input) : again ? meter.hold(kind, { again }) : meter.hold(kind)).catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
       if (!hold.ok) return { spent: hold.refusal.fix };
       held = hold.value;
     }
@@ -7106,7 +7109,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return ok(
       await describe({
         name: model.name,
-        ask: (input) => slashAsked('draft', input, (i) => model.draft(i)),
+        /* TRY AGAIN SPENDS NONE OF HIS ASKS (`again`): it is the same description asked another way, and he paid for it once. */
+        ask: (input) => slashAsked('draft', input, (i) => model.draft(i), not !== undefined && not.length > 0),
         input: {
           usage: r.usage,
           noticed: r.noticed,

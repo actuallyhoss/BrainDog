@@ -357,10 +357,10 @@ test('A DESCRIBED COST SCRIPT A RULE WOULD START, AS THE PACK HAS IT, IS DROPPED
   /* HELD BEFORE ANY PREVIEW, so no repair is asked for a draft the record will not take from a description. */
   assert.equal(heard.length, 1);
   assert.deepEqual(out.drafts, []);
-  assert.ok(
-    out.dropped.some((d) => d.includes('script.cost, which a door or a rule would start, and from a description Slash builds a script that runs only on its clock.')),
-    JSON.stringify(out.dropped),
-  );
+  /* THE RECORD'S OWN REASON ("Proposal 1 has script.cost, which a door or a rule would start...") IS ITS GRAMMAR AND NEVER
+     THE PERSON'S (`plainDropped`, the Slash audit of 24 November): the sheet is told plainly that nothing was drafted. */
+  assert.deepEqual(out.dropped, ['The model proposed nothing Slash could use, so nothing was drafted from what you described.']);
+  assert.ok(!out.dropped.some((d) => /Proposal \d|script\.cost/u.test(d)), JSON.stringify(out.dropped));
   assert.equal(suggestions(sql), 0);
   sql.close();
 });

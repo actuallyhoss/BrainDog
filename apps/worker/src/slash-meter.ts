@@ -93,7 +93,7 @@ const WAITS = {
 export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): SlashMeter {
   const built = meterBuilder(env, api, deps);
   return {
-    hold: async (kind) => (await built()).hold(kind),
+    hold: async (kind, opts) => (await built()).hold(kind, opts),
     background: async (kind = 'skill', payload?: unknown) => {
       const meter = await built();
       if (await includedCeilingReached(env, deps)) return ceilingSpent(deps.clock.now(), WAITS[kind] ?? WAITS.skill);

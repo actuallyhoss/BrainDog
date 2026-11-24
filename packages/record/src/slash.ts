@@ -2759,6 +2759,19 @@ export async function describe(deps: {
 }
 
 /** What `describe` kept, as `slashDraft` answers it: the question, the change, the rows and what it drew. */
+/**
+ * WHY A DRAFT WAS DROPPED, IN THE RECORD'S WORDS ("Proposal 1 was a page proposal, and Slash files only pack, settings,
+ * arrange and change"): the model's fault and the record's grammar, kept for the tests and never for a person. On the
+ * page sheet's Try again the audit of 24 November read exactly that line. What a person is shown is the plain lines
+ * (no model, Decide full), and where every draft was dropped for the model's fault, one line that says so plainly.
+ */
+const MODEL_FAULT = /^Proposal \d+\b| was not drawn: /u;
+export const DRAFT_NONE = "Slash's draft did not fit what it can make here, so nothing was drafted. Try again, or say it another way.";
+export const plainDropped = (dropped: readonly string[], kept: number): string[] => {
+  const plain = dropped.filter((d) => !MODEL_FAULT.test(d));
+  return kept === 0 && plain.length === 0 && dropped.length > 0 ? [DRAFT_NONE] : plain;
+};
+
 export const draftedOf = (d: SlashDescribed): SlashDrafted => ({
   by: d.by,
   drafts: d.drafts.map((x) => ({
@@ -2767,7 +2780,7 @@ export const draftedOf = (d: SlashDescribed): SlashDrafted => ({
     rows: x.rows,
     preview: x.preview,
   })),
-  dropped: d.dropped,
+  dropped: plainDropped(d.dropped, d.drafts.length),
   ...(d.cost === undefined ? {} : { cost: d.cost }),
 });
 

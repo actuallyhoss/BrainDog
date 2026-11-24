@@ -1014,7 +1014,9 @@ const settled = (charge: AskSpends, code: string | undefined): AskSpends =>
 export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
   const mint = ulids(() => deps.clock.now());
   return {
-    async hold(kind) {
+    async hold(kind, opts) {
+      /* A TRY AGAIN SPENDS NOTHING OF HIS: its row is kept, priced and settled as any other, under `none`. */
+      const charge: AskSpends = opts?.again === true ? 'none' : PERSON;
       const engine = await deps.engine();
       /* NO ENGINE IS NO LEDGER, AND NO LEDGER IS NO SPEND: the record reads a refusal as "the rules draft". */
       if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Slash has no ledger on this host to count the ask in.' } };
@@ -1052,7 +1054,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
         model,
         kind === 'draft' ? "Slash's press" : "Slash's first plan",
         HELD_PURPOSE[kind] ?? HELD_PURPOSE.draft,
-        PERSON,
+        charge,
       );
       let done = false;
       return {
@@ -1072,7 +1074,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
               deps.clock.now() - t0,
               code === undefined ? 'ok' : 'error',
               code ?? null,
-              settled(PERSON, code),
+              settled(charge, code),
               id,
             );
           },

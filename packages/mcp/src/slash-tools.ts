@@ -584,7 +584,9 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
       const filed = isObject(out.value) && Array.isArray(out.value.filed) ? out.value.filed.filter(isObject) : [];
       const first = filed[0];
       if (first === undefined) {
-        const why = isObject(out.value) && Array.isArray(out.value.dropped) ? out.value.dropped.filter((d): d is string => typeof d === 'string') : [];
+        /* THE RECORD'S OWN REASON A DRAFT WAS DROPPED ("Proposal 1 was a page proposal...") is its grammar, never a person's
+           to read, and the model said it on: only a plain line goes on. */
+        const why = (isObject(out.value) && Array.isArray(out.value.dropped) ? out.value.dropped.filter((d): d is string => typeof d === 'string') : []).filter((d) => !/^Proposal \d+\b| was not drawn: /u.test(d));
         return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: why[0] ?? 'Nothing came of that draft. Try describing it another way.', at: 'what' } };
       }
       return { ok: true, value: { receipt: `Drafted “${clip(text(op['what']), 100)}”. It waits for you in Decide.`, href: `/decide/${encodeURIComponent(text(first['id']))}` } };
