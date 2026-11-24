@@ -1,0 +1,2149 @@
+{
+  "format": 1,
+  "made_at": "2026-11-24T21:25:19.079Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Nothing held yet. Add a fund, a certificate or gold you own.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "holdings-count"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add a holding",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "holdings",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "holdings-count"
+          },
+          "key": "k0gr37qo",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Worth now",
+              "metric": "holdings-worth-costed",
+              "note": "{{holdings-at-cost}} of {{holdings-count}} at what they cost"
+            },
+            {
+              "label": "Paid in",
+              "metric": "holdings-cost"
+            },
+            {
+              "label": "Gain",
+              "metric": "holdings-gain"
+            },
+            {
+              "label": "Gain on what was paid",
+              "metric": "holdings-gain-pct"
+            }
+          ],
+          "heading": "What you hold",
+          "icon": "chart-pie",
+          "kind": "stat",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "holdings-at-cost"
+          },
+          "key": "k1x4zwfp",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Worth now",
+              "metric": "holdings-worth-costed"
+            },
+            {
+              "label": "Paid in",
+              "metric": "holdings-cost"
+            },
+            {
+              "label": "Gain",
+              "metric": "holdings-gain"
+            },
+            {
+              "label": "Gain on what was paid",
+              "metric": "holdings-gain-pct"
+            }
+          ],
+          "heading": "What you hold",
+          "icon": "chart-pie",
+          "kind": "stat",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "is": 0,
+            "metric": "holdings-at-cost"
+          },
+          "key": "k1x4zwfp-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Worth now",
+              "metric": "holdings-worth-costed",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 3,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Paid in",
+              "metric": "holdings-cost",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 3,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Gain",
+              "metric": "holdings-gain",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 3,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Gain on what was paid",
+              "metric": "holdings-gain-pct",
+              "target": {
+                "gte": 0
+              },
+              "format": "pct",
+              "reading": {
+                "value": null,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 3,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": null
+              }
+            }
+          ],
+          "figures": {
+            "holdings-worth-costed": {
+              "name": "Worth now of what has a cost",
+              "source": "register.holdings",
+              "where": "value is set, cost is set",
+              "value": {
+                "sum": "value"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "holdings-cost": {
+              "name": "Paid in",
+              "source": "register.holdings",
+              "where": "cost is set, value is set",
+              "value": {
+                "sum": "cost"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "holdings-gain": {
+              "name": "Gain",
+              "source": "register.holdings",
+              "where": "gain is set",
+              "value": {
+                "sum": "gain"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "holdings-gain-pct": {
+              "name": "Gain on what was paid",
+              "source": "register.holdings",
+              "where": "gain is set",
+              "value": {
+                "ratio": {
+                  "of": {
+                    "sum": "gain"
+                  },
+                  "per": {
+                    "sum": "cost"
+                  }
+                }
+              },
+              "format": "pct",
+              "target": {
+                "gte": 0
+              }
+            }
+          },
+          "drawn": false,
+          "why": "unsaid"
+        },
+        {
+          "body": "1 holding has no price yet, so it is left out of these.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "is": 1,
+            "metric": "holdings-unvalued"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "{{holdings-unvalued}} holdings have no price yet, so they are left out of these.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "gt": 1,
+            "metric": "holdings-unvalued"
+          },
+          "key": "k08lez9h-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "holdings-unvalued": 3
+          },
+          "read_as": {
+            "holdings-unvalued": "figure"
+          },
+          "figures": {
+            "holdings-unvalued": {
+              "name": "Holdings with no worth yet",
+              "source": "register.holdings",
+              "where": "value is empty",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "body": "1 holding has no cost yet, so it is left out of these until you say what you paid.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "is": 1,
+            "metric": "holdings-uncosted"
+          },
+          "key": "k08lez9h-4",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "{{holdings-uncosted}} holdings have no cost yet, so they are left out of these until you say what you paid.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "gt": 1,
+            "metric": "holdings-uncosted"
+          },
+          "key": "k08lez9h-5",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Prices are from {{holdings-priced-on}}.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "is": 0,
+                "metric": "holdings-stale"
+              },
+              {
+                "gt": 0,
+                "metric": "holdings-count"
+              },
+              {
+                "empty": false,
+                "metric": "holdings-priced-on"
+              }
+            ]
+          },
+          "key": "k08lez9h-6",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "holdings-priced-on": "2026-11-23"
+          },
+          "read_as": {
+            "holdings-priced-on": "figure"
+          },
+          "figures": {
+            "holdings-priced-on": {
+              "name": "Oldest price",
+              "source": "register.holdings",
+              "where": "price is set, priced_on is set",
+              "value": {
+                "min": "priced_on"
+              },
+              "format": "day",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "body": "Priced on {{holdings-priced-on}}, {{bad:over 30 days ago}}.",
+          "kind": "note",
+          "span": 12,
+          "tone": "warn",
+          "when": {
+            "gt": 0,
+            "metric": "holdings-stale"
+          },
+          "key": "k08lez9h-7",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "The gold rate is from {{gold-rate-on}}, {{bad:over a week ago}}.",
+          "kind": "note",
+          "span": 12,
+          "tone": "warn",
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "gold-held"
+              },
+              {
+                "gt": 0,
+                "metric": "gold-rates-old"
+              }
+            ]
+          },
+          "key": "k08lez9h-8",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "against": 30,
+          "back": 90,
+          "columns": [
+            {
+              "field": "on"
+            },
+            {
+              "field": "per_gram"
+            },
+            {
+              "field": "karat"
+            },
+            {
+              "field": "per_gram"
+            },
+            {
+              "field": "per_gram"
+            }
+          ],
+          "empty": "No 24k gold rate yet. Set one under Gold rates, below.",
+          "heading": "Gold price, 24k a gram",
+          "icon": "vault",
+          "kind": "lines",
+          "limit": 1,
+          "source": "register.gold_rates",
+          "span": 6,
+          "when": {
+            "gt": 0,
+            "metric": "gold-held"
+          },
+          "where": "karat is 24k",
+          "key": "k066vj45",
+          "rows": [],
+          "matched": 60,
+          "refusals": [],
+          "measures": [
+            {
+              "name": "24k",
+              "unit": "USD",
+              "bucket": "day",
+              "keys": [
+                "2026-08-27",
+                "2026-08-28",
+                "2026-08-29",
+                "2026-08-30",
+                "2026-08-31",
+                "2026-09-01",
+                "2026-09-02",
+                "2026-09-03",
+                "2026-09-04",
+                "2026-09-05",
+                "2026-09-06",
+                "2026-09-07",
+                "2026-09-08",
+                "2026-09-09",
+                "2026-09-10",
+                "2026-09-11",
+                "2026-09-12",
+                "2026-09-13",
+                "2026-09-14",
+                "2026-09-15",
+                "2026-09-16",
+                "2026-09-17",
+                "2026-09-18",
+                "2026-09-19",
+                "2026-09-20",
+                "2026-09-21",
+                "2026-09-22",
+                "2026-09-23",
+                "2026-09-24",
+                "2026-09-25",
+                "2026-09-26",
+                "2026-09-27",
+                "2026-09-28",
+                "2026-09-29",
+                "2026-09-30",
+                "2026-10-01",
+                "2026-10-02",
+                "2026-10-03",
+                "2026-10-04",
+                "2026-10-05",
+                "2026-10-06",
+                "2026-10-07",
+                "2026-10-08",
+                "2026-10-09",
+                "2026-10-10",
+                "2026-10-11",
+                "2026-10-12",
+                "2026-10-13",
+                "2026-10-14",
+                "2026-10-15",
+                "2026-10-16",
+                "2026-10-17",
+                "2026-10-18",
+                "2026-10-19",
+                "2026-10-20",
+                "2026-10-21",
+                "2026-10-22",
+                "2026-10-23",
+                "2026-10-24",
+                "2026-10-25",
+                "2026-10-26",
+                "2026-10-27",
+                "2026-10-28",
+                "2026-10-29",
+                "2026-10-30",
+                "2026-10-31",
+                "2026-11-01",
+                "2026-11-02",
+                "2026-11-03",
+                "2026-11-04",
+                "2026-11-05",
+                "2026-11-06",
+                "2026-11-07",
+                "2026-11-08",
+                "2026-11-09",
+                "2026-11-10",
+                "2026-11-11",
+                "2026-11-12",
+                "2026-11-13",
+                "2026-11-14",
+                "2026-11-15",
+                "2026-11-16",
+                "2026-11-17",
+                "2026-11-18",
+                "2026-11-19",
+                "2026-11-20",
+                "2026-11-21",
+                "2026-11-22",
+                "2026-11-23",
+                "2026-11-24"
+              ],
+              "now": [
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                122.32,
+                122.4,
+                123.64,
+                124.23,
+                123.79,
+                123.44,
+                122.96,
+                122.55,
+                122.08,
+                122.89,
+                123.73,
+                123.06,
+                123.96,
+                124.99,
+                124.47,
+                125.63,
+                126.53,
+                126.35,
+                127.3,
+                128.36,
+                127.49,
+                127.71,
+                128,
+                129.31,
+                130.25,
+                130.97,
+                130.36,
+                129.53,
+                129.95,
+                129.48,
+                129.83,
+                130.82,
+                132.08,
+                132.31,
+                133.15,
+                133.02,
+                133.39,
+                132.7,
+                133.55,
+                134.59,
+                134.34,
+                135.59,
+                136.25,
+                135.75,
+                136.59,
+                136.52,
+                136.4,
+                135.69,
+                136.17,
+                136.93,
+                136.96,
+                137.75,
+                139.13,
+                138.31,
+                137.95,
+                137.85,
+                137.81,
+                139.2,
+                140.2,
+                139.47
+              ],
+              "was": [
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+              ],
+              "latest": {
+                "value": 139.47,
+                "at": "2026-11-24T00:00:00.000Z",
+                "day": "2026-11-24"
+              }
+            }
+          ],
+          "latest": []
+        },
+        {
+          "empty": "Nothing is valued yet.",
+          "heading": "Where it sits",
+          "icon": "chart-pie",
+          "kind": "split",
+          "source": "metric.holdings-by-kind",
+          "span": 6,
+          "when": {
+            "gt": 0,
+            "metric": "holdings-count"
+          },
+          "key": "k1m81vst",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "metric": "holdings-by-kind",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 3,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true,
+                "groups": [],
+                "more": 0
+              }
+            }
+          ],
+          "figures": {
+            "holdings-by-kind": {
+              "name": "Worth now, by type",
+              "source": "register.holdings",
+              "where": "value is set",
+              "value": {
+                "sum": "value"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              },
+              "group_by": "kind"
+            }
+          },
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "field": "label",
+              "label": "Holding",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "kind",
+              "label": "Type",
+              "width": "12ch"
+            },
+            {
+              "align": "end",
+              "field": "qty",
+              "label": "How many",
+              "width": "10ch"
+            },
+            {
+              "field": "karat",
+              "label": "Karat",
+              "width": "8ch"
+            },
+            {
+              "align": "end",
+              "field": "value",
+              "label": "Worth now",
+              "width": "14ch"
+            },
+            {
+              "align": "end",
+              "field": "gain",
+              "label": "Gain",
+              "width": "14ch"
+            }
+          ],
+          "empty": "Nothing held yet.",
+          "heading": "Everything you hold",
+          "icon": "chart-line",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "value"
+            }
+          ],
+          "source": "register.holdings",
+          "span": 12,
+          "key": "k00991of",
+          "rows": [
+            {
+              "id": "01M87Q5TK70BKN284E6BNKCYZB",
+              "register": "holdings",
+              "seq": 3,
+              "fields": {
+                "label": "Apple",
+                "kind": "stock",
+                "unit": "share",
+                "code": "AAPL",
+                "qty": 10,
+                "unit_cost": {
+                  "amount": 17200,
+                  "currency": "USD"
+                },
+                "price": {
+                  "amount": 22800,
+                  "currency": "USD"
+                },
+                "priced_on": "2026-11-23",
+                "acquired_on": "2025-07-12"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284E635EHJ29",
+              "register": "holdings",
+              "seq": 2,
+              "fields": {
+                "label": "Global index fund",
+                "kind": "fund",
+                "unit": "share",
+                "qty": 42.5,
+                "unit_cost": {
+                  "amount": 11000,
+                  "currency": "USD"
+                },
+                "price": {
+                  "amount": 12440,
+                  "currency": "USD"
+                },
+                "priced_on": "2026-11-23",
+                "acquired_on": "2026-01-28"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284E5Q943685",
+              "register": "holdings",
+              "seq": 1,
+              "fields": {
+                "label": "Gold bar, 50 g",
+                "kind": "gold",
+                "karat": "24k",
+                "unit": "gram",
+                "qty": 50,
+                "cost": {
+                  "amount": 310000,
+                  "currency": "USD"
+                },
+                "acquired_on": "2025-10-20"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 3,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "item",
+              "label": "Holding"
+            },
+            {
+              "field": "bought_on",
+              "label": "Bought on"
+            },
+            {
+              "align": "end",
+              "field": "qty",
+              "label": "Grams or shares"
+            },
+            {
+              "align": "end",
+              "field": "price",
+              "label": "Price each"
+            },
+            {
+              "align": "end",
+              "field": "paid",
+              "label": "Paid"
+            },
+            {
+              "align": "end",
+              "field": "value",
+              "label": "Worth now"
+            },
+            {
+              "align": "end",
+              "field": "gain",
+              "label": "Gain"
+            },
+            {
+              "field": "kept_at",
+              "label": "Kept at"
+            }
+          ],
+          "empty": "No buys yet.",
+          "heading": "Buys",
+          "icon": "hand-coins",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "bought_on"
+            }
+          ],
+          "source": "register.holding_buys",
+          "span": 12,
+          "key": "k04w9z4o",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "fold": true,
+          "heading": "Gold rates",
+          "icon": "vault",
+          "kind": "section",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "gold-rates-current"
+          },
+          "key": "k0dx0nu7",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Gold rates",
+          "icon": "vault",
+          "kind": "section",
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "gold-held"
+              },
+              {
+                "lt": 1,
+                "metric": "gold-rates-current"
+              }
+            ]
+          },
+          "key": "k0dx0nu7-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Rate of"
+            },
+            {
+              "field": "karat",
+              "label": "Karat"
+            },
+            {
+              "align": "end",
+              "field": "per_gram",
+              "label": "A gram"
+            },
+            {
+              "field": "from",
+              "label": "Set by"
+            }
+          ],
+          "heading": "Gold rates said",
+          "icon": "vault",
+          "kind": "table",
+          "limit": 30,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.gold_rates",
+          "span": 12,
+          "key": "k1jvc5zg",
+          "rows": [
+            {
+              "id": "01M87Q5TK70BKN284EP4B3XM43",
+              "register": "gold_rates",
+              "seq": 60,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13947,
+                  "currency": "USD"
+                },
+                "on": "2026-11-24",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284ENRXW82VY",
+              "register": "gold_rates",
+              "seq": 59,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 14020,
+                  "currency": "USD"
+                },
+                "on": "2026-11-23",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284ENGMVP7V8",
+              "register": "gold_rates",
+              "seq": 58,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13920,
+                  "currency": "USD"
+                },
+                "on": "2026-11-22",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284ENC6QSYGM",
+              "register": "gold_rates",
+              "seq": 57,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13781,
+                  "currency": "USD"
+                },
+                "on": "2026-11-21",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EN1C4689V",
+              "register": "gold_rates",
+              "seq": 56,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13785,
+                  "currency": "USD"
+                },
+                "on": "2026-11-20",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EMPR6HSSR",
+              "register": "gold_rates",
+              "seq": 55,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13795,
+                  "currency": "USD"
+                },
+                "on": "2026-11-19",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EMG26M1PY",
+              "register": "gold_rates",
+              "seq": 54,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13831,
+                  "currency": "USD"
+                },
+                "on": "2026-11-18",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EM6G74AAW",
+              "register": "gold_rates",
+              "seq": 53,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13913,
+                  "currency": "USD"
+                },
+                "on": "2026-11-17",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EM091PEFM",
+              "register": "gold_rates",
+              "seq": 52,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13775,
+                  "currency": "USD"
+                },
+                "on": "2026-11-16",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EKKP7DNX1",
+              "register": "gold_rates",
+              "seq": 51,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13696,
+                  "currency": "USD"
+                },
+                "on": "2026-11-15",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EKBPYNVVF",
+              "register": "gold_rates",
+              "seq": 50,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13693,
+                  "currency": "USD"
+                },
+                "on": "2026-11-14",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EK27YPQS1",
+              "register": "gold_rates",
+              "seq": 49,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13617,
+                  "currency": "USD"
+                },
+                "on": "2026-11-13",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EJQ4RAJFH",
+              "register": "gold_rates",
+              "seq": 48,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13569,
+                  "currency": "USD"
+                },
+                "on": "2026-11-12",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EJKRHBR2M",
+              "register": "gold_rates",
+              "seq": 47,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13640,
+                  "currency": "USD"
+                },
+                "on": "2026-11-11",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EJBJTTCKF",
+              "register": "gold_rates",
+              "seq": 46,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13652,
+                  "currency": "USD"
+                },
+                "on": "2026-11-10",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EJ17W30WM",
+              "register": "gold_rates",
+              "seq": 45,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13659,
+                  "currency": "USD"
+                },
+                "on": "2026-11-09",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EHNMQH15T",
+              "register": "gold_rates",
+              "seq": 44,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13575,
+                  "currency": "USD"
+                },
+                "on": "2026-11-08",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EHC258TXG",
+              "register": "gold_rates",
+              "seq": 43,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13625,
+                  "currency": "USD"
+                },
+                "on": "2026-11-07",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EH6EZAYF0",
+              "register": "gold_rates",
+              "seq": 42,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13559,
+                  "currency": "USD"
+                },
+                "on": "2026-11-06",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EH1AZGQ5D",
+              "register": "gold_rates",
+              "seq": 41,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13434,
+                  "currency": "USD"
+                },
+                "on": "2026-11-05",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EGTN1K8QA",
+              "register": "gold_rates",
+              "seq": 40,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13459,
+                  "currency": "USD"
+                },
+                "on": "2026-11-04",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EGFK9VCXF",
+              "register": "gold_rates",
+              "seq": 39,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13355,
+                  "currency": "USD"
+                },
+                "on": "2026-11-03",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EGASB337N",
+              "register": "gold_rates",
+              "seq": 38,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13270,
+                  "currency": "USD"
+                },
+                "on": "2026-11-02",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EG2C4B37M",
+              "register": "gold_rates",
+              "seq": 37,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13339,
+                  "currency": "USD"
+                },
+                "on": "2026-11-01",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EFN4VH5QX",
+              "register": "gold_rates",
+              "seq": 36,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13302,
+                  "currency": "USD"
+                },
+                "on": "2026-10-31",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EF9F4GNZC",
+              "register": "gold_rates",
+              "seq": 35,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13315,
+                  "currency": "USD"
+                },
+                "on": "2026-10-30",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EEZ5HGEXX",
+              "register": "gold_rates",
+              "seq": 34,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13231,
+                  "currency": "USD"
+                },
+                "on": "2026-10-29",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EEQV88G68",
+              "register": "gold_rates",
+              "seq": 33,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13208,
+                  "currency": "USD"
+                },
+                "on": "2026-10-28",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EEHEH7R9B",
+              "register": "gold_rates",
+              "seq": 32,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 13082,
+                  "currency": "USD"
+                },
+                "on": "2026-10-27",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M87Q5TK70BKN284EE8C0P173",
+              "register": "gold_rates",
+              "seq": 31,
+              "fields": {
+                "karat": "24k",
+                "per_gram": {
+                  "amount": 12983,
+                  "currency": "USD"
+                },
+                "on": "2026-10-26",
+                "from": "feed",
+                "note": "World price"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 60,
+          "refusals": []
+        },
+        {
+          "heading": "Set today's gold rate",
+          "icon": "vault",
+          "kind": "capture",
+          "register": "gold_rates",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "gold-held"
+          },
+          "key": "k1ww1ej8",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        }
+      ],
+      "icon": "chart-pie",
+      "nav": {
+        "order": 30,
+        "section": "Money"
+      },
+      "pack": "holdings",
+      "page": "holdings",
+      "requires": [
+        "register.holdings",
+        "register.holding_buys",
+        "register.gold_rates"
+      ],
+      "title": "Investments and gold",
+      "read_at": "2026-11-24T21:25:19.079Z",
+      "zone": "UTC",
+      "look": {
+        "look": "holdings",
+        "basis": "r1fe1q66",
+        "by": "rule",
+        "hide": [
+          "k04w9z4o"
+        ]
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "label"
+            },
+            {
+              "as": "figure",
+              "field": "value"
+            },
+            {
+              "as": "fact",
+              "field": "cost",
+              "label": "Paid"
+            },
+            {
+              "as": "fact",
+              "field": "gain",
+              "label": "Gain"
+            },
+            {
+              "as": "fact",
+              "field": "gain_pct",
+              "label": "Gain, %"
+            }
+          ],
+          "kind": "cards",
+          "lead": true,
+          "limit": 1,
+          "source": "register.holdings",
+          "span": 12,
+          "where": "seq is 1",
+          "key": "k0i6vzqz",
+          "rows": [
+            {
+              "id": "01M87Q5TK70BKN284E5Q943685",
+              "register": "holdings",
+              "seq": 1,
+              "fields": {
+                "label": "Gold bar, 50 g",
+                "kind": "gold",
+                "karat": "24k",
+                "unit": "gram",
+                "qty": 50,
+                "cost": {
+                  "amount": 310000,
+                  "currency": "USD"
+                },
+                "acquired_on": "2025-10-20"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "bought_on",
+              "label": "Bought on"
+            },
+            {
+              "align": "end",
+              "field": "qty",
+              "label": "Grams or shares"
+            },
+            {
+              "align": "end",
+              "field": "price",
+              "label": "Price each"
+            },
+            {
+              "align": "end",
+              "field": "paid",
+              "label": "Paid"
+            },
+            {
+              "align": "end",
+              "field": "value",
+              "label": "Worth now"
+            },
+            {
+              "align": "end",
+              "field": "gain",
+              "label": "Gain"
+            },
+            {
+              "field": "kept_at",
+              "label": "Kept at"
+            }
+          ],
+          "empty": "No buys yet.",
+          "heading": "Buys",
+          "icon": "hand-coins",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "bought_on"
+            }
+          ],
+          "source": "register.holding_buys",
+          "span": 12,
+          "where": "item is holdings#1",
+          "key": "k04w9z4o",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "fleeting": true,
+        "register": "holdings"
+      },
+      "icon": "chart-line",
+      "pack": "holdings",
+      "page": "gold-bar-50-g",
+      "requires": [
+        "register.holdings",
+        "register.holding_buys"
+      ],
+      "title": "Gold bar, 50 g",
+      "read_at": "2026-11-24T21:25:19.079Z",
+      "zone": "UTC",
+      "param": {
+        "register": "holdings",
+        "seq": 1,
+        "title": "Gold bar, 50 g"
+      },
+      "look": {
+        "look": "holding",
+        "basis": "r1fe1q66",
+        "by": "rule",
+        "hide": [
+          "k04w9z4o"
+        ]
+      }
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "label"
+            },
+            {
+              "as": "figure",
+              "field": "value"
+            },
+            {
+              "as": "fact",
+              "field": "cost",
+              "label": "Paid"
+            },
+            {
+              "as": "fact",
+              "field": "gain",
+              "label": "Gain"
+            },
+            {
+              "as": "fact",
+              "field": "gain_pct",
+              "label": "Gain, %"
+            }
+          ],
+          "kind": "cards",
+          "lead": true,
+          "limit": 1,
+          "source": "register.holdings",
+          "span": 12,
+          "where": "seq is 2",
+          "key": "k0i6vzqz",
+          "rows": [
+            {
+              "id": "01M87Q5TK70BKN284E635EHJ29",
+              "register": "holdings",
+              "seq": 2,
+              "fields": {
+                "label": "Global index fund",
+                "kind": "fund",
+                "unit": "share",
+                "qty": 42.5,
+                "unit_cost": {
+                  "amount": 11000,
+                  "currency": "USD"
+                },
+                "price": {
+                  "amount": 12440,
+                  "currency": "USD"
+                },
+                "priced_on": "2026-11-23",
+                "acquired_on": "2026-01-28"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "bought_on",
+              "label": "Bought on"
+            },
+            {
+              "align": "end",
+              "field": "qty",
+              "label": "Grams or shares"
+            },
+            {
+              "align": "end",
+              "field": "price",
+              "label": "Price each"
+            },
+            {
+              "align": "end",
+              "field": "paid",
+              "label": "Paid"
+            },
+            {
+              "align": "end",
+              "field": "value",
+              "label": "Worth now"
+            },
+            {
+              "align": "end",
+              "field": "gain",
+              "label": "Gain"
+            },
+            {
+              "field": "kept_at",
+              "label": "Kept at"
+            }
+          ],
+          "empty": "No buys yet.",
+          "heading": "Buys",
+          "icon": "hand-coins",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "bought_on"
+            }
+          ],
+          "source": "register.holding_buys",
+          "span": 12,
+          "where": "item is holdings#2",
+          "key": "k04w9z4o",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "fleeting": true,
+        "register": "holdings"
+      },
+      "icon": "chart-line",
+      "pack": "holdings",
+      "page": "global-index-fund",
+      "requires": [
+        "register.holdings",
+        "register.holding_buys"
+      ],
+      "title": "Global index fund",
+      "read_at": "2026-11-24T21:25:19.079Z",
+      "zone": "UTC",
+      "param": {
+        "register": "holdings",
+        "seq": 2,
+        "title": "Global index fund"
+      },
+      "look": {
+        "look": "holding",
+        "basis": "r1fe1q66",
+        "by": "rule",
+        "hide": [
+          "k04w9z4o"
+        ]
+      }
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "label"
+            },
+            {
+              "as": "figure",
+              "field": "value"
+            },
+            {
+              "as": "fact",
+              "field": "cost",
+              "label": "Paid"
+            },
+            {
+              "as": "fact",
+              "field": "gain",
+              "label": "Gain"
+            },
+            {
+              "as": "fact",
+              "field": "gain_pct",
+              "label": "Gain, %"
+            }
+          ],
+          "kind": "cards",
+          "lead": true,
+          "limit": 1,
+          "source": "register.holdings",
+          "span": 12,
+          "where": "seq is 3",
+          "key": "k0i6vzqz",
+          "rows": [
+            {
+              "id": "01M87Q5TK70BKN284E6BNKCYZB",
+              "register": "holdings",
+              "seq": 3,
+              "fields": {
+                "label": "Apple",
+                "kind": "stock",
+                "unit": "share",
+                "code": "AAPL",
+                "qty": 10,
+                "unit_cost": {
+                  "amount": 17200,
+                  "currency": "USD"
+                },
+                "price": {
+                  "amount": 22800,
+                  "currency": "USD"
+                },
+                "priced_on": "2026-11-23",
+                "acquired_on": "2025-07-12"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-24T21:25:19.079Z",
+              "updated_at": "2026-11-24T21:25:19.079Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "bought_on",
+              "label": "Bought on"
+            },
+            {
+              "align": "end",
+              "field": "qty",
+              "label": "Grams or shares"
+            },
+            {
+              "align": "end",
+              "field": "price",
+              "label": "Price each"
+            },
+            {
+              "align": "end",
+              "field": "paid",
+              "label": "Paid"
+            },
+            {
+              "align": "end",
+              "field": "value",
+              "label": "Worth now"
+            },
+            {
+              "align": "end",
+              "field": "gain",
+              "label": "Gain"
+            },
+            {
+              "field": "kept_at",
+              "label": "Kept at"
+            }
+          ],
+          "empty": "No buys yet.",
+          "heading": "Buys",
+          "icon": "hand-coins",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "bought_on"
+            }
+          ],
+          "source": "register.holding_buys",
+          "span": 12,
+          "where": "item is holdings#3",
+          "key": "k04w9z4o",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "fleeting": true,
+        "register": "holdings"
+      },
+      "icon": "chart-line",
+      "pack": "holdings",
+      "page": "apple",
+      "requires": [
+        "register.holdings",
+        "register.holding_buys"
+      ],
+      "title": "Apple",
+      "read_at": "2026-11-24T21:25:19.079Z",
+      "zone": "UTC",
+      "param": {
+        "register": "holdings",
+        "seq": 3,
+        "title": "Apple"
+      },
+      "look": {
+        "look": "holding",
+        "basis": "r1fe1q66",
+        "by": "rule",
+        "hide": [
+          "k04w9z4o"
+        ]
+      }
+    }
+  ]
+}

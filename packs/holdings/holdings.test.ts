@@ -142,7 +142,7 @@ const SPREAD_MS = 15 * 60_000;
 test('THE FILE IS 2.0.0, Investments and gold, and every field and kind 1.4.2 held is still there as it was', () => {
   const doc = file();
   const old = v142();
-  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.8.1', 'Investments and gold']);
+  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.8.2', 'Investments and gold']);
   assert.equal(old.version, '1.4.2', 'the frozen 1.4.2 moved');
   assert.equal(v100().version, '1.0.0', 'the frozen 1.0.0 moved');
   assert.deepEqual(doc.requires, old.requires);
@@ -233,13 +233,13 @@ test('INSTALLED FROM THE FILE: three lists, five rules, three scripts, twenty-tw
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), ADDS);
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.8.1');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.8.2');
   close();
 });
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.8.1']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.8.2']);
 });
 
 test('NO FILE OF THIS ADD-ON NAMES A CURRENCY IN A FORMAT, so every amount reads in the money somebody chose', () => {
@@ -581,9 +581,11 @@ test('THE PAGE READS LIKE THE MOCK: a line, what you hold with its gain, the gol
   const note = tiles[0]!.readings!.find((r) => r.metric === 'holdings-worth-costed')!.note!.replace(/\{\{([a-z-]+)\}\}/gu, (_, id: string) => String(tiles[0]!.values?.[id]));
   assert.equal(note, '1 of 4 at what they cost');
 
-  /* THE GOLD RATE IN USE, a row a karat said. */
-  const gold = on.find((b) => b.heading === 'Gold rate')!;
-  assert.deepEqual((gold.rows ?? []).map((r) => [r.fields.karat, r.fields.per_gram]), [['24k', egp(520_000)]]);
+  /* THE GOLD PRICE, SINCE 3.8.2 A CHART OF 24k A GRAM where it was a row a karat: one rate is one reading, said as its
+     figure until a second day makes a line. */
+  const gold = on.find((b) => b.heading === 'Gold price, 24k a gram')! as Block & { latest?: { measure: string; value: number; unit: string }[] };
+  assert.equal(gold.kind, 'lines');
+  assert.deepEqual((gold.latest ?? []).map((m) => [m.measure, m.value, m.unit]), [['24k', 5_200, 'EGP']]);
 
   /* HOW IT SPLITS BY KIND, one part a kind, by its own name. */
   const split = on.find((b) => b.kind === 'split')!;
@@ -636,6 +638,49 @@ test('A FRESH PAGE SAYS WHAT GOES HERE AND OFFERS THE FIRST HOLDING, and draws n
   close();
 });
 
+test('GOLD PRICE IS A CHART OF 24k A GRAM, SINCE 3.8.2: one line over ninety days read against a month back, on Today and on the page', async () => {
+  /* THE WIDGET AND THE PAGE'S TILE ARE ONE CHART: a `lines` over every rate of 24k, the money read as money (the fifth
+     column), at the sizes a chart is drawn at, where it was a table of the rates in use at small, wide and tall. */
+  const doc = file();
+  type W = { id: string; block: Body; sizes: string[]; size: string };
+  const widget = (doc.widgets as W[]).find((w) => w.id === 'gold-price')!;
+  const tile = (decl(doc, 'page', 'holdings').blocks as Body[]).find((b) => b.kind === 'lines')!;
+  const chart = { kind: 'lines', source: 'register.gold_rates', where: 'karat is 24k', back: 90, against: 30, limit: 1 };
+  for (const b of [widget.block, tile]) {
+    assert.deepEqual(Object.fromEntries(Object.keys(chart).map((k) => [k, b[k]])), chart);
+    assert.deepEqual((b.columns as { field: string }[]).map((c) => c.field), ['on', 'per_gram', 'karat', 'per_gram', 'per_gram']);
+  }
+  assert.deepEqual([widget.sizes, widget.size], [['wide', 'large', 'full'], 'wide']);
+
+  /* FORTY DAYS OF RATES, 24k AND 21k, a pound more each day: the chart draws the 24k alone, as one line. */
+  const { api, close } = await inPounds();
+  hold(api, { label: 'Gold bar 24k', kind: 'gold', karat: '24k', unit: 'gram', qty: 10 });
+  for (let i = 0; i < 40; i++) {
+    const on = new Date(NOW - (39 - i) * 86_400_000).toISOString().slice(0, 10);
+    rate(api, { karat: '24k', per_gram: egp(600_000 + i * 100), on, from: 'feed' });
+    rate(api, { karat: '21k', per_gram: egp(525_000 + i * 90), on, from: 'feed' });
+  }
+  const on = (await pageOf(api)).blocks.filter(drawn);
+  type Series = { name: string; unit: string; keys: string[]; now: (number | null)[]; latest: { value: number; day: string } | null };
+  const gold = on.find((b) => b.heading === 'Gold price, 24k a gram')! as Block & { measures?: Series[] };
+  assert.deepEqual(gold.refusals, []);
+  assert.equal(gold.kind, 'lines');
+  assert.deepEqual((gold.measures ?? []).map((m) => [m.name, m.unit, m.keys.length, m.latest?.value, m.latest?.day]), [['24k', 'EGP', 90, 6_039, TODAY]]);
+  /* EVERY DAY OF THE FORTY IS A POINT, the last of them today's, and the fifty days before it are gaps, never noughts. */
+  const now = gold.measures![0]!.now;
+  assert.deepEqual([now.filter((v) => v !== null).length, now.at(-1), now.at(-31), now[0]], [40, 6_039, 6_009, null]);
+  close();
+
+  /* `against:` IS NO MORE THAN THE DAYS IT READS, since the read holds that period and the one before and nothing older. */
+  const far = file();
+  (decl(far, 'page', 'holdings').blocks as Body[]).find((b) => b.kind === 'lines')!.against = 120;
+  const { api: other, close: done } = await money();
+  const refused = await put(other, far);
+  assert.equal(refused.ok, false);
+  assert.match(String(refused.refusal?.fix), /against is how many days back its lead's change is measured, a whole number from 1 to 90/u);
+  done();
+});
+
 test('NO GOLD RATE YET OFFERS THE BOX TO SET ONE, and a rate over a week old says so in words', async () => {
   const { api, close } = await inPounds();
   const gold = hold(api, { label: 'Gold 21k', kind: 'gold', karat: '21k' });
@@ -684,7 +729,7 @@ async function upgraded(doc: Doc, rows: readonly Body[] = HELD): Promise<Awaited
   const diff = await planOf(made.api, file());
   assert.deepEqual(diff.conflicts, [], 'the update met a conflict');
   said(await put(made.api, file()));
-  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.8.1');
+  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.8.2');
   return { ...made, ids, before };
 }
 

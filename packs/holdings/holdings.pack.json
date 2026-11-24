@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "3.8.1",
+  "version": "3.8.2",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "The gold feed stops writing a rate for a karat you no longer hold. It writes 24k, each karat your gold is in, and any karat you typed a rate for in the last 30 days.",
+  "changes": "Gold price is a chart: today's 24k rate a gram, how much it moved against a month ago (a week ago until a month of rates is kept), and its line over the last 90 days, on Today and on Investments and gold.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -43,60 +43,54 @@
     {
       "id": "gold-price",
       "title": "Gold price",
-      "says": "Today’s gold rate for a gram, each karat.",
+      "says": "Today’s 24k gold rate for a gram, how it moved in a month, and its line over 90 days.",
       "group": "money",
       "for": "personal",
       "icon": "vault",
       "block": {
-        "kind": "table",
-        "heading": "Gold price",
+        "kind": "lines",
+        "heading": "Gold price, 24k a gram",
         "icon": "vault",
         "source": "register.gold_rates",
-        "where": "live is true",
+        "where": "karat is 24k",
         "columns": [
           {
-            "field": "karat",
-            "label": "Karat"
+            "field": "on"
           },
           {
-            "field": "per_gram",
-            "label": "A gram",
-            "align": "end"
-          }
-        ],
-        "order": [
+            "field": "per_gram"
+          },
           {
-            "field": "karat",
-            "dir": "asc"
+            "field": "karat"
+          },
+          {
+            "field": "per_gram"
+          },
+          {
+            "field": "per_gram"
           }
         ],
-        "limit": 3,
-        "empty": "No gold rate yet."
+        "back": 90,
+        "against": 30,
+        "limit": 1,
+        "empty": "No 24k gold rate yet."
       },
       "sizes": [
-        "small",
         "wide",
-        "tall"
+        "large",
+        "full"
       ],
-      "size": "small",
+      "size": "wide",
       "needs": {
         "lists": [
           "gold_rates"
         ]
       },
-      "rows": {
-        "title": "karat",
-        "amount": "per_gram"
-      },
       "example": {
-        "rows": [
+        "figures": [
           {
-            "title": "24k",
-            "meta": "¤110 a gram"
-          },
-          {
-            "title": "21k",
-            "meta": "¤96 a gram"
+            "label": "24k, a gram",
+            "said": "¤110"
           }
         ]
       },
@@ -1196,41 +1190,37 @@
           }
         },
         {
-          "kind": "table",
-          "heading": "Gold rate",
+          "kind": "lines",
+          "heading": "Gold price, 24k a gram",
           "icon": "vault",
           "span": 6,
-          "body": "A karat with no rate of its own follows the newest rate there is.",
           "source": "register.gold_rates",
-          "where": "live is true",
+          "where": "karat is 24k",
           "columns": [
             {
-              "field": "karat",
-              "label": "Karat"
+              "field": "on"
             },
             {
-              "field": "per_gram",
-              "label": "A gram",
-              "align": "end"
+              "field": "per_gram"
             },
             {
-              "field": "on",
-              "label": "Rate of",
-              "align": "end"
-            }
-          ],
-          "order": [
+              "field": "karat"
+            },
             {
-              "field": "karat",
-              "dir": "asc"
+              "field": "per_gram"
+            },
+            {
+              "field": "per_gram"
             }
           ],
-          "limit": 4,
+          "back": 90,
+          "against": 30,
+          "limit": 1,
           "when": {
             "metric": "gold-held",
             "gt": 0
           },
-          "empty": "No gold rate yet. Set one under Gold rates, below."
+          "empty": "No 24k gold rate yet. Set one under Gold rates, below."
         },
         {
           "kind": "split",

@@ -3470,8 +3470,60 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "3.8.1",
+      "latest": "3.8.2",
       "versions": [
+        {
+          "version": "3.8.2",
+          "checksum": "ea0b5c94ec9401092d9e7e72d99617b1dd5d81714f1c05ba5bfa2ce71bdd3064",
+          "bytes": 68383,
+          "published_at": "2026-11-24T21:25:19.079Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "latest.currency-api.pages.dev",
+                "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
+                "key": null
+              }
+            ],
+            "widgets": [
+              "Gold price"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.fx",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Gold price is a chart: today's 24k rate a gram, how much it moved against a month ago (a week ago until a month of rates is kept), and its line over the last 90 days, on Today and on Investments and gold.",
+          "preview": true
+        },
         {
           "version": "3.8.1",
           "checksum": "7b056fc038fec7fc8253fa2c0335f6c6dd6dad6d4518c1148288e2d13e2e1181",
