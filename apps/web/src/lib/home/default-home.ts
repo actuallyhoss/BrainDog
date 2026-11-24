@@ -1066,7 +1066,7 @@ export function homeDrawn(
     }
     /* CASH AHEAD LEADS WITH WHAT THERE IS, with no account open yet (AO4). */
     if (isCashAhead(b)) {
-      shaped.push(linesKept(cashDrawn(b)));
+      shaped.push(linesKept(cashDrawn(b, today)));
       continue;
     }
     shaped.push(linesKept(newOnly(b)));
@@ -1176,7 +1176,7 @@ const CASH_NOW = 'cash-now';
  * nought is left out, so the tile leads with the money that does move (the rent going out), and a tile with nothing
  * left to say is not drawn. Once an account is open, cash now stands and a nought beside it is left off as well.
  */
-function cashDrawn(b: LiveBlock): LiveBlock {
+function cashDrawn(b: LiveBlock, today: string): LiveBlock {
   const all = b.metrics ?? [];
   const now = all.find((m) => m.id === CASH_NOW);
   /* A CASH NOW OVER NO ACCOUNT HOLDS NOTHING (`nothingHeld`) and is not drawn, though it reads nought. */
@@ -1184,12 +1184,26 @@ function cashDrawn(b: LiveBlock): LiveBlock {
     /* BESIDE A BALANCE, MONEY IN OR OUT AT NOUGHT IS LEFT OFF TOO (leftovers9, the owner 2 Nov: "remove any $0 cards"): Today
        read "In, 30 days $0" beside "Cash now $12,500" on a record nothing is due to come into. Money's own hero keeps
        its nought, where it answers the page; Today says what moves. */
-    const moving = all.filter((m) => m.id === CASH_NOW || !nought(m.value));
-    return moving.length === all.length ? b : { ...b, metrics: moving };
+    const moving = all.filter((m) => m.id === CASH_NOW || !nought(m.value)).map((m) => (m.id === CASH_NOW ? countedSaid(m, today) : m));
+    return moving.length === all.length && moving.every((m, i) => m === all[i]) ? b : { ...b, metrics: moving };
   }
   const metrics = all.filter((m) => m.id !== CASH_NOW && m.value !== MISSING && !m.nothingHeld && !nought(m.value));
   if (metrics.length === all.length) return b;
   return metrics.length === 0 ? { ...b, metrics, drawn: false } : { ...b, metrics };
+}
+
+/** How old the oldest balance under Cash now may be before Today says when it was counted. */
+const STALE_CASH_DAYS = 30;
+
+/**
+ * CASH NOW SAYS WHEN ITS BALANCES WERE COUNTED ONCE THAT IS OVER A MONTH AGO (P8, 24 Nov): his read "as of 28 Sep" on Money,
+ * two accounts not counted since, and Cash ahead on Today said nothing of it. The oldest day a balance was stated on is
+ * the figure's own (`statedOn`, the reading's `as_of`), said first in its note.
+ */
+function countedSaid(m: NonNullable<LiveBlock['metrics']>[number], today: string): NonNullable<LiveBlock['metrics']>[number] {
+  const days = typeof m.statedOn === 'string' ? daysBetween(m.statedOn, today) : 0;
+  if (days <= STALE_CASH_DAYS) return m;
+  return { ...m, note: [words.counted(days), m.note].filter((part) => part !== '').join('. ') };
 }
 
 /**

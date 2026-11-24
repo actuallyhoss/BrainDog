@@ -1488,6 +1488,8 @@ export type Metric = {
   ahead?: { from: string; currency: string; low: { day: string; value: number } } | undefined;
   value: string;
   note: string;
+  /** The oldest day a balance in the figure was stated on (a rolled cash figure's `as_of`), as `YYYY-MM-DD`. */
+  statedOn?: string | undefined;
   /** The way the money in the figure goes, drawn as its sign in front: `+` coming in, `−` going out (AM1). */
   sign?: 'in' | 'out' | undefined;
   tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;

@@ -48,3 +48,10 @@ test('A NOTE OF ONE SENTENCE IS CUT BY ITS CLAUSES AS IT WAS, and a part of a fi
   /* A SENTENCE WITH NO FIGURE LEFT GOES WHOLE, and one with no figure in it at all stays. */
   assert.equal(noteOf('Lasts {{a}} day(s). Then {{c}} goes. Nothing else.', said), 'Lasts 3 days. Nothing else.');
 });
+
+test('A ROLLED CASH FIGURE SAYS THE OLDEST DAY ITS BALANCES WERE STATED ON, for Today to say how old the count is (P8)', () => {
+  const cash = (as_of?: string) =>
+    ({ metric: 'cash-now', label: 'Cash now', reading: { value: 229918300, unit: 'EGP', rows: 4, held: 4, delta: null, why: '', met: null, refusals: [], ...(as_of ? { as_of } : {}) } }) as never;
+  assert.equal(tileOf(cash('2026-09-28')).statedOn, '2026-09-28');
+  assert.equal(tileOf(cash()).statedOn, undefined);
+});

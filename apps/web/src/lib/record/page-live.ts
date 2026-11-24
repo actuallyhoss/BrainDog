@@ -248,6 +248,8 @@ type Reading = {
   targetIn?: TargetIn;
   /** A walk to zero that never went under: the last day it looked at. Beside a null value; narrowed by `beyondOf`, never trusted. */
   beyond?: unknown;
+  /** On a rolled cash figure, the oldest day any of its balances was stated on. Unchecked, so it is narrowed where read. */
+  as_of?: unknown;
 };
 
 /* `group` IS A GROUPED CARD'S OR TABLE ROW'S, what it is grouped under by value and name (`PageRow.group`), narrowed by `groupsOf`. */
@@ -1050,6 +1052,8 @@ export function tileOf(
     ...(r.rows === 0 && r.value === 0 && typeof r.unit === 'string' && /^[A-Z]{3}$/u.test(r.unit) && (r as { beyond?: unknown }).beyond === undefined ? { noughtOverNone: true } : {}),
     /* AND WHAT BACKS IT, so two figures of one entry are said once and two of one amount are not. */
     ...backsOf(r),
+    /* AND THE OLDEST DAY ITS BALANCES WERE STATED ON (a rolled cash figure's `as_of`), so Today can say a count is old. */
+    ...(typeof r.as_of === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(r.as_of) ? { statedOn: r.as_of.slice(0, 10) } : {}),
   };
 }
 

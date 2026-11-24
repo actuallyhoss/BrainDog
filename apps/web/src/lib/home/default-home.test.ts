@@ -415,6 +415,14 @@ test('LATE IS THE LATE LIST WITH NO LATE MONEY AFTER IT, so his Today with the m
   assert.equal((out.find((b) => b.key === 'to-check') as WithRows).homeRows, undefined);
 });
 
+test('CASH AHEAD SAYS WHEN ITS BALANCES WERE COUNTED once that is over a month ago (P8, 24 Nov)', () => {
+  const cash = (statedOn: string) =>
+    block({ kind: 'stat', key: 'cash', metrics: [{ id: 'cash-now', label: 'Cash now', value: 'EGP 2,299,183', note: 'Lowest EGP 2,068,984 on 13 Jan 2027', statedOn }] as never });
+  const noteOf = (b: LiveBlock) => homeDrawn([b], NOW).blocks[0]!.metrics?.[0]?.note;
+  assert.equal(noteOf(cash('2026-08-06')), 'Counted 57 days ago. Lowest EGP 2,068,984 on 13 Jan 2027');
+  assert.equal(noteOf(cash('2026-09-10')), 'Lowest EGP 2,068,984 on 13 Jan 2027');
+});
+
 test('COMING UP IS A FEW DAYS, each a chip with what falls due on it, and a feed never ends on a bare number', () => {
   const due = block({ kind: 'timeline', heading: 'Coming up', source: 'deadlines' }, [
     { row: 'obligations#2', day: '2026-10-02' },

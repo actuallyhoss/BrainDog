@@ -35,6 +35,8 @@ export const words = {
   cashNow: 'Cash now',
   /** Under the cash figure: the day it runs out on what is due, from the Money page's own figure. */
   lastsTo: 'Lasts to {{runs-out-on}}',
+  /** Under the cash figure when its balances were last counted more than a month ago (`STALE_CASH_DAYS`). */
+  counted: (days: number) => `Counted ${days} days ago`,
   /**
    * TODAY'S OWN SHORT LABELS for the two figures beside the cash, under "Cash ahead" (his call of 23 Oct): at about
    * 1280 wide the Money page's words, "To come in, next 30 days" and "Bills and usual spending, next 30 days", wrapped
