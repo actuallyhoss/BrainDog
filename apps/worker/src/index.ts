@@ -3703,14 +3703,76 @@ const keptAs = <V,>(m: Map<string, V>, id: string, v: V): void => {
   if (m.size >= KEPT_MOST && !m.has(id)) m.clear();
   m.set(id, v);
 };
+/**
+ * AND UNDER THIS ISOLATE, THE DATA CENTRE'S CACHE (`caches.default`). The isolate alone took production's Directory
+ * trips per bearer call from 2.12 to 0.63, not the 0.01 one isolate showed, because the calls land on many isolates and
+ * each starts cold. So an isolate that has no answer asks its colo's cache before the Directory, and puts there what the
+ * Directory said, for the next isolate in the colo to find.
+ *
+ * THE SAME ANSWERS AND THE SAME BOUNDS. Only `knows`'s `true` is put, and a lapse either way. An entry carries `until`,
+ * set once, when the Directory answered, and an isolate that finds it keeps it until then and never for a fresh
+ * `KNOWN_MS`: however many isolates pass a yes on, it is never older than 30 s from the Directory's word, nor a lapse
+ * older than 60 s, as with the isolate alone. An entry past its `until`, of another shape, or a `knows` other than
+ * `true` is a miss, and so is a `match` that throws. Nothing clears the isolate's answers early either: a deleted
+ * record's object refuses its bearer anyway (`bearer-deleted`), and a lapse lands within the minute.
+ *
+ * THE KEY IS THE RECORD'S ID, the bearer's public half and none of its secret, under `/.kept/` on `PUBLIC_HOST`: a path
+ * nothing else in this Worker puts or matches, and no request is answered from the cache, on a host alpha and production
+ * do not share. Not the tiered cache, which a `put` cannot fill. A `match` or `put` is a subrequest and no Directory
+ * call. No `PUBLIC_HOST` or no `caches` and only the isolate keeps. `directoryKept.colo`, when set, is the cache asked
+ * instead, and `null` is none (a test's).
+ */
+type KeptColo = { match(key: string): Promise<Response | undefined | null>; put(key: string, value: Response): Promise<void> };
+/** Where a bearer call's `knows` or lapse was answered, for its `bearer-time` line: this isolate, the colo, the Directory. */
+type KeptAt = 'mem' | 'colo' | 'dir';
+const KEPT_PATH = '/.kept/directory/v1';
+
 export const directoryKept = {
   on: true,
   knownKept,
   lapseKept,
+  colo: undefined as KeptColo | null | undefined,
+  /** This isolate's answers, emptied as a new isolate starts with none. The colo's are not this isolate's to empty. */
   clear: (): void => {
     knownKept.clear();
     lapseKept.clear();
   },
+};
+
+/** The colo's cache and the key its entry for `id`'s `what` is put under, or `null` when there is none to ask. */
+function keptColo(env: Env, what: 'knows' | 'lapsed', id: string): { cache: KeptColo; key: string } | null {
+  if (!env.PUBLIC_HOST) return null;
+  const cache = directoryKept.colo !== undefined ? directoryKept.colo : ((globalThis as { caches?: { default?: KeptColo } }).caches?.default ?? null);
+  return cache === null ? null : { cache, key: `https://${env.PUBLIC_HOST}${KEPT_PATH}/${what}/${id}` };
+}
+
+/** The colo's entry, while it is in: its `until`, never more than `most` from now, and its answer. Anything else is `null`. */
+async function keptRead(colo: { cache: KeptColo; key: string }, most: number): Promise<{ until: number; v: boolean } | null> {
+  try {
+    const hit = await colo.cache.match(colo.key);
+    if (!hit) return null;
+    const kept = (await hit.json()) as { until?: unknown; v?: unknown } | null;
+    const now = Date.now();
+    if (typeof kept?.until !== 'number' || typeof kept.v !== 'boolean' || !(kept.until > now)) return null;
+    return { until: Math.min(kept.until, now + most), v: kept.v };
+  } catch {
+    return null;
+  }
+}
+
+/** The Directory's answer put in the colo until `until`, its own clock's `max-age` to match. One that fails is dropped. */
+async function keptWrite(colo: { cache: KeptColo; key: string }, until: number, v: boolean): Promise<void> {
+  const s = Math.floor((until - Date.now()) / 1000);
+  if (s < 1) return;
+  try {
+    await colo.cache.put(colo.key, new Response(JSON.stringify({ until, v }), { headers: { 'content-type': 'application/json', 'cache-control': `max-age=${s}` } }));
+  } catch {
+    /* A miss for the next isolate, as before the colo was asked. */
+  }
+}
+
+const keptAt = (clock: BearerClock | undefined, what: 'knows' | 'billing', at: KeptAt): void => {
+  if (clock !== undefined) clock.at[what] = at;
 };
 
 /**
@@ -3722,27 +3784,57 @@ export const directoryKept = {
  *
  * `clock`, WHEN GIVEN, IS ADDED THE TIME OF EACH TRIP `bearerOf` MAKES: `knows`, the lapse (`billing`) and `admit`.
  *
- * `knows` AND THE LAPSE ARE ANSWERED FROM THIS ISOLATE WHILE THEY ARE KEPT (`directoryKept`), so a trip is made only when
- * the kept answer is missing or out.
+ * `knows` AND THE LAPSE ARE ANSWERED FROM THIS ISOLATE WHILE THEY ARE KEPT (`directoryKept`), then from the colo's cache
+ * (`keptColo`), so a trip is made only when neither holds the answer in; the clock is told which answered (`at`).
  */
 function bearerDeps(env: Env, clock?: BearerClock): BearerDeps {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   return {
     knows: async (id) => {
-      if (directoryKept.on && (knownKept.get(id) ?? 0) > Date.now()) return true;
+      if (directoryKept.on && (knownKept.get(id) ?? 0) > Date.now()) {
+        keptAt(clock, 'knows', 'mem');
+        return true;
+      }
+      const colo = directoryKept.on ? keptColo(env, 'knows', id) : null;
+      const kept = colo === null ? null : await clocked(clock, 'colo', () => keptRead(colo, KNOWN_MS));
+      if (kept?.v === true) {
+        keptAs(knownKept, id, kept.until);
+        keptAt(clock, 'knows', 'colo');
+        return true;
+      }
       const yes = await clocked(clock, 'knows', () => directory.knows(id));
+      keptAt(clock, 'knows', 'dir');
       if (!directoryKept.on) return yes;
-      if (yes) keptAs(knownKept, id, Date.now() + KNOWN_MS);
-      else knownKept.delete(id);
+      if (!yes) {
+        knownKept.delete(id);
+        return yes;
+      }
+      const until = Date.now() + KNOWN_MS;
+      keptAs(knownKept, id, until);
+      if (colo !== null) await clocked(clock, 'colo', () => keptWrite(colo, until, true));
       return yes;
     },
     /* THE DIRECTORY'S ROW AND NOT THE OBJECT'S FLAG, as the session's `lapsed` is, so both doors cap on one fact. A record
        with no billing row answers `false` and is never capped. */
     lapsed: async (id) => {
-      const kept = directoryKept.on ? lapseKept.get(id) : undefined;
-      if (kept !== undefined && kept.until > Date.now()) return kept.lapsed;
+      const mem = directoryKept.on ? lapseKept.get(id) : undefined;
+      if (mem !== undefined && mem.until > Date.now()) {
+        keptAt(clock, 'billing', 'mem');
+        return mem.lapsed;
+      }
+      const colo = directoryKept.on ? keptColo(env, 'lapsed', id) : null;
+      const kept = colo === null ? null : await clocked(clock, 'colo', () => keptRead(colo, LAPSE_MS));
+      if (kept !== null) {
+        keptAs(lapseKept, id, { until: kept.until, lapsed: kept.v });
+        keptAt(clock, 'billing', 'colo');
+        return kept.v;
+      }
       const lapsed = await clocked(clock, 'billing', async () => ((await directory.billing({ op: 'lapsed', record: id })) as unknown) === true);
-      if (directoryKept.on) keptAs(lapseKept, id, { until: Date.now() + LAPSE_MS, lapsed });
+      keptAt(clock, 'billing', 'dir');
+      if (!directoryKept.on) return lapsed;
+      const until = Date.now() + LAPSE_MS;
+      keptAs(lapseKept, id, { until, lapsed });
+      if (colo !== null) await clocked(clock, 'colo', () => keptWrite(colo, until, lapsed));
       return lapsed;
     },
     verify: (id, bearer, surface, build) => held(env, id, (record) => record.verify(bearer, surface, build)),
@@ -3768,13 +3860,16 @@ function bearerDeps(env: Env, clock?: BearerClock): BearerDeps {
  * forward to the record, and the whole of it from when this Worker took the request (`began`). `billing` and `admit` go
  * out side by side, so they overlap and do not add; what the parts leave of the total is time none of them owns. Each is
  * wall time across a trip: the clock stands still while this Worker's own code runs.
+ *
+ * `colo` IS THE TIME IN THE COLO'S CACHE (`keptColo`), its `match` and `put` together, and `at` says where `knows` and
+ * the lapse were answered: `mem`, this isolate; `colo`, the colo's cache; `dir`, a trip to the Directory.
  */
-type BearerClock = { began: number; knows: number; billing: number; admit: number; limit: number; forward: number };
+type BearerClock = { began: number; knows: number; billing: number; admit: number; limit: number; forward: number; colo: number; at: { knows?: KeptAt; billing?: KeptAt } };
 
-const bearerClock = (began: number): BearerClock => ({ began, knows: 0, billing: 0, admit: 0, limit: 0, forward: 0 });
+const bearerClock = (began: number): BearerClock => ({ began, knows: 0, billing: 0, admit: 0, limit: 0, forward: 0, colo: 0, at: {} });
 
 /** `run`, with the time it took added to `clock`'s `leg` whether it answered or threw, and as it was with no clock. */
-async function clocked<T>(clock: BearerClock | undefined, leg: Exclude<keyof BearerClock, 'began'>, run: () => Promise<T>): Promise<T> {
+async function clocked<T>(clock: BearerClock | undefined, leg: Exclude<keyof BearerClock, 'began' | 'at'>, run: () => Promise<T>): Promise<T> {
   if (clock === undefined) return run();
   const t0 = Date.now();
   try {
@@ -3796,7 +3891,8 @@ function bearerTimeSaid(clock: BearerClock, path: string, rec: string, status: n
   const total = Date.now() - clock.began;
   const slow = total > BEARER_TIME_SLOW_MS;
   if (!slow && Math.random() >= 1 / BEARER_TIME_EVERY) return;
-  op({ op: 'bearer-time', path, rec, status, knows: clock.knows, billing: clock.billing, admit: clock.admit, limit: clock.limit, forward: clock.forward, total, ...(slow ? {} : { sampled: true }) });
+  const at = { ...(clock.at.knows === undefined ? {} : { knowsAt: clock.at.knows }), ...(clock.at.billing === undefined ? {} : { billingAt: clock.at.billing }) };
+  op({ op: 'bearer-time', path, rec, status, knows: clock.knows, billing: clock.billing, admit: clock.admit, limit: clock.limit, forward: clock.forward, colo: clock.colo, ...at, total, ...(slow ? {} : { sampled: true }) });
 }
 
 /** The methods a runner calls, and the only paths `runnerOf` reads a bearer at. */
