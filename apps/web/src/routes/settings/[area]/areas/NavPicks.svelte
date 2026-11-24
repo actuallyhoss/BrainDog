@@ -11,7 +11,7 @@
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
-  import { arrange, flatNav, listCounts, tabsOf, workOf } from '$lib/nav.ts';
+  import { arrange, flatNav, lifted, listCounts, tabsOf, workOf } from '$lib/nav.ts';
   import { railOf } from '$lib/nav/rail.ts';
   import { said as voiced } from '$lib/voice.svelte.ts';
   import { navPrefs, type NavShape, type Saved } from '$lib/nav-prefs.svelte.ts';
@@ -56,11 +56,11 @@
   const places = $derived.by(() => {
     const views = new Set(shell.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
     const nav = navPrefs.relabel(shell.nav.filter((n) => !n.cut && !views.has(n.href) && !navPrefs.isHidden(n.href)));
-    const flat = flatNav(arrange(nav, navPrefs.order), 1, { today: copy.today, activity: copy.audit, decide: voiced('decide') }, { work: workOf(shell.index.registers), counts: listCounts(shell.index.registers) });
-    return railOf(flat, voiced('decide')).places;
+    const flat = flatNav(arrange(lifted(nav, navPrefs.places), navPrefs.order), 1, { today: copy.today, activity: copy.audit, decide: voiced('decide') }, { work: workOf(shell.index.registers), counts: listCounts(shell.index.registers) });
+    return railOf(flat, voiced('decide'), navPrefs.order).places;
   });
   /* WHAT THE PHONE BAR DRAWS NOW, Today first and left out of the picks: it is always there. */
-  const drawn = $derived(tabsOf(places, MOST + 1, navPrefs.tabs).slice(1));
+  const drawn = $derived(tabsOf(places, MOST + 1, navPrefs.tabs, navPrefs.order).slice(1));
   const pickable = $derived(places.slice(1));
   const onBar = (href: string): boolean => drawn.some((t) => t.href === href);
 

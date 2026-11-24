@@ -238,3 +238,19 @@ test('A SHELF KEEPS HOW A COMPONENT IS BUILT FOR THE PERSON, never rows of data'
   assert.deepEqual(await prefsOf(api, ada), {});
   sql.close();
 });
+
+test('THE RAIL KEEPS ITS PLACES IN HIS ORDER AND ANY PAGE AS A PLACE OF ITS OWN (P1, 24 Nov), and a wrong shape is refused', async () => {
+  const { api, sql } = await record();
+  const code = (r: { ok: boolean }) => (r.ok ? 'ok' : (r as unknown as { refusal: { code: string } }).refusal.code);
+  const order = await api.setPref({ key: 'nav.order', value: ['section:Projects', 'section:Work', '/p/money', '/p/holdings'] }, ada);
+  assert.ok(order.ok, JSON.stringify(order));
+  const places = await api.setPref({ key: 'nav.places', value: ['/p/holdings', '/p/holdings'] }, ada);
+  assert.ok(places.ok, JSON.stringify(places));
+  assert.deepEqual(await prefsOf(api, ada), { 'nav.order': ['section:Projects', 'section:Work', '/p/money', '/p/holdings'], 'nav.places': ['/p/holdings'] });
+  assert.equal(code(await api.setPref({ key: 'nav.order', value: ['section:'] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.order', value: ['Projects'] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.hidden', value: ['section:Work'] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.places', value: ['section:Work'] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.places', value: Array.from({ length: 21 }, (_, i) => `/p/${i}`) }, ada)), 'VALUE_MALFORMED');
+  sql.close();
+});

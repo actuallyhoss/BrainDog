@@ -1310,6 +1310,7 @@ export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
  */
 export const PREF_KEYS = [
   'nav.order',
+  'nav.places',
   'nav.hidden',
   'nav.pins',
   'nav.shape',
@@ -1340,6 +1341,8 @@ export const PREF_KEYS = [
   'agents.self_update',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
+/** The most pages one person makes places of their own (`nav.places`). */
+export const OWN_PLACES_MOST = 20;
 /**
  * A MEMBER'S OWN TODAY (widgets plan §4.5, W8), kept among that person's own preferences as `{ version, body }`: the board
  * they arranged for themselves, a page body as `page.home`'s is. Written by the record alone (`boardSteps` on `home`), never
@@ -1445,7 +1448,10 @@ export const SELF_UPDATE_PREF = 'agents.self_update' satisfies PrefKey;
  * `false` is off, and the start says to run braindog update, as it always did. Only an owner in a browser turns it on.
  */
 export type Prefs = {
+  /** The rail's order: page addresses, and the places themselves as `section:<name>`, which rank before their `nav.place`. */
   'nav.order'?: string[];
+  /** The pages this person made places of their own, by address, in the order made (P1, 24 Nov). */
+  'nav.places'?: string[];
   'nav.hidden'?: string[];
   /** The projects kept in the sidebar, by address (`/p/tidepool`), in the order pinned; absent is none (3 Nov). */
   'nav.pins'?: string[];
@@ -15782,9 +15788,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const texts = (v: unknown, most: number, fits: (s: string) => boolean): v is string[] =>
         Array.isArray(v) && v.length <= most && v.every((s) => typeof s === 'string' && s.length <= 300 && fits(s));
       let kept: Prefs[PrefKey] | null = null;
-      if (value !== null && (key === 'nav.order' || key === 'nav.hidden')) {
+      if (value !== null && key === 'nav.order') {
+        /* AND THE PLACES THEMSELVES, as `section:Projects` (P1, 24 Nov): he could not put Projects above Work. */
+        if (!texts(value, 500, (s) => s.startsWith('/') || /^section:\S/u.test(s)))
+          return no('VALUE_MALFORMED', 'nav.order is a list of at most 500 addresses, each starting with /, or places written section:<name>, or null to take it away.', { at: 'value' });
+        kept = [...new Set(value)];
+      } else if (value !== null && key === 'nav.hidden') {
         if (!texts(value, 500, (s) => s.startsWith('/')))
           return no('VALUE_MALFORMED', `${key} is a list of at most 500 addresses, each starting with /, or null to take it away.`, { at: 'value' });
+        kept = [...new Set(value)];
+      } else if (value !== null && key === 'nav.places') {
+        if (!texts(value, OWN_PLACES_MOST, (s) => s.startsWith('/')))
+          return no('VALUE_MALFORMED', `nav.places is a list of at most ${OWN_PLACES_MOST} page addresses, each starting with /, or null to take it away.`, { at: 'value' });
         kept = [...new Set(value)];
       } else if (value !== null && key === 'nav.pins') {
         if (!texts(value, 100, (s) => s.startsWith('/')))

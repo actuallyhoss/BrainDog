@@ -81,9 +81,9 @@
   import { KEYS_REGISTER } from '$lib/record/keys-register.ts';
   import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, litOfUp, rowsAsLists, sideModel, sideOrder, upFirst, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
-  import { MENU, WORK, arrange, flatNav, isHere, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
+  import { MENU, WORK, arrange, flatNav, isHere, lifted, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { byUse, keptUses, noteUse } from '$lib/shell/tab-use.ts';
-  import { AGENTS_PAGE, agentsHref, agentsPlace, heldHref, railOf } from '$lib/nav/rail.ts';
+  import { AGENTS_PAGE, agentsHref, agentsPlace, heldHref, isPlaceKey, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount, toldReadable } from '$lib/home/need-you.ts';
   import { answerTakenBack, answerWritten, heardWaits, waitsNow, waitsTicket, workingNow } from '$lib/home/waits.svelte.ts';
@@ -458,7 +458,8 @@
     if (home !== null && home !== '/' && here(page.url.pathname) === '/' && page.url.search === '') void goto(at(home), { replaceState: true });
   });
   /* A PAGE HIDDEN FROM THE RAIL IS HIDDEN FROM THE TOP BAR AND THE SIDEBAR TOO: one nav, not two. */
-  const grouped = $derived(arrange(railNav.filter((e) => !navPrefs.hidden.includes(e.href)), navPrefs.order));
+  /* AND A PAGE HE MADE A PLACE OF ITS OWN STANDS AS ONE (`lifted`, P1). */
+  const grouped = $derived(arrange(lifted(railNav.filter((e) => !navPrefs.hidden.includes(e.href)), navPrefs.places), navPrefs.order));
   /* THE SIDEBAR'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`), the kernel's own marked, each with
      what its declaration says of where it belongs: as the sidebar learnt it, else as this device last kept it, so every
      list is drawn in its home at once, from the shell's own index, and never pops in after a read. */
@@ -545,7 +546,10 @@
    * THE RAIL'S SECTIONS (`railOf`): the seven places, each section's own things under its name, and the
    * rest under More. One reading for the rail, the tab bar and the sidebar, so a place is in the same spot on each.
    */
-  const rail = $derived(railOf(flat, said('decide')));
+  /* IN HIS ORDER OF PLACES WHERE HE GAVE ONE (`nav.order`'s `section:` keys, P1). */
+  const rail = $derived(railOf(flat, said('decide'), navPrefs.order));
+  /** Whether he put the places in an order of his own, which the sidebar then draws as it is (P1). */
+  const ownOrder = $derived(navPrefs.order.some(isPlaceKey));
   /* A BAR HAS NO ROW FOR KILN, SO ON KILN'S PAGE ITS SECTION IS WHERE YOU ARE: the rail marks Kiln under Projects
      (`railOf`), and the top bar and the tab bar, which draw no Kiln, mark Projects in its ink block. */
   const withThings = (items: FlatItem[]): FlatItem[] =>
@@ -625,7 +629,7 @@
   const tabUses = typeof window === 'undefined' ? [] : keptUses();
   const tabs = $derived.by(() => {
     const main = withThings(keepsNoProject ? rail.places.filter((p) => p !== projectsPlace) : rail.places);
-    const chosen = tabsOf(main, 4, navPrefs.tabs);
+    const chosen = tabsOf(main, 4, navPrefs.tabs, navPrefs.order);
     return navPrefs.tabs.length > 0 ? chosen : byUse(main, chosen, tabUses);
   });
   /** The place of the rail a page sits in, past Today: its own address, its section's pages, or a list under it. */
@@ -734,7 +738,15 @@
       .filter((i) => i !== projectsPlace && i.key !== 'activity' && (rail.places.includes(i) || i.key === agents))
       .map((i) => (i.key === 'decide' ? { ...i, count: open } : i.key === agents ? { ...i, count: working, live: working > 0 } : i));
     const others: NavPlace[] = rail.rest.filter((i) => i !== projectsPlace && i.key !== 'activity' && i.key !== agents);
-    return { at, places: sideOrder(places, at), others };
+    return { at, places: ownOrder ? places : sideOrder(places, at), others };
+  });
+  /* THE PROJECTS' PART STANDS WHERE HE PUT PROJECTS (P1, 24 Nov): drawn after every place, it stayed under Work and Money
+     whatever order he chose. The places that come after it, by key; none where he chose no order. */
+  const projectsAfter = $derived.by((): string[] => {
+    if (!ownOrder || projectsPlace === null) return [];
+    const all = [...rail.places, ...rail.rest];
+    const at = all.indexOf(projectsPlace);
+    return at < 0 ? [] : all.slice(at + 1).map((i) => i.key);
   });
   const sideHomes = $derived(homesOf(sideLists, placed.places, placed.at));
   /* A PAGE HELD OFF THE RAIL WHILE ITS LISTS ARE EMPTY (`waits`, audit 31 Oct f, AF7) goes under its section's place, at
@@ -746,8 +758,9 @@
       .relabel(data.nav.filter((n) => n.waits === true && !navPrefs.hidden.includes(n.href)))
       .map((n) => ({ href: n.href, label: n.title, icon: n.icon, section: n.section, home: byName.get(n.section.trim().toLowerCase()) ?? IN_MORE }));
   });
-  const model = $derived(
-    sideModel({
+  const model = $derived({
+    projectsAfter,
+    ...sideModel({
       places: placed.places,
       others: placed.others,
       projects: projectsPlace
@@ -780,7 +793,7 @@
       leads: placed.at.money ? { [placed.at.money]: moneyLead(rail.views[placed.at.money], [...rail.places, ...rail.rest].find((i) => i.key === placed.at.money)?.href) } : {},
       waiting,
     }),
-  );
+  });
   /* A TAB IS LIT ON ITS PLACE'S OWN LISTS TOO, as the sidebar's place unfolds there: Money's tab on its ledger. */
   const phoneTabs = $derived(
     tabs.map((t) => {

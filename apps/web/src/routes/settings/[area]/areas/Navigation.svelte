@@ -188,6 +188,7 @@
 </script>
 
 <!-- THE PAGES IN THE NAV, their order and Hide, with what the app opens on in that tile's heading row (G9), then every page not in it with the way back (Pages folded in here). -->
+<Pages {shell} {area} part="places" />
 <Pages {shell} {area} part="nav" />
 <Pages {shell} {area} part="others" />
 

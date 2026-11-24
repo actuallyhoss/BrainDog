@@ -21,8 +21,13 @@
 
 import * as pref from './pref.ts';
 import { putBackVersion, shelve, shelvedOf, unshelve, shelfId, type Declared, type Shelved, type ShelveMore } from './page/shelf.ts';
+import { isPlaceKey } from './nav/rail.ts';
 
 const HIDDEN = 'bd_nav_hidden';
+/* THE DEVICE'S COPY OF THE PAGES MADE PLACES OF THEIR OWN (`nav.places`), so a reload draws them before `boot` answers. */
+const PLACES = 'bd_nav_places';
+/** Pages one person makes places of their own, the record's own cap (`OWN_PLACES_MOST`). */
+export const PLACES_MOST = 20;
 /* THE DEVICE'S COPY OF THE PHONE BAR, so a reload draws it before `boot` answers. */
 const TABS = 'bd_nav_tabs';
 /* THE DEVICE'S COPY OF THE PROJECTS PINNED TO THE SIDEBAR, under the key the sidebar kept its own pins in before they
@@ -56,7 +61,10 @@ const DISMISSED_MOST = 500;
 export type NavShape = 'bar' | 'menu';
 
 export type Prefs = {
+  /** The rail's order: page addresses, and places as `section:<name>`, which rank before their declared place. */
   'nav.order'?: string[];
+  /** The pages made places of their own, by address (P1, 24 Nov). */
+  'nav.places'?: string[];
   'nav.hidden'?: string[];
   'nav.tabs'?: string[];
   /** THE PROJECTS KEPT IN THE SIDEBAR, by address, in the order pinned. Absent is none. */
@@ -215,6 +223,7 @@ const sendTo =
 
 export type Start = {
   order?: string[];
+  places?: string[];
   hidden?: string[];
   tabs?: string[];
   pins?: string[];
@@ -229,6 +238,7 @@ const fromDevice = (): Start => {
   const held = pref.read();
   return {
     order: held.nav ?? [],
+    places: readList(PLACES).filter((h) => h.startsWith('/')),
     hidden: readList(HIDDEN),
     tabs: readList(TABS),
     pins: readList(PINS).filter((h) => h.startsWith('/')),
@@ -270,6 +280,8 @@ export function moved(groups: Arranged, href: string, step: -1 | 1, skip: (href:
 
 export class NavPrefs {
   order = $state<string[]>([]);
+  /** The pages this person made places of their own, by address, in the order made. */
+  places = $state<string[]>([]);
   hidden = $state<string[]>([]);
   /** The pages the person put on the phone bar after Today; empty is the rail's first four. */
   tabs = $state<string[]>([]);
@@ -305,6 +317,7 @@ export class NavPrefs {
 
   constructor(start: Start = fromDevice()) {
     this.order = start.order ?? [];
+    this.places = start.places ?? [];
     this.hidden = start.hidden ?? [];
     this.tabs = start.tabs ?? [];
     this.pins = start.pins ?? [];
@@ -341,6 +354,9 @@ export class NavPrefs {
     }
     this.hidden = strings(prefs['nav.hidden']);
     keepList(HIDDEN, this.hidden);
+    /* THE PAGES MADE PLACES ARE THE RECORD'S, as the hidden ones are. */
+    this.places = strings(prefs['nav.places']);
+    keepList(PLACES, this.places);
     this.tabs = strings(prefs['nav.tabs']);
     keepList(TABS, this.tabs);
     /* THE PINS ARE THE RECORD'S ONCE IT HOLDS ANY. Before then, the pins this device kept (the sidebar's own, from when
@@ -403,6 +419,34 @@ export class NavPrefs {
     return this.#commit('nav.order', next, () => {
       this.order = before;
       pref.write({ nav: before });
+    });
+  }
+
+  /** The places named in the order, `section:<name>`, in the order he put them (`placeKey`). */
+  get placeOrder(): string[] {
+    return this.order.filter(isPlaceKey);
+  }
+
+  /**
+   * THE PLACES IN HIS ORDER (P1, 24 Nov): `keys` are the places as the rail draws them (`placeKey`), written into the order
+   * ahead of its pages, which keep theirs. Empty takes his order of places away, and the rail is drawn as it was.
+   */
+  setPlaceOrder(keys: readonly string[]): Promise<Saved> {
+    return this.setOrder([...new Set(keys.filter(isPlaceKey)), ...this.order.filter((h) => !isPlaceKey(h))]);
+  }
+
+  /** Whether a page, by its address, is a place of its own. */
+  isPlace = (href: string): boolean => this.places.includes(href);
+
+  /** A page made a place of its own, at the end, or put back under its section. */
+  setPlace(href: string, on: boolean): Promise<Saved> {
+    const before = this.places;
+    const next = on ? [...new Set([...before, href])].slice(-PLACES_MOST) : before.filter((h) => h !== href);
+    this.places = next;
+    keepList(PLACES, next);
+    return this.#commit('nav.places', next, () => {
+      this.places = before;
+      keepList(PLACES, before);
     });
   }
 

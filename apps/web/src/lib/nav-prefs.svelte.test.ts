@@ -307,3 +307,25 @@ test("A NAME IS THE PERSON'S OWN, and the page's own title or nothing takes it a
     { key: 'nav.labels', value: {} },
   ]);
 });
+
+test('THE PLACES GO IN HIS ORDER AHEAD OF THE PAGES, AND A PAGE IS MADE A PLACE AND PUT BACK (P1, 24 Nov)', async () => {
+  const prefs = new NavPrefs({ order: ['/p/money', '/p/kiln'], hidden: [] });
+  const io = recorder();
+  prefs.adopt({ 'nav.order': ['/p/money', '/p/kiln'], 'nav.places': ['/p/holdings'] }, 'https://app.example', io.send);
+  assert.deepEqual(prefs.places, ['/p/holdings']);
+  await prefs.setPlaceOrder(['section:Projects', 'section:Work', '/p/stray']);
+  assert.deepEqual(prefs.order, ['section:Projects', 'section:Work', '/p/money', '/p/kiln']);
+  assert.deepEqual(prefs.placeOrder, ['section:Projects', 'section:Work']);
+  await prefs.setPlace('/p/estate', true);
+  await prefs.setPlace('/p/holdings', false);
+  assert.deepEqual(prefs.places, ['/p/estate']);
+  assert.equal(prefs.isPlace('/p/estate'), true);
+  await prefs.setPlaceOrder([]);
+  assert.deepEqual(prefs.order, ['/p/money', '/p/kiln']);
+  assert.deepEqual(io.sent, [
+    { key: 'nav.order', value: ['section:Projects', 'section:Work', '/p/money', '/p/kiln'] },
+    { key: 'nav.places', value: ['/p/holdings', '/p/estate'] },
+    { key: 'nav.places', value: ['/p/estate'] },
+    { key: 'nav.order', value: ['/p/money', '/p/kiln'] },
+  ]);
+});

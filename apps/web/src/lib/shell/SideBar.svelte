@@ -125,6 +125,8 @@
   /* THE PHONE'S MENU LISTS WHAT THE TAB BAR DOES NOT (ui-perfect, 3 Nov): Today and Needs you stood in the Menu right above
      their own tabs. A tab's place that has places under it (Money's lists) stays, as the way to them. */
   const menuPlaces = $derived(phone ? model.places.filter((p) => !(tabbed.includes(p.href) && p.kids.length === 0)) : model.places);
+  /* THE PROJECTS' PART STANDS BEFORE THE FIRST PLACE HE PUT AFTER PROJECTS (`projectsAfter`, P1), else after them all. */
+  const projectsBefore = (list: readonly { key: string }[]): string | null => list.find((p) => model.projectsAfter?.includes(p.key) === true)?.key ?? null;
   /** What in the rail moves to make room for a place arriving: each row, the head of Projects, and the rule. */
   const ROWS = '.s-list, li, .s-tile';
 
@@ -702,6 +704,16 @@
   {/if}
 {/snippet}
 
+{#snippet railProjects()}
+  {#if model.projects?.href}
+    <li>
+      <a class="s-ricon tap" href={at(model.projects.href)} aria-current={isLit(model.projects.href) || projectLit !== undefined || model.projects.things.some((t) => isLit(t.href)) || model.projects.kids.some((k) => isLit(k.href)) ? 'page' : undefined} aria-label={model.projects.label} title={model.projects.label}>
+        <Icon name="projects" size="m" />
+      </a>
+    </li>
+  {/if}
+{/snippet}
+
 {#snippet footPart()}
   <ul class="s-list s-end">
     {#each model.foot as l (l.href)}
@@ -721,8 +733,8 @@
     {#if menuPlaces.length > 0 || showProjects}
       <nav class="s-tile" aria-label={words.nav}>
         <ul class="s-list">
-          {#each menuPlaces as p (p.key)}{@render place(p)}{/each}
-          {@render projectsPart()}
+          {#each menuPlaces as p (p.key)}{#if p.key === projectsBefore(menuPlaces)}{@render projectsPart()}{/if}{@render place(p)}{/each}
+          {#if projectsBefore(menuPlaces) === null}{@render projectsPart()}{/if}
         </ul>
       </nav>
     {/if}
@@ -746,6 +758,7 @@
     <ul class="s-list s-rlist">
       {#each model.places as p (p.key)}
         {@const n = countOf(p)}
+        {#if p.key === projectsBefore(model.places)}{@render railProjects()}{/if}
         <li>
           <a class="s-ricon tap" href={at(p.href)} aria-current={isLit(p.href) || p.kids.some((k) => isLit(k.href)) ? 'page' : undefined} aria-label={p.label} title={p.label}>
             <Icon name={p.icon as IconName} size="m" />
@@ -753,13 +766,7 @@
           </a>
         </li>
       {/each}
-      {#if model.projects?.href}
-        <li>
-          <a class="s-ricon tap" href={at(model.projects.href)} aria-current={isLit(model.projects.href) || projectLit !== undefined || model.projects.things.some((t) => isLit(t.href)) || model.projects.kids.some((k) => isLit(k.href)) ? 'page' : undefined} aria-label={model.projects.label} title={model.projects.label}>
-            <Icon name="projects" size="m" />
-          </a>
-        </li>
-      {/if}
+      {#if projectsBefore(model.places) === null}{@render railProjects()}{/if}
     </ul>
     <ul class="s-list s-rlist s-rfoot">
       <li>
@@ -789,8 +796,8 @@
     </div>
     <nav class="s-scroll" aria-label={words.nav} bind:this={rows} {@attach litSlide('.s-row[aria-current="page"]', { fill: 'var(--chosen)' })}>
       <ul class="s-list">
-        {#each model.places as p (p.key)}{@render place(p)}{/each}
-        {@render projectsPart()}
+        {#each model.places as p (p.key)}{#if p.key === projectsBefore(model.places)}{@render projectsPart()}{/if}{@render place(p)}{/each}
+        {#if projectsBefore(model.places) === null}{@render projectsPart()}{/if}
       </ul>
       {@render morePart()}
       {@render penPart()}

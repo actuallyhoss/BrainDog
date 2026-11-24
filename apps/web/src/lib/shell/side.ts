@@ -325,6 +325,8 @@ export type SidePlace = NavPlace & {
 /** The whole sidebar, from the shell's nav and the record's lists: every place, the projects' part, More lists, the foot. */
 export type SideModel = {
   places: SidePlace[];
+  /** The places drawn after the projects' part, by key, where he put the places in his own order; else it comes last. */
+  projectsAfter?: readonly string[] | undefined;
   /** Where the projects' heading opens (the portfolio page), the projects' own pages, and the lists under them. */
   projects: { href: string | null; label: string; things: readonly SideLink[]; kids: SideLink[] } | null;
   more: SideLink[];

@@ -29,8 +29,8 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { WORK, arrange, flatNav } from '$lib/nav.ts';
-  import { agentsHref, railOf } from '$lib/nav/rail.ts';
+  import { WORK, arrange, flatNav, lifted } from '$lib/nav.ts';
+  import { agentsHref, isPlaceKey, placeKey, railOf, type Rail } from '$lib/nav/rail.ts';
   import { sideOrder } from '$lib/shell/side.ts';
   import { said as voiced } from '$lib/voice.svelte.ts';
   import { TASKS } from '$lib/work/list.ts';
@@ -57,8 +57,8 @@
    * "Opens on" at the top, then "In your nav", then "Not in your nav", so the two areas can no longer count the same
    * pages two ways ("Your pages 40" here beside "Your pages 8" there). With no `part` all three are drawn, in that order.
    */
-  let { shell, part }: AreaProps & { part?: 'opens' | 'nav' | 'others' | undefined } = $props();
-  const drawn = (which: 'opens' | 'nav' | 'others'): boolean => part === undefined || part === which;
+  let { shell, part }: AreaProps & { part?: 'opens' | 'places' | 'nav' | 'others' | undefined } = $props();
+  const drawn = (which: 'opens' | 'places' | 'nav' | 'others'): boolean => part === undefined || part === which;
 
   /* THE PAGE ITSELF IS THE OWNER'S TO CHANGE, as the record's `setDeclaration` and `slashDraft` hold. */
   const owner = $derived(ownsRecord(shell.me));
@@ -114,6 +114,16 @@
       `${on === 0 ? 'No plugins on' : on === 1 ? '1 plugin on' : `${on} plugins on`}${off === 0 ? '' : `, ${off} off`}`,
     manage: 'Manage',
     moreLists: 'More lists',
+    places: 'Places',
+    placesHint: 'Today and Needs you stay first.',
+    placeUp: (title: string) => `Move the ${title} place up`,
+    placeDown: (title: string) => `Move the ${title} place down`,
+    usualOrder: 'Usual order',
+    usualDone: 'Places are in the usual order.',
+    lift: 'Make it a place',
+    unlift: (section: string) => `Put back in ${section}`,
+    lifted: (title: string) => `${title} is a place now.`,
+    unlifted: (title: string, section: string) => `${title} is back in ${section}.`,
   };
 
   /** A refusal is the record's own sentence; a change it kept says what it came to. */
@@ -141,9 +151,10 @@
    */
   const views = $derived(new Set(shell.index.registers.flatMap((r) => r.views.map((v) => v.href))));
   const inNav = $derived(shell.nav.filter((e) => !e.cut && !e.row && !views.has(e.href)));
-  const sections = $derived(arrange(inNav, navPrefs.order));
+  /* A PAGE MADE A PLACE OF ITS OWN STANDS AS ONE HERE TOO (`lifted`, P1), as the sidebar draws it. */
+  const sections = $derived(arrange(lifted(inNav, navPrefs.places), navPrefs.order));
   /* THE ORDER A MOVE IS MADE IN: the nav's own arrangement, hidden pages in, so a page shown again goes back where it was. */
-  const arranged = $derived(arrange(navPrefs.relabel(inNav), navPrefs.order));
+  const arranged = $derived(arrange(lifted(navPrefs.relabel(inNav), navPrefs.places), navPrefs.order));
   /* WHETHER A PRESS WOULD MOVE ANYTHING, among the pages of its heading still drawn, so an arrow at an edge is not offered. */
   const edge = (href: string, step: -1 | 1): boolean => {
     const list = (arranged.find(([, l]) => l.some((e) => e.href === href))?.[1] ?? []).filter((e) => !navPrefs.isHidden(e.href));
@@ -187,9 +198,33 @@
    * have no layout of their own to edit yet. A section's pages follow its row, each saying its section when its name
    * does not. Decide is listed whether or not anything waits on it today, since this is where it is found.
    */
-  const ordered = $derived.by((): Listed[] => {
-    const holdsTasks = shell.index.registers.some((r) => r.id === TASKS);
+  const holdsTasks = $derived(shell.index.registers.some((r) => r.id === TASKS));
+  /**
+   * THE SIDEBAR'S PLACES IN ITS OWN ORDER (`railOf`): Today, Needs you, the places with Agents after Money, then Projects,
+   * then what it folds under More lists. WHERE HE PUT THE PLACES IN AN ORDER OF HIS OWN (`nav.order`'s `section:` keys, P1)
+   * they are drawn in it as they stand, Projects among them, as the sidebar draws them (`AppFrame` `projectsAfter`).
+   */
+  const railed = $derived.by(() => {
     const flat = flatNav(sections, 1, { today: copy.today, activity: copy.audit, decide: voiced('decide') }, { work: holdsTasks ? WORK : null });
+    const rail: Rail<(typeof sections)[number][1][number]> = railOf(flat, voiced('decide'), navPrefs.order);
+    const own = navPrefs.order.some(isPlaceKey);
+    const all = [...rail.places, ...rail.rest];
+    const plain = (i: { key: string }): string => i.key.replace(/^section:/u, '').trim().toLocaleLowerCase();
+    const projectsAt = all.find((i) => rail.things.some(([section]) => section === i.label)) ?? all.find((i) => plain(i) === 'projects') ?? null;
+    const agentsKey = all.find((i) => i.href === agentsHref(all))?.key ?? null;
+    const moneyKey = all.find((i) => plain(i) === 'money')?.key ?? null;
+    const placed = all.filter((i) => i !== projectsAt && i.key !== 'activity' && (rail.places.includes(i) || i.key === agentsKey));
+    const seq = own ? placed : sideOrder(placed, { agents: agentsKey, money: moneyKey });
+    if (projectsAt) {
+      const after = new Set(own ? all.slice(all.indexOf(projectsAt) + 1).map((i) => i.key) : []);
+      const at = seq.findIndex((i) => after.has(i.key));
+      seq.splice(at < 0 ? seq.length : at, 0, projectsAt);
+    }
+    const restIn = rail.rest.filter((i) => i !== projectsAt && i.key !== 'activity' && i.key !== agentsKey);
+    return { rail, seq, restIn, own };
+  });
+
+  const ordered = $derived.by((): Listed[] => {
     const bySection = new Map(groups.map(([section, list]) => [section.trim().toLocaleLowerCase(), { section, list }] as const));
     const app = (href: string, own: string, icon: IconName): Listed => ({ href, slug: null, own, icon, inNav: true, row: false, app: true });
     const out: Listed[] = [];
@@ -197,19 +232,9 @@
        top level and Activity, none of which the sidebar shows there. The sidebar is the rail (`railOf`): Today, Needs
        you, the places with Agents after Money, then Projects, then whatever it folds under More lists, which each say
        so. Activity is not a row of the sidebar, so it is not one here. */
-    const rail = railOf(flat, voiced('decide'));
-    const all = [...rail.places, ...rail.rest];
-    const plain = (i: { key: string }): string => i.key.replace(/^section:/u, '').trim().toLocaleLowerCase();
-    const projectsAt = all.find((i) => rail.things.some(([section]) => section === i.label)) ?? all.find((i) => plain(i) === 'projects') ?? null;
-    const agentsKey = all.find((i) => i.href === agentsHref(all))?.key ?? null;
-    const moneyKey = all.find((i) => plain(i) === 'money')?.key ?? null;
-    const placesIn = sideOrder(
-      all.filter((i) => i !== projectsAt && i.key !== 'activity' && (rail.places.includes(i) || i.key === agentsKey)),
-      { agents: agentsKey, money: moneyKey },
-    );
-    const restIn = rail.rest.filter((i) => i !== projectsAt && i.key !== 'activity' && i.key !== agentsKey);
+    const { seq, restIn } = railed;
     const folded = new Set(restIn.map((i) => i.key));
-    for (const item of [...placesIn, ...(projectsAt ? [projectsAt] : []), ...restIn]) {
+    for (const item of [...seq, ...restIn]) {
       const atMore = folded.has(item.key);
       const start = out.length;
       if (item.key === 'today') out.push(app('/', item.label, 'today'));
@@ -235,7 +260,54 @@
     return out;
   });
 
+  /* ── the places, in order (P1) ── */
+
+  /** One place as the Places list draws it: its key in `nav.order`, its name, its glyph, and whether More lists holds it. */
+  type Place = { key: string; label: string; icon: IconName; folded: boolean };
+  /* EVERY PLACE BUT TODAY AND NEEDS YOU, which stay first, in the sidebar's order. */
+  const placeRows = $derived.by((): Place[] => {
+    const folded = new Set(railed.restIn.map((i) => i.key));
+    return [...railed.seq, ...railed.restIn]
+      .filter((i) => i.key !== 'today' && i.key !== 'decide' && i.key !== 'activity')
+      .map((i) => ({ key: placeKey(i), label: i.label, icon: (i.icon || 'doc') as IconName, folded: folded.has(i.key) }));
+  });
+  let placesBox = $state<HTMLElement | undefined>();
+
+  /* A MOVE WRITES EVERY PLACE IN ITS NEW ORDER, so the sidebar, the bar and this list read the one order. */
+  function movePlace(key: string, step: -1 | 1) {
+    const keys = placeRows.map((r) => r.key);
+    const at = keys.indexOf(key);
+    const to = at + step;
+    if (at < 0 || to < 0 || to >= keys.length) return;
+    [keys[at], keys[to]] = [keys[to]!, keys[at]!];
+    const land = glide(placesBox?.closest<HTMLElement>('.settings-place'), '.place-row');
+    const saving = navPrefs.setPlaceOrder(keys);
+    void tick().then(land);
+    void saving.then((saved) => {
+      if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
+    });
+  }
+
+  function usualOrder() {
+    const before = navPrefs.placeOrder;
+    void navPrefs.setPlaceOrder([]).then((saved) => said(saved, words.usualDone, () => void navPrefs.setPlaceOrder(before)));
+  }
+
+  /* A PAGE OF ITS OWN SECTION'S NAME IS ALREADY ITS PLACE, so only a page under a section named otherwise is offered. */
+  const sectionOf = (href: string): string | null => inNav.find((e) => e.href === href)?.section ?? null;
+  const canLift = (p: Listed): boolean => {
+    const entry = inNav.find((e) => e.href === p.href);
+    return entry !== undefined && entry.row !== true && !same(entry.title, entry.section) && !inNav.some((e) => same(e.section, entry.title));
+  };
+
+  function toggleLift(p: Listed, title: string) {
+    const on = !navPrefs.isPlace(p.href);
+    const section = sectionOf(p.href) ?? '';
+    void navPrefs.setPlace(p.href, on).then((saved) => said(saved, on ? words.lifted(title) : words.unlifted(title, section), () => void navPrefs.setPlace(p.href, !on)));
+  }
+
   /**
+   * EVERY OTHER PAGE THE RECORD DECLARES, by the title the record gives it  /**
    * EVERY OTHER PAGE THE RECORD DECLARES, by the title the record gives it: one `pages` read, asked once for this visit.
    * A shell no record answered has the slugs `boot` sent and nothing more, so a page is named by its address there.
    */
@@ -537,6 +609,9 @@
             {#if p.inNav && !p.app}
               <button type="button" class="mi" role="menuitem" onclick={() => startRename(p)}><Icon name="edit" size="s" />{words.rename}</button>
             {/if}
+            {#if p.inNav && !p.app && !hidden && (navPrefs.isPlace(p.href) || canLift(p))}
+              <button type="button" class="mi" role="menuitem" onclick={() => toggleLift(p, title)}><Icon name="rows" size="s" />{navPrefs.isPlace(p.href) ? words.unlift(sectionOf(p.href) ?? '') : words.lift}</button>
+            {/if}
             <button type="button" class="mi" role="menuitem" onclick={() => toggleFirst(p)}><Icon name="home" size="s" />{first ? words.notFirst : words.first}</button>
             {#if p.inNav && !p.app && !hidden}
               <button type="button" class="mi mi-phone" role="menuitem" onclick={() => toggleHidden(p, title)}><Icon name="eye-off" size="s" />{words.hide}</button>
@@ -580,6 +655,37 @@
         {#each homes as h (h.href)}<option value={h.href}>{h.name}</option>{/each}
       </select>
     </div>
+  </Tile>
+{/if}
+
+{#snippet usualAction()}
+  {#if railed.own}<Button size="sm" weight="bare" onclick={usualOrder}>{words.usualOrder}</Button>{/if}
+{/snippet}
+
+{#if drawn('places') && placeRows.length > 1}
+  <!-- THE PLACES IN HIS ORDER (P1): each up or down a step, Today and Needs you first as ever. -->
+  <Tile icon="grid" title={words.places} actions={usualAction}>
+    <p class="hint">{words.placesHint}</p>
+    <ul class="ledger ledger-lead pages" bind:this={placesBox}>
+      {#each placeRows as r, i (r.key)}
+        <li class="page-row place-row">
+          <div class="line" class:line-tall={r.folded}>
+            <span class="line-mark"><IconWell name={r.icon} size="l" /></span>
+            <span class="line-main">
+              <span class="line-title">{r.label}</span>
+              {#if r.folded}<span class="line-detail">{words.under(words.moreLists)}</span>{/if}
+            </span>
+            <span class="line-amount"></span>
+            <span class="line-when line-verbs page-acts">
+              <span class="moves">
+                <button type="button" class="step tap" aria-label={words.placeUp(r.label)} disabled={i === 0} onclick={() => movePlace(r.key, -1)}><Icon name="arrow-up" size="s" /></button>
+                <button type="button" class="step tap" aria-label={words.placeDown(r.label)} disabled={i === placeRows.length - 1} onclick={() => movePlace(r.key, 1)}><Icon name="arrow-down" size="s" /></button>
+              </span>
+            </span>
+          </div>
+        </li>
+      {/each}
+    </ul>
   </Tile>
 {/if}
 

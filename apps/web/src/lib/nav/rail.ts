@@ -76,12 +76,27 @@ const plainOf = (s: string): string => s.trim().toLowerCase();
 const PLACE_AT: Readonly<Record<string, number>> = { work: 10, orders: 20, shop: 20, projects: 30, money: 40, people: 50, agents: 60 };
 
 /**
+ * WHERE A PLACE IS NAMED IN `nav.order` (P1, 24 Nov): `section:` and the place's name, as a section's key says it. The
+ * Work screen's row is named by its section's name, so Work and a team's Tickets are each named as they are drawn.
+ */
+export const placeKey = (item: Pick<FlatItem, 'key' | 'label'>): string => (item.key === 'work' ? `section:${item.label}` : item.key);
+
+/** Whether an entry of `nav.order` names a place (`placeKey`) and not a page. */
+export const isPlaceKey = (entry: string): boolean => entry.startsWith('section:');
+
+/* HIS ORDER WINS (P1, 24 Nov): a place `nav.order` names (`section:Projects`) ranks by where it is named, ahead of every
+   number a page declares, so Projects stands above Work when he puts it there. */
+const NAMED = -10_000;
+
+/**
  * The rank a section is drawn at: the place its pages declare (`nav.place`), else the named place's own number, else
  * after them all. A STARTER'S OWN PLACE (Goals, Products, Studies, a team's Sprints, a founder's Dashboard) declares 20
  * or 25, so it sits after Work as the record orders it (`packages/record/src/places.ts`), and the phone's bar, which
  * takes its places in the same numbers (`tabsOf`), draws it too (FB4).
  */
-function rankOf(item: FlatItem, starter: number | null): number {
+function rankOf(item: FlatItem, starter: number | null, order: readonly string[] = []): number {
+  const named = order.indexOf(placeKey(item));
+  if (named >= 0) return NAMED + named;
   const name = plainOf(item.key === 'work' ? 'work' : item.key.replace(/^section:/u, ''));
   /* ON A STARTER'S RECORD A NEW PROJECTS COMES AFTER THE PLACES THAT RANK (AL3), as on the phone's bar (`atOf` in
      `nav.ts`): it is no place until the first project, and stepping in at 30 then moved Money and pushed the starter's
@@ -95,7 +110,7 @@ function rankOf(item: FlatItem, starter: number | null): number {
  * that declares where it sits and is none of `PLACES`.
  */
 const starterOf = (items: readonly FlatItem[]): number | null => {
-  const own = items.filter((i) => i.key.startsWith('section:') && typeof i.place === 'number' && !PLACES.includes(plainOf(i.key.replace(/^section:/u, ''))));
+  const own = items.filter((i) => i.key.startsWith('section:') && typeof i.place === 'number' && i.lifted !== true && !PLACES.includes(plainOf(i.key.replace(/^section:/u, ''))));
   return own.length > 0 ? starterItems(own) : null;
 };
 
@@ -103,7 +118,7 @@ const starterOf = (items: readonly FlatItem[]): number | null => {
  * The rail, from the flat nav (`flatNav`): its rows and the rows it put under More are one list again, ordered by
  * `PLACES`, and its groups keep only a page about one thing.
  */
-export function railOf<T extends { href: string; row?: boolean | undefined; tabs?: boolean | undefined }>(flat: Flat<T>, decideWord: string): Rail<T> {
+export function railOf<T extends { href: string; row?: boolean | undefined; tabs?: boolean | undefined }>(flat: Flat<T>, decideWord: string, order: readonly string[] = []): Rail<T> {
   const all = [...flat.main, ...flat.more];
   const today = all.find((i) => i.key === 'today');
   const activity = all.find((i) => i.key === 'activity');
@@ -113,7 +128,7 @@ export function railOf<T extends { href: string; row?: boolean | undefined; tabs
   const sections = all
     .filter((i) => i.key === 'work' || i.key.startsWith('section:'))
     .map((item, i) => ({ item, i }))
-    .sort((a, b) => rankOf(a.item, starter) - rankOf(b.item, starter) || a.i - b.i)
+    .sort((a, b) => rankOf(a.item, starter, order) - rankOf(b.item, starter, order) || a.i - b.i)
     .map((x) => x.item);
   const things = flat.groups.flatMap(([section, list]): [string, T[]][] => {
     const rows = list.filter((e) => e.row === true);

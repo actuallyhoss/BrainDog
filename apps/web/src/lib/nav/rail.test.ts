@@ -5,8 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { WORK, flatNav, isHere, tabsOf } from '../nav.ts';
-import { AGENTS_PAGE, RAIL_MOST, agentsHref, railOf } from './rail.ts';
+import { WORK, arrange, flatNav, isHere, lifted, tabsOf } from '../nav.ts';
+import { AGENTS_PAGE, RAIL_MOST, agentsHref, placeKey, railOf } from './rail.ts';
 
 type Entry = { title: string; href: string; icon: string; row?: true };
 
@@ -170,4 +170,29 @@ test('the bar fills a missing place with the next one in the rail, so it is neve
 test("his own pick still wins on the phone's bar, after Today", () => {
   const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Needs you');
   assert.deepEqual(tabsOf(rail.places, 5, ['/p/money', '/p/portfolio']).map((i) => i.label), ['Today', 'Money', 'Projects']);
+});
+
+test('HIS ORDER OF PLACES WINS (P1, 24 Nov): Projects above Work, and the phone bar takes them as the rail has them', () => {
+  const order = ['section:Projects', 'section:Work', '/p/money'];
+  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Needs you', order);
+  assert.deepEqual(rail.places.map((i) => i.label), ['Today', 'Needs you', 'Projects', 'Work', 'Money', 'People', 'Agents']);
+  assert.deepEqual(tabsOf(rail.places, 5, [], order).map((i) => i.label), ['Today', 'Needs you', 'Projects', 'Work', 'Money']);
+  /* A PAGE ORDER ALONE MOVES NO PLACE. */
+  const pages = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Needs you', ['/p/money']);
+  assert.deepEqual(pages.places.map((i) => i.label), ['Today', 'Needs you', 'Work', 'Projects', 'Money', 'People', 'Agents']);
+});
+
+test('A PAGE MADE A PLACE OF ITS OWN STANDS AS ONE (P1), and a page named as a section stays in it', () => {
+  const nav = [
+    { title: 'Money', href: '/p/money', section: 'Money', icon: 'wallet', order: 1 },
+    { title: 'Gold and investments', href: '/p/holdings', section: 'Money', icon: 'chart', order: 2 },
+    { title: 'People', href: '/p/people', section: 'People', icon: 'people', order: 3 },
+  ];
+  const out = lifted(nav, ['/p/holdings', '/p/people']);
+  assert.deepEqual(out.map((e) => [e.section, e.lifted ?? false]), [['Money', false], ['Gold and investments', true], ['People', false]]);
+  const flat = flatNav(arrange(out, ['section:Gold and investments', 'section:Money']), 0, WORDS);
+  const rail = railOf(flat, 'Needs you', ['section:Gold and investments', 'section:Money']);
+  assert.deepEqual(rail.places.map((i) => i.label), ['Today', 'Needs you', 'Gold and investments', 'Money', 'People']);
+  assert.equal(rail.places[2]?.lifted, true);
+  assert.equal(placeKey(rail.places[2]!), 'section:Gold and investments');
 });

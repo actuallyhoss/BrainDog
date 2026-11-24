@@ -11,7 +11,8 @@
  * mistake `+layout.ts` already has a paragraph about.
  */
 
-import { LATE, PLACES, projectsLate, starterItems } from './nav/rail.ts';
+import { LATE, PLACES, isPlaceKey, projectsLate, starterItems } from './nav/rail.ts';
+export { isPlaceKey, placeKey } from './nav/rail.ts';
 import { TASKS } from './work/list.ts';
 import { WORK_PAGE } from './work/page.ts';
 
@@ -149,7 +150,21 @@ export type FlatItem = {
    * project kept with no page of its own is counted here, which `rows` never sees (RM10).
    */
   holds?: number;
+  /** A page this person made a place of its own (`nav.places`, `lifted`), never a starter's own place. */
+  lifted?: true;
 };
+
+/**
+ * ANY PAGE AS A PLACE OF ITS OWN (P1, 24 Nov): the pages this person lifted (`nav.places`) each stand as a section of
+ * one, under the name the nav draws them by, so Gold and investments is a place on the rail and a tab the phone's bar can
+ * hold. A page whose name is already a section's stays where it is, so two places are never drawn as one.
+ */
+export function lifted<T extends { href: string; title: string; section: string; row?: boolean | undefined }>(entries: readonly T[], places: readonly string[]): (T & { lifted?: true })[] {
+  if (places.length === 0) return [...entries];
+  const sections = new Set(entries.map((e) => plainOf(e.section)));
+  const wanted = new Set(places);
+  return entries.map((e) => (wanted.has(e.href) && !e.row && !sections.has(plainOf(e.title)) ? { ...e, section: e.title, lifted: true as const } : e));
+}
 
 /** The words the fixed rows say, handed in so this module stays pure and the words stay in `copy`. */
 export type FlatWords = { today: string; activity: string; decide: string };
@@ -187,7 +202,7 @@ function leadOf<T extends { title: string; row?: boolean | undefined }>(entries:
    rail's Projects is the same picture on every record. Any other section wears its lead page's glyph. */
 const SECTION_ICONS: Readonly<Record<string, string>> = { projects: 'projects', work: 'work' };
 
-function sectionItem<T extends { href: string; icon: string; place?: number | undefined; row?: boolean | undefined; register?: string | undefined }>(
+function sectionItem<T extends { href: string; icon: string; place?: number | undefined; row?: boolean | undefined; register?: string | undefined; lifted?: true | undefined }>(
   section: string,
   lead: T,
   entries: readonly T[],
@@ -208,6 +223,7 @@ function sectionItem<T extends { href: string; icon: string; place?: number | un
     ...(places.length > 0 ? { place: Math.min(...places) } : {}),
     ...(rows > 0 ? { rows } : {}),
     ...(holds === undefined ? {} : { holds }),
+    ...(entries.some((e) => e.lifted === true) ? { lifted: true as const } : {}),
   };
 }
 
@@ -229,7 +245,7 @@ export function listCounts(registers: readonly { id: string; name: string; count
  * Today leads, Activity and Decide follow the first sections (Decide only while something waits on it), and the list
  * stops at `FLAT_MOST`: what does not fit is a row under More, the sections that come last going first.
  */
-export function flatNav<T extends { title: string; href: string; icon: string; row?: boolean | undefined; register?: string | undefined }>(
+export function flatNav<T extends { title: string; href: string; icon: string; row?: boolean | undefined; register?: string | undefined; lifted?: true | undefined }>(
   sections: readonly (readonly [string, readonly T[]])[],
   open: number,
   words: FlatWords,
@@ -361,7 +377,7 @@ const renamedWork = (i: FlatItem): boolean => i.key === 'work' && plainOf(i.labe
  * without one of the three fills its slot with its next place in the rail's order, so the bar is never short while
  * the record has places to show. The rest are behind More with everything else.
  */
-export function tabsOf(main: readonly FlatItem[], most = 5, chosen: readonly string[] = []): FlatItem[] {
+export function tabsOf(main: readonly FlatItem[], most = 5, chosen: readonly string[] = [], order: readonly string[] = []): FlatItem[] {
   /* HIS FIVE WIN: Today first, then the pages he put on the bar in his order. A pick that is gone from the rail is
      skipped, and none left at all is the default below. */
   const picked = chosen.flatMap((href) => main.filter((i) => i.href === href && i !== main[0]));
@@ -370,11 +386,14 @@ export function tabsOf(main: readonly FlatItem[], most = 5, chosen: readonly str
   const rest = main.filter((i) => i !== decide && i.key !== 'activity');
   const [lead, ...tail] = rest;
   if (lead === undefined) return [];
+  /* HIS ORDER OF PLACES (`nav.order`'s `section:` keys, P1): the rail is already drawn in it (`railOf`), and the bar
+     takes its places as the rail has them. */
+  if (order.some(isPlaceKey)) return [lead, ...(decide ? [decide] : []), ...tail].slice(0, most);
   /* A STARTER'S OWN PLACE IS ON THE BAR AS IT IS ON THE RAIL (audit 31 Oct h, AH13 and FB4): Products, Goals, Studies, a
      team's Sprints and a founder's Dashboard declare where they sit (`nav.place`, before Projects), and ranked after the
      five they fell into Menu while the rail drew them. Each of the five and each such place goes by that number, a
      place that says none by where the five put it. */
-  const own = tail.filter((i) => (!PLACES.includes(placeName(i)) && typeof i.place === 'number') || renamedWork(i));
+  const own = tail.filter((i) => (!PLACES.includes(placeName(i)) && typeof i.place === 'number' && i.lifted !== true) || renamedWork(i));
   const named = [...FIVE.flatMap((name) => tail.filter((i) => placeName(i) === name)), ...own]
     .map((item, i) => ({ item, at: atOf(item, own.length > 0 ? starterItems(own) : null), i }))
     .sort((a, b) => a.at - b.at || a.i - b.i)
