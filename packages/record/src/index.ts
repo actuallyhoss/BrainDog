@@ -18,7 +18,7 @@
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import { keptRound, pagesCleanReading, ROUND_HOLDER, ROUND_KEPT, roundBegun, roundEnded, roundOf, roundPartOf, roundStep, ROUND_MS, unworded, type RoundPart } from './page-lint.ts';
-import { TICK_PAGES, UNBOUNDED, type TickBudget } from './tick-budget.ts';
+import { TICK_PAGES, UNBOUNDED, type TickBudget, type WalkTold } from './tick-budget.ts';
 import { ipBucket } from './signup-keys.ts';
 import { SIGNS_KEPT, SIGNS_MOVED_MS, SIGNS_REKEEP_MS, agentSaid, clientName, fileRecordSigns, keptNow, keptSigns, readArrivedSign, type KeptSign } from './signs.ts';
 import { APPEND_READ_AT, appendReadRefusal } from './append-refusal.ts';
@@ -329,7 +329,7 @@ export { PASS_KIND, installedTwice, passSentence, type ByWho, type PassSaid, typ
 export { CARD_AIM, CARD_MOST, OLDER, TWO_SESSIONS, card, type Card, type CardAt } from './card.ts';
 export { ALSO_HERE_MOST, STEP_DAYS, TREE_WARNING, alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 export { keptRoundIn, lintAnswer, lintRound, pagesCleanReading, pagesToLint, roundBegun, roundEnded, roundOf, roundPartOf, roundStep, ROUND_HOLDER, ROUND_MS, ROUND_PAGES, TEMPLATE_ALL, type AnswerRule, type KeptFinding, type KeptRound, type PageFinding, type PageLintRound, type PagesCleanReading, type RoundPart } from './page-lint.ts';
-export { TICK_MS, TICK_PAGES, tickBudget, UNBOUNDED, type TickBudget } from './tick-budget.ts';
+export { TICK_MS, TICK_PAGES, tickBudget, UNBOUNDED, type TickBudget, type WalkTold } from './tick-budget.ts';
 export {
   HEADLINE_ANSWER_TOKENS,
   HEADLINE_ASKS_DAY,
@@ -6445,6 +6445,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        begun again from Home and the first page. */
     const listed = kernel.pages();
     let walk = headlineWalk !== null && headlineWalk.day === today && headlineWalk.again === again ? headlineWalk : null;
+    /* HOW THIS TICK CAME TO THE WALK, said to the host with what it did (`WalkTold`): from memory, a kept place, or begun. */
+    let from: WalkTold['from'] = walk === null ? 'new' : 'on';
     /* NONE IN MEMORY: ONE AN OBJECT BEFORE THIS ONE KEPT (`HEADLINE_WALK`), the same day and kind of look. */
     const kept = walk === null ? keptWalkOf() : null;
     const resumed = kept !== null && kept.day === today && kept.again === again && kept.order.length > 0 ? kept : null;
@@ -6465,6 +6467,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         headlineNotes.push(line);
       }
       walk = { day: today, again, order: resumed.order, at: Math.min(resumed.at, resumed.order.length), due: homeDue(), stamp: resumed.stamp, redo };
+      from = 'kept';
     }
     if (walk === null) {
       const first: HeadlineDue[] = homeDue();
@@ -6603,12 +6606,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(drawing === undefined ? {} : { drawing }),
       } satisfies KeptWalk);
     };
+    let drawn = 0;
+    let passed = 0;
+    /** What this tick did of the walk, said once to a host that counts its alarm (`TickBudget.walked`) as its part ends. */
+    const tell = (): void => budget.walked?.({ kind: again ? 'later' : 'night', from, listed: going.order.length, drawn, passed, owed: due0.length });
     /** A tick's share of the walk spent: its place kept with no page under way, and the rest left to the next tick. */
     const spent = (): { said: string[]; dropped: string[]; cut: true } => {
       keepPlace();
+      tell();
       return { said: [], dropped: [], cut: true };
     };
-    let drawn = 0;
     /* A WALK AN OBJECT BEFORE THIS ONE KEPT: what it had found owed is drawn again, under the tick's budget as every page
        is (second review of 30 October, Q1: it was drawn all at once, so the alarm that resumed a cut walk ran as long as
        the one cut, and was cut in the same place). */
@@ -6617,7 +6624,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (drawn > 0 && budget.spent()) return spent();
       const slug = going.redo.shift()!;
       const p = bySlug.get(slug);
-      if (p === undefined || p.nav === null || p.slug === HOME_PAGE) continue;
+      if (p === undefined || p.nav === null || p.slug === HOME_PAGE) {
+        passed++;
+        continue;
+      }
       drawn++;
       budget.spend();
       /* KEPT BEFORE THE PAGE IS DRAWN, NAMED AS UNDER WAY: an object reset in the draw goes on without it. */
@@ -6632,9 +6642,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const p = bySlug.get(going.order[going.at]!);
       going.at++;
       /* A PAGE GONE SINCE THE WALK BEGAN is passed over, as a page that does not draw is. */
-      if (p === undefined) continue;
       /* A PAGE DECLARED `home` IS NOT ASKED AS A PAGE: its pref is Home's line. */
-      if (p.nav === null || p.slug === HOME_PAGE) continue;
+      if (p === undefined || p.nav === null || p.slug === HOME_PAGE) {
+        passed++;
+        continue;
+      }
       /* A LATER WALK DOES NOT DRAW A PAGE NOTHING IT READ MOVED ON (`pagesSeen`): it finds what it found, at none of the tick. */
       const found = unmoved(p);
       if (found !== null) {
@@ -6650,6 +6662,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const d = drawnDue(p);
       if (d !== null) due0.push(d);
     }
+    tell();
     /* THE WALK HAS READ WHAT IT WILL: a page it left unread, or one it had to draw again and did not, is one
        `HEADLINE_PAGES_MOST` left out, still owed. */
     const leftOut = going.at < going.order.length || going.redo.length > 0;

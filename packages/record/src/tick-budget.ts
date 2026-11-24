@@ -30,7 +30,19 @@ export type TickBudget = {
    * walks whose lists stand, `slashHeadlinesAgain`). Spends nothing; a host that counts what its alarm did says it.
    */
   kept?(n?: number): void;
+  /** What the look's headline walk did on this tick (`WalkTold`), said once as the tick's part of it ends. Spends nothing. */
+  walked?(walk: WalkTold): void;
 };
+
+/**
+ * WHAT THE LOOK'S HEADLINE WALK DID ON ONE TICK, for a host that counts what its alarm did (`TickBudget.walked`): the
+ * night's walk or a later one; how the tick came to it (`new`: begun on it, `on`: going on from this object's memory,
+ * `kept`: going on from the place an object before this one kept, which only a restarted object reads); the pages the
+ * walk lists; and of those what this tick drew, what it went past with no draw (no place in the rail, Home, or gone since
+ * the walk began), and how many the walk has found owed so far. A page passed over because nothing it read moved is
+ * `kept`, not `passed`.
+ */
+export type WalkTold = { kind: 'night' | 'later'; from: 'new' | 'on' | 'kept'; listed: number; drawn: number; passed: number; owed: number };
 
 /** A budget that never runs out: one tick does everything, as a caller that hands none always had. */
 export const UNBOUNDED: TickBudget = { spend: () => undefined, spent: () => false };

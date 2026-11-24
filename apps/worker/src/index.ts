@@ -44,7 +44,7 @@ import { withCalls } from '@braindog/mcp';
 import { MIN_CLI } from '@braindog/mcp/build';
 import { slashTools } from '@braindog/mcp/slash-tools';
 import { ATTACHED_WEIGHT, INVITE_GONE, UNBOUND_REFUSED, liveAgents, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type KeychainGrant, type Waiting } from '@braindog/kernel';
-import { createRecordApi, tickBudget, type CallContext, type TickBudget, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
+import { createRecordApi, tickBudget, type CallContext, type TickBudget, type WalkTold, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
@@ -154,7 +154,7 @@ import { ABUSE, tooManyLine, type AbuseName } from '@braindog/host/abuse';
 import { guardBody } from './body-cap.ts';
 import { codeOf, guarded } from '@braindog/ports';
 import { KERNEL_MIGRATION, type Ack } from '@braindog/kernel';
-import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
+import { doorPath, op, outboxFields, type AckedRow, type OpValue } from './oplog.ts';
 /* BILLING: the account's four billing doors, and the Stripe client they call through. */
 import { billingDoors, endForDeleted, reportExtra, sells, type BillingDeps } from './billing.ts';
 import { opsPlan, type OpsPlanDeps } from './ops-plan.ts';
@@ -536,12 +536,14 @@ const ALARM_ACT_MS = 10_000;
  * SAY WHERE AN ALARM'S CPU WENT: it stands still while a page draws (on 1 November an alarm spent 19.5 s of CPU and named
  * no step), and moves only behind a timer, which is why each step's `alarm-step` line is written after one. The pages each
  * step drew are what it cost. AND WHAT IT PASSED OVER BECAUSE NOTHING IT READ MOVED (`kept`): the look's later walks keep
- * what each page read, and draw again only the pages whose reads moved (F35, perf2).
+ * what each page read, and draw again only the pages whose reads moved (F35, perf2). AND WHAT THE HEADLINE WALK DID
+ * (`walks`), as each slice of it told (`WalkTold`), for `walkSaid`.
  */
-const countedShare = (): { budget: TickBudget; used: () => number; kept: () => number } => {
+const countedShare = (): { budget: TickBudget; used: () => number; kept: () => number; walks: () => readonly WalkTold[] } => {
   const inner = tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES);
   let used = 0;
   let kept = 0;
+  const walks: WalkTold[] = [];
   return {
     budget: {
       spend: (n = 1) => {
@@ -552,9 +554,35 @@ const countedShare = (): { budget: TickBudget; used: () => number; kept: () => n
       kept: (n = 1) => {
         kept += n;
       },
+      walked: (walk) => {
+        walks.push(walk);
+      },
     },
     used: () => used,
     kept: () => kept,
+    walks: () => walks,
+  };
+};
+
+/**
+ * WHAT THE LOOK'S HEADLINE WALK DID ON THIS ALARM, for the `alarm-work` line, from what each slice told (`WalkTold`).
+ * `walk` is `night`, `later` or `none`; `walkFrom` how the alarm came to it (`new`: begun on it, `on`: going on from this
+ * object's memory, `kept`: going on from the place an object before this one kept); `listed` the pages the walk lists;
+ * `drawn` and `passed` what this alarm drew and went past with no draw (no place in the rail), the pages kept for being
+ * unmoved being `lookKept`; `owed` what the walk has found owed so far. So the lines count walks begun an hour
+ * (`walkFrom: new`), and with `fresh` how many began on an object that had just started.
+ */
+const walkSaid = (walks: readonly WalkTold[]): Record<string, OpValue> => {
+  const first = walks[0];
+  const last = walks[walks.length - 1];
+  if (first === undefined || last === undefined) return { walk: 'none' };
+  return {
+    walk: [...new Set(walks.map((w) => w.kind))].join(' '),
+    walkFrom: first.from,
+    listed: last.listed,
+    drawn: walks.reduce((n, w) => n + w.drawn, 0),
+    passed: walks.reduce((n, w) => n + w.passed, 0),
+    owed: last.owed,
   };
 };
 
@@ -1294,6 +1322,14 @@ export class Record$ extends DurableObject<Env> {
   #alarming = false;
   #wakeOwed: 'soon' | 'look' | null = null;
 
+  /**
+   * WHEN THIS OBJECT STARTED, AND WHETHER IT HAS RUN AN ALARM SINCE: in memory, so both begin again when the platform
+   * restarts it, which no other line shows (`boot` is written only on a new build). The `alarm-work` line says them
+   * (`fresh`, `upMs`), since the look's later walk keeps its quarter-hour gate in memory too (`slashHeadlinesAgain`).
+   */
+  #bornAt = Date.now();
+  #alarmed = false;
+
   /** The record's `Sql`, and the counters it holds back from it (`observed-later.ts`). */
   #observed: ObservedLater | undefined;
 
@@ -1304,6 +1340,9 @@ export class Record$ extends DurableObject<Env> {
   #modelSignLast: string | null = null;
 
   async #alarmPass(): Promise<void> {
+    /* THE FIRST ALARM THIS OBJECT RUNS SINCE IT STARTED (`#alarmed`), said on the `alarm-work` line as `fresh`. */
+    const fresh = !this.#alarmed;
+    this.#alarmed = true;
     this.#pace.began();
     const api = await this.#record();
     this.#observed?.flush();
@@ -1396,15 +1435,19 @@ export class Record$ extends DurableObject<Env> {
           undefined,
         );
       /* WHAT THIS ALARM DREW AND WHAT IT LEFT FOR THE NEXT, when it drew anything: the clock cannot say (`countedShare`). */
-      if (lookShare.used() + lintShare.used() + lookShare.kept() > 0)
+      if (lookShare.used() + lintShare.used() + lookShare.kept() + lookShare.walks().length > 0)
         op({
           op: 'alarm-work',
           rec: recOf(api),
           look: lookShare.used(),
           lookKept: lookShare.kept(),
+          /* AND WHAT THE HEADLINE WALK DID ON IT (`walkSaid`), with whether this object had just started. */
+          ...walkSaid(lookShare.walks()),
           /* THE WORDS' WALK SPENDS PARTS OF A UNIT (a document read is a tenth of a page), so the lint's is said to a tenth. */
           lint: Math.round(lintShare.used() * 10) / 10,
           more: ([['act', more], ['ask', asked], ['model', modelled], ['look', looked], ['lint', linted]] as const).filter(([, m]) => m).map(([n]) => n).join(' '),
+          fresh,
+          upMs: Date.now() - this.#bornAt,
         });
     } catch (e) {
       const said = e instanceof Error ? e.message : String(e);
@@ -1673,8 +1716,10 @@ export class Record$ extends DurableObject<Env> {
     }
     await this.#stepNote(step);
     /* THE CLOCK IS READ BEHIND A TIMER AT BOTH ENDS (the last step's breath, and this one's), since it stands still while
-       code runs. So `ms` is the step's own CPU and whatever it waited on, and `let` says how many calls came in at the
-       breath behind it, whose own time is in `ms` too. One line a step, so production can say where an alarm's time went. */
+       code runs. So `ms` is wall time: what the step waited on and its timers, this breath among them, and NEVER ITS CPU.
+       A step that drew for seconds behind a 1 ms breath logs `ms: 1`; what it cost is the pages it drew, on the
+       `alarm-work` line (`countedShare`). `let` says how many calls came in at the breath behind it, and what they waited
+       on is in `ms` too. One line a step, so production can say where an alarm waited. */
     const started = Date.now();
     const out = await run();
     const calls = this.#pace.calls();
@@ -1705,6 +1750,7 @@ export class Record$ extends DurableObject<Env> {
         },
         spent: () => used >= ALARM_SLICE_UNITS || share.budget.spent(),
         kept: (n = 1) => share.budget.kept?.(n),
+        walked: (walk) => share.budget.walked?.(walk),
       });
       /* A STEP THAT ANSWERS `more` AND SPENDS NOTHING STILL ENDS: the count of slices is the bound under the share's. */
       if (!more || share.budget.spent() || slice >= ALARM_STEP_PAGES) return more;
