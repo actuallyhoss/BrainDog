@@ -98,6 +98,8 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   net: ['series'],
   ahead: ['series'],
   back: ['series', 'stat', 'lines'],
+  /* A `lines` LEAD MEASURED AGAINST ITS OWN LINE SO MANY DAYS BACK, not the period before (`measures.ts` in the app). */
+  against: ['lines'],
   bucket: ['stat', 'lines'],
   recorded: ['forecast'],
   knobs: ['forecast'],

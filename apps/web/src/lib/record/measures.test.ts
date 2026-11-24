@@ -11,7 +11,7 @@ import { parse, type Block } from 'braindog-render';
 import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
 import { toSegments } from './blocks.ts';
-import { allStale, changeLine, figureOf, linesText, measuresOf, periodOf, staleTilesText, tileRows } from './measures.ts';
+import { agoOf, allStale, changeLine, figureOf, linesText, measuresOf, periodOf, staleTilesText, tileRows } from './measures.ts';
 import { blockOf } from './page-live.ts';
 import type { RegisterDecl } from './schema.ts';
 
@@ -129,6 +129,36 @@ test('a live stat and a live lines block over a register draw tiles and charts, 
   const charts = toSegments(lines).filter((s): s is Block => s.type === 'block');
   assert.equal(charts.length, 1);
   assert.equal(charts[0]!.kind, 'lines');
+});
+
+test('A BLOCK THAT SAYS against: IS READ AGAINST ITS OWN LINE THAT MANY DAYS BACK, a week back while the line is younger, and draws no period before', () => {
+  /* A GRAM OF 24k A DAY, EGP 60 MORE EACH DAY, ending on the 17th. */
+  const gold = (days: number) =>
+    Array.from({ length: days }, (_, i) => ({
+      fields: { name: '24k', at: new Date(NOW - (days - 1 - i) * 86_400_000).toISOString().slice(0, 10), value: null, unit: '', amount: { amount: 600_000 + i * 6_000, currency: 'EGP' } },
+    }));
+  const [quarter] = measuresOf(gold(45), [...FIELDS, 'amount'], NOW, 90, 'Gold price', { tz: 'UTC' });
+  const ago = agoOf(quarter!, 30)!;
+  assert.equal(ago.days, 30);
+  assert.equal(ago.cells.at(-1), quarter!.now.at(-31), 'the last point is set against the reading thirty days before it');
+  const text = linesText([quarter!], [], 'Gold price', 30);
+  assert.match(text, /^```lines\nDay \| 24k \| ago: A month ago\n/u, 'one chart under its tile, named in the fold, set against a month ago');
+  assert.doesNotMatch(text, /was:/u, 'a dashed period before was drawn beside a line read against itself');
+  /* A FORTNIGHT OF RATES IS READ AGAINST A WEEK AGO, AND FIVE DAYS AGAINST NOTHING: no column, so no change is said. */
+  const [fortnight] = measuresOf(gold(14), [...FIELDS, 'amount'], NOW, 90, 'Gold price', { tz: 'UTC' });
+  assert.equal(agoOf(fortnight!, 30)?.days, 7);
+  assert.match(linesText([fortnight!], [], 'Gold price', 30), /\| ago: A week ago\n/u);
+  const [five] = measuresOf(gold(5), [...FIELDS, 'amount'], NOW, 90, 'Gold price', { tz: 'UTC' });
+  assert.equal(agoOf(five!, 30), null);
+  assert.match(linesText([five!], [], 'Gold price', 30), /^```lines\nDay \| 24k\n/u);
+  /* AND A BLOCK WITH NO against: IS DRAWN AS IT ALWAYS WAS, against the period before. */
+  assert.match(linesText([quarter!], [], 'Gold price'), /\| was: Previous 90 days\n/u);
+
+  /* THE BLOCK SAYS IT, AND THE RECORD'S SERIES ARE DRAWN BY IT: the fence the page draws is read against a month ago. */
+  const live = blockOf(answered('lines', 'register.datapoints', FIELDS, [], { back: 90, against: 30, heading: 'Gold price', measures: [quarter], latest: [] }) as never, new Map(), NOW);
+  const [chart] = toSegments(live).filter((s): s is Block => s.type === 'block');
+  assert.equal(chart!.kind, 'lines');
+  assert.deepEqual(chart!.rows[0]!.cells, ['Day', '24k', 'ago: A month ago']);
 });
 
 test('A RECORD THAT SENDS THE MEASURES READ ONCE BESIDE ITS LINES DRAWS THEM AS ONE LIST, under the lines and named', () => {

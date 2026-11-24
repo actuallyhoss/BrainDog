@@ -218,12 +218,40 @@ export function staleTilesText(measures: readonly Measure[], ago: (iso: string) 
   return fences.join('\n\n');
 }
 
+/** A week back: what a lead is measured against while its line is younger than the days its block asked for. */
+const WEEK_DAYS = 7;
+
+/**
+ * THE SAME LINE `days` BACK, at each point of the period, from the period and the one before it, which is all a read
+ * holds: the cells of an `ago:` comparison (`lines.ts` in the renderer), and the days it is said in. While the line
+ * holds no reading that far back it is a week back, so a price a fortnight old still says how it moved this week; while
+ * it holds none a week back either there is no change to say, and `null`.
+ */
+export function agoOf(m: Measure, days: number): { days: number; cells: (number | null)[] } | null {
+  const per = m.bucket === 'week' ? 7 : 1;
+  const all = [...m.was, ...m.now];
+  const off = m.was.length;
+  const last = lastOf(m.now);
+  if (!last) return null;
+  for (const want of days > WEEK_DAYS ? [days, WEEK_DAYS] : [days]) {
+    const n = Math.round(want / per);
+    const from = off + last.at - n;
+    if (n < 1 || from < 0 || !all.slice(0, from + 1).some((v) => v !== null && v !== undefined)) continue;
+    return { days: want, cells: m.now.map((_, i) => all[off + i - n] ?? null) };
+  }
+  return null;
+}
+
 /**
  * The `lines` fences: one chart a measure, the period as the line and the period before as the dashed one, each under
  * the measure's name as its heading. A block hands this only its measures with a line to draw (`linesAndLatest`), and
  * `beside` the ones read once it draws under them, so a name two projects share is told apart across both.
+ *
+ * A BLOCK THAT SAYS `against:` IS READ AGAINST ITS OWN LINE THAT MANY DAYS BACK (`agoOf`), written as an `ago:` column
+ * nothing draws, and the period before is then not drawn: a gold price over ninety days is one line, with its change on
+ * a month ago, never a dashed line a quarter behind it.
  */
-export function linesText(measures: readonly Measure[], beside: readonly Latest[] = [], over: string | null = null): string {
+export function linesText(measures: readonly Measure[], beside: readonly Latest[] = [], over: string | null = null, against?: number): string {
   const shown = measures.slice(0, CHARTS_MOST);
   const shared = sharedNames([...shown, ...beside.slice(0, CHARTS_MOST).map((m) => ({ name: m.measure, of: m.of }))]);
   /* ONE CHART UNDER ITS TILE'S OWN HEADING IS NOT NAMED AGAIN (Team's "Open tickets, each morning" read "Open tickets"
@@ -233,10 +261,18 @@ export function linesText(measures: readonly Measure[], beside: readonly Latest[
   return shown
     .map((m) => {
       const label = measureLabel(m, shared);
-      const head = `${escapeCell(copy.seriesAxis[m.bucket] ?? 'Day')} | ${escapeCell(label)} | was: ${escapeCell(copy.measurePrevious(m.keys.length, m.bucket === 'week'))}`;
+      const ago = against === undefined ? null : agoOf(m, against);
+      const compared =
+        against === undefined
+          ? ` | was: ${escapeCell(copy.measurePrevious(m.keys.length, m.bucket === 'week'))}`
+          : ago
+            ? ` | ago: ${escapeCell(measureWords.ago(ago.days))}`
+            : '';
+      const head = `${escapeCell(copy.seriesAxis[m.bucket] ?? 'Day')} | ${escapeCell(label)}${compared}`;
       const rows = m.keys.map((d, i) => {
         const cell = (v: number | null | undefined) => (v === null || v === undefined ? '' : escapeCell(figureOf(v, m.unit)));
-        return `${escapeCell(dayLabel(d))} | ${cell(m.now[i])} | ${cell(m.was[i])}`;
+        const then = against === undefined ? ` | ${cell(m.was[i])}` : ago ? ` | ${cell(ago.cells[i])}` : '';
+        return `${escapeCell(dayLabel(d))} | ${cell(m.now[i])}${then}`;
       });
       return [named ? '```lines | ' + escapeCell(label) : '```lines', head, ...rows, '```'].join('\n');
     })
@@ -271,6 +307,8 @@ export const measureWords = {
   readOnce: 'Reported once',
   /** On a grouped block (its sixth column), the heading over the measures in no group, after every named one. */
   ungrouped: 'Everything else',
+  /** What a lead read against its own line some days back is measured against: "against a month ago". */
+  ago: (days: number): string => (days === WEEK_DAYS ? 'A week ago' : days === 30 ? 'A month ago' : `${days} days ago`),
 } as const;
 
 /**

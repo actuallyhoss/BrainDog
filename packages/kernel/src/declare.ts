@@ -17,7 +17,7 @@
  * record got slow.
  */
 
-import { MEASURES_LISTED } from './measures.ts';
+import { MEASURES_LISTED, measurePeriod } from './measures.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, parseWhere, type Predicate } from '@braindog/where';
@@ -2043,6 +2043,13 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     /* A GROUPED `lines` BLOCK'S `most:` IS HOW MANY READINGS IT LISTS under the lines (`MEASURES_LISTED` at most). */
     if (kind === 'lines' && block.most !== undefined && !isInt(block.most, 1, MEASURES_LISTED))
       return bad('DECLARATION_INVALID', `${id}.${at}'s most is how many readings a grouped lines block lists, a whole number from 1 to ${MEASURES_LISTED}.`, `${at}.most`);
+    /* A `lines` BLOCK'S `against:` IS HOW MANY DAYS BACK ITS LEAD IS MEASURED, no more than the days it reads (`back:`, 30
+       when it says none), because the read holds that period and the one before and nothing older. */
+    if (kind === 'lines' && (raw as { against?: unknown }).against !== undefined) {
+      const back = measurePeriod((raw as { back?: unknown }).back);
+      if (!isInt((raw as { against?: unknown }).against, 1, back))
+        return bad('DECLARATION_INVALID', `${id}.${at}'s against is how many days back its lead's change is measured, a whole number from 1 to ${back}, the days it reads (back:).`, `${at}.against`);
+    }
     const grouped = kind === 'cards' || kind === 'table' ? cardGroupFault(id, at, raw as Readonly<Record<string, unknown>>, installed) : null;
     if (grouped) return grouped;
     if (block.icon !== undefined && (typeof block.icon !== 'string' || !GLYPH.test(block.icon)))

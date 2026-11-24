@@ -264,6 +264,12 @@ export type PageBlock = {
   parts?: readonly string[];
   /** A `stat` or `lines` over readings: whether a point is a day or a week. A day when absent. */
   bucket?: string;
+  /**
+   * A `lines` over readings: how many days back its lead's change is measured, on its own line, in place of the period
+   * before, which is then not drawn. A week back while the line is younger than that; no change while it is younger than
+   * a week. At most `back:`, since the read holds the period and the one before it and nothing older.
+   */
+  against?: number;
   /** A `series`'s: whether it draws what was left, in minus out, as a line. */
   net?: boolean;
   /**

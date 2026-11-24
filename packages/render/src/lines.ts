@@ -12,6 +12,11 @@
  * before it. The first line that is not a comparison is the one accent series a chart may have. At most
  * four lines draw. A missing value is a gap and never a zero, because a zero is a claim.
  *
+ * A header cell written `ago: <label>` IS A COMPARISON NOTHING DRAWS: the same line some days before each point, which
+ * the lead's change is measured against ("against a month ago") and the fold lists, with no path, no key and no say in
+ * the scale. A price is read against what it was a month ago, and a dashed line a month behind it would be the same line
+ * twice. Its lead says the change as an amount and a share (`delta`), and the host may say which way it went.
+ *
  * The cells arrive as plain text, already drawn, so both renderers hand this the same strings and
  * everything they print comes back from here. No import from the app: this package is MIT and embeddable.
  */
@@ -30,6 +35,8 @@ export type LinesLine = {
   label: string;
   /** A comparison line: the same measure over the period before, dashed and quiet. */
   was: boolean;
+  /** A comparison nothing draws (`ago:`), which `was` is also true of. Absent on every other line. */
+  ago?: true;
   /** Which line this is among its own kind, from 0, so a host styles the first current line as the accent. */
   step: number;
   /** The path in the `0 0 1000 100` box, broken at a gap. Empty when fewer than one point has a value. */
@@ -72,6 +79,13 @@ export type LinesPlan = {
   trend: 'up' | 'down' | 'flat' | '';
   /** The label of the comparison line the change is measured against. */
   against: string;
+  /**
+   * THE CHANGE AS AN AMOUNT, SIGNED (`+EGP 120.50`, `−EGP 48.10`), when the lead is measured against an `ago:` line, and ''
+   * otherwise: a price is asked how much it moved, as well as by what share.
+   */
+  delta: string;
+  /** Whether the change is measured against an `ago:` line, the same line some days back, so a host may colour its way. */
+  ago: boolean;
   /** The point the lead's value was read at, as printed (`27 Sep`), or '' when there is no lead. */
   last: string;
   /** No value anywhere: the chart is a sentence. */
@@ -119,17 +133,20 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
   /* THE CHART STARTS AT ITS FIRST READING (ui-work 2 Nov). "By project, this year" asked for a year of weeks, and a
      measure first read in October drew as a cliff in the last twentieth of the plot, its ends' figures on the line. The
      empty weeks before the first reading are not drawn; the first tick says where it starts. */
-  const firstRead = whole.findIndex((r) => r.slice(1, LINES_MOST + 1).some((c) => linesValue(c ?? '') !== null));
-  const body = firstRead > 0 && whole.length - firstRead >= 2 ? whole.slice(firstRead) : whole;
   const steps = { now: 0, was: 0 };
   const named = head.slice(1, LINES_MOST + 1).map((cell) => {
-    const m = /^was:\s*(.*)$/iu.exec(cell.trim());
+    const m = /^(was|ago):\s*(.*)$/iu.exec(cell.trim());
     const was = Boolean(m);
-    return { label: m ? m[1]!.trim() : cell.trim(), was, step: was ? steps.was++ : steps.now++ };
+    const ago = m?.[1]!.toLowerCase() === 'ago';
+    return { label: m ? m[2]!.trim() : cell.trim(), was, ...(ago ? { ago: true as const } : {}), step: was ? steps.was++ : steps.now++ };
   });
+  /* AN `ago:` LINE IS NO LINE: it starts no chart, sets no scale and is never the one reading a figure is made of. */
+  const drawn = named.map((l) => l.ago !== true);
+  const firstRead = whole.findIndex((r) => r.slice(1, LINES_MOST + 1).some((c, k) => drawn[k] === true && linesValue(c ?? '') !== null));
+  const body = firstRead > 0 && whole.length - firstRead >= 2 ? whole.slice(firstRead) : whole;
 
   const values = named.map((_, k) => body.map((r) => linesValue(r[k + 1] ?? '')));
-  const every = values.flat().filter((v): v is number => v !== null);
+  const every = values.filter((_, k) => drawn[k]).flat().filter((v): v is number => v !== null);
   const hi = every.length ? Math.max(...every) : 0;
   const lo = every.length ? Math.min(...every) : 0;
   /* A FLAT RUN SITS IN THE MIDDLE, rather than on the top edge where a line reads as a ceiling. */
@@ -144,6 +161,7 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
        readings stand side by side, the gaps are the days between readings and the line runs through them. Where some
        do, a gap still breaks the line, and a reading alone between two gaps is a dot. */
     const row = values[k]!;
+    if (line.ago) return { ...line, d: '', end: '' };
     const runs = row.some((v, i) => v !== null && i > 0 && row[i - 1] !== null);
     let d = '';
     let open = false;
@@ -167,7 +185,7 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
   });
 
   /* THE TEMPLATE A COMPUTED FIGURE IS WRITTEN IN: the first cell that holds a number, so a currency keeps its symbol. */
-  const template = body.flatMap((r) => r.slice(1, named.length + 1)).find((c) => linesValue(c) !== null) ?? '';
+  const template = body.flatMap((r) => r.slice(1, named.length + 1).filter((_, k) => drawn[k])).find((c) => linesValue(c) !== null) ?? '';
 
   const points = body.map((r, i) => ({
     label: (r[0] ?? '').trim(),
@@ -183,13 +201,15 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
     minor: i !== 0 && i !== n - 1,
   }));
 
-  /* THE LEAD IS THE FIRST CURRENT LINE, and the comparison beside it is the first `was:` line. */
+  /* THE LEAD IS THE FIRST CURRENT LINE, and the comparison beside it is the first `ago:` line, else the first `was:`. */
   const primary = named.findIndex((l) => !l.was);
-  const compared = named.findIndex((l) => l.was);
+  const agoAt = named.findIndex((l) => l.ago === true);
+  const compared = agoAt >= 0 ? agoAt : named.findIndex((l) => l.was);
   let now = '';
   let lastAt = '';
   let then = '';
   let change = '';
+  let delta = '';
   let trend: LinesPlan['trend'] = '';
   if (primary >= 0) {
     const last = lastOf(values[primary]!);
@@ -206,13 +226,19 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
           const b = values[compared]![k]!;
           change = changeSaid(a, b);
           trend = change === '' ? '' : a > b ? 'up' : a < b ? 'down' : 'flat';
+          /* IN THE LINE'S OWN MONEY OR UNIT, every minor unit, its way said by a plus or a real minus. */
+          if (agoAt >= 0 && change !== '') {
+            const moved = amountLike(template, a - b, home, 'exact');
+            delta = a > b ? `+${moved}` : moved;
+          }
         }
       }
     }
   }
 
   const sentence = lines
-    .map((line, k) => {
+    .flatMap((line, k) => (line.ago ? [] : [[line, k] as const]))
+    .map(([line, k]) => {
       const got = values[k]!.map((v, i) => ({ v, i })).filter((p): p is { v: number; i: number } => p.v !== null);
       if (!got.length) return `${line.label}, ${LINES_NOTHING}`;
       const first = got[0]!;
@@ -226,7 +252,7 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
 
   /* ONE READING IS A FIGURE. 227 of the 261 measures a real record had read that month held exactly one point, its import's,
      and a page of them drew each as a dot in an empty box over a fold of that one point. */
-  const lone = every.length === 1 ? values.findIndex((v) => v.some((x) => x !== null)) : -1;
+  const lone = every.length === 1 ? values.findIndex((v, k) => drawn[k] && v.some((x) => x !== null)) : -1;
   const at1 = lone < 0 ? -1 : values[lone]!.findIndex((x) => x !== null);
   const single =
     lone < 0 || at1 < 0
@@ -251,6 +277,8 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
     change,
     trend,
     against: compared >= 0 ? named[compared]!.label : '',
+    delta,
+    ago: agoAt >= 0 && change !== '',
     last: lastAt,
     empty: every.length === 0,
     single,
@@ -268,6 +296,9 @@ export function linesOnly(single: NonNullable<LinesPlan['single']>, headed: bool
   const said = `${which}${single.label ? `${single.label}, ` : ''}${LINES_ONLY}`;
   return `${said.charAt(0).toUpperCase()}${said.slice(1)}`;
 }
+
+/** The change against an `ago:` line as the lead says it: the amount and the share, `+EGP 120.50 (+2.0%)`. */
+export const linesMoved = (plan: Pick<LinesPlan, 'delta' | 'change'>): string => (plan.delta ? `${plan.delta} (${plan.change})` : plan.change);
 
 /** The point a pointer at `fraction` along the chart is nearest, or -1 when there are none. */
 export function linesNearest(plan: Pick<LinesPlan, 'points'>, fraction: number): number {

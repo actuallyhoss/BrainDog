@@ -9,12 +9,15 @@
 
   ONE READING IS A FIGURE (`plan.single`): its value and when it was read, and no chart of one dot.
 
+  AGAINST AN `ago:` LINE THE LEAD SAYS AN AMOUNT AND A SHARE (`linesMoved`), and the host's sheet says its way in its
+  up and down colours: a price against what it was a month ago is a change, where a period against the one before is not.
+
   A TREND ONLY WHEN THE READINGS HOLD ONE (`src/lines-trend.ts`): a quiet dashed line over the current line, or
   "No clear trend in 12 readings" under the plot, so noise never reads as news. Under six readings, neither.
 -->
 <script lang="ts">
   import { inline, text, type Block, type RenderOptions } from '../src/index.ts';
-  import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, againstSaid, linesAge, linesKeyed, linesNearest, linesOnly, linesPlan } from '../src/lines.ts';
+  import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, againstSaid, linesAge, linesKeyed, linesMoved, linesNearest, linesOnly, linesPlan } from '../src/lines.ts';
   import { linesTrend } from '../src/lines-trend.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -48,7 +51,7 @@
   <div class="prop lines">
     {#if plan.now}
       <p class="lines-lead">
-        <span class="lines-now num">{plan.now}</span>{#if plan.change}<span class="lines-change num" data-trend={plan.trend}>{plan.change}</span><span class="lines-against">{LINES_AGAINST} {againstSaid(plan.against)}, <span class="num">{plan.then}</span></span>{/if}{#if age}<span class="lines-against" data-old="">{age}</span>{/if}
+        <span class="lines-now num">{plan.now}</span>{#if plan.change && plan.ago}<span class="lines-change num" data-trend={plan.trend} data-ago="">{linesMoved(plan)}</span><span class="lines-against">{LINES_AGAINST} {againstSaid(plan.against)}</span>{:else if plan.change}<span class="lines-change num" data-trend={plan.trend}>{plan.change}</span><span class="lines-against">{LINES_AGAINST} {againstSaid(plan.against)}, <span class="num">{plan.then}</span></span>{/if}{#if age}<span class="lines-against" data-old="">{age}</span>{/if}
       </p>
     {/if}
     {#if keyed.length > 0}
@@ -83,7 +86,8 @@
           <div class="lines-readout" style="--at:{point.at}" data-flip={Number(point.at) > 0.5 ? '' : undefined} aria-hidden="true">
             <span class="lines-readout-day">{point.label}</span>
             {#each plan.lines as l, k}
-              <span class="lines-readout-value" data-was={l.was ? '' : undefined} data-step={l.step}><span class="lines-swatch"></span><span class="lines-readout-name">{l.label}</span><span class="num">{point.values[k]}</span></span>
+              <!-- AN `ago:` COMPARISON IS NOT ON THE CHART, so the readout over it does not name it with a swatch. -->
+              {#if !l.ago}<span class="lines-readout-value" data-was={l.was ? '' : undefined} data-step={l.step}><span class="lines-swatch"></span><span class="lines-readout-name">{l.label}</span><span class="num">{point.values[k]}</span></span>{/if}
             {/each}
           </div>
         {/if}

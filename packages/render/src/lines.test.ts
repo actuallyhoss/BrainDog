@@ -98,3 +98,40 @@ test('AN OLD READING SAYS ITS AGE: a line that stopped weeks ago says when, and 
   assert.equal(linesAge(linesPlan([['Month', 'Players'], ['Aug', '9'], ['Sep', '10']]), now), '', 'a month is no day');
   assert.equal(linesAge(linesPlan([['Day', 'Players'], ['30 Dec', '9'], ['31 Dec', '10']]), Date.UTC(2027, 0, 20)), 'Last reading 31 Dec, 20 days ago');
 });
+
+test('AN `ago:` COMPARISON IS THE LEAD\'S AND NOTHING DRAWS IT: an amount and a share, no path, no key, no say in the scale', async () => {
+  const { linesKeyed, linesMoved } = await import('./lines.ts');
+  const { linesTrend } = await import('./lines-trend.ts');
+  const sp = (t: string): string => t.replace(/\s/gu, ' ');
+  /* A MONTH BACK OF THE FIRST DAY IS FAR BELOW THE CHART: it is no line, so the scale is the price's own. */
+  const plan = linesPlan(rows('Day | 24k | ago: A month ago\n1 Sep | EGP 6,000.00 | EGP 3,000.00\n2 Sep | EGP 6,100.00 | \n3 Sep | EGP 6,303.95 | EGP 6,183.45'), 'EGP');
+  assert.deepEqual(plan.lines.map((l) => [l.label, l.was, l.ago === true, l.d, l.end]), [
+    ['24k', false, false, plan.lines[0]!.d, plan.lines[0]!.end],
+    ['A month ago', true, true, '', ''],
+  ]);
+  assert.notEqual(plan.lines[0]!.d, '');
+  assert.deepEqual(linesKeyed(plan), [], 'one drawn line needs no key, and the comparison is none');
+  assert.equal([plan.now, plan.change, plan.trend, plan.against, plan.ago].join(' | '), 'EGP 6,303.95 | +1.9% | up | A month ago | true');
+  assert.equal(sp(plan.delta), '+EGP 120.50');
+  assert.equal(sp(linesMoved(plan)), '+EGP 120.50 (+1.9%)');
+  assert.doesNotMatch(plan.bottom, /3/u, 'the comparison set the scale');
+  assert.doesNotMatch(plan.sentence, /month ago/u, 'the chart\'s name described a line it does not draw');
+  /* THE TREND'S BOX IS THE LINES' TOO, so a trend over six points lies on them. */
+  const six = Array.from({ length: 6 }, (_, i) => `${i + 1} Sep | ${100 + i * 10} | ${i === 5 ? 1 : ''}`).join('\n');
+  const trend = linesTrend(linesPlan(rows(`Day | Price | ago: A week ago\n${six}`)));
+  assert.ok(trend && 'd' in trend);
+  assert.match(trend.d, /^M0 100 L1000 0$/u);
+
+  /* A FALL SAYS ITS AMOUNT WITH A REAL MINUS, and a period against the one before keeps its words and no amount. */
+  const fell = linesPlan(rows('Day | 24k | ago: A week ago\n1 Sep | EGP 6,000.00 | EGP 6,050.00\n2 Sep | EGP 5,950.00 | EGP 6,100.00'), 'EGP');
+  assert.equal(sp(linesMoved(fell)), '−EGP 150.00 (−2.5%)');
+  assert.equal(fell.trend, 'down');
+  const was = linesPlan(rows('Day | Revenue | was: Previous 30 days\n1 Sep | £4,000.00 | £3,600.00\n3 Sep | £4,200.00 | £3,900.00'));
+  assert.deepEqual([was.ago, was.delta, linesMoved(was)], [false, '', '+7.7%']);
+
+  /* DRAWN: the change marked as against its own line, the words after it, no dashed path and no figure then. */
+  const html = toHTML(parse('```lines | Gold price\nDay | 24k | ago: A month ago\n1 Sep | EGP 6,000.00 | EGP 5,900.00\n2 Sep | EGP 6,100.00 | EGP 5,950.00\n```'), { home: 'EGP' });
+  assert.match(sp(html), /<span class="lines-change num" data-trend="up" data-ago="">\+EGP 150\.00 \(\+2\.5%\)<\/span><span class="lines-against">against a month ago<\/span><\/p>/u);
+  assert.doesNotMatch(html, /data-was=""/u, 'a dashed line or key was drawn for a comparison nothing draws');
+  assert.match(html, /<th scope="col">A month ago<\/th>/u, 'the fold lists what the change was measured against');
+});

@@ -1504,7 +1504,10 @@ function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSp
     const { lines, latest } = linesAndLatest(measuresFor(block), block.readOnce);
     /* EVERY LINE OLDER THAN A WEEK IS A TILE THAT SAYS ITS AGE (`staleTilesText`), never a chart drawn as this month's. */
     const nowMs = Date.parse(block.stale_at);
-    const drawnLines = allStale(lines, nowMs) ? staleTilesText(lines, (at) => sinceWords(at, nowMs), latest) : linesText(lines, latest, block.heading ?? null);
+    /* `against:` READS THE LEAD AGAINST ITS OWN LINE SO MANY DAYS BACK (`agoOf`), in place of the period before. */
+    const against = keyOf(block, 'against');
+    const back = typeof against === 'number' && Number.isInteger(against) && against >= 1 ? against : undefined;
+    const drawnLines = allStale(lines, nowMs) ? staleTilesText(lines, (at) => sinceWords(at, nowMs), latest) : linesText(lines, latest, block.heading ?? null, back);
     return parse([drawnLines, latestText(latest, lines.length > 0, lines, (at) => sinceWords(at, nowMs))].filter(Boolean).join('\n\n'), { page: true });
   }
   /* A CAPTURE'S HEADING GOES THROUGH TOO, because it is not a caption: it is the field's placeholder and its

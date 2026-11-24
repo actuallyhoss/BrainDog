@@ -41,8 +41,9 @@ export function linesTrend(plan: LinesPlan): LinesTrend | null {
   const n = got.length;
   if (n < LINES_TREND_POINTS) return null;
 
-  /* THE SAME BOX AS THE LINES: x by the point's place, y between every line's highest and lowest value. */
-  const every = read.flatMap((vs) => vs.slice(0, plan.lines.length)).filter((v): v is number => v !== null);
+  /* THE SAME BOX AS THE LINES: x by the point's place, y between every drawn line's highest and lowest value, so an
+     `ago:` comparison, which nothing draws, moves the trend no more than it moves the lines. */
+  const every = read.flatMap((vs) => vs.slice(0, plan.lines.length).filter((_, j) => plan.lines[j]?.ago !== true)).filter((v): v is number => v !== null);
   const hi = Math.max(...every);
   const lo = Math.min(...every);
   const span = hi - lo;

@@ -1363,6 +1363,13 @@
     font-weight: 500;
   }
 
+  /* EXCEPT AGAINST ITS OWN LINE SOME DAYS BACK (`ago:`): a price against what it was a month ago is a change, said in
+     the house's up and down as a stat's lead says it, up in the good green and down in the ink, since less is a thing
+     to know and not the danger colour. A period against the one before stays ink. */
+  .lines-change[data-ago][data-trend='up'] {
+    color: var(--good);
+  }
+
   .lines-against {
     color: var(--ink-3);
     font-size: var(--fs-meta);
