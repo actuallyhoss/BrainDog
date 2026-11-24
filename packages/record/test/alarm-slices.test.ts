@@ -327,39 +327,68 @@ test('A HEADLINES WALK WHOSE OBJECT WAS RESET MID-PAGE GOES ON PAST THAT PAGE IN
   assert.equal(walkOf(fresh.api), undefined, 'the walk kept its place after it ended');
 });
 
-/* Q1 (second review of 30 October): a resumed walk drew every page it had found owed in one step, with no budget, so the
-   alarm that resumed it ran as long as the one cut and was cut in the same place, and the pref never moved. */
-test('A RESUMED WALK DRAWS AGAIN WHAT IT HAD FOUND OWED A SLICE AT A TIME, keeping its place before each, and leaves out the page it went in', async () => {
+/* 24 November: a resumed walk drew again every page it had found owed (Q1, second review of 30 October, drew them a slice
+   at a time), so on his record an object that restarted every few alarms spent each one on the same pages. */
+test('A RESUMED WALK GOES ON FROM ITS PLACE AND DRAWS NOTHING IT HAD FOUND OWED AGAIN, and the next walk asks what it carried', async () => {
   const s = await seeded();
-  const kept = await goneWhileDrawing(s.api, (w) => w.again === false && w.at < w.order.length);
-  assert.ok(kept !== null, 'the walk never kept its place');
-  const pages = s.api.kernel.pages().filter((p) => p.nav !== null && p.slug !== 'home' && p.about === null);
-  assert.ok(pages.length >= 4, 'the seed has too few pages to walk');
-  const [went, first, second, third] = pages.map((p) => p.slug) as [string, string, string, string];
-  const redo = [first, second, third];
+  const kept = await goneWhileDrawing(s.api, (w) => w.again === false && w.owed.length >= 2 && w.at < w.order.length);
+  assert.ok(kept !== null, 'the walk never found two pages owed before its end');
+  const went = kept.drawing!;
+  const carried = kept.owed.filter((slug) => slug !== went);
+  assert.ok(carried.length >= 2, 'the walk found too few pages owed');
+  const behind = kept.order.slice(0, kept.at);
 
-  /* AN OBJECT WENT WHILE DRAWING `went` AGAIN, with three more found owed and none left on the rail. */
-  s.api.kernel.setPref('slash', 'headlines.walk', { ...kept, at: kept.order.length, owed: [went, ...redo], drawing: went } satisfies Walk);
-
-  /* EACH PAGE DRAWN AGAIN IS NAMED AS UNDER WAY BEFORE IT IS DRAWN, so a reset in it is not drawn again by the next. */
-  const under: (string | undefined)[] = [];
-  const fresh = await freshObject(s, (slug) => {
-    if (redo.includes(slug)) under.push(walkOf(fresh.api)?.drawing);
-  });
-  const tick = await fresh.api.slashTick({ budget: onePage() });
-  assert.equal((tick as { more?: true }).more, true, 'a tick of one page drew every page owed again');
-  assert.equal(redo.reduce((n, slug) => n + (fresh.drawn.get(slug) ?? 0), 0), 1, 'a tick of one page drew more than one page again');
-  /* A TICK THAT SPENT ITS SHARE KEEPS ITS PLACE WITH NO PAGE UNDER WAY, the pages still to draw again in it. */
-  const between = walkOf(fresh.api);
-  assert.equal(between?.drawing, undefined, 'a tick that spent its share left a page named as under way');
-  assert.ok(between !== undefined && second !== undefined && between.owed.includes(second) && between.owed.includes(third), 'the place lost the pages still to draw again');
-  assert.ok(tick.ran && tick.dropped.some((line) => line.startsWith(`${pages[0]!.title} was cut off`)), `the log said nothing of the page left out: ${JSON.stringify(tick)}`);
-
-  const { ticks } = await tickThrough(fresh.api);
-  assert.ok(ticks >= 2 && ticks < 2_000, `the rest took ${ticks} ticks`);
-  assert.equal(fresh.drawn.get(went) ?? 0, 0, `${went} was drawn again after the object went in it`);
-  for (const slug of redo) assert.equal(fresh.drawn.get(slug) ?? 0, 1, `${slug} was drawn again ${fresh.drawn.get(slug) ?? 0} times`);
-  assert.deepEqual(under, redo, 'a page drawn again was not named as under way while it drew');
+  const fresh = await freshObject(s);
+  const { ticks, said } = await tickThrough(fresh.api);
+  assert.ok(ticks < 2_000, 'the look never ended in the new object');
+  /* NOTHING BEHIND ITS PLACE IS DRAWN AGAIN: not what it had found owed, nor the page it went in. */
+  for (const slug of behind) assert.equal(fresh.drawn.get(slug) ?? 0, 0, `the new object drew ${slug} again, behind the place it was kept at`);
+  const title = s.api.kernel.pages().find((p) => p.slug === went)!.title;
+  assert.ok(said.some((line) => line.startsWith(`${title} was cut off`)), `the log said nothing of the page left out: ${JSON.stringify(said)}`);
   assert.ok(fresh.heard.length <= 1, 'the walk asked more than once');
+  assert.ok(!fresh.heard.some((h) => h.pages.some((p) => carried.includes(p.page))), 'the walk asked a page it did not draw');
   assert.equal(walkOf(fresh.api), undefined, 'the walk kept its place after it ended');
+  /* WHAT IT CARRIED STAYS OWED, waiting from now (`headlines.owed`). */
+  const waiting = fresh.api.kernel.prefsOf('slash')['headlines.owed'] as Record<string, number>;
+  for (const slug of carried) assert.equal(waiting[slug], s.clock.now(), `${slug} was not kept as owed`);
+
+  /* PAST THE QUARTER HOUR, THE NEXT WALK DRAWS THEM AGAIN AND ASKS THEM, its wait already out. */
+  s.clock.advance(16 * MIN);
+  const asked = fresh.heard.length;
+  await tickThrough(fresh.api);
+  const later = fresh.heard.slice(asked).flatMap((h) => h.pages.map((p) => p.page));
+  for (const slug of carried) assert.ok(later.includes(slug), `the next walk did not ask ${slug}: ${JSON.stringify(later)}`);
+});
+
+/* 24 November: the later look's quarter hour was kept in memory alone, so every object restart walked again at once, and
+   his record walked up to 110 times an hour. */
+test('THE LATER LOOK\'S QUARTER HOUR HOLDS ACROSS A RESTART: a new object over the same record does not walk again within it', async () => {
+  const s = await seeded();
+  assert.ok((await s.api.slashTick()).ran);
+  const write = async (what: string): Promise<void> => {
+    const made = await s.api.create({ register: 'tasks', fields: { what, state: 'open' } }, OWNER);
+    assert.ok(made.ok, JSON.stringify(made));
+  };
+  /* A LATER LOOK OVER A RECORD THAT MOVED WALKS, and keeps when it began. */
+  s.clock.advance(16 * MIN);
+  await write('One');
+  assert.ok((await drawing(s.api, () => s.api.slashTick())) > 0, 'the later look over a moved record drew no page');
+  assert.equal(s.api.kernel.prefsOf('slash')['headlines.looked'], s.clock.now());
+
+  /* THE RECORD MOVES AGAIN AND THE OBJECT RESTARTS WITHIN THE QUARTER HOUR: the new one walks nothing until it is out. */
+  s.clock.advance(5 * MIN);
+  await write('Two');
+  const fresh = await freshObject(s);
+  assert.equal(await drawing(fresh.api, () => fresh.api.slashTick()), 0, 'a new object walked again within the quarter hour');
+  s.clock.advance(5 * MIN);
+  assert.equal(await drawing(fresh.api, () => fresh.api.slashTick()), 0, 'a new object walked again within the quarter hour');
+  s.clock.advance(6 * MIN);
+  assert.ok((await drawing(fresh.api, () => fresh.api.slashTick())) > 0, 'the walk did not come once the quarter hour was out');
+
+  /* A TIME KEPT AFTER THE CLOCK'S NOW IS NOT TRUSTED, so it cannot hold the look back. */
+  s.clock.advance(16 * MIN);
+  await write('Three');
+  fresh.api.kernel.setPref('slash', 'headlines.looked', s.clock.now() + 24 * 60 * MIN);
+  const again = await freshObject(s);
+  assert.ok((await drawing(again.api, () => again.api.slashTick())) > 0, 'a time kept from the future held the look back');
 });

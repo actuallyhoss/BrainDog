@@ -6336,23 +6336,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     at: number;
     due: HeadlineDue[];
     stamp: string;
-    /** The pages a walk an object before this one had found owed, still to draw again. */
-    redo: string[];
+    /** The pages a walk an object before this one had found owed: not drawn again by this walk, and still owed. */
+    carried: string[];
   } | null = null;
   /**
    * AND ITS PLACE AS ONE OF SLASH'S PREFS, written before each page is drawn (review of 30 October, R3): a page whose draw
    * runs past what the platform allows resets the object, and a walk kept in memory alone began again from Home, reached
    * the same page and was reset again, so the look stalled on the headlines step all day. A new object goes on from the
-   * page AFTER the one being drawn, and draws again the pages already found owed (`owed`), since what was found is not
-   * kept: a page's blocks as read are too big for a pref.
+   * page AFTER the one being drawn.
+   *
+   * WHAT THE WALK HAD FOUND OWED (`owed`) IS NOT DRAWN AGAIN BY THE NEW OBJECT (24 November). It was, since what was found
+   * is not kept (a page's blocks as read are too big for a pref), and on his record an object that restarted every few
+   * alarms spent each one drawing the same owed pages again, so the walk never got further. They are carried in the place
+   * instead (`carried`): this walk asks only what it found itself, settles nothing (`headlinesSettled`), and a later walk
+   * keeps their wait (`HEADLINES_OWED`) and draws them again, finds them owed, and asks them.
    *
    * `drawing` IS THE PAGE UNDER WAY WHEN THE PREF WAS WRITTEN (second review of 30 October, Q1). A tick that ends on its
-   * budget writes the pref again without it, so a `drawing` a new object finds is a draw the object went in, whether it
-   * was a page on the rail or one found owed and drawn again. That page is left out of this walk, with a line in the
-   * look's log, and never drawn again by it: two alarms in a row cut in the look hold the whole look for six hours
-   * (`alarm-cuts.ts`), which costs far more than one page's headline, and the day's next walk reads it again. The pages
-   * drawn again are drawn under the tick's budget like the rest, the place kept before each, so every object gets
-   * further than the one before it.
+   * budget writes the pref again without it, so a `drawing` a new object finds is a draw the object went in. That page is
+   * left out of this walk, with a line in the look's log, and never drawn again by it: two alarms in a row cut in the look
+   * hold the whole look for six hours (`alarm-cuts.ts`), which costs far more than one page's headline, and the day's
+   * next walk reads it again. So every object gets further than the one before it.
    */
   const HEADLINE_WALK = 'headlines.walk';
   type KeptWalk = { day: string; again: boolean; order: string[]; at: number; stamp: string; owed: string[]; drawing?: string };
@@ -6404,8 +6407,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * holds (`headlineFor`), so a page passed over that did move says its rules' line until the next walk draws it.
    *
    * WHAT IS ALWAYS DRAWN: a page whose draw the kernel could not keep (one that read a vital sign or wrote: `seen` is
-   * `null`); one an object before this one had found owed (`redo`); and every page of the day's first walk. Kept in
-   * memory, so an object that restarts draws every page once, as before.
+   * `null`); and every page of the day's first walk. Kept in memory, so an object that restarts draws every page once,
+   * as before.
    */
   type PageSeen = {
     day: string;
@@ -6457,16 +6460,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return owed(HOME_PAGE, basis, undefined) ? [{ page: home, basis }] : [];
     };
     if (walk === null && resumed !== null) {
-      /* WHAT IT HAD FOUND OWED IS DRAWN AGAIN, all but the page it was drawing when it went (`drawing`): that one is left
-         out of this walk, and the look's log says so. */
+      /* WHAT IT HAD FOUND OWED IS CARRIED AND NOT DRAWN AGAIN (`carried`), and the page it was drawing when it went
+         (`drawing`) is left out of this walk, and the look's log says so. */
       const went = resumed.drawing;
-      const redo = resumed.owed.filter((slug) => slug !== HOME_PAGE && slug !== went);
+      const carried = resumed.owed.filter((slug) => slug !== HOME_PAGE && slug !== went);
       if (went !== undefined && went !== HOME_PAGE) {
         const line = `${listed.find((p) => p.slug === went)?.title ?? went} was cut off while its headline was being worked out, so this look went on without it.`;
         console.warn(line);
         headlineNotes.push(line);
       }
-      walk = { day: today, again, order: resumed.order, at: Math.min(resumed.at, resumed.order.length), due: homeDue(), stamp: resumed.stamp, redo };
+      walk = { day: today, again, order: resumed.order, at: Math.min(resumed.at, resumed.order.length), due: homeDue(), stamp: resumed.stamp, carried };
       from = 'kept';
     }
     if (walk === null) {
@@ -6476,7 +6479,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          `HEADLINE_PAGES_MOST`: a page left out is still owed, and a later ask of the day takes it. */
       const touched = (p: (typeof listed)[number]): string => String(p.about?.updated_at ?? '');
       const ordered = [...listed.filter((p) => p.about === null), ...listed.filter((p) => p.about !== null).sort((a, b) => touched(b).localeCompare(touched(a)))];
-      walk = { day: today, again, order: ordered.map((p) => p.slug), at: 0, due: first, stamp: changeStamp(), redo: [] };
+      walk = { day: today, again, order: ordered.map((p) => p.slug), at: 0, due: first, stamp: changeStamp(), carried: [] };
     }
     const bySlug = new Map(listed.map((p) => [p.slug, p] as const));
     /* WHAT A PAGE NOT DRAWN AGAIN IS KEPT BY (`pagesSeen`): its kept line and the basis it was last asked at, beside its reads. */
@@ -6592,8 +6595,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const going = walk;
     const due0 = going.due;
     /**
-     * THE WALK'S PLACE, KEPT AS A PREF (`HEADLINE_WALK`): the pages found owed so far, then those still to draw again, and
-     * the page about to be drawn (`drawing`), if any. Kept before each page is drawn and when a tick's share is spent.
+     * THE WALK'S PLACE, KEPT AS A PREF (`HEADLINE_WALK`): the pages found owed so far, then those an object before this
+     * one found (`carried`), and the page about to be drawn (`drawing`), if any. Kept before each page is drawn and when a
+     * tick's share is spent.
      */
     const keepPlace = (drawing?: string): void => {
       kernel.setPref(SLASH, HEADLINE_WALK, {
@@ -6602,39 +6606,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         order: going.order,
         at: going.at,
         stamp: going.stamp,
-        owed: [...due0.filter((d) => d.page.page !== HOME_PAGE).map((d) => d.page.page), ...going.redo],
+        owed: [...due0.filter((d) => d.page.page !== HOME_PAGE).map((d) => d.page.page), ...going.carried],
         ...(drawing === undefined ? {} : { drawing }),
       } satisfies KeptWalk);
     };
     let drawn = 0;
     let passed = 0;
     /** What this tick did of the walk, said once to a host that counts its alarm (`TickBudget.walked`) as its part ends. */
-    const tell = (): void => budget.walked?.({ kind: again ? 'later' : 'night', from, listed: going.order.length, drawn, passed, owed: due0.length });
+    const tell = (): void => budget.walked?.({ kind: again ? 'later' : 'night', from, listed: going.order.length, drawn, passed, owed: due0.length + going.carried.length });
     /** A tick's share of the walk spent: its place kept with no page under way, and the rest left to the next tick. */
     const spent = (): { said: string[]; dropped: string[]; cut: true } => {
       keepPlace();
       tell();
       return { said: [], dropped: [], cut: true };
     };
-    /* A WALK AN OBJECT BEFORE THIS ONE KEPT: what it had found owed is drawn again, under the tick's budget as every page
-       is (second review of 30 October, Q1: it was drawn all at once, so the alarm that resumed a cut walk ran as long as
-       the one cut, and was cut in the same place). */
-    while (going.redo.length > 0) {
-      if (due0.length >= HEADLINE_PAGES_MOST) break;
-      if (drawn > 0 && budget.spent()) return spent();
-      const slug = going.redo.shift()!;
-      const p = bySlug.get(slug);
-      if (p === undefined || p.nav === null || p.slug === HOME_PAGE) {
-        passed++;
-        continue;
-      }
-      drawn++;
-      budget.spend();
-      /* KEPT BEFORE THE PAGE IS DRAWN, NAMED AS UNDER WAY: an object reset in the draw goes on without it. */
-      keepPlace(slug);
-      const d = drawnDue(p);
-      if (d !== null) due0.push(d);
-    }
     while (going.at < going.order.length) {
       if (due0.length >= HEADLINE_PAGES_MOST) break;
       /* A TICK'S SHARE OF THE WALK IS SPENT: the rest waits for the next tick, and nothing is asked until it is read. */
@@ -6663,18 +6648,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (d !== null) due0.push(d);
     }
     tell();
-    /* THE WALK HAS READ WHAT IT WILL: a page it left unread, or one it had to draw again and did not, is one
-       `HEADLINE_PAGES_MOST` left out, still owed. */
-    const leftOut = going.at < going.order.length || going.redo.length > 0;
+    /* THE WALK HAS READ WHAT IT WILL: a page it left unread (`HEADLINE_PAGES_MOST`), or one an object before this one found
+       owed and this walk did not draw again (`carried`), is left out, still owed. */
+    const leftOut = going.at < going.order.length || going.carried.length > 0;
     const walked = going.stamp;
     forgetWalk();
     let due = due0;
     /* A LATER TICK OF THE SAME DAY WAITS FOR THE SITTING TO END (`owedPages`): each page whose basis moved
        is kept with when it was first seen owed (`HEADLINES_OWED`), and none is asked about until `HEADLINE_OWED_MS` after
        the first, so the writes of one sitting are answered in one ask. The night asks every page it owes at once. */
-    const waits = again ? owedSince(owedOn(prefs[HEADLINES_OWED]), due.map((d) => ({ page: d.page.page, basis: askedAt(d.basis, d.facts) })), clock.now()) : [];
-    const waiting = Object.fromEntries(waits.map((w) => [w.page, w.since]));
-    if (JSON.stringify(waiting) !== JSON.stringify(owedOn(prefs[HEADLINES_OWED]))) kernel.setPref(SLASH, HEADLINES_OWED, waiting);
+    const owedKept = owedOn(prefs[HEADLINES_OWED]);
+    const waits = again ? owedSince(owedKept, due.map((d) => ({ page: d.page.page, basis: askedAt(d.basis, d.facts) })), clock.now()) : [];
+    const waiting: Record<string, number> = Object.fromEntries(waits.map((w) => [w.page, w.since]));
+    /* AND EACH PAGE CARRIED UNDRAWN (`carried`) WAITS ON, from when a later walk first found it owed, or from now: the walk
+       after this one draws it again and asks it once its wait is out, if it is owed still. */
+    for (const page of going.carried)
+      if (!Object.hasOwn(waiting, page)) waiting[page] = again && Object.hasOwn(owedKept, page) ? Math.min(owedKept[page]!, clock.now()) : clock.now();
+    if (JSON.stringify(waiting) !== JSON.stringify(owedKept)) kernel.setPref(SLASH, HEADLINES_OWED, waiting);
     if (again) {
       const now = new Set(owedPages(waits, clock.now()));
       due = due.filter((d) => now.has(d.page.page));
@@ -6744,11 +6734,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * THE SAME DAY'S LATER LOOKS at the headlines, on a tick after the daily look: only the headline step, and at most once
-   * every `HEADLINE_LOOK_MS`, since the Worker asks after every request. Kept in memory, so a restart looks once more,
-   * which costs a read and never an ask: the ask is bounded by `HEADLINES_ASKED`. A look that finds a page's basis moved
-   * notes when (`HEADLINES_OWED`) and asks nothing; the ask goes on the first look `HEADLINE_OWED_MS` after that.
+   * every `HEADLINE_LOOK_MS`, since the Worker asks after every request. The ask is bounded by `HEADLINES_ASKED`. A look
+   * that finds a page's basis moved notes when (`HEADLINES_OWED`) and asks nothing; the ask goes on the first look
+   * `HEADLINE_OWED_MS` after that.
+   *
+   * WHEN THE LAST ONE BEGAN IS ONE OF SLASH'S PREFS (`HEADLINES_LOOKED`, 24 November), read once by an object and held in
+   * its memory after. It was kept in memory alone, so every restart looked again at once, and on 20 and 21 November his
+   * record walked up to 110 times an hour where four were meant. A time kept after the clock's now is not trusted, and a
+   * record with none kept yet looks at once, as a restart did.
    */
-  let headlinesLooked = Number.NEGATIVE_INFINITY;
+  const HEADLINES_LOOKED = 'headlines.looked';
+  let headlinesLooked: number | null = null;
+  /** When the last later look began, as this object holds it or, the first time it is asked, as the pref keeps it. */
+  const lookedAt = (): number => {
+    if (headlinesLooked === null) {
+      const kept = kernel.prefsOf(SLASH)[HEADLINES_LOOKED];
+      headlinesLooked = typeof kept === 'number' && Number.isFinite(kept) && kept <= clock.now() ? kept : Number.NEGATIVE_INFINITY;
+    }
+    return headlinesLooked;
+  };
+  const lookedNow = (): void => {
+    headlinesLooked = clock.now();
+    kernel.setPref(SLASH, HEADLINES_LOOKED, headlinesLooked);
+  };
   /**
    * AND NOT AT ALL WHILE NOTHING MOVED (`headlinesQuiet`). This walk drew every page on every quarter hour's tick, and
    * a page's figures are held for an hour at most (`holdAcross`), so on his record each tick that came after an hour
@@ -6760,8 +6768,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const slashHeadlinesAgain = async (today: string, budget: TickBudget = UNBOUNDED): Promise<boolean> => {
     if (walkAgainOn(today)) return (await slashHeadlines(today, true, budget)).cut === true;
-    if (clock.now() - headlinesLooked < HEADLINE_LOOK_MS) return false;
-    headlinesLooked = clock.now();
+    if (clock.now() - lookedAt() < HEADLINE_LOOK_MS) return false;
+    lookedNow();
     const prefs = kernel.prefsOf(SLASH);
     if (askedOn(prefs[HEADLINES_ASKED], today).asks >= HEADLINE_ASKS_DAY) return false;
     if (Object.keys(owedOn(prefs[HEADLINES_OWED])).length === 0 && headlinesQuiet(today)) return false;
@@ -6774,7 +6782,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const headlinesAgainDue = (today: string): boolean => {
     if (!deps.slashModel?.headline) return false;
     if (walkAgainOn(today)) return true;
-    if (clock.now() - headlinesLooked < HEADLINE_LOOK_MS) return false;
+    if (clock.now() - lookedAt() < HEADLINE_LOOK_MS) return false;
     const prefs = kernel.prefsOf(SLASH);
     if (askedOn(prefs[HEADLINES_ASKED], today).asks >= HEADLINE_ASKS_DAY) return false;
     return Object.keys(owedOn(prefs[HEADLINES_OWED])).length > 0 || !headlinesQuiet(today);
