@@ -706,6 +706,9 @@ const DUE_WITH_MONEY = 'amount is set';
  * WHAT IS OWNED, AS A FOUNDER'S TODAY SAYS IT (his record's plan of 24 Nov, section 6.1): net worth with its twelve weeks,
  * what the holdings are worth and what is still to pay over time; the holdings themselves, worth most first; and the
  * next parts left to pay on a plan. Each only where its list holds rows, so no tile reads a list the record lacks.
+ *
+ * THE TWO TABLES ARE LARGE, NOT TALL: at 1512 a tall tile is 288 px wide, and both dropped their last column there
+ * (Gain, and Amount), which is the figure each table is for (Slash audit, 24 November).
  */
 export function worthTiles(w: { holdings: boolean; installments: boolean }): PageBlock[] {
   const cells = [
@@ -719,7 +722,7 @@ export function worthTiles(w: { holdings: boolean; installments: boolean }): Pag
     kind: 'table',
     heading: 'Gold and investments',
     icon: 'vault',
-    size: 'tall',
+    size: 'large',
     source: 'register.holdings',
     columns: [
       { field: 'label', label: 'Holding' },
@@ -736,7 +739,7 @@ export function worthTiles(w: { holdings: boolean; installments: boolean }): Pag
     kind: 'table',
     heading: 'Property: next parts',
     icon: 'calendar',
-    size: 'tall',
+    size: 'large',
     source: 'register.installments',
     where: 'state is open',
     columns: [

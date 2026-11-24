@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
 
-import { COMING_UP_DAYS, COMING_UP_DAYS_OWNED, COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, NUMBERS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, homeDrawn, numbersTile, onDesk, peopleOf, quietHeld, railed, slashLineOf, todayHome, weekMoney, weekOf, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
+import { COMING_UP_DAYS, COMING_UP_DAYS_OWNED, COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, NUMBERS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, homeDrawn, numbersTile, onDesk, peopleOf, quietHeld, railed, slashLineOf, todayHome, weekMoney, weekOf, worthTiles, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { WithRows } from './home-rows.ts';
@@ -971,4 +971,9 @@ test('A RECORD THAT OWNS SOMETHING OPENS ON WHAT IT OWNS: worth, the holdings an
   /* ON A PHONE THEY COME AFTER CASH. */
   const order = both.phone!.order!;
   assert.deepEqual(order.slice(order.indexOf('cash'), order.indexOf('cash') + 4), ['cash', 'worth', 'property-next', 'gold']);
+});
+
+test('THE TWO WORTH TABLES ARE LARGE, so at 1512 neither drops its last column (Gain, Amount) as a 288 px tall tile did', () => {
+  const sizes = Object.fromEntries(worthTiles({ holdings: true, installments: true }).map((b) => [(b as unknown as { key: string }).key, (b as unknown as { size: string }).size]));
+  assert.deepEqual(sizes, { worth: 'wide', gold: 'large', 'property-next': 'large' });
 });
