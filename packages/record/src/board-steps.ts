@@ -9,7 +9,7 @@
  * PURE: a body in, a body out, nothing read or written. `index.ts` `boardSteps` reads the page and installs the answer.
  */
 
-import { isWidgetSize, widgetSizesOf as sizesOf, type WidgetSize } from '@braindog/kernel';
+import { isWidgetSize, keyedBlocks, widgetSizesOf as sizesOf, type WidgetSize } from '@braindog/kernel';
 
 type Block = Record<string, unknown> & { kind?: unknown; key?: unknown; size?: unknown; draft?: unknown };
 export type BoardBody = Record<string, unknown> & { blocks: Block[]; phone?: Phone; requires?: unknown };
@@ -29,7 +29,7 @@ const keyOf = (b: Block): string | null => (typeof b.key === 'string' ? b.key : 
 
 /** A key no widget of `blocks` has: `w-` and four letters and digits. */
 function freshKey(blocks: readonly Block[]): string {
-  const taken = new Set(blocks.map(keyOf));
+  const taken = new Set([...blocks.map(keyOf), ...keyedBlocks(blocks).map((b) => b.key)]);
   for (let n = 0; ; n += 1) {
     const k = `w-${(Math.random() * 36 ** 4).toString(36).slice(0, 4).padStart(4, '0')}`;
     if (!taken.has(k) || n > 50) return taken.has(k) ? `w-${Date.now().toString(36)}` : k;
@@ -54,7 +54,14 @@ export function boardStepsOn(body: BoardBody, steps: readonly BoardStep[]): { ok
   const blocks = body.blocks.map((b) => ({ ...b }));
   let phone: Phone | undefined = body.phone ? structuredClone(body.phone) : undefined;
   let requires = Array.isArray(body.requires) ? [...(body.requires as string[])] : undefined;
-  const find = (key: string): number => blocks.findIndex((b) => keyOf(b) === key);
+  /* A BLOCK WITH NO KEY OF ITS OWN IS NAMED AS THE PAGE IS READ (`keyedBlocks`, P4 of 24 Nov): Today's lead line and its
+     Add a task are drawn under the keys the read gives them, and a step naming either was refused as gone. Each block is
+     named once, before any step, so a step after a move still finds it. */
+  const named = new Map<Block, string>(keyedBlocks(blocks).map((b, i) => [blocks[i]!, b.key] as const));
+  const idOf = (b: Block): string | null => keyOf(b) ?? named.get(b) ?? null;
+  const find = (key: string): number => blocks.findIndex((b) => idOf(b) === key);
+  /* A KEYLESS BLOCK A STEP CHANGES KEEPS THE KEY IT WAS NAMED BY, so its next edit finds it whatever is added beside it. */
+  const keep = (at: number, b: Block): Block => (keyOf(b) === null && named.has(blocks[at]!) ? { ...b, key: named.get(blocks[at]!)! } : b);
   const gone = (at: number, key: string): { ok: false; fault: StepFault } => ({ ok: false, fault: { at, code: 'VERSION_STALE', fix: `The widget ${key} is no longer on the board, so a change to it could not be made. Open Today again and make it there.` } });
   const place = (block: Block, before: string | null | undefined): void => {
     const at = before == null ? -1 : find(before);
@@ -65,15 +72,16 @@ export function boardStepsOn(body: BoardBody, steps: readonly BoardStep[]): { ok
     if ('move' in step) {
       const at = find(step.move);
       if (at < 0) return gone(i, step.move);
-      const [b] = blocks.splice(at, 1);
+      const b = keep(at, blocks[at]!);
+      blocks.splice(at, 1);
       /* MOVED BEFORE ITSELF OR BEFORE A WIDGET SINCE GONE, it goes before the next one there is, else the end. */
-      place(b!, step.before === step.move ? null : step.before);
+      place(b, step.before === step.move ? null : step.before);
     } else if ('size' in step) {
       const at = find(step.size);
       if (at < 0) return gone(i, step.size);
       const kind = String(blocks[at]!.kind ?? '');
       if (!isWidgetSize(step.to) || !sizesOf(kind).includes(step.to)) return { ok: false, fault: { at: i, code: 'VALUE_MALFORMED', fix: `That widget is not drawn ${String(step.to)}.` } };
-      blocks[at] = { ...blocks[at]!, size: step.to };
+      blocks[at] = keep(at, { ...blocks[at]!, size: step.to });
     } else if ('add' in step) {
       const add = { ...step.add };
       if (typeof add.key !== 'string' || find(add.key) >= 0) add.key = freshKey(blocks);
@@ -90,7 +98,7 @@ export function boardStepsOn(body: BoardBody, steps: readonly BoardStep[]): { ok
       const at = find(step.keep);
       if (at < 0) return gone(i, step.keep);
       const { draft: _draft, ...kept } = blocks[at]!;
-      blocks[at] = kept;
+      blocks[at] = keep(at, kept);
     } else if ('set' in step) {
       /* A WIDGET CHANGED IN THE INSPECTOR, OR A DRAFT TRIED AGAIN: its block replaced where it stands, under its own key,
          at its size unless the new block says one. */
@@ -106,7 +114,7 @@ export function boardStepsOn(body: BoardBody, steps: readonly BoardStep[]): { ok
   }
   /* THE PHONE NAMES ONLY WIDGETS THE BOARD HOLDS, so a widget removed, or one an agent took off meanwhile, leaves it. */
   if (phone) {
-    const keys = new Set(blocks.flatMap((b) => (b.size !== undefined && keyOf(b) ? [keyOf(b)!] : [])));
+    const keys = new Set(blocks.flatMap((b) => (b.size !== undefined && idOf(b) ? [idOf(b)!] : [])));
     phone = {
       ...(phone.order ? { order: phone.order.filter((k) => keys.has(k)) } : {}),
       ...(phone.hidden ? { hidden: phone.hidden.filter((k) => keys.has(k)) } : {}),

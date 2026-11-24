@@ -5,6 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { keyedBlocks } from '@braindog/kernel';
+
 import { boardStepsOn, stepsOf } from '../src/board-steps.ts';
 
 const body = () => ({
@@ -59,4 +61,18 @@ test('a widget set anew keeps its key, its place and its size, and reads what th
   assert.deepEqual(out.body.blocks[1], { kind: 'todo', heading: 'Blocked', source: 'register.things', key: 'a', size: 'small' });
   assert.ok((out.body.requires as string[]).includes('register.things'));
   assert.ok(stepsOf([{ set: 'a', block: { kind: 'stat' } }]));
+});
+
+test('a block with no key of its own is named as the page is read, so Today\'s lead line and Add a task move and go (P4)', () => {
+  const page = { ...body(), blocks: [{ kind: 'note', lead: true, body: 'Hi' }, { kind: 'capture', heading: 'Add a task', register: 'tasks' }, ...body().blocks.slice(1)] };
+  const [lead, capture] = keyedBlocks(page.blocks).map((b) => b.key);
+  const out = boardStepsOn(page, [{ move: lead!, before: null }, { remove: capture! }]);
+  assert.ok(out.ok, JSON.stringify(out));
+  if (!out.ok) return;
+  assert.deepEqual(out.body.blocks.map((b) => b.kind), ['stat', 'todo', 'stat', 'note']);
+  /* AND IT KEEPS THE KEY IT WAS NAMED BY, so its next edit finds it. */
+  assert.equal(out.body.blocks.at(-1)!.key, lead);
+  const sized = boardStepsOn(page, [{ size: capture!, to: 'wide' }]);
+  assert.ok(sized.ok);
+  if (sized.ok) assert.deepEqual([sized.body.blocks[1]!.key, sized.body.blocks[1]!.size], [capture, 'wide']);
 });
