@@ -129,6 +129,7 @@ const TOOLS: readonly SlashTool[] = [
   { name: 'today', args: '', about: 'What is late, due today, stopped or waiting on them' },
   { name: 'search', args: 'q', about: 'Find rows by a name or one or two key words, in every list: "Ada", "Analytics", "rent". Not a whole sentence' },
   { name: 'open', args: 'id', about: 'One row whole, by its id (tasks#3) or its name; or one figure by its id (cash-now)' },
+  { name: 'total', args: 'list, field?, where?, by?', about: 'The sum of a money or number field over EVERY row of one list that where matches, with how many, each currency apart, split by its which-way field (in, out) or by the field by names: total("ledger", "amount", {"field":"payee","contains":"Northern Rail"}). Use it for any total over rows; never add up rows from list yourself' },
   { name: 'list', args: 'list, where?, limit?', about: 'Rows of one list, newest first. where filters by field ids: {"field":"state","is":"open"}, or several: {"all":[{"field":"state","is":"open"},{"field":"due","before":"today"}]}. Tests: is, not, in, gt, lt, before, after, contains' },
   { name: 'lists', args: 'list', about: "One list's fields: their ids and the values they take, for list's where, add and change" },
   { name: 'changes', args: 'about?, since?', about: 'What changed lately and who changed it. With about, a row\'s id or name: what changed on that row. With since: what changed since "this morning", "yesterday", "3 hours"' },
@@ -174,6 +175,11 @@ const QUALIFIED = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u;
 const NOTE_MOST = 200;
 /** How many late rows `today` names, the worst first; how many there are in all is said beside them. */
 const LATE_LISTED = 12;
+/** A page of `total`'s walk, the most the record's `list` answers at once, and the most rows it adds before it says so. */
+const TOTAL_PAGE = 500;
+const TOTAL_MOST = 5_000;
+/** The field types `total` adds up. */
+const ADDS: ReadonlySet<string> = new Set(['money', 'int', 'decimal']);
 
 /** The words a question asks a figure with that no figure's name carries, taken out before the names are matched. */
 const ASKING = new Set(['how', 'much', 'many', 'what', 'whats', 'did', 'do', 'does', 'i', 'my', 'me', 'the', 'a', 'an', 'is', 'are', 'have', 'has', 'of', 'on', 'for', 'and', 'we', 'our', 'total', 'it']);
@@ -711,7 +717,80 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         const got = await agent.answer('list', { register: one.id, limit, ...(where === undefined ? {} : { where }) }, ctx);
         if (!got.result.ok) return { text: got.text, refused: true, step: `Reading ${one.name}` };
         const rows = isObject(got.result.value) && Array.isArray(got.result.value.rows) ? got.result.value.rows : [];
-        return { ...heldRows(got.text, rows), step: `Reading ${one.name}` };
+        const held = heldRows(got.text, rows);
+        /* A PAGE OF ROWS IS NEVER A TOTAL: on the seed a month of payments was 30 rows of 41, and calc added the 30. */
+        const matched = isObject(got.result.value) && typeof got.result.value['matched'] === 'number' ? got.result.value['matched'] : null;
+        const more = (matched !== null && matched > rows.length) || (isObject(got.result.value) && typeof got.result.value['cursor'] === 'string');
+        return {
+          ...held,
+          text: more ? `${held.text}\nThese are ${String(rows.length)} of ${matched !== null ? String(matched) : 'more'} rows. For a total, call total; never add these up.` : held.text,
+          step: `Reading ${one.name}`,
+        };
+      }
+      case 'total': {
+        /* EVERY MATCHING ROW, READ AS THE ASKER MAY READ IT, a page at a time, and added here in minor units, each currency
+           apart. MEASURED 24 NOVEMBER: Quick could list at most 30 rows and had no way to add more, so a total over a busy
+           ledger was calc over the 30 it was shown, said as if checked. */
+        const one = await listNamed(text(args['list'] ?? args['register']));
+        if (one === null) return { text: `There is no list called ${text(args['list']) || 'that'}. The lists are named before the tools.` };
+        const step = `Adding up ${one.name}`;
+        const adds = (shapeIn(deps.sql, one.id)?.fields ?? []).filter((f) => ADDS.has(String(f.type)));
+        const asked = text(args['field']);
+        const field = asked === '' ? (adds.find((f) => f.type === 'money') ?? adds[0]) : adds.find((f) => f.id === asked);
+        if (field === undefined)
+          return {
+            text: adds.length === 0 ? `${one.name} holds no amount or number to add up, so there is no total. list counts its rows.` : `${asked} is not an amount or a number of ${one.name}. The ones that add up: ${adds.map((f) => f.id).join(', ')}.`,
+            refused: true,
+            step,
+          };
+        const where = isObject(args['where']) || Array.isArray(args['where']) ? whereShape(args['where']) : undefined;
+        /* SPLIT BY WHICH WAY THE MONEY WENT where the list keeps it and the filter does not fix it: a ledger's amounts are
+           all positive beside `direction`, so one sum over money in and money out is a number that means nothing. */
+        const has = new Set((shapeIn(deps.sql, one.id)?.fields ?? []).map((f) => f.id));
+        const fixed = JSON.stringify(where ?? null).includes('"direction"');
+        const by = text(args['by']) !== '' && has.has(text(args['by'])) ? text(args['by']) : has.has('direction') && !fixed ? 'direction' : null;
+        type Part = { rows: number; empty: number; plain: number; sums: Map<string, number> };
+        const parts = new Map<string, Part>();
+        let rows = 0;
+        let cursor: string | null = null;
+        do {
+          const got = await surface.list({ register: one.id, limit: TOTAL_PAGE, ...(where === undefined ? {} : { where }), ...(cursor === null ? {} : { cursor }) }, ctx);
+          if (!got.ok) return { text: `That total was refused: ${fixOf(got) || codeOf(got)}`, refused: true, step };
+          const page = (got.value as { rows?: unknown; cursor?: unknown }).rows;
+          for (const r of Array.isArray(page) ? page : []) {
+            if (!isRow(r)) continue;
+            rows += 1;
+            const key = by === null ? '' : (() => {
+              const g = r.fields[by];
+              return typeof g === 'string' || typeof g === 'number' || typeof g === 'boolean' ? String(g) : 'none';
+            })();
+            const part = parts.get(key) ?? { rows: 0, empty: 0, plain: 0, sums: new Map<string, number>() };
+            parts.set(key, part);
+            part.rows += 1;
+            const v = r.fields[field.id];
+            const amount = moneyIn(v);
+            if (amount !== null) part.sums.set(amount.currency, (part.sums.get(amount.currency) ?? 0) + amount.amount);
+            else if (typeof v === 'number' && Number.isFinite(v)) part.plain += v;
+            else part.empty += 1;
+          }
+          const next = (got.value as { cursor?: unknown }).cursor;
+          cursor = typeof next === 'string' && next !== '' ? next : null;
+          if (cursor !== null && rows >= TOTAL_MOST)
+            return { text: `More than ${String(TOTAL_MOST)} rows of ${one.name} match, more than Slash adds up here, so there is no total. Ask for a narrower span, such as one month.`, step };
+        } while (cursor !== null);
+        const label = ((field as { label?: unknown }).label as string | undefined) ?? field.id;
+        const sumOf = (p: Part): string => {
+          const each = field.type === 'money' ? [...p.sums.entries()].map(([cur, minor]) => money(minor, cur)) : [String(Math.round(p.plain * 1e6) / 1e6)];
+          const said = each.length === 0 ? 'no amount' : each.length === 1 ? each[0]! : `${each.join(' and ')}, each currency apart (never add them)`;
+          return `${said}${p.empty > 0 && each.length > 0 ? `, ${String(p.empty)} of them holding no amount` : ''}`;
+        };
+        if (rows === 0) return { text: `No row of ${one.name} matches, so the total is nothing.`, step };
+        const lines = [...parts.entries()].sort(([a], [z]) => (a < z ? -1 : 1)).map(([k, p]) => (by === null ? sumOf(p) : `${by} ${k}: ${sumOf(p)} over ${String(p.rows)} rows`));
+        const said =
+          by === null
+            ? `${label} over all ${String(rows)} matching rows of ${one.name}: ${lines[0]!}.`
+            : `${label} over all ${String(rows)} matching rows of ${one.name}, by ${by} (never add one to another):\n${lines.map((l) => `- ${l}`).join('\n')}`;
+        return { text: said, step };
       }
       case 'open': {
         const id = text(args['id'] ?? args['spoken']);
@@ -746,7 +825,9 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
             return read.result.ok ? (read.text.split('\n')[0] ?? `${f.name ?? f.id} (${f.id})`) : `${f.name ?? f.id} (${f.id})`;
           }),
         );
-        return { text: lines.join('\n'), step: 'Working out the figures' };
+        /* EACH FIGURE IS ITS OWN SPAN, said by its name: asked for "all money out, every line", the model answered with
+           this month's spending. A total over every row of a list is `total`'s. */
+        return { text: `${lines.join('\n')}\nEach figure covers only what its name says. For a total over every row of a list, call total.`, step: 'Working out the figures' };
       }
       case 'today': {
         /* WHAT IS LATE IS READ WHOLE, THE WORST FIRST (`lateRows`), and the briefing says the rest: due, asked, stopped. The
