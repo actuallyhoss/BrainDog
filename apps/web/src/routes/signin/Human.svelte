@@ -4,7 +4,7 @@
   when `/auth/methods` hands a site key. The answer is good once, so `reset()` asks again after a refused send.
 -->
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
   import { loadWidget, reopenForCheck, widgetWords, type WidgetState } from '../signup/turnstile.ts';
@@ -78,8 +78,32 @@
     }
   }
 
+  /* DRAWN ON THE FIRST SIGN OF USE, NOT WITH THE PAGE. Cloudflare's check fetched about 2 MB (its frame and two
+     challenge payloads) and ran its own scripts while sign-in was still drawing, for every visitor, most of whom sign
+     in with a passkey or Google and never send a link. Now it starts when the form is touched, focused or typed in,
+     or when Send is pressed first (`arm`, from the page); the address takes longer to type than the check takes to
+     answer, and a press before it has waits for the answer (the page keeps it). */
+  let armed = $state(false);
+
+  /** Start the check now, if nothing in the form has yet. */
+  export function arm(): void {
+    if (untrack(() => armed)) return;
+    armed = true;
+    void draw();
+  }
+
   $effect(() => {
-    if (slot !== null) void draw();
+    if (slot === null) return;
+    const form = slot.closest('form') ?? slot.parentElement;
+    if (form?.contains(document.activeElement) && document.activeElement !== document.body) {
+      arm();
+      return;
+    }
+    const kinds = ['focusin', 'pointerdown', 'input', 'keydown'] as const;
+    for (const k of kinds) form?.addEventListener(k, arm, { once: true, passive: true });
+    return () => {
+      for (const k of kinds) form?.removeEventListener(k, arm);
+    };
   });
 
   /* A CHECK THAT FAILED WHILE THE TAB WAS OUT OF SIGHT IS TRIED AGAIN WHEN IT COMES BACK. */
@@ -110,12 +134,13 @@
   });
 </script>
 
-<!-- THE SLOT HOLDS THE WIDGET'S 65PX FROM THE FIRST FRAME, so nothing under it moves when it arrives; while it loads the
-     slot says so in one quiet line, and once it failed it is one notice with Try again at its end (UI pass, 3 Nov: the
-     line said "Try again." beside a button that said it again, squeezed into half the column). -->
+<!-- THE SLOT HOLDS THE WIDGET'S 65PX FROM THE FIRST FRAME, so nothing under it moves when it arrives; it stands empty
+     until the form is used, while the check loads it says so in one quiet line, and once it failed it is one notice
+     with Try again at its end (UI pass, 3 Nov: the line said "Try again." beside a button that said it again, squeezed
+     into half the column). -->
 <div class="human" role="group" aria-label={copy.signupHuman} data-phase={phase}>
   <div class="slot" class:slot-off={phase === 'failed'} bind:this={slot}></div>
-  {#if phase === 'loading'}<p class="waiting" aria-hidden="true">{entryWords.checkLoading}</p>{/if}
+  {#if phase === 'loading' && armed}<p class="waiting" aria-hidden="true">{entryWords.checkLoading}</p>{/if}
   {#if phase === 'failed'}
     <Notice tone="bad" role="alert">
       {entryWords.checkFailed}

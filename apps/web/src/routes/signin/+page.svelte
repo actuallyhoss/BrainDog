@@ -121,7 +121,7 @@
   /* WHILE THE CHECK IS ASKED AND NOT YET ANSWERED, the button says so and a press sends nothing, as sign-up's does:
      sent without an answer, the host could only refuse it. */
   const waitsForCheck = $derived(siteKey !== null && human === null);
-  let humanBox = $state<{ reset: () => void } | null>(null);
+  let humanBox = $state<{ reset: () => void; arm: () => void } | null>(null);
   /**
    * WHETHER THE SERVER-KEY BLOCK IS OPEN IS THE READER'S, ONCE IT IS DRAWN. The first run opens it, and
    * nothing a press does closes it again: bound to the derived state, a wrong key shut the block the
@@ -455,18 +455,37 @@
   }
 
   /* SEND PRESSED BEFORE THE CHECK ANSWERED: the label stays put (it no longer flips while the check loads), and the
-     check's own slot says what is left to do. */
+     check's own slot says what is left to do. THE PRESS IS KEPT AND GOES WHEN THE ANSWER COMES, since the check now
+     starts only when the form is used (`Human.svelte`) and a quick press can beat it: one kept press at most, for the
+     address it was pressed with, let go if that address is changed (the letter would go to the one it was changed
+     from), and never sent without an answer. `run` sends nothing while another press is out, so it goes once. */
   let nudged = $state(false);
+  let kept = $state<string | null>(null);
   $effect(() => {
     if (!waitsForCheck) nudged = false;
+  });
+  $effect(() => {
+    if (kept === null || waitsForCheck) return;
+    const to = kept;
+    kept = null;
+    untrack(() => sendTo(to));
+  });
+  $effect(() => {
+    if (kept !== null && email.trim() !== kept) {
+      kept = null;
+      nudged = false;
+    }
   });
 
   function send(e: SubmitEvent) {
     e.preventDefault();
     if (waitsForCheck) {
       nudged = true;
+      kept = email.trim();
+      humanBox?.arm();
       return;
     }
+    kept = null;
     sendTo(email.trim());
   }
 

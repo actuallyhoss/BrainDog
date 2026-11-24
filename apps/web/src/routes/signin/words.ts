@@ -53,7 +53,7 @@ export const words = {
   /** The check that you are a person, while its widget loads, when it did not load, and when Send was pressed first. */
   checkLoading: 'Checking that you are a person',
   checkFailed: 'The check that you are a person did not load.',
-  checkFirst: 'Finish the check above first.',
+  checkFirst: 'The link goes as soon as the check above is done.',
 } as const;
 
 /**
