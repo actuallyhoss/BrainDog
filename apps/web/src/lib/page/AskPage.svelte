@@ -6,7 +6,7 @@
   same reader every declared page goes through (`PageView mode="preview"`). Only then does a press file it: "Keep it"
   files it and accepts it in one go, "Ask in Needs you" files it for later, and "Throw away" drops it unfiled. "Try again"
   asks the same words once more with the draft shown handed back as turned down, so Slash drafts another way; the one
-  turned down is dropped unfiled, and the record leaves it out if it comes back.
+  turned down stays on the sheet until a new one lands, and then as an earlier draft to go back to (audit of 24 Nov, 9).
 
   ONE COMPONENT FOR BOTH PLACES A DESCRIPTION IS TYPED. With `page` it is the sheet a page's head opens, about that
   page; without it it is the Slash screen's describe field, about the whole BrainDog. The drafts are drawn the same
@@ -58,7 +58,7 @@
   } = $props();
 
   /** One draft as the sheet holds it: what the record drew for it, and what a press on it came to. */
-  type Shown = { key: number; draft: Drafted; drawn: Rehearsed | null; kept: Kept | null; said: string | null; busy: boolean; rule?: Ruled };
+  type Shown = { key: number; draft: Drafted; drawn: Rehearsed | null; kept: Kept | null; said: string | null; busy: boolean; rule?: Ruled; earlier?: true };
   /** A draft the rules made: what it does, and the page it was read against, which Undo puts back. */
   type Ruled = { said: Exclude<SaidPage, { do: 'which' }>; ctx: Omit<SayIn, 'text'>; version: number | null };
 
@@ -78,6 +78,12 @@
   /** The words last sent, and the drafts turned down for them by Try again, which a new description forgets. */
   let lastAsked = '';
   let tried: Drafted[] = [];
+  /** The field, which Throw away hands the caret back to. */
+  let field = $state<HTMLTextAreaElement>();
+  /** A draft was just thrown away, said in plain words until the next send. */
+  let thrown = $state(false);
+  /** Try again came back with nothing new: the first draft stays, and this says so. */
+  let sameAgain = $state(false);
 
   /* A LINE HANDED IN IS SENT ONCE, as if typed, so the model reads it only after the rules would not. */
   $effect(() => {
@@ -108,6 +114,10 @@
     sending = true;
     fix = null;
     cost = null;
+    thrown = false;
+    sameAgain = false;
+    /* TRY AGAIN KEEPS WHAT IS SHOWN until a new draft lands, and after it, as an earlier draft to go back to. */
+    const before = again ? shown.filter((x) => x.kept === null) : [];
     const mine = ++sends;
     try {
       /* THE RULES FIRST, on a new line (never on Try again, which asks the model for another way): a draft at once. */
@@ -135,25 +145,29 @@
         fix = out.fix;
         return;
       }
-      rules = byRules(out.drafted);
-      dropped = out.drafted.dropped;
       cost = out.drafted.cost?.said ?? null;
-      shown = out.drafted.drafts.map((draft, i) => ({ key: mine * 1000 + i, draft, drawn: null, kept: null, said: null, busy: false }));
+      const drafts = again ? out.drafted.drafts.filter((d) => !before.some((b) => sameDraft(b.draft, d))) : out.drafted.drafts;
+      if (again && drafts.length === 0) {
+        sameAgain = true;
+        dropped = [];
+        return;
+      }
+      rules = byRules(out.drafted);
+      dropped = again ? [] : out.drafted.dropped;
+      const made: Shown[] = drafts.map((draft, i) => ({ key: mine * 1000 + i, draft, drawn: null, kept: null, said: null, busy: false }));
+      shown = [...made, ...before.map((b) => ({ ...b, earlier: true as const }))];
       chosen = 0;
       /* DRAWN THROUGH DECIDE'S OWN PREVIEW, loaded on the first send and not with every page. The record drew each
          draft once to check it, as bare blocks; `previewOf` asks it again as the change and its sample rows, and turns
          the answer into what the reader draws, lists the change brings and refs walked, which is the one conversion a
          proposal on Decide goes through too. */
       const { previewOf } = await import('../../routes/decide/[id]/proposed.ts');
-      for (const s of shown) {
+      /* ONLY THE NEW ONES: an earlier draft kept by Try again was drawn already, or is still being drawn under its own key. */
+      for (const s of made) {
         const rows = Object.keys(s.draft.rows).length > 0 ? { rows: s.draft.rows } : {};
         void previewOf({ to: s.draft.change.to, ...rows }, apiBase())
-          .then((drawn) => {
-            if (mine === sends) put(s.key, { drawn });
-          })
-          .catch(() => {
-            if (mine === sends) put(s.key, { drawn: { from: 'none' } });
-          });
+          .then((drawn) => put(s.key, { drawn }))
+          .catch(() => put(s.key, { drawn: { from: 'none' } }));
       }
     } catch {
       if (mine === sends) fix = words.unreached;
@@ -195,8 +209,8 @@
     if (said.do !== 'rename') {
       const { previewOf } = await import('../../routes/decide/[id]/proposed.ts');
       void previewOf({ to: draft.change.to }, apiBase())
-        .then((drawn) => mine === sends && put(key, { drawn }))
-        .catch(() => mine === sends && put(key, { drawn: { from: 'none' } }));
+        .then((drawn) => put(key, { drawn }))
+        .catch(() => put(key, { drawn: { from: 'none' } }));
     }
     return true;
   }
@@ -264,18 +278,28 @@
     }
   }
 
-  /** Turn the draft shown down and ask the same words again: it goes unfiled, and Slash is told not to draft it again. */
+  /** Two drafts that would make the same change. */
+  const sameDraft = (a: Drafted, b: Drafted): boolean => JSON.stringify(a.change.to) === JSON.stringify(b.change.to);
+
+  /**
+   * Ask the same words again with the draft shown turned down, so Slash drafts another way. The draft stays on the sheet
+   * until a new one lands, and then as an earlier draft to go back to; only Throw away drops it.
+   */
   function retry(key: number) {
     const s = shown.find((x) => x.key === key);
     if (!s || s.busy || s.kept || sending) return;
     /* A RULES DRAFT TURNED DOWN ASKS THE MODEL for another way, with nothing of its own to hand back. */
-    if (!s.rule) tried = [...tried, s.draft];
+    if (!s.rule && !tried.some((t) => sameDraft(t, s.draft))) tried = [...tried, s.draft];
     void send(true);
   }
 
+  /** Throw the draft away, say so, and hand the caret back to the field for the next description. */
   function drop(key: number) {
     shown = shown.filter((s) => s.key !== key);
     chosen = Math.max(0, Math.min(chosen, shown.length - 1));
+    sameAgain = false;
+    thrown = true;
+    field?.focus();
   }
 </script>
 
@@ -295,6 +319,7 @@
       <label class="ask-hint" for={fieldId}>{about === undefined ? words.hintRecord : words.hintPage}</label>
       {#if about !== undefined && say}<p class="ask-said ask-examples">{sayWords.hint}</p>{/if}
       <textarea
+        bind:this={field}
         id={fieldId}
         class="ask-field"
         rows="3"
@@ -321,7 +346,11 @@
       <p class="ask-said ask-cost">{cost}</p>
     {/if}
 
-    {#if answered && fix === null && shown.length === 0 && dropped.length === 0}
+    {#if thrown}
+      <p class="ask-said" role="status">{shown.length === 0 ? words.thrownAll : words.thrown}</p>
+    {:else if sameAgain}
+      <p class="ask-said" role="status">{words.sameAgain}</p>
+    {:else if answered && fix === null && shown.length === 0 && dropped.length === 0}
       <p class="ask-said">{words.none}</p>
     {/if}
 
@@ -329,7 +358,7 @@
       <ul class="ask-picks" aria-label={words.which}>
         {#each shown as s, i (s.key)}
           <li>
-            <button type="button" class="ask-pick" aria-pressed={i === chosen} onclick={() => (chosen = i)}>{s.draft.question}</button>
+            <button type="button" class="ask-pick" aria-pressed={i === chosen} onclick={() => (chosen = i)}>{s.earlier ? words.earlier(s.draft.question) : s.draft.question}</button>
           </li>
         {/each}
       </ul>

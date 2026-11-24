@@ -163,6 +163,13 @@ export const changeWords = {
   filed: 'This is waiting in Needs you.',
   open: 'Open in Needs you',
   none: 'Slash drafted nothing from that.',
+  /** After Throw away: what happened, and what to do next. */
+  thrown: 'Thrown away.',
+  thrownAll: 'Thrown away. Nothing on the page changed. Describe it another way to get a new draft.',
+  /** Try again found no other way: the first draft is kept. */
+  sameAgain: 'Slash found no other way to do it. Your first draft is still here.',
+  /** A draft kept by Try again, in the list of drafts to choose from. */
+  earlier: (question: string) => `Earlier: ${question}`,
   noPage: 'This draft changes no page, so there is nothing to draw. What it changes is in its question.',
   unDrawn: 'This draft could not be drawn here. You can still ask about it in Needs you, where it is drawn again.',
   unreached: 'BrainDog could not be reached.',
