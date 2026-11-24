@@ -74,7 +74,9 @@ export async function run(probe: Probe, host: string, fetcher: typeof fetch = fe
   try {
     const res = await fetcher(`https://${host}${probe.path}`, {
       method: probe.method,
-      ...(probe.body === undefined ? {} : { body: probe.body, headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' } }),
+      /* Named, so its expected 401s on /mcp read as this probe in the logs and not as a client failing to sign in. */
+      headers: { 'user-agent': 'braindog-watchdog', ...(probe.body === undefined ? {} : { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }) },
+      ...(probe.body === undefined ? {} : { body: probe.body }),
       redirect: 'follow',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
