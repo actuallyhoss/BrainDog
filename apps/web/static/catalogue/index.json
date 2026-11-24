@@ -3470,8 +3470,60 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "3.7.2",
+      "latest": "3.8.0",
       "versions": [
+        {
+          "version": "3.8.0",
+          "checksum": "b1689b1df481564ff98eca7aacbecbfc0c5df2944509cb802dc6e8c485bb5311",
+          "bytes": 67071,
+          "published_at": "2026-11-24T16:26:57.686Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "latest.currency-api.pages.dev",
+                "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
+                "key": null
+              }
+            ],
+            "widgets": [
+              "Gold price"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.fx",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Each buy says what it is worth now and its gain, beside its price each and what it paid, on Investments and gold and on its holding's page, and moves with the gold rate. A new figure, Gold, worth now, counts the gold alone.",
+          "preview": true
+        },
         {
           "version": "3.7.2",
           "checksum": "ad160819e451ba8a1a7a2e8db8b90177769cf349f04f2e04d16d0fb6ef948e32",

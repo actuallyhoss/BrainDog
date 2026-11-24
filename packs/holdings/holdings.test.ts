@@ -142,7 +142,7 @@ const SPREAD_MS = 15 * 60_000;
 test('THE FILE IS 2.0.0, Investments and gold, and every field and kind 1.4.2 held is still there as it was', () => {
   const doc = file();
   const old = v142();
-  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.7.2', 'Investments and gold']);
+  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.8.0', 'Investments and gold']);
   assert.equal(old.version, '1.4.2', 'the frozen 1.4.2 moved');
   assert.equal(v100().version, '1.0.0', 'the frozen 1.0.0 moved');
   assert.deepEqual(doc.requires, old.requires);
@@ -219,7 +219,7 @@ test('THE SCRIPTS IN THE FILE ARE cost.js, twin.js AND feed.js, byte for byte, e
 });
 
 const ADDS = [
-  'metric.gold-grams', 'metric.gold-held', 'metric.gold-rate-on', 'metric.gold-rates-current', 'metric.gold-rates-old', 'metric.holding-buys',
+  'metric.gold-grams', 'metric.gold-held', 'metric.gold-rate-on', 'metric.gold-rates-current', 'metric.gold-rates-old', 'metric.gold-worth', 'metric.holding-buys',
   'metric.holdings-at-cost', 'metric.holdings-by-kind', 'metric.holdings-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-gain',
   'metric.holdings-gain-pct', 'metric.holdings-gained', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-uncosted', 'metric.holdings-unpriced', 'metric.holdings-unvalued', 'metric.holdings-value', 'metric.holdings-worth-costed',
   'page.holding', 'page.holdings', 'register.gold_rates', 'register.holding_buys', 'register.holdings',
@@ -227,19 +227,19 @@ const ADDS = [
   'script.holdings_twin',
 ];
 
-test('INSTALLED FROM THE FILE: three lists, five rules, three scripts, twenty-one figures and two pages, and nothing refused', async () => {
+test('INSTALLED FROM THE FILE: three lists, five rules, three scripts, twenty-two figures and two pages, and nothing refused', async () => {
   const { api, close } = await money();
   const diff = await planOf(api, file());
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), ADDS);
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.7.2');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.8.0');
   close();
 });
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.7.2']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.8.0']);
 });
 
 test('NO FILE OF THIS ADD-ON NAMES A CURRENCY IN A FORMAT, so every amount reads in the money somebody chose', () => {
@@ -353,6 +353,68 @@ test('A HOLDING WITH MORE THAN FIFTY BUYS COUNTS AND COSTS EVERY ONE', async () 
   for (let i = 0; i < 3; i++) await settle(api);
   const h = fields(api, gold);
   assert.deepEqual([h.qty, h.cost], [70, egp(7_000_000)]);
+  close();
+});
+
+test('EACH BUY IS WORTH ITS GRAMS AT THE GOLD RATE, GAINS THAT OVER WHAT IT PAID, and moves when a new rate comes in', async () => {
+  const { api, close } = await inPounds();
+  const bars = hold(api, { label: 'Gold 24k', kind: 'gold', karat: '24k', unit: 'gram' });
+  const ring = hold(api, { label: 'Ring 21k', kind: 'gold', karat: '21k', unit: 'gram' });
+  const fund = hold(api, { label: 'Index fund', kind: 'fund', unit: 'share', price: egp(32_000) });
+  const cert = hold(api, { label: 'Certificate', kind: 'certificate', unit: 'unit' });
+  /* TWO INGOTS, THE OWNER'S SHEET'S FIRST AND FIFTH: 5 g at 5,373, and 10 g at 7,863 with 850 in fees. */
+  const first = buy(api, { item: bars, bought_on: '2025-05-02', qty: 5, price: egp(537_300) });
+  const fifth = buy(api, { item: bars, bought_on: '2026-03-27', qty: 10, price: egp(786_300), fees: egp(85_000) });
+  const chain = buy(api, { item: ring, bought_on: '2026-01-10', qty: 2, price: egp(500_000) });
+  const shares = buy(api, { item: fund, bought_on: '2026-02-01', qty: 100, price: egp(25_000) });
+  const deposit = buy(api, { item: cert, bought_on: '2026-02-01', qty: 1, price: egp(10_000_000) });
+  rate(api, { karat: '24k', per_gram: egp(630_395), on: '2026-09-24' });
+  await settle(api);
+
+  /* 5 g AT 6,303.95 IS 31,519.75, A GAIN OF 4,654.75 OVER 26,865; 10 g IS 63,039.50, A LOSS OF 16,440.50 ON 79,480. */
+  assert.deepEqual([fields(api, first).paid, fields(api, first).value, fields(api, first).gain], [egp(2_686_500), egp(3_151_975), egp(465_475)]);
+  assert.deepEqual([fields(api, fifth).paid, fields(api, fifth).value, fields(api, fifth).gain], [egp(7_948_000), egp(6_303_950), egp(-1_644_050)]);
+  /* THE BUYS ADD UP TO THEIR HOLDING. */
+  assert.deepEqual(fields(api, bars).value, egp(3_151_975 + 6_303_950));
+  /* A KARAT WITH NO RATE OF ITS OWN IS PRICED AS ITS HOLDING IS: 21 of 24 parts of 6,303.95 is 5,515.96 a gram. */
+  assert.deepEqual([fields(api, chain).value, fields(api, chain).gain], [egp(1_103_191), egp(103_191)]);
+  /* A HOLDING'S OWN PRICE PRICES ITS BUYS, and a holding at what it cost gives its buys no worth and no gain. */
+  assert.deepEqual([fields(api, shares).value, fields(api, shares).gain], [egp(3_200_000), egp(700_000)]);
+  assert.deepEqual([fields(api, deposit).value, fields(api, deposit).gain], [undefined, undefined]);
+
+  /* GOLD, WORTH NOW, IS THE GOLD ALONE: both gold holdings, and neither the fund nor the certificate. */
+  const gold = (): unknown => said<{ value: number | null }>(api.kernel.metric(decl(file(), 'metric', 'gold-worth') as never)).value;
+  assert.equal(gold(), 3_151_975 + 6_303_950 + 1_103_191);
+
+  /* A NEW RATE MOVES EVERY BUY OF GOLD, and nothing else. */
+  rate(api, { karat: '24k', per_gram: egp(650_000), on: TODAY });
+  await settle(api);
+  assert.deepEqual([fields(api, first).value, fields(api, first).gain], [egp(3_250_000), egp(563_500)]);
+  assert.deepEqual([fields(api, fifth).value, fields(api, fifth).gain], [egp(6_500_000), egp(-1_448_000)]);
+  assert.deepEqual(fields(api, chain).value, egp(1_137_500));
+  assert.deepEqual(fields(api, shares).value, egp(3_200_000));
+  assert.equal(gold(), 3_250_000 + 6_500_000 + 1_137_500);
+
+  /* A PRICE GIVEN TO THE GOLD PRICES ITS BUYS TOO, as it prices the holding. */
+  edit(api, 'holdings', bars, { price: egp(700_000) });
+  await settle(api);
+  assert.deepEqual([fields(api, first).value, fields(api, fifth).value], [egp(3_500_000), egp(7_000_000)]);
+  close();
+});
+
+test('A RECORD WITH MANY BUYS IS WRITTEN OVER RUNS, never past what one run may write, and every buy ends priced', async () => {
+  const { api, close } = await inPounds();
+  const gold = hold(api, { label: 'Gold 24k', kind: 'gold', karat: '24k', unit: 'gram' });
+  for (let i = 0; i < 170; i++) buy(api, { item: gold, bought_on: '2026-03-01', qty: 1, price: egp(100_000) });
+  rate(api, { karat: '24k', per_gram: egp(120_000) });
+  for (let i = 0; i < 6; i++) await settle(api);
+  const figure = (where: string, value: Body): unknown =>
+    said<{ value: number | null }>(api.kernel.metric({ metric: 'check', name: 'Check', source: 'register.holding_buys', where, value, format: 'money', target: { gte: 0 }, window: '30d', compare: 'none' } as never)).value;
+  /* EVERY ONE OF THE 170 IS WORTH 1,200 AND GAINED 200. */
+  assert.equal(figure('value is set', { count: 'id' }), 170);
+  assert.equal(figure('gain is set', { sum: 'gain' }), 170 * 20_000);
+  assert.equal(figure('value is set', { sum: 'value' }), 170 * 120_000);
+  assert.deepEqual([fields(api, gold).qty, fields(api, gold).value], [170, egp(20_400_000)]);
   close();
 });
 
@@ -540,6 +602,16 @@ test('THE PAGE READS LIKE THE MOCK: a line, what you hold with its gain, the gol
     ['2026-02-01', null],
     ['2025-10-02', '21k'],
   ]);
+  /* AND EACH BUY'S PRICE EACH, WHAT IT PAID, WHAT IT IS WORTH NOW AND ITS GAIN, SINCE 3.8.0: 21k at 455.00 a gram is 21 of
+     24 parts of the 24k rate, and the fund's buy is priced by the fund's own price. */
+  type Col = { field?: string; label?: string };
+  assert.deepEqual(((buys as { columns?: Col[] }).columns ?? []).map((c) => c.label), ['Holding', 'Bought on', 'Grams or shares', 'Price each', 'Paid', 'Worth now', 'Gain', 'Kept at']);
+  assert.deepEqual((buys.rows ?? []).map((r) => [r.fields.price, r.fields.paid, r.fields.value, r.fields.gain]), [
+    [egp(480_000), egp(4_800_000), egp(5_200_000), egp(400_000)],
+    [egp(420_000), egp(4_200_000), egp(4_550_000), egp(350_000)],
+    [egp(25_000), egp(2_500_000), egp(3_200_000), egp(700_000)],
+    [egp(380_000), egp(7_640_000), egp(9_100_000), egp(1_460_000)],
+  ]);
   /* AND EVERY HOLDING. */
   const cards = on.find((b) => b.heading === 'Everything you hold')!;
   assert.deepEqual((cards.rows ?? []).map((r) => r.fields.label).sort(), ['Gold 21k', 'Gold bar 24k', 'Three-year certificate', 'World index fund']);
@@ -547,7 +619,10 @@ test('THE PAGE READS LIKE THE MOCK: a line, what you hold with its gain, the gol
   const own = await pageOf(api, `holdings#${api.kernel.get(ids.g21!)!.seq}`);
   for (const b of own.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused on a holding's page`);
   assert.equal(own.title, 'Gold 21k');
-  assert.equal(own.blocks.find((b) => b.heading === 'Buys')!.rows!.length, 2);
+  const mine = own.blocks.find((b) => b.heading === 'Buys')!;
+  /* ITS BUYS, NEWEST FIRST, with the columns of every buy but the holding's name. */
+  assert.deepEqual(((mine as { columns?: Col[] }).columns ?? []).map((c) => c.label), ['Bought on', 'Grams or shares', 'Price each', 'Paid', 'Worth now', 'Gain', 'Kept at']);
+  assert.deepEqual(mine.rows!.map((r) => [r.fields.bought_on, r.fields.value]), [['2026-04-11', egp(4_550_000)], ['2025-10-02', egp(9_100_000)]]);
   close();
 });
 
@@ -609,7 +684,7 @@ async function upgraded(doc: Doc, rows: readonly Body[] = HELD): Promise<Awaited
   const diff = await planOf(made.api, file());
   assert.deepEqual(diff.conflicts, [], 'the update met a conflict');
   said(await put(made.api, file()));
-  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.7.2');
+  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.8.0');
   return { ...made, ids, before };
 }
 

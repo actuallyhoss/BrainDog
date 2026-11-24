@@ -20,6 +20,15 @@
  * than the cost priced it and both are in one currency. A holding that stands at what it cost has no gain, not a gain
  * of nought.
  *
+ * EACH BUY IS WORTH SOMETHING TOO, SINCE 3.8.0 (24 Nov, the owner: "see each ingot i have, when i bought it and for how
+ * much"). A buy's `value` is its count at its holding's own price, when somebody gave one, and else, for gold, at the
+ * gold rate for the buy's karat, or its holding's when the buy says none, read exactly as the holding's is; and its
+ * `gain` is that less what it paid, in one currency. A buy of a holding valued at what it cost has no worth and no
+ * gain, as its holding has none. Every buy of a holding is written when its holding is worked out, so a new gold rate
+ * moves each buy's worth with its holding's. Buys are written only while a run has queued fewer than 150 writes, so a
+ * record with many buys never runs past what one run may write; the rest are written by the next run, which finds them
+ * still out of date.
+ *
  * THE GOLD RATE. One row a karat is current: the newest by its day, and by when it was written on a tie. A rate written
  * with no day is dated today. A new rate marks itself current, the one before it not, and every gold holding is worked
  * out again against it.
@@ -81,7 +90,7 @@ function rateFor(current, karat) {
 }
 
 /** Dates a rate nobody dated, and marks the newest a karat current and the rest not. */
-function markRates(ctx, rates, today) {
+function markRates(ctx, rates, today, room) {
   const undated = (r) => amount(r.fields.per_gram) && !(typeof r.fields.on === 'string' && r.fields.on !== '');
   const current = currentOf(rates.map((r) => (undated(r) ? { ...r, fields: { ...r.fields, on: today } } : r)));
   const ids = new Set(Object.values(current).map((c) => c.id));
@@ -89,16 +98,61 @@ function markRates(ctx, rates, today) {
     const next = undated(r) ? { on: today } : {};
     const now = ids.has(r.id);
     if ((r.fields.live === true) !== now) next.live = now;
-    if (Object.keys(next).length > 0) ctx.update('gold_rates#' + r.seq, next, r.version);
+    if (Object.keys(next).length > 0) put(ctx, room, 'gold_rates#' + r.seq, next, r.version);
   }
   return current;
 }
 
-/** Works out one holding against its buys and the rates, and writes what moved. */
-async function work(ctx, row, current, today, repriced) {
+/**
+ * THE WRITES A RUN LEAVES ITS BUYS: a run may queue 200 and is refused whole past them, so buys are written only while
+ * fewer than 150 writes are queued, and the holdings and the rates are always written.
+ */
+const BUYS_UNDER = 150;
+
+/** One write, counted, so the buys know how much room is left. */
+function put(ctx, room, spoken, patch, version) {
+  room.wrote += 1;
+  ctx.update(spoken, patch, version);
+}
+
+/**
+ * What one buy is worth now and has gained, as `{ value, gain }`, each `null` when it cannot be said: its count at its
+ * holding's own price, else for gold at the rate for its karat or its holding's, and the worth less what it paid.
+ */
+function buyWorth(buy, holding, current) {
+  const qty = buy.fields.qty;
+  const f = holding.fields;
+  let each = null;
+  if (amount(f.price)) each = f.price;
+  else if (f.kind === 'gold') each = rateFor(current, typeof buy.fields.karat === 'string' ? buy.fields.karat : f.karat);
+  if (!number(qty) || each === null) return { value: null, gain: null };
+  const value = { amount: Math.round(qty * each.amount), currency: each.currency };
+  const paid = paidOf(buy);
+  const gain = paid !== null && paid.currency === value.currency ? { amount: value.amount - paid.amount, currency: value.currency } : null;
+  return { value, gain };
+}
+
+/** Writes each buy's paid, worth and gain where they moved, while the run has room for buys. */
+function priceBuys(ctx, buys, holding, current, room) {
+  for (const b of buys) {
+    if (room.wrote >= BUYS_UNDER) return;
+    const paid = paidOf(b);
+    const { value, gain } = buyWorth(b, holding, current);
+    const next = {};
+    if (paid !== null && !same(b.fields.paid, paid)) next.paid = paid;
+    if (!same(b.fields.value, value)) next.value = value;
+    if (!same(b.fields.gain, gain)) next.gain = gain;
+    if (Object.keys(next).length === 0) continue;
+    put(ctx, room, 'holding_buys#' + b.seq, next, b.version);
+  }
+}
+
+/** Works out one holding against its buys and the rates, and writes what moved, its buys first. */
+async function work(ctx, row, current, today, repriced, room) {
   if (!row) return;
   const f = row.fields;
   const buys = await every(ctx, 'holding_buys', { field: 'item', is: row.id });
+  priceBuys(ctx, buys, row, current, room);
   const next = {};
 
   let qty = f.qty;
@@ -123,7 +177,7 @@ async function work(ctx, row, current, today, repriced) {
   }
   const gram = f.kind === 'gold' ? rateFor(current, f.karat) : null;
   if (!number(qty) || (cost === null && !amount(f.price) && !gram)) {
-    if (Object.keys(next).length > 0) ctx.update('holdings#' + row.seq, next, row.version);
+    if (Object.keys(next).length > 0) put(ctx, room, 'holdings#' + row.seq, next, row.version);
     return;
   }
 
@@ -147,7 +201,7 @@ async function work(ctx, row, current, today, repriced) {
   if ((number(f.gain_pct) ? f.gain_pct : null) !== pct) next.gain_pct = pct;
   if (amount(f.price) && (!f.priced_on || repriced) && f.priced_on !== today) next.priced_on = today;
   if (!amount(f.price) && f.priced_on) next.priced_on = null;
-  if (Object.keys(next).length > 0) ctx.update('holdings#' + row.seq, next, row.version);
+  if (Object.keys(next).length > 0) put(ctx, room, 'holdings#' + row.seq, next, row.version);
 }
 
 /**
@@ -202,33 +256,36 @@ export default async function run(ctx) {
   const repriced = moved.includes('price') && !moved.includes('priced_on');
   const rates = await every(ctx, 'gold_rates');
   const id = typeof input.id === 'string' ? input.id : null;
+  const room = { wrote: 0 };
 
   if (id !== null && input.register === 'holding_buys') {
     const buy = await ctx.record.get(id);
     const current = currentOf(rates);
+    const holding = buy !== null && typeof buy.fields.item === 'string' ? await ctx.record.get(buy.fields.item) : null;
+    /* A BUY OF NO HOLDING THAT STANDS is still paid what it cost. One with a holding is written with its holding's buys,
+       once, so its paid, worth and gain go in one write. */
     const paid = buy === null ? null : paidOf(buy);
-    if (buy !== null && paid !== null && !same(buy.fields.paid, paid)) ctx.update('holding_buys#' + buy.seq, { paid }, buy.version);
+    if (buy !== null && holding === null && paid !== null && !same(buy.fields.paid, paid)) put(ctx, room, 'holding_buys#' + buy.seq, { paid }, buy.version);
     /* GONE, OR MOVED FROM ONE HOLDING TO ANOTHER: which holding it left is not said, so every holding is worked out. */
     if (buy === null || (input.op === 'update' && moved.includes('item'))) {
-      for (const row of await every(ctx, 'holdings')) await work(ctx, row, current, today, false);
+      for (const row of await every(ctx, 'holdings')) await work(ctx, row, current, today, false, room);
       return;
     }
-    const holding = typeof buy.fields.item === 'string' ? await ctx.record.get(buy.fields.item) : null;
-    await work(ctx, holding, current, today, false);
+    await work(ctx, holding, current, today, false, room);
     return;
   }
   if (id !== null && input.register === 'gold_rates') {
-    const current = markRates(ctx, rates, today);
-    for (const row of await every(ctx, 'holdings', { field: 'kind', is: 'gold' })) await work(ctx, row, current, today, false);
+    const current = markRates(ctx, rates, today, room);
+    for (const row of await every(ctx, 'holdings', { field: 'kind', is: 'gold' })) await work(ctx, row, current, today, false, room);
     return;
   }
   if (id !== null) {
-    await work(ctx, await ctx.record.get(id), currentOf(rates), today, repriced);
+    await work(ctx, await ctx.record.get(id), currentOf(rates), today, repriced, room);
     return;
   }
   /* THE CLOCK: the rates, every holding nothing has worked out yet, the gold, and the first page of the rest, which
      catches a holding whose buy a rule could not start a run for on a busy day. */
-  const current = markRates(ctx, rates, today);
+  const current = markRates(ctx, rates, today, room);
   const done = new Set();
   const lists = [{ field: 'valued_by', empty: true }, { field: 'kind', is: 'gold' }, null];
   const rows = [];
@@ -236,6 +293,6 @@ export default async function run(ctx) {
   for (const row of rows) {
     if (done.has(row.id)) continue;
     done.add(row.id);
-    await work(ctx, row, current, today, false);
+    await work(ctx, row, current, today, false, room);
   }
 }
