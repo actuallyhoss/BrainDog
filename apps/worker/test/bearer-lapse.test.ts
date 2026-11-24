@@ -9,7 +9,8 @@
  * WHAT IS PINNED, ON `/api`: a write is 403 in the lapse's sentence at `billing` and the record is never asked; a read is
  * answered at `read` whatever the token's scope and the person's level; a token's export is a write like any other and is
  * refused; and an operation grant approved for `export` (how `braindog export` takes it) exports whole. ON `/mcp`: a write
- * tool is the same 403 and the record is never asked, while a read tool and the listing are answered.
+ * tool is answered as that tool's result, an error in the lapse's sentence, and the record is never asked, while a read
+ * tool and the listing are answered.
  */
 
 import { test } from 'node:test';
@@ -115,13 +116,15 @@ test('A TOKEN’S EXPORT ON A LAPSED RECORD IS A WRITE AND IS REFUSED, AND THE O
   assert.equal(seen.asked, 1);
 });
 
-test('ON /mcp A WRITE TOOL IS THE SAME 403 AND THE RECORD IS NOT ASKED, while a read tool and the listing are answered', async () => {
+test('ON /mcp A WRITE TOOL IS ITS OWN RESULT, AN ERROR IN THE LAPSE’S SENTENCE, AND THE RECORD IS NOT ASKED, while a read tool and the listing are answered', async () => {
   const { c, person, bearer, seen } = await lapsed();
   const write = await mcp(c, bearer, { method: 'tools/call', params: { name: 'create', arguments: { register: 'tasks', fields: { title: 'After the lapse' } } } });
-  const said = (await write.json()) as Out;
-  assert.equal(write.status, 403, JSON.stringify(said));
-  /* THE /api SHAPE AND NOT JSON-RPC'S: the door answers it before the record reads the message (`agent` in `index.ts`). */
-  assert.deepEqual(said, { ok: false, refusal: LAPSED });
+  const said = (await write.json()) as unknown;
+  /* JSON-RPC AND NOT THE /api SHAPE (audit finding 10, changed 24 November): the MCP client threw on the 403 without
+     reading its body, so the agent saw a broken transport. A 200 carrying the tool's result marked `isError` is what an
+     agent reads back and can explain; the door still answers it before the record reads the message. */
+  assert.equal(write.status, 200, JSON.stringify(said));
+  assert.deepEqual(said, { jsonrpc: '2.0', id: 1, result: { isError: true, content: [{ type: 'text', text: LAPSED.fix }] } });
   assert.equal(seen.asked, 0, 'the record was asked to answer a write tool the lapse refuses');
 
   /* THE LISTING IS ANSWERED UNDER THE CAPPED CONTEXT, so a write key on a lapsed record is offered the read tools only. */

@@ -118,7 +118,14 @@ test('SO A PARENT THAT SPENT ITS MINUTE LEAVES ITS CHILD NONE: the child is 429 
   const refused = await mcpCall(c, child.value.bearer, { method: 'tools/list' });
   const said = await refused.text();
   assert.equal(refused.status, 429, said);
-  assert.equal((JSON.parse(said) as Out).refusal?.code, 'RATE_LIMITED', 'the /mcp 429 is the /api body, not JSON-RPC');
+  /* JSON-RPC AND NOT THE /api BODY (audit finding 10, changed 24 November), with the status and Retry-After kept. */
+  const rpc = JSON.parse(said) as { jsonrpc?: string; id?: unknown; error?: { code?: number; message?: string; data?: { retry_after?: number } } };
+  assert.equal(rpc.jsonrpc, '2.0', said);
+  assert.equal(rpc.id, 1, said);
+  assert.equal(rpc.error?.code, -32000, said);
+  assert.equal(rpc.error?.data?.retry_after, 60, said);
+  assert.ok((rpc.error?.message ?? '').length > 0, said);
+  assert.equal(refused.headers.get('retry-after'), '60');
   assert.equal(seen.asked, asked + 2);
 });
 

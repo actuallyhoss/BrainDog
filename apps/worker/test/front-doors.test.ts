@@ -72,9 +72,10 @@ test('A THROW AT THE FRONT DOOR ANSWERS A REFERENCE AND NOTHING OF WHAT WAS THRO
     assert.equal(crashes.length, 1, `${path}: ${lines.join('\n')}`);
     const ref = String(crashes[0]?.ref);
     assert.match(ref, /^[0-9a-f-]{36}$/);
-    const body = JSON.parse(text) as { refusal?: { code?: string; fix?: string }; jsonrpc?: string; error?: { code?: number; data?: { ref?: string } } };
+    const body = JSON.parse(text) as { refusal?: { code?: string; fix?: string }; jsonrpc?: string; id?: unknown; error?: { code?: number; data?: { ref?: string } } };
     if (path === '/mcp') {
       assert.equal(body.jsonrpc, '2.0');
+      assert.equal(body.id, 1, 'the internal answer echoes the request id');
       assert.equal(body.error?.code, -32603);
       assert.equal(body.error?.data?.ref, ref);
     } else {
@@ -84,6 +85,19 @@ test('A THROW AT THE FRONT DOOR ANSWERS A REFERENCE AND NOTHING OF WHAT WAS THRO
     /* AND THE LINE NAMES THE DOOR, NEVER THE NAME IN THE PATH. */
     assert.equal(crashes[0]?.where, path === '/mcp' ? '/mcp' : '/api/boot');
   }
+});
+
+test('A BUSY RECORD ON /mcp IS 503 IN JSON-RPC, AND IT ECHOES THE REQUEST ID (it said id: null)', async () => {
+  const { default: app } = await bundled();
+  const busy = Object.assign(new Error('Durable Object is overloaded.'), { overloaded: true });
+  const throwing = { idFromName: (name: string) => name, get: () => { throw busy; } };
+  const env = { PUBLIC_HOST: HOST, BRAINDOG_BUILD: '', DIRECTORY: throwing, RECORD: throwing, INGRESS: { send: async () => {} } };
+  const init = { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${REC}.not-a-real-token` }, body: JSON.stringify({ jsonrpc: '2.0', id: 'call-7', method: 'tools/list' }) };
+  const { out } = await logged(() => app.fetch(new Request(`https://${HOST}/mcp`, init), env, { waitUntil: () => {} }));
+  const body = (await out.json()) as { jsonrpc?: string; id?: unknown; error?: { code?: number; message?: string } };
+  assert.equal(out.status, 503, JSON.stringify(body));
+  assert.deepEqual([body.jsonrpc, body.id, body.error?.code, body.error?.message], ['2.0', 'call-7', -32000, 'busy']);
+  assert.ok(out.headers.get('retry-after') !== null);
 });
 
 test('A REFUSING RL_READ IS 429 BEFORE THE RECORD IS ASKED, AND NO BINDING LIMITS NOTHING', async () => {

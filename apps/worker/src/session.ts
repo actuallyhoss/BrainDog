@@ -199,7 +199,8 @@ export type BearerDeps = {
   lapsed?: (record: string) => Promise<boolean>;
 };
 
-export type Bearer = { record: string; ctx: CallContext } | { status: 401 } | { status: 403; refusal: Refusal };
+/** `tool` marks the lapse's refusal of an MCP tool that writes, which `/mcp` answers as that tool's result (`agent`). */
+export type Bearer = { record: string; ctx: CallContext } | { status: 401 } | { status: 403; refusal: Refusal; tool?: true };
 
 type TokenPrincipal = Extract<CallContext['principal'], { kind: 'token' }>;
 
@@ -337,7 +338,7 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
   if (surface === 'mcp') {
     if (!(await lapsedOf())) return { record, ctx };
     const message: unknown = await request.clone().json().catch(() => null);
-    return mcpWrites(message) ? { status: 403, refusal: LAPSED } : { record, ctx: capped(ctx) };
+    return mcpWrites(message) ? { status: 403, refusal: LAPSED, tool: true } : { record, ctx: capped(ctx) };
   }
   return lapseOf(lapsedOf, record, methodAsked(request), ctx);
 }

@@ -3967,6 +3967,24 @@ function saidUnauthorized(door: string, why: string): Response {
  *
  * `alert` MAILS THE OPERATOR the same line's ref and door (`opsAlert`), throttled, inside the caller's `waitUntil`.
  */
+/**
+ * A JSON-RPC request's id as its answer echoes it: a string or a number, else `null` (a batch, a notification, or a body
+ * that is not JSON-RPC), which is what JSON-RPC answers when the id could not be read.
+ */
+export const rpcIdOf = (message: unknown): string | number | null => {
+  if (message === null || typeof message !== 'object' || Array.isArray(message)) return null;
+  const id = (message as { id?: unknown }).id;
+  return typeof id === 'string' || (typeof id === 'number' && Number.isFinite(id)) ? id : null;
+};
+
+/**
+ * The id of the `/mcp` request a throw came out of, kept against the throw by `agent`, so the busy and internal answers
+ * made above it echo it. Both said `id: null` (audit finding 10), and a client matching answers to requests by id had
+ * none to match.
+ */
+const thrownRpc = new WeakMap<object, string | number>();
+const rpcOfThrown = (e: unknown): string | number | null => (typeof e === 'object' && e !== null ? (thrownRpc.get(e) ?? null) : null);
+
 function crashAnswer(request: Request, e: unknown, alert: (fields: { op: 'crash' } & Record<string, string>) => void): Response {
   let path = '/';
   try {
@@ -3981,14 +3999,14 @@ function crashAnswer(request: Request, e: unknown, alert: (fields: { op: 'crash'
     op({ ...said, op: 'crash' }, 'error');
     alert({ ...said, op: 'crash' });
   });
-  return servesMcp(path) ? json({ jsonrpc: '2.0', id: null, error: { code: -32603, message: 'internal', data: { ref } } }, 500) : json(out, 500);
+  return servesMcp(path) ? json({ jsonrpc: '2.0', id: rpcOfThrown(e), error: { code: -32603, message: 'internal', data: { ref } } }, 500) : json(out, 500);
 }
 
 /**
  * A record too busy to take one more request: 503 with `Retry-After`, a line and no alert mail. A full queue is load,
  * not a fault; the client asks a read again after a short wait (`@braindog/client`, `call`).
  */
-function busyAnswer(request: Request): Response {
+function busyAnswer(request: Request, e?: unknown): Response {
   let path = '/';
   try {
     path = new URL(request.url).pathname;
@@ -3997,7 +4015,7 @@ function busyAnswer(request: Request): Response {
   }
   op({ op: 'busy', where: doorPath(path) });
   const wait: [string, string][] = [['retry-after', String(BUSY.retry_after)]];
-  return servesMcp(path) ? json({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'busy', data: { retry_after: BUSY.retry_after } } }, 503, wait) : json({ ok: false, refusal: BUSY }, 503, wait);
+  return servesMcp(path) ? json({ jsonrpc: '2.0', id: rpcOfThrown(e), error: { code: -32000, message: 'busy', data: { retry_after: BUSY.retry_after } } }, 503, wait) : json({ ok: false, refusal: BUSY }, 503, wait);
 }
 
 /** The methods that read, for a door with no route table to ask: `/auth/*`. */
@@ -4116,7 +4134,7 @@ export default {
       answer = restoring(e)
         ? json({ ok: false, refusal: RESTORING }, 503)
         : overloaded(e)
-          ? busyAnswer(request)
+          ? busyAnswer(request, e)
           : crashAnswer(request, e, (fields) => ctx.waitUntil(opsAlert(env, fields, alertClaim(env))));
     }
     /* SIGNED IN, THE SITE SAYS SO: the readable `bd_in` cookie follows the session (`signed-in.ts`). */
@@ -5190,6 +5208,42 @@ function mailAddress(request: Request, env: Env, id: string, ctx: CallContext): 
 async function agent(request: Request, env: Env, began = Date.now()): Promise<Response> {
   const early = gate(request);
   if (early) return drained(request, early);
+  /* THE REQUEST'S ID, READ FROM A COPY, so what is answered here echoes it (JSON-RPC 2.0 section 5), and a throw below
+     carries it up to the busy and internal answers (`thrownRpc`). The record reads the body itself, as it came. */
+  const id = rpcIdOf(await request.clone().json().catch(() => null));
+  try {
+    return await agentFor(request, env, began, id);
+  } catch (e) {
+    if (id !== null && typeof e === 'object' && e !== null) thrownRpc.set(e, id);
+    throw e;
+  }
+}
+
+/**
+ * The 429 a bearer's minute refused, said in JSON-RPC (audit finding 10). The MCP client (SDK 1.32) throws on any status it
+ * does not expect without reading the body as JSON-RPC, so the `/api` body read to it as a broken transport. The status
+ * and `Retry-After` stay, so a client that waits on them still waits.
+ */
+async function rpcLimited(over: Response, id: string | number | null): Promise<Response> {
+  const said = (await over.clone().json().catch(() => null)) as { refusal?: { fix?: unknown; retry_after?: unknown } } | null;
+  const fix = typeof said?.refusal?.fix === 'string' ? said.refusal.fix : 'Too many requests. Wait a moment and try again.';
+  const wait = over.headers.get('retry-after');
+  const retry = typeof said?.refusal?.retry_after === 'number' ? said.refusal.retry_after : Number(wait ?? 60);
+  return json({ jsonrpc: '2.0', id, error: { code: -32000, message: fix, data: { retry_after: retry } } }, 429, wait === null ? [] : [['retry-after', wait]]);
+}
+
+/**
+ * The record object's own internal answer, made before it read the message (`Record$.fetch`), with this request's id:
+ * the object answers `id: null` there, since its copy of the body is the one that was being read when it threw.
+ */
+async function rpcAnswered(out: Response, id: string | number | null): Promise<Response> {
+  if (id === null || out.status !== 500) return out;
+  const said = (await out.clone().json().catch(() => null)) as { jsonrpc?: unknown; id?: unknown; error?: unknown } | null;
+  if (said === null || said.jsonrpc !== '2.0' || said.id !== null || said.error === undefined) return out;
+  return json({ ...said, id }, 500);
+}
+
+async function agentFor(request: Request, env: Env, began: number, id: string | number | null): Promise<Response> {
   /* EACH TRIP TIMED FOR THE `bearer-time` LINE (`BearerClock`), as on `/api`. */
   const clock = bearerClock(began);
   const found = await bearerOf(request, 'mcp', bearerDeps(env, clock));
@@ -5197,14 +5251,19 @@ async function agent(request: Request, env: Env, began = Date.now()): Promise<Re
      On the name it reached, so a client set up with `brain.dog/mcp` reads `brain.dog/mcp` as the resource
      (`mcpMetadataAt`). Without a public host there is no address to name, and the 401 is as it was. */
   const metadata = mcpMetadataAt(request, env.PUBLIC_HOST, env.LEGACY_HOSTS);
+  /* A TOOL THAT WRITES ON A LAPSED RECORD IS THAT TOOL'S RESULT, marked as an error, in the read-only sentence: the MCP
+     client threw on the 403 without reading the body (audit finding 10), so the agent saw a broken transport and not a
+     refusal it could explain. The record is still never asked. */
+  if ('status' in found && found.status === 403 && found.tool === true)
+    return drained(request, json({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text: found.refusal.fix }] } }, 200));
   if ('status' in found) return drained(request, found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unknownAgent(metadata));
   /* THE TOKEN'S MINUTE BEFORE THE RECORD READS THE BODY, and always the MCP budget (`RL_MCP`, else the read one): which tool is called is inside a
      body nobody has parsed yet (`classOf`), and the record still decides whether a write is allowed. */
   const over = await clocked(clock, 'limit', () => overLimit(env, { door: 'bearer', ctx: found.ctx }, request, 'mcp'));
-  if (over !== null) return drained(request, over);
+  if (over !== null) return drained(request, over.status === 429 ? await rpcLimited(over, id) : over);
   const out = await clocked(clock, 'forward', () => env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx)));
   bearerTimeSaid(clock, '/mcp', found.record, out.status);
-  return out;
+  return rpcAnswered(out, id);
 }
 
 /**
