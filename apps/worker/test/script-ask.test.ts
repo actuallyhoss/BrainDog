@@ -122,22 +122,17 @@ const run = async (source: string, writes = ['recurring']): Promise<Answer> => {
   return out.answer;
 };
 
-test("MONEY'S MONTH-END SCRIPT ASKS ITS ONE QUESTION, and the Cloud's runner hands it back whole", async () => {
+test("MONEY'S MONTH-END SCRIPT DECIDES EACH LINE ITSELF, and the Cloud's runner hands its writes back whole", async () => {
   const answer = await run(LAST_DAY);
   assert.equal(answer.refused, undefined, answer.refused?.why);
-  assert.deepEqual(answer.writes, []);
-  const ask = answer.ask as { cause: string; question: string; about: string; options: { label: string; patches: unknown[] }[] };
-  assert.equal(ask.cause, 'money.last-day');
-  assert.equal(ask.question, '2 repeating lines fall on the last day of their month. Is each the last day, or that date?');
-  assert.equal(ask.about, 'Rent, 30 September; Salary, 30 September');
-  assert.deepEqual(
-    ask.options.map((o) => o.label),
-    ['The last day', 'That date'],
-  );
-  assert.deepEqual(ask.options[1]!.patches, [
-    { id: 'recurring#1', version: 3, fields: { day_of_month: '30' } },
-    { id: 'recurring#2', version: 1, fields: { day_of_month: '30' } },
+  /* SINCE MONEY-CORE 3.38.8 (002b047da) THE SCRIPT READS EACH LINE'S PAST PAYMENTS AND WRITES ITS DAY, where it once asked
+     which was meant: both lines here were paid on the 30th, so both keep the 30th. The ask riding back whole is the next
+     case's, on a script of its own. */
+  assert.deepEqual(answer.writes, [
+    { op: 'update', spoken: 'recurring#1', patch: { day_of_month: '30' }, version: 3 },
+    { op: 'update', spoken: 'recurring#2', patch: { day_of_month: '30' }, version: 1 },
   ]);
+  assert.equal(answer.ask, undefined);
 });
 
 test('THE ASK RIDES BESIDE THE WRITES as data: what JSON cannot carry is dropped, and the run is not', async () => {

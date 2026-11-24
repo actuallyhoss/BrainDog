@@ -213,7 +213,9 @@ test("ON A DURABLE OBJECT, STATUS ANSWERS 200 TO A PALETTE THAT SENDS NO ORIGIN,
   const status = await fetch(`${base}/api/slash/status`, { headers: { cookie, 'sec-fetch-site': 'same-origin' } });
   const seen = (await status.json()) as Reply['body'];
   assert.equal(status.status, 200, `status on real storage answered ${String(status.status)}: ${JSON.stringify(seen)}`);
-  assert.deepEqual(seen.value?.asks && { used: seen.value.asks.used, cap: seen.value.asks.cap }, { used: 0, cap: 80 });
+  /* 400 AND NOT CLOUD'S 80 WHILE BILLING IS OFF (85b7c6358): every record not on a self-host is metered as Plus, and Plus's
+     400 credits are its ask cap. This test sets no `BILLING`, as production has it empty. */
+  assert.deepEqual(seen.value?.asks && { used: seen.value.asks.used, cap: seen.value.asks.cap }, { used: 0, cap: 400 });
 
   const set = await fetch(`${base}/api/slash/settings`, {
     method: 'POST',
