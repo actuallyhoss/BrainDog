@@ -1,22 +1,23 @@
 <!--
   The Agents page's composer and what he told agents (`panel: instruct`, agents and MCP plan §2.1, §7.1): the box he
-  tells an agent in, and under it each instruction's live state, the agent's reply and Undo all on what it changed.
+  tells an agent in, and under it each thing he said as a conversation (the Agents page of 24 Nov): his words and the
+  agent's in turn, one plain line of where it stands, and a box to write back inside it.
 
-  THE HOST'S HALF ONLY. braindog-render draws (`Instruct`, `Instructions`); `$lib/record/instruct.ts` words every line
-  and makes every write. This file holds what he chose and typed, reads the record when it moves (`listen`, the shell's
-  version poll) and when the other panel says something changed (`told`), and is aimed at a run by a run row's Tell
-  (`aim`).
+  THE HOST'S HALF ONLY. braindog-render draws the composer (`Instruct`); `Threads.svelte` draws the threads from what
+  `$lib/agents/threads.ts` words; `$lib/record/instruct.ts` makes every write. This file holds what he chose and typed,
+  reads the record when it moves (`listen`, the shell's version poll) and when the other panel says something changed
+  (`told`), and is aimed at a run by a run row's Tell (`aim`).
+
+  A REPLY IS THE THREAD'S NEXT WORD (`sendReply`), to the run that has the thread while it is open: never a new
+  instruction titled "Following up IN2". His answer to a question the agent asked lands in the same thread.
 
   THE ROW APPEARS AT ONCE (§2.1). Send draws the thread as On its way before the record answers; the answer replaces it
   with the record's own, or takes it away and puts his words back in the field with the record's reason under it.
-  Take back is the thread's own undo while no run has taken it.
 
   HIS ALONE (`level: owner`): the record refuses `instruct` to anyone but a person, and lists the threads to the owner.
 
-  ON THE AGENTS PAGE AND A PROJECT'S, ONE LINE, AND WHAT HE TOLD BESIDE IT: the field, To and Send on one row, the other choices once he
-  starts (`Instruct`'s `line`), and the last three threads in a column of their own beside it where the tile is wide
-  enough, under it where it is not. ON A PHONE THE LINE IS A PRESS THAT OPENS THE SHEET with the whole composer in it,
-  so the page opens on a line and the form takes the screen only while he writes. A run row's Tell opens it too.
+  ON A PHONE THE BOX IS PINNED UNDER THE THREADS, above the tab bar, as a message box is: a press that opens the sheet
+  with the whole composer in it, so the conversations take the screen and the box is always one press away.
 
   SCOPED WHERE ANOTHER SCREEN HOLDS IT. `run` opens the composer aimed at that run and lists what went to it
   (Today's run sheet); `project` fixes "On" to that project, offers only the runs working there and lists what he told
@@ -25,12 +26,14 @@
 -->
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { Instruct, Instructions, type ControlMark, type ThreadView } from 'braindog-render/svelte';
+  import { Instruct, type ControlMark, type ThreadView } from 'braindog-render/svelte';
   import { AGENT_MARKS, isMarked } from '@braindog/skin/agent-marks.ts';
   import { apiBase } from '$lib/at.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import { listen } from '../listen.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
+  import Threads from '$lib/agents/Threads.svelte';
+  import { groupOf, threadCardOf, threadsInOrder, threadsOf } from '$lib/agents/threads.ts';
   import {
     NO_PLACES,
     PICK_FIRST,
@@ -43,10 +46,7 @@
     runsOf,
     scopedThreads,
     sendingOf,
-    threadOf,
-    threadOrder,
     told,
-    undoAll,
     unknownRuns,
     type LiveRun,
     type Chosen,
@@ -92,11 +92,8 @@
   let busy = $state(false);
   let fault = $state<string | null>(null);
   let sending = $state.raw<ThreadView | null>(null);
-  let undone = $state.raw<Map<string, string>>(new Map());
   let pressing = $state.raw<Set<string>>(new Set());
-  /** How many threads stand beside the line on the Agents page, where the column beside it is short. */
-  const SHOWN_BESIDE = 3;
-  const firstShown = (): number => (run === null && project === null ? Math.min(first, SHOWN_BESIDE) : first);
+  const firstShown = (): number => first;
   let shown = $state(firstShown());
   let now = $state(recordNow());
   let box = $state<{ focus(): void } | undefined>(undefined);
@@ -205,11 +202,12 @@
     pressing = next;
   };
 
-  async function takeBack(key: string): Promise<void> {
+  async function takeBack(id: string): Promise<void> {
+    const key = groupOf(groups, id)?.key ?? id;
     press(key, true);
     try {
-      const out = await io.takeBack(key);
-      if (out.ok) threads = threads.map((t) => (t.id === key ? out.value : t));
+      const out = await io.takeBack(id);
+      if (out.ok) threads = threads.map((t) => (t.id === id ? out.value : t));
       else fault = out.fix;
     } finally {
       press(key, false);
@@ -217,10 +215,11 @@
     told.say();
   }
 
-  /* THE LIST LOSES IT AT ONCE; a refusal puts it back and says why. */
+  /* THE LIST LOSES IT AT ONCE, the whole thread; a refusal puts it back and says why. */
   async function close(key: string): Promise<void> {
     const before = threads;
-    threads = threads.filter((t) => t.id !== key);
+    const gone = new Set(groupOf(groups, key)?.words.map((w) => w.id) ?? [key]);
+    threads = threads.filter((t) => !gone.has(t.id));
     const out = await io.close(key);
     if (!out.ok) {
       threads = before;
@@ -229,25 +228,33 @@
     told.say();
   }
 
-  async function undo(key: string): Promise<void> {
-    const t = threads.find((x) => x.id === key);
-    if (!t?.receipts) return;
+  /* HIS REPLY INSIDE A THREAD, drawn as his next word while it goes; the record's own read replaces it. */
+  async function reply(key: string, said: string): Promise<string | null> {
     press(key, true);
     try {
-      const line = await undoAll(apiBase(), t.receipts);
-      undone = new Map([...undone, [key, line]]);
+      const out = await io.reply(key, said);
+      if (!out.ok) return out.fix;
+      told.say();
+      await read();
+      return null;
     } finally {
       press(key, false);
     }
-    told.say();
   }
 
-  const ordered = $derived(threadOrder(scopedThreads(threads, { run, project })));
-  const drawn = $derived.by(() => {
-    const ctx = { now, runs: known, projects, undone, busy: pressing };
-    const list = ordered.slice(0, shown).map((t) => threadOf(t, ctx));
-    return sending ? [sending, ...list] : list;
+  const scoped = $derived(scopedThreads(threads, { run, project }));
+  /* A REPLY ON THIS PAGE FOLLOWS A THREAD WHOSE FIRST WORD IT MAY NOT HOLD when scoped: the thread is kept whole. */
+  const groups = $derived(threadsInOrder(threadsOf([...scoped, ...threads.filter((t) => scoped.some((x) => x.thread === t.id))])));
+  const cards = $derived.by(() => {
+    const ctx = { now, runs: known, projects };
+    return groups.slice(0, shown).map((g) => threadCardOf(g, ctx));
   });
+  /* THE ONE ON ITS WAY, drawn as a thread of his words alone until the record answers. */
+  const pending = $derived(
+    sending
+      ? [{ key: sending.key, title: sending.said.replace(/\s+/gu, ' ').trim(), who: sending.to, agent: sending.agent, status: 'On its way', tone: 'open' as const, messages: [], changes: null, folded: false, reply: false, name: 'the agent', quick: [], takeBack: null, close: false }]
+      : [],
+  );
 </script>
 
 {#snippet field(oneLine: boolean)}
@@ -267,23 +274,21 @@
 {/snippet}
 
 {#if owner}
-  <div class="tell" data-line={line ? '' : undefined} bind:this={here}>
-    <div class="tell-compose">
-      {#if line && narrow}
-        <!-- THE PHONE'S LINE: a press that looks like the field and opens the sheet, his draft in it if he has one. -->
-        <button type="button" class="tell-open" data-said={said.trim() ? '' : undefined} aria-haspopup="dialog" onclick={() => (sheetOpen = true)}><span class="tell-open-text">{said.trim() || 'Tell an agent what to do…'}</span></button>
-        <Sheet bind:open={sheetOpen} title="Tell an agent">
-          {#if sheetOpen}{@render field(false)}{/if}
-        </Sheet>
-      {:else}
-        {@render field(line)}
-      {/if}
-    </div>
-    {#if drawn.length > 0}
+  <div class="tell" data-line={line ? '' : undefined} data-phone={line && narrow ? '' : undefined} bind:this={here}>
+    {#if !(line && narrow)}<div class="tell-compose">{@render field(line)}</div>{/if}
+    {#if pending.length + cards.length > 0}
       <div class="tell-told">
-        <h3 class="told-head">What you told agents</h3>
-        <Instructions threads={drawn} {mark} more={Math.max(0, ordered.length - shown)} ontakeback={(k) => void takeBack(k)} onclose={(k) => void close(k)} onundo={(k) => void undo(k)} onmore={() => (shown += STEP)} />
+        <Threads cards={[...pending, ...cards]} {mark} busy={pressing} more={Math.max(0, groups.length - shown)} onreply={reply} onclose={(k) => void close(k)} ontakeback={(id) => void takeBack(id)} onmore={() => (shown += STEP)} />
       </div>
+    {/if}
+    {#if line && narrow}
+      <!-- THE PHONE'S BOX, PINNED UNDER THE THREADS: a press that looks like the field and opens the sheet, his draft in it if he has one. -->
+      <div class="tell-pin">
+        <button type="button" class="tell-open" data-said={said.trim() ? '' : undefined} aria-haspopup="dialog" onclick={() => (sheetOpen = true)}><span class="tell-open-text">{said.trim() || 'Tell an agent what to do…'}</span><span class="tell-open-send" aria-hidden="true">Send</span></button>
+      </div>
+      <Sheet bind:open={sheetOpen} title="Tell an agent">
+        {#if sheetOpen}{@render field(false)}{/if}
+      </Sheet>
     {/if}
   </div>
 {:else}
@@ -294,10 +299,10 @@
 <style>
   .tell {
     display: grid;
+    gap: var(--sp-4);
     min-inline-size: 0;
     padding-block-start: var(--sp-1);
     scroll-margin-block: var(--sp-8);
-    container-type: inline-size;
   }
 
   .tell-compose,
@@ -307,30 +312,33 @@
     min-inline-size: 0;
   }
 
-  /* WHAT HE TOLD, BESIDE THE LINE where the tile is wide enough: the line takes seven parts and the threads five, with no
-     rule over them, since the column is their edge. */
-  @container (width >= 760px) {
-    .tell[data-line] {
-      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-      gap: var(--sp-6);
-    }
-
-    .tell[data-line] .tell-told :global(.told-head) {
-      margin-block-start: 0;
-      padding-block-start: 0;
-      border-block-start: 0;
-    }
+  /* THE THREADS UNDER THE BOX, a rule between them, so the box reads as the start of the next one. */
+  .tell:not([data-phone]) .tell-told {
+    padding-block-start: var(--sp-2);
+    border-block-start: 1px solid var(--rule);
   }
 
-  /* THE PHONE'S LINE: the field's fill, its height and its quiet words, as a press. */
+  /* THE PHONE'S BOX, PINNED: it rides at the foot of the screen, over the tab bar, while the threads scroll under it,
+     and rests at the tile's foot once they are past. A solid ground, never glass. */
+  /* PINNED OVER THE TAB BAR, ON A SOLID BAND: the app scrolls inside its main, whose own padding already clears the tab
+     bar, so the pin reaches down into that padding by its own bottom padding and nothing scrolls between the two. */
+  .tell-pin {
+    position: sticky;
+    inset-block-end: calc(-1 * var(--sp-4));
+    z-index: 2;
+    padding-block: var(--sp-2) var(--sp-4);
+    background: var(--tile);
+  }
+
   .tell-open {
     display: flex;
     align-items: center;
+    gap: var(--sp-2);
     box-sizing: border-box;
     inline-size: 100%;
     min-block-size: var(--tap, 44px);
-    padding-inline: var(--sp-3);
-    border: 0;
+    padding-inline: var(--sp-3) var(--sp-1);
+    border: 1px solid var(--rule);
     border-radius: var(--r-ctl);
     background: var(--tile-2);
     color: var(--ink-3);
@@ -341,10 +349,23 @@
   }
 
   .tell-open-text {
+    flex: 1;
     min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .tell-open-send {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 36px;
+    padding-inline: var(--sp-3);
+    border-radius: var(--r-ctl);
+    background: var(--ink);
+    color: var(--tile);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
   }
 
   .tell-open[data-said] {

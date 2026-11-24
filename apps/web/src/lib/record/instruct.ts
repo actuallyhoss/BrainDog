@@ -57,6 +57,10 @@ export type LiveRun = {
   heard_s: number;
   /** Seconds since its last call; absent from a host older than the Agents page of 23 October, `null` before any call. */
   quiet_s?: number | null;
+  /** When its `doing` was last written, and its newest note with when; each absent from a host older than 24 November. */
+  doing_at?: string | null;
+  note?: string | null;
+  note_at?: string | null;
   reach: 'hooks' | 'next_call';
   /** Its key proves the app it says it is; absent from a host older than 24 October. */
   verified?: boolean;
@@ -113,6 +117,10 @@ export type Thread = {
   /** The questions it lets the run that takes it answer, with his answer, and the ones answered; absent from an older host. */
   answers?: { question: string; option: string }[];
   answered?: string[];
+  /** The thread it replies inside, by its first instruction (`IN2`); `null` or absent for the first word of one. */
+  thread?: string | null;
+  /** Every answer the run gave it, oldest first; absent from a host older than threads (24 Nov), which keeps `reply`. */
+  replies?: { said: string; state: 'done' | 'needs_you' | 'declined'; at: string }[];
 };
 
 /** A run the page knows by handle: its agent kind, project and branch, read from presence or its own row. */
@@ -178,7 +186,7 @@ export const controlWords = {
 /** An agent kind by its name ("Claude"), or `null` for none. */
 export const agentNamed = (kind: string | null | undefined): string | null => (kind ? (AGENT_NAMES[kind] ?? null) : null);
 
-const plural = (n: number, one: string, many = `${one}s`): string => `${String(n)} ${n === 1 ? one : many}`;
+export const plural = (n: number, one: string, many = `${one}s`): string => `${String(n)} ${n === 1 ? one : many}`;
 
 /** A stretch of time in words: "under a minute", "9 min", "3 h 20 min", "2 days". */
 export function spanSaid(ms: number): string {
@@ -224,7 +232,7 @@ export function clockSaid(iso: string | null, now: number, zone?: string): strin
 }
 
 /** A project's name by its handle, or the handle's own words when the page has not read it. */
-const projectName = (key: string | null, projects: ReadonlyMap<string, Project>): string | null =>
+export const projectName = (key: string | null, projects: ReadonlyMap<string, Project>): string | null =>
   key === null ? null : (projects.get(key)?.name ?? null);
 
 /** A run by name: its agent, and where it works when that tells two apart ("Claude on Kiln"). */
@@ -882,6 +890,13 @@ export function control(base: string, io?: Fetch) {
     },
     async takeBack(id: string): Promise<Out<Thread>> {
       return outOf<Thread>(await c.withdrawInstruction({ id }), 'That could not be taken back.');
+    },
+    /**
+     * His reply inside a thread (`sendReply`): the thread's next word, to the run that has it while it is open, else the
+     * same way the thread went. Answers the new instruction's id.
+     */
+    async reply(id: string, note: string): Promise<Out<{ id: string }>> {
+      return outOf<{ id: string }>(await c.sendReply({ id, note }), 'That reply could not be sent.');
     },
     /** Close one that is finished, and it leaves his list. */
     async close(id: string): Promise<Out<Thread>> {
