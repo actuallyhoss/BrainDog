@@ -6798,10 +6798,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * writes no briefing is asked nothing and nothing is kept, so the rules' cards stand and nothing is said about it.
    *
    * AT MOST ONCE EVERY `HEADLINE_LOOK_MS` ON A LATER TICK OF THE DAY (`again`), since the Worker ticks after every
-   * request and the gathering reads every list that keeps a date. Kept in memory, so a restart looks once more, which
-   * costs a read and never an ask: the ask is bounded by `BRIEF_ASKS_DAY`.
+   * request and the gathering reads every list that keeps a date. The ask is bounded by `BRIEF_ASKS_DAY`.
+   *
+   * WHEN THE LAST GATHERING BEGAN IS ONE OF SLASH'S PREFS (`BRIEF_LOOKED`, 24 November), read once by an object and held
+   * in its memory after, as the headlines' gate is (`HEADLINES_LOOKED`). It was kept in memory alone, so every restart
+   * gathered again at once and read every dated list. A time kept after the clock's now is not trusted, and a record with
+   * none kept yet gathers at once, as a restart did.
    */
-  let briefLooked = Number.NEGATIVE_INFINITY;
+  const BRIEF_LOOKED = 'brief.looked';
+  let briefLooked: number | null = null;
+  /** When the last gathering began, as this object holds it or, the first time it is asked, as the pref keeps it. */
+  const briefLookedAt = (): number => {
+    if (briefLooked === null) {
+      const kept = kernel.prefsOf(SLASH)[BRIEF_LOOKED];
+      briefLooked = typeof kept === 'number' && Number.isFinite(kept) && kept <= clock.now() ? kept : Number.NEGATIVE_INFINITY;
+    }
+    return briefLooked;
+  };
+  const briefLookedNow = (nowMs: number): void => {
+    briefLooked = nowMs;
+    kernel.setPref(SLASH, BRIEF_LOOKED, nowMs);
+  };
   /**
    * WHAT THE LAST GATHERING READ: the record (`changeStamp`), the part of the day it was in (`briefSlot`), and when. A
    * later tick of the day gathers nothing while all three hold within `LOOK_REWALK_MS`: `briefTick` asks once a part of
@@ -6818,7 +6835,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const briefAgainDue = (nowMs: number): boolean => {
     const model = deps.slashModel;
     if (typeof model?.written === 'function' || typeof model?.brief !== 'function') return false;
-    return nowMs - briefLooked >= HEADLINE_LOOK_MS && !briefQuiet(nowMs);
+    return nowMs - briefLookedAt() >= HEADLINE_LOOK_MS && !briefQuiet(nowMs);
   };
   const slashBrief = async (nowMs: number, again = false): Promise<string[]> => {
     const model = deps.slashModel;
@@ -6826,9 +6843,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        cards alone, so its ask every change bought sentences nobody read. Nor does it fall to the cards' ask below. */
     if (typeof model?.written === 'function') return [];
     if (typeof model?.brief !== 'function') return [];
-    if (again && nowMs - briefLooked < HEADLINE_LOOK_MS) return [];
+    if (again && nowMs - briefLookedAt() < HEADLINE_LOOK_MS) return [];
     if (again && briefQuiet(nowMs)) return [];
-    briefLooked = nowMs;
+    briefLookedNow(nowMs);
     const brief = model.brief.bind(model);
     const zone = kernel.identity()?.tz ?? 'UTC';
     const seen = { stamp: changeStamp(), ...briefSlot(nowMs, zone), at: nowMs };

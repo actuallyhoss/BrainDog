@@ -262,3 +262,49 @@ test('A MODEL THAT WRITES THE BRIEF IS ASKED NOTHING FOR IT: nobody reads it, an
   assert.ok(brief.cards.every((c) => c.by === 'rule'), JSON.stringify(brief.cards));
   sql.close();
 });
+
+/* 24 November: the later gathering's quarter hour was kept in memory alone, so every object restart gathered again at once
+   and read every dated list, as the headline walk did before `headlines.looked`. */
+test('THE BRIEFING\'S QUARTER HOUR HOLDS ACROSS A RESTART: a new object over the same record gathers nothing within it', async () => {
+  const MIN = 60_000;
+  const r = await record();
+  assert.ok((await r.api.slashTick()).ran);
+  assert.equal(r.heard.length, 1);
+  /* THE DAY'S LOOK GATHERED, and keeps when it began. */
+  assert.equal(r.api.kernel.prefsOf('slash')['brief.looked'], r.clock.now());
+  const began = r.clock.now();
+
+  /* A NEW OBJECT OVER THE SAME RECORD, with nothing in memory and its own model and meter. */
+  const fresh = async () => {
+    const { heard, model } = briefing();
+    const { meter: m } = meter();
+    const api = await createRecordApi({ sql: r.sql, clock: r.clock, slashModel: model, slashMeter: m });
+    return { api, heard };
+  };
+  const bill = async (name: string): Promise<void> => {
+    value(r.api.kernel.create('bills', { name, due: '2026-10-13' } as never, { actor: 'p_owner' }));
+  };
+
+  /* THE FACTS MOVE AND THE OBJECT RESTARTS WITHIN THE QUARTER HOUR: the new one asks nothing until it is out. */
+  r.clock.advance(5 * MIN);
+  await bill('Studio power');
+  const next = await fresh();
+  await next.api.slashTick();
+  assert.equal(next.heard.length, 0, 'a new object gathered again within the quarter hour');
+  r.clock.set(began + 10 * MIN);
+  await next.api.slashTick();
+  assert.equal(next.heard.length, 0, 'a new object gathered again within the quarter hour');
+  r.clock.set(began + 16 * MIN);
+  await next.api.slashTick();
+  assert.equal(next.heard.length, 1, 'the gathering did not come once the quarter hour was out');
+  assert.equal(next.api.kernel.prefsOf('slash')['brief.looked'], r.clock.now());
+
+  /* A TIME KEPT AFTER THE CLOCK'S NOW IS NOT TRUSTED, so it cannot hold the briefing back. */
+  r.clock.advance(16 * MIN);
+  await bill('Studio water');
+  next.api.kernel.setPref('slash', 'brief.looked', r.clock.now() + 24 * 60 * MIN);
+  const again = await fresh();
+  await again.api.slashTick();
+  assert.equal(again.heard.length, 1, 'a time kept from the future held the briefing back');
+  r.sql.close();
+});
