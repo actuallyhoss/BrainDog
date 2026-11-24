@@ -15,6 +15,11 @@
  * the way through and read only when the network did not answer at all. A file under `_app/immutable/` is answered from
  * the copy first, because its name is its content's hash, so the copy of it cannot be stale.
  *
+ * AND A FILE UNDER `_app/immutable/` THE NETWORK FAILED IS ASKED FOR TWICE MORE (24 November): on a 5xx or no answer
+ * at all, again after about 300 ms and again after a second, and only then is the failure handed to the page. One chunk
+ * answered 500 for a few minutes that evening, and a page whose import of it failed could not recover, because the
+ * browser keeps a failed module for the life of the document. A non-ok answer is never kept, retried or not.
+ *
  * THE SHELL IS ANSWERED FROM THE COPY, AND ASKED FOR AGAIN BEHIND IT (scope 2026-10-24 A17). Network first, an open on
  * his phone waited the whole trip to the record's front (90 ms at best from Marseille, often 400) before a single pixel,
  * though the shell is the same few kilobytes every time until a deploy. Now an address of the app is answered with the
@@ -183,7 +188,7 @@ async function answer(kind: Exclude<Route, 'pass' | 'out'>, e: Fetched, now: num
      so offline each is answered from the copy as it always was (the client asks them one at a time when `reads` cannot
      be sent). Its body is read before the network takes it. */
   const several = kind === 'write' && READS.test(new URL(req.url).pathname) && !req.headers.has('authorization') ? req.clone().text() : null;
-  const net = await network(req);
+  const net = kind === 'asset' ? await networkAgain(req) : await network(req);
   if (net !== null) {
     const json = (net.headers.get('content-type') ?? '').includes('application/json');
     const keepable = net.ok && net.type === 'basic' && (kind === 'read' ? json : kind !== 'write' && kind !== 'door');
@@ -222,6 +227,26 @@ async function network(req: Request): Promise<Response | null> {
     return null;
   }
   if (res.status === 401 || accessEnded(res.headers)) await Promise.all([sw.caches.delete(COPY), sw.caches.delete(SHARED)]);
+  return res;
+}
+
+/** The pauses before asking for a hashed file again: about 300 ms, then a second. Two more tries, three in all. */
+const AGAIN_MS = [300, 1000];
+
+/**
+ * A file under `_app/immutable/` from the network, asked for again while it answers 5xx or nothing.
+ *
+ * ONLY A HASHED FILE, because asking again is safe only for a GET whose answer cannot differ: the same name is the same
+ * bytes. A 4xx is an answer (a file a deploy took away) and is handed on at once; the last try's answer, whatever it
+ * is, goes to the page, and `answer` keeps it only when it is ok.
+ */
+async function networkAgain(req: Request): Promise<Response | null> {
+  let res = await network(req);
+  for (const ms of AGAIN_MS) {
+    if (res !== null && res.status < 500) return res;
+    await new Promise((r) => setTimeout(r, ms));
+    res = await network(req);
+  }
   return res;
 }
 
