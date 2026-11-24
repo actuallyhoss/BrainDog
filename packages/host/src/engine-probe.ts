@@ -22,7 +22,7 @@
  */
 
 import { looksLikeCredential } from '@braindog/kernel';
-import { no, ok, type Clock, type Completion, type CompleteRequest, type Result } from '@braindog/ports';
+import { no, ok, REASONING_ROOM, type Clock, type Completion, type CompleteRequest, type Result } from '@braindog/ports';
 
 import { infer, mayThink, routeFor, type Candidate, type InferLedger, type Reads, type RouteFacts, type Try } from './infer.ts';
 import type { SlashInference } from './slash.ts';
@@ -55,14 +55,21 @@ export const PROBE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-/** The whole request for one candidate: nothing in it comes from the record. */
+/**
+ * The whole request for one candidate: nothing in it comes from the record.
+ *
+ * ITS CEILING IS A REAL CALL'S (`REASONING_ROOM`), never one sized for `{"ready":true}` alone. It was 16 tokens, and
+ * `gpt-oss-120b`, which reasons before it answers, spent them thinking: every press in production said it "began to
+ * answer and broke off" while the model answered every real ask. A probe asked otherwise than the asks it stands for
+ * measures something nobody sends.
+ */
 export const probeRequest = (model: string): CompleteRequest => ({
   model,
   messages: [
     { role: 'system', content: PROBE_SYSTEM },
     { role: 'user', content: PROBE_USER },
   ],
-  maxTokens: 16,
+  maxTokens: REASONING_ROOM,
   schema: { ...PROBE_SCHEMA },
   budget: { neurons: 1000 },
 });

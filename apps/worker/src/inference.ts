@@ -42,6 +42,7 @@ import {
   budgetSpent,
   modelMissing,
   ok,
+  REASONING_ROOM,
   schemaFailed,
   type Completion,
   type CompleteRequest,
@@ -60,7 +61,7 @@ import {
  * callers and tests keep the one import they had.
  */
 export type { Budget, Completion, CompleteRequest, Embeddings, Inference, JsonSchema, Missing, Msg, Usage } from '@braindog/ports';
-export { budgetSpent, INCLUDED_FALLBACKS, INCLUDED_MODEL, modelMissing, schemaFailed } from '@braindog/ports';
+export { budgetSpent, INCLUDED_FALLBACKS, INCLUDED_MODEL, modelMissing, REASONING_ROOM, schemaFailed } from '@braindog/ports';
 
 /* ── The adapter ──────────────────────────────────────────────────────────────────────────────── */
 
@@ -186,6 +187,28 @@ const MODELS: Record<string, Rate> = {
  * never a copy that could drift from it. Read only; the adapter still reads `MODELS`.
  */
 export const ROUTED: readonly ({ name: string } & Readonly<Rate>)[] = Object.freeze(Object.entries(MODELS).map(([name, rate]) => Object.freeze({ name, ...rate })));
+
+/**
+ * The ceiling a row is sent: what was asked for, and on a row that reasons never less than `REASONING_ROOM`, since its
+ * thinking is spent from the same tokens. MEASURED 24 NOVEMBER: the engine's probe asked `gpt-oss-120b` for 16 tokens,
+ * which its reasoning used up before the answer began, so every press in production read "broke off before the end".
+ */
+export const ceilingFor = (rate: Pick<Rate, 'effort'>, asked: number): number => (rate.effort === undefined ? asked : Math.max(asked, REASONING_ROOM));
+
+/**
+ * Everything one call sends a row, besides the stream switch: the messages, the ceiling (`ceilingFor`), the schema in the
+ * row's own envelope, and the row's own knobs. EXPORTED FOR THE MODEL CHECKS (`tools/model-checks/run.mjs`), so a check
+ * asks a model exactly as the Worker does and cannot measure a call nobody sends.
+ */
+export const inputsFor = (rate: Pick<Rate, 'shape' | 'effort' | 'thinks'>, req: Pick<CompleteRequest, 'messages' | 'maxTokens' | 'schema'>): Record<string, unknown> => ({
+  messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+  max_tokens: ceilingFor(rate, req.maxTokens),
+  response_format: formatFor(rate.shape, req.schema),
+  /* THE ROW'S OWN EFFORT, where it reasons (`Effort`): its thinking is spent from `max_tokens` too. */
+  ...(rate.effort === undefined ? {} : { reasoning_effort: rate.effort }),
+  /* AND A ROW THAT MUST NOT THINK AT ALL, where the platform has the switch (`thinks`). */
+  ...(rate.thinks === false ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+});
 
 /** Embeddings are the adapter's own pick, because the port passes no model: multilingual, because the record holds Arabic and English (`11 §3`). */
 export const EMBED_MODEL = '@cf/baai/bge-m3';
@@ -774,19 +797,12 @@ export function aiInference(env: AiEnv, deps: AiDeps = {}): StreamingInference {
        that erred low would let exactly the runaway generation this exists to stop through, and
        the price of erring high is a job that asks for a bigger number in its routing table. */
     const promptTokens = req.messages.reduce((n, m) => n + tokensIn(m.content), 0);
-    const would = Math.ceil((promptTokens * rate.inPerM + req.maxTokens * rate.outPerM) / 1_000_000);
+    /* THE CEILING SENT, which on a row that reasons may be more than was asked for (`ceilingFor`), and is what is priced. */
+    const ceiling = ceilingFor(rate, req.maxTokens);
+    const would = Math.ceil((promptTokens * rate.inPerM + ceiling * rate.outPerM) / 1_000_000);
     if (would > req.budget.neurons) return budgetSpent<Completion>(would, req.budget.neurons);
 
-    const got = await call(rate.provider, {
-      messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
-      max_tokens: req.maxTokens,
-      response_format: formatFor(rate.shape, req.schema),
-      /* THE ROW'S OWN EFFORT, where it reasons (`Effort`): its thinking is spent from `max_tokens` too. */
-      ...(rate.effort === undefined ? {} : { reasoning_effort: rate.effort }),
-      /* AND A ROW THAT MUST NOT THINK AT ALL, where the platform has the switch (`thinks`). */
-      ...(rate.thinks === false ? { chat_template_kwargs: { enable_thinking: false } } : {}),
-      ...(onText === undefined ? {} : { stream: true }),
-    });
+    const got = await call(rate.provider, { ...inputsFor(rate, req), ...(onText === undefined ? {} : { stream: true }) });
     if ('why' in got) return modelMissing<Completion>(req.model, got.why, got.raw);
 
     /* A STREAM THAT BREAKS OFF IS A PROVIDER THAT STOPPED ANSWERING, in the port's words; what arrived before it is
@@ -811,16 +827,16 @@ export function aiInference(env: AiEnv, deps: AiDeps = {}): StreamingInference {
        OF THE CEILING WAS THINKING where the platform counted it (`Effort`): a reasoning row spends
        its ceiling on both, and the two send a reader to different places again, the effort or the
        size of what was asked for. */
-    if (cutOff ?? (usage.out > 0 && usage.out >= req.maxTokens)) {
+    if (cutOff ?? (usage.out > 0 && usage.out >= ceiling)) {
       /* MENDED WHERE IT CAN BE (`mendCut`), and said once in the log, so a ceiling that keeps being reached is still seen. */
       const mended = mendCut(text, req.schema);
       if (mended !== null) {
-        deps.log?.(`ai: ${req.model} stopped at the ${req.maxTokens}-token ceiling and was mended to the last whole value`);
+        deps.log?.(`ai: ${req.model} stopped at the ${ceiling}-token ceiling and was mended to the last whole value`);
         return ok({ text: mended, model: rate.provider, usage });
       }
       return schemaFailed<Completion>(
         req.model,
-        `it stopped at the ${req.maxTokens}-token ceiling${thought > 0 ? `, ${thought} of them its reasoning` : ''}, so what came back is the beginning of a document rather than one`,
+        `it stopped at the ${ceiling}-token ceiling${thought > 0 ? `, ${thought} of them its reasoning` : ''}, so what came back is the beginning of a document rather than one`,
       );
     }
 

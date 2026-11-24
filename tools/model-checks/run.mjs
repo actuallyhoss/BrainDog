@@ -78,7 +78,9 @@ if (args.changed !== null) {
 
 /* ── what the Worker routes ────────────────────────────────────────────────────────────────────────────────────────── */
 
-const { ROUTED, INCLUDED_MODEL } = await import(join(root, 'apps', 'worker', 'src', 'inference.ts'));
+/* AND THE WORKER'S OWN REQUEST (`inputsFor`): the messages, the ceiling a reasoning row is raised to, the schema's envelope
+   and the row's knobs, so a check asks a model exactly as a real call does. */
+const { ROUTED, INCLUDED_MODEL, REASONING_ROOM, inputsFor, ceilingFor } = await import(join(root, 'apps', 'worker', 'src', 'inference.ts'));
 /** The routing name every template of the packages asks (`INCLUDED_MODEL`, `@braindog/ports`), or the one `--model` names. */
 const INCLUDED = args.model ?? INCLUDED_MODEL;
 const included = ROUTED.find((r) => r.name === INCLUDED) ?? ROUTED[0];
@@ -118,7 +120,9 @@ const PROMPT = [
   { role: 'user', content: 'Write one calm sentence for a page named Bills saying that two bills are due this week. Answer as {"lines": {"bills": "<the sentence>"}}.' },
 ];
 const SCHEMA = { type: 'object', properties: { lines: { type: 'object' } }, required: ['lines'] };
-const MAX_TOKENS = 120;
+/* THE LEAST CEILING A REAL CALL IS SENT (`REASONING_ROOM`). It was 120, which no real call asks for, and the engine's probe
+   at 16 read a model that reasons as broken while it answered every ask. */
+const MAX_TOKENS = REASONING_ROOM;
 /* THREE KNOBS FOR THE TESTS ALONE, so `test/outcomes.test.mjs` can stand a provider up on localhost and not wait 30
    seconds for a timeout: the address, how long one ask may take, and the first wait between tries (the second is four
    times it). Unset, they are Cloudflare's address, the host's own 30 seconds, and 2 then 8 seconds. */
@@ -128,21 +132,19 @@ const TIMEOUT_MS = Number(process.env.MODEL_CHECK_TIMEOUT_MS) > 0 ? Number(proce
 const WAIT_MS = Number(process.env.MODEL_CHECK_WAIT_MS) > 0 ? Number(process.env.MODEL_CHECK_WAIT_MS) : 2_000;
 const waits = { waits: [WAIT_MS, 4 * WAIT_MS] };
 
-/** The `response_format` a row's shape takes, as `formatFor` in `inference.ts` builds it: one schema, two envelopes. */
-const formatFor = (shape) => (shape === 'chat' ? { type: 'json_schema', json_schema: { name: 'answer', schema: SCHEMA, strict: true } } : { type: 'json_schema', json_schema: SCHEMA });
-
 /**
  * The answer's text, token counts and whether it was cut off, read as `readAnswer` in `inference.ts` reads the row's shape:
  * `text` reads a string `response`, `chat` a string `content` and its `finish_reason`, and anything else is no text. The REST
  * envelope wraps `result`. Read more kindly than the Worker reads it, a route would pass here and fail every call there.
  */
-function readAnswer(shape, body) {
+function readAnswer(route, body) {
+  const shape = route.shape;
   const r = body && typeof body === 'object' && 'result' in body ? body.result : body;
   const raw = shape === 'chat' ? r?.choices?.[0]?.message?.content : r?.response;
   const why = shape === 'chat' ? r?.choices?.[0]?.finish_reason : undefined;
   const u = r?.usage ?? {};
   const usage = { in: u.prompt_tokens ?? 0, out: u.completion_tokens ?? 0 };
-  return { text: typeof raw === 'string' ? raw : '', usage, cutOff: typeof why === 'string' ? why === 'length' : usage.out > 0 && usage.out >= MAX_TOKENS };
+  return { text: typeof raw === 'string' ? raw : '', usage, cutOff: typeof why === 'string' ? why === 'length' : usage.out > 0 && usage.out >= ceilingFor(route, MAX_TOKENS) };
 }
 
 /** Whether the text is the object the schema pins: JSON as it came, an object, `lines` an object. The top level, as the Worker checks it. */
@@ -160,10 +162,9 @@ async function askOnce(route, url) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-    /* AND THE ROW'S OWN `reasoning_effort` (`Effort` in `inference.ts`), so the check asks as the Worker asks: at the
-       model's default the thinking alone runs a 120-token ceiling out and the route reads cut off whatever it would answer.
-       And its `thinks: false` switch the same way (`knobsOf`), or a model that thinks by default is measured thinking. */
-    body: JSON.stringify({ messages: PROMPT, max_tokens: MAX_TOKENS, response_format: formatFor(route.shape), ...knobsOf(route) }),
+    /* THE WORKER'S OWN REQUEST (`inputsFor`): its ceiling, its envelope, the row's `reasoning_effort` and `thinks: false`,
+       so the check asks as the Worker asks and a model that reasons is not read as cut off for a ceiling nobody sends. */
+    body: JSON.stringify(inputsFor(route, { messages: PROMPT, maxTokens: MAX_TOKENS, schema: SCHEMA })),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   const said = await res.text();
@@ -181,8 +182,8 @@ async function askOnce(route, url) {
   } catch {
     return { answered: true, served: true, strict: false, ms, said: lib.scrub(`not JSON: ${said}`, secrets), usage: { in: 0, out: 0 } };
   }
-  const { text, usage, cutOff } = readAnswer(route.shape, body);
-  if (cutOff) return { answered: true, served: true, strict: false, ms, said: `it stopped at the ${MAX_TOKENS}-token ceiling`, usage };
+  const { text, usage, cutOff } = readAnswer(route, body);
+  if (cutOff) return { answered: true, served: true, strict: false, ms, said: `it stopped at the ${ceilingFor(route, MAX_TOKENS)}-token ceiling`, usage };
   const strict = honoured(text);
   return { answered: true, served: true, strict, ms, said: strict ? '' : lib.scrub(`the answer broke the schema: ${text}`, secrets), usage };
 }
@@ -326,12 +327,6 @@ const STEPS = [
   },
 ];
 
-/** The knobs a row asks with, as `aiInference` sends them (`effort`, `thinks`). */
-const knobsOf = (route) => ({
-  ...(route.effort ? { reasoning_effort: route.effort } : {}),
-  ...(route.thinks === false ? { chat_template_kwargs: { enable_thinking: false } } : {}),
-});
-
 /**
  * One step streamed: how long to the first event, to the first word of the answer and to the end, the answer read as
  * `readStream` in `inference.ts` reads it, and the counts from the stream's last word.
@@ -342,14 +337,15 @@ async function stepOnce(route, step) {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      messages: [
-        { role: 'system', content: step.system },
-        { role: 'user', content: step.user },
-      ],
-      max_tokens: step.maxTokens,
-      response_format: route.shape === 'chat' ? { type: 'json_schema', json_schema: { name: 'answer', schema: step.schema, strict: true } } : { type: 'json_schema', json_schema: step.schema },
+      ...inputsFor(route, {
+        messages: [
+          { role: 'system', content: step.system },
+          { role: 'user', content: step.user },
+        ],
+        maxTokens: step.maxTokens,
+        schema: step.schema,
+      }),
       stream: true,
-      ...knobsOf(route),
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS * 2),
   });
@@ -398,7 +394,7 @@ async function stepOnce(route, step) {
   }
   if (held.trim() !== '') take(held.trim());
   const ms = Math.round(performance.now() - started);
-  if (cut) return { answered: true, served: true, right: false, ms, first, firstText, said: `it stopped at the ${step.maxTokens}-token ceiling`, usage };
+  if (cut) return { answered: true, served: true, right: false, ms, first, firstText, said: `it stopped at the ${ceilingFor(route, step.maxTokens)}-token ceiling`, usage };
   let value;
   try {
     value = JSON.parse(text);
@@ -413,7 +409,7 @@ async function checkSteps() {
   for (const route of asked) {
     for (const step of STEPS) {
       const row = { name: route.name, step: step.id, route: step.route };
-      if (!afford(lib.worst(route, step.system + step.user, step.maxTokens))) {
+      if (!afford(lib.worst(route, step.system + step.user, ceilingFor(route, step.maxTokens)))) {
         report.steps.push({ ...row, outcome: lib.NONE, reason: lib.CEILING });
         continue;
       }
@@ -427,6 +423,12 @@ async function checkSteps() {
 }
 
 /* ── the two harnesses, in their own process ───────────────────────────────────────────────────────────────────────── */
+
+/** A row's own knobs (`reasoning_effort`, `thinks: false`), read off the Worker's own request so the two cannot drift. */
+const knobsOf = (route) => {
+  const { messages: _messages, max_tokens: _ceiling, response_format: _format, ...knobs } = inputsFor(route, { messages: [], maxTokens: 0, schema: {} });
+  return knobs;
+};
 
 /** The variables each harness reads, pointed at Workers AI's chat-completions address with the included model. */
 const harnessEnv = (suite) => {

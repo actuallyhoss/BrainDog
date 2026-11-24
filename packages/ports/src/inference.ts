@@ -142,6 +142,17 @@ export const INCLUDED_MODEL = 'gpt-oss-120b' as const;
 export const INCLUDED_FALLBACKS = ['gemma-4-26b-a4b'] as const;
 
 /**
+ * THE LEAST CEILING A MODEL THAT REASONS IS SENT, in tokens, its thinking and its answer together. `gpt-oss-120b` always
+ * reasons (`low` is its least) and spends that from `max_tokens`, so a call sized for its answer alone breaks off before
+ * the answer begins. MEASURED 24 NOV 2026 in production: the engine's probe asked for 16 tokens, and every press said
+ * "It began to answer and broke off before the end" while the model was fine. Asked the same locally, 16 tokens stopped
+ * at `finish_reason: length` inside the reply's own header (`<|start|>assistant<|channel|>`) after its reasoning, and 64
+ * answered whole in 29. A chat step used 55 to 111. Every template, every probe and the model checks read this one
+ * number, and the Worker's adapter raises any smaller ceiling on a reasoning row to it (`apps/worker/src/inference.ts`).
+ */
+export const REASONING_ROOM = 600 as const;
+
+/**
  * A batch of embeddings.
  *
  * `vectors` ARE `Int8Array` BECAUSE THE QUANTISATION IS THE ADAPTER'S, not the caller's:

@@ -18,7 +18,7 @@
  * its own fence.
  */
 
-import { INCLUDED_MODEL } from '@braindog/ports';
+import { INCLUDED_MODEL, REASONING_ROOM } from '@braindog/ports';
 
 export type ModelId = 'llama-3.2-1b' | 'glm-5.3-flash' | 'glm-5.3' | 'bge-m3' | 'gemma-4-26b-a4b' | 'gpt-oss-120b';
 export type ModelRate = { in: number; out: number };
@@ -611,7 +611,7 @@ const CHAT_SCHEMA = {
  * (`apps/worker/src/inference.ts` `Effort`), and that thinking is spent from the same ceiling: on `glm-5.3-flash`, which
  * reasoned the same way, 200 tokens left a short answer cut off before it began.
  */
-export const LOW_THINKING_ROOM = 600;
+export const LOW_THINKING_ROOM = REASONING_ROOM;
 
 /** A template `core.run` takes, which says its purpose. */
 export type Routed = PromptTemplate & { purpose: TemplatePurpose };

@@ -27,7 +27,7 @@ import assert from 'node:assert/strict';
 
 import { fixOf, refused, type Result } from '@braindog/ports';
 
-import { aiInference, RAW_MOST, scrubRaw, type AiEnv, type AiOptions, type CompleteRequest } from '../src/inference.ts';
+import { aiInference, RAW_MOST, REASONING_ROOM, scrubRaw, type AiEnv, type AiOptions, type CompleteRequest } from '../src/inference.ts';
 
 /** The triage schema of `46 §5`, cut to the two fields the model actually contributes. */
 const TRIAGE = {
@@ -335,23 +335,27 @@ test('EACH ROW IS SENT THE `response_format` ITS OWN INPUT TYPE DECLARES, and th
  * one, and the guess it justified calls a complete answer truncated whenever the model lands
  * exactly on the ceiling.
  */
+/* THE REASONING ROW IS ASKED AT A CEILING IT IS SENT AS ASKED (640, over `REASONING_ROOM`), so these say 640 and not the
+   room a smaller ask is raised to; that raise has its own test below. */
+const reasoned: CompleteRequest = { ...ask, model: 'gpt-oss-120b', maxTokens: 640 };
+
 test('A CHAT-COMPLETIONS ANSWER THAT LANDS ON THE CEILING AND SAYS `stop` IS NOT TRUNCATED', async () => {
   const good = '{"kind":"invoice","actionable":true}';
 
   const stopped = answering(() => ({
     choices: [{ index: 0, message: { role: 'assistant', content: good }, finish_reason: 'stop' }],
-    usage: { prompt_tokens: 412, completion_tokens: 64 },
+    usage: { prompt_tokens: 412, completion_tokens: 640 },
   }));
-  const fine = await aiInference(stopped.env).complete({ ...ask, model: 'gpt-oss-120b' });
+  const fine = await aiInference(stopped.env).complete(reasoned);
   assert.ok(fine.ok, fixOf(fine));
 
   const cut = answering(() => ({
     choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoi' }, finish_reason: 'length' }],
-    usage: { prompt_tokens: 412, completion_tokens: 64 },
+    usage: { prompt_tokens: 412, completion_tokens: 640 },
   }));
-  const got = await aiInference(cut.env).complete({ ...ask, model: 'gpt-oss-120b' });
+  const got = await aiInference(cut.env).complete(reasoned);
   assert.equal(codeOf(got), 'PROPOSAL_SCHEMA');
-  assert.match(fixOf(got), /stopped at the 64-token ceiling/u);
+  assert.match(fixOf(got), /stopped at the 640-token ceiling/u);
 });
 
 /**
@@ -365,9 +369,9 @@ test('THE REASONING ROW IS SENT `reasoning_effort: low` AND A ROW THAT DOES NOT 
     choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoice","actionable":true}' }, finish_reason: 'stop' }],
     usage: { prompt_tokens: 5, completion_tokens: 4 },
   }));
-  await aiInference(chat.env).complete({ ...ask, model: 'gpt-oss-120b' });
+  await aiInference(chat.env).complete(reasoned);
   assert.equal(chat.seen[0]?.inputs['reasoning_effort'], 'low');
-  assert.equal(chat.seen[0]?.inputs['max_tokens'], 64, 'the ceiling is the one asked for, thinking and answer together');
+  assert.equal(chat.seen[0]?.inputs['max_tokens'], 640, 'the ceiling is the one asked for, thinking and answer together');
 
   const text = answering(() => ({ response: '{"kind":"invoice","actionable":true}', usage: { prompt_tokens: 5, completion_tokens: 4 } }));
   await aiInference(text.env).complete(ask);
@@ -377,18 +381,44 @@ test('THE REASONING ROW IS SENT `reasoning_effort: low` AND A ROW THAT DOES NOT 
 test('AN ANSWER CUT OFF AT THE CEILING SAYS HOW MUCH OF IT WAS THINKING, where the platform counted it', async () => {
   const cut = answering(() => ({
     choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoi' }, finish_reason: 'length' }],
-    usage: { prompt_tokens: 412, completion_tokens: 64, completion_tokens_details: { reasoning_tokens: 58 } },
+    usage: { prompt_tokens: 412, completion_tokens: 640, completion_tokens_details: { reasoning_tokens: 580 } },
   }));
-  const got = await aiInference(cut.env).complete({ ...ask, model: 'gpt-oss-120b' });
+  const got = await aiInference(cut.env).complete(reasoned);
   assert.equal(codeOf(got), 'PROPOSAL_SCHEMA');
-  assert.match(fixOf(got), /stopped at the 64-token ceiling, 58 of them its reasoning, so what came back/u);
+  assert.match(fixOf(got), /stopped at the 640-token ceiling, 580 of them its reasoning, so what came back/u);
 
   const silent = answering(() => ({
     choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoi' }, finish_reason: 'length' }],
-    usage: { prompt_tokens: 412, completion_tokens: 64 },
+    usage: { prompt_tokens: 412, completion_tokens: 640 },
   }));
-  const plain = await aiInference(silent.env).complete({ ...ask, model: 'gpt-oss-120b' });
-  assert.match(fixOf(plain), /stopped at the 64-token ceiling, so what came back/u, 'no count is no claim');
+  const plain = await aiInference(silent.env).complete(reasoned);
+  assert.match(fixOf(plain), /stopped at the 640-token ceiling, so what came back/u, 'no count is no claim');
+});
+
+/**
+ * A CEILING SIZED FOR THE ANSWER ALONE IS RAISED ON A ROW THAT REASONS. The engine's probe asked `gpt-oss-120b` for 16
+ * tokens on 24 November and every press in production read "broke off before the end": its reasoning spent them before
+ * the answer began. Red before: 16 was sent as asked. A row that does not reason keeps the ceiling it was asked for.
+ */
+test('A REASONING ROW ASKED FOR LESS THAN ITS ROOM IS SENT `REASONING_ROOM`, priced at it, and a plain row as asked', async () => {
+  const chat = answering(() => ({
+    choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoice","actionable":true}' }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 5, completion_tokens: 30 },
+  }));
+  const got = await aiInference(chat.env).complete({ ...ask, model: 'gpt-oss-120b', maxTokens: 16 });
+  assert.ok(got.ok, fixOf(got));
+  assert.equal(chat.seen[0]?.inputs['max_tokens'], REASONING_ROOM);
+  /* PRICED AT WHAT IS SENT: 600 out at 68,182 a million is 41 neurons, over a ceiling of 10, so nothing is sent. */
+  const dear = answering(() => ({ choices: [] }));
+  assert.equal(codeOf(await aiInference(dear.env).complete({ ...ask, model: 'gpt-oss-120b', maxTokens: 16, budget: { neurons: 10 } })), 'SLASH_BUDGET_SPENT');
+  assert.equal(dear.seen.length, 0);
+
+  const plain = answering(() => ({
+    choices: [{ index: 0, message: { role: 'assistant', content: '{"kind":"invoice","actionable":true}' }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 5, completion_tokens: 10 },
+  }));
+  await aiInference(plain.env).complete({ ...ask, model: 'gemma-4-26b-a4b', maxTokens: 16 });
+  assert.equal(plain.seen[0]?.inputs['max_tokens'], 16);
 });
 
 /**

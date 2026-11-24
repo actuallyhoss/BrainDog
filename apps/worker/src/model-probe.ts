@@ -14,7 +14,7 @@
  * and the day it does is the day to know, not the day it stops. Any words of the kind outside the answer's text count.
  */
 
-import { INCLUDED_FALLBACKS, INCLUDED_MODEL, inferenceDetail } from '@braindog/ports';
+import { INCLUDED_FALLBACKS, INCLUDED_MODEL, inferenceDetail, REASONING_ROOM } from '@braindog/ports';
 
 import { aiInference, scrubRaw, type AiBinding, type AiEnv } from './inference.ts';
 import { opsAlert, type OpsEnv } from './mail.ts';
@@ -33,9 +33,9 @@ const PROBE_MESSAGES = [
   { role: 'user' as const, content: 'Answer {"ok": true}.' },
 ];
 const PROBE_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] };
-/** Room for a fallback that reasons at `low` before its ten tokens of answer; a model that thinks not uses about ten. */
-const PROBE_TOKENS = 200;
-/** The most one probe may spend: 200 tokens out on the dearest row is about 14 neurons. */
+/** A real call's ceiling (`REASONING_ROOM`), so a model that reasons is probed as it is asked; one that thinks not uses about ten. */
+const PROBE_TOKENS = REASONING_ROOM;
+/** The most one probe may spend: 600 tokens out on the dearest row is about 42 neurons. */
 const PROBE_NEURONS = 100;
 
 /** Words of a retirement, read outside the answer's own text. */
