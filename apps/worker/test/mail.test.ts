@@ -340,7 +340,7 @@ test("THE DIRECTORY'S WINDOW HOLDS ACROSS ISOLATES: a claim that says no sends n
   assert.equal(email.sent.length, 1);
 });
 
-test('A MODEL THAT DID NOT ANSWER MAILS "BrainDog model" WITH THE RECORD, THE MODEL AND THE PHRASE, and never the raw message', async () => {
+test('A MODEL THAT DID NOT ANSWER MAILS "BrainDog model" WITH THE RECORD, THE MODEL, THE PHRASE AND THE PROVIDER\'S WORDS, floored', async () => {
   const email = binding();
   const env = { ...OPS, EMAIL: email };
   const line = { op: 'model', rec: 'rec_1', model: 'glm-5.3-flash', why: 'the provider did not answer', raw: `5016: account 1234 said no to ${ADDRESS}` } as const;
@@ -352,8 +352,10 @@ test('A MODEL THAT DID NOT ANSWER MAILS "BrainDog model" WITH THE RECORD, THE MO
   assert.equal(email.sent[0]?.subject, 'BrainDog model');
   assert.match(String(email.sent[0]?.text), /next day are not mailed/u);
   const text = String(email.sent[0]?.text);
-  for (const said of ['op: model', 'rec: rec_1', 'model: glm-5.3-flash', 'why: the provider did not answer', 'route table', "provider's console"]) assert.ok(text.includes(said), said);
-  assert.ok(!text.includes('5016') && !text.includes(ADDRESS), 'raw stays in the log');
+  for (const said of ['op: model', 'rec: rec_1', 'model: glm-5.3-flash', 'why: the provider did not answer', 'INCLUDED_MODEL', "provider's console"]) assert.ok(text.includes(said), said);
+  /* THE PROVIDER'S WORDS, floored as every field is: the code that says what happened, and never an address. */
+  assert.ok(text.includes('raw: 5016: account 1234 said no to'), text);
+  assert.ok(!text.includes(ADDRESS), 'an address reached the mail');
 });
 
 test('A NIGHT THAT DID NOT RUN WHOLE MAILS "BrainDog night" WITH ITS COUNTS and the runbook at 53 §5.4', async () => {

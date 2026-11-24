@@ -169,8 +169,11 @@ test('ON THE RECORD: a throw is one model line and one claimed mail, and a secon
   assert.equal(sent.length, 1, 'one mail a quarter hour');
   assert.equal(sent[0]!['subject'], 'BrainDog model');
   assert.equal(sent[0]!['to'], 'ops@example.test');
-  assert.ok(String(sent[0]!['text']).includes('model: glm-5.3-flash'));
-  assert.ok(!String(sent[0]!['text']).includes('5016'), 'raw stays in the log');
+  assert.ok(String(sent[0]!['text']).includes('model: gpt-oss-120b'));
+  /* THE PROVIDER'S OWN WORDS ARE IN THE MAIL, scrubbed as the line is: a phrase alone mailed "did not answer" for four
+     days while the provider said, every call, that the model was retired. No key, no account, no prompt. */
+  assert.match(String(sent[0]!['text']), /raw: 5016: AiError/u);
+  assert.ok(!String(sent[0]!['text']).includes('0123456789abcdef') && !String(sent[0]!['text']).includes('7731'), String(sent[0]!['text']));
   assert.deepEqual(leaked(JSON.stringify(said)), [], 'a key reached the log');
   assert.deepEqual(leaked(JSON.stringify(sent)), [], 'a key reached the mail');
   assert.ok(typeof kv.get('ops-alert:model') === 'number', 'the Directory\'s window was not claimed');

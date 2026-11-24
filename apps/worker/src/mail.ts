@@ -925,7 +925,7 @@ const RUNBOOK: Record<OpsKind, string> = {
     'find the ref the person was shown, read where and error in Workers Logs; if it started with a deploy, DEPLOYMENT.md "Rolling back"; more than one door, 53 §5.11',
   refuse: '53 §5.3 (docs/53-SPEC-OPERATIONS.md)',
   model:
-    'read raw on the op: model line in Workers Logs; a message that names the model means the route table (MODELS in apps/worker/src/inference.ts), one that names the account or the gateway means the provider\'s console; from the model-checks workflow, read model-checks.json in that run\'s artifacts',
+    'raw above is the provider\'s own words, and every line is in Workers Logs (op: model; probe: true is the nightly probe); a model the provider does not serve or has retired (5028, "deprecated") means the model is swapped in INCLUDED_MODEL and INCLUDED_FALLBACKS (packages/ports/src/inference.ts) with its row in MODELS (apps/worker/src/inference.ts), after tools/model-checks/run.mjs --steps; one that names the account or the gateway means the provider\'s console; from the model-checks workflow, read model-checks.json in that run\'s artifacts',
   night: '53 §5.4 (docs/53-SPEC-OPERATIONS.md): read the op: walk lines with ok false from the same night in Workers Logs',
   step: 'a record\'s alarm was reset in the same step two alarms in a row and that step is held for six hours: read the op: alarm-step lines for the rec in Workers Logs (cut, times, held), and the Record$ alarm events beside them for CPU time; the step named act:<script> is that script\'s calls into the record (apps/worker/src/alarm-cuts.ts)',
   door:
@@ -933,10 +933,15 @@ const RUNBOOK: Record<OpsKind, string> = {
 };
 
 /**
- * The fields a mail repeats from its line: ids, codes, a model's name and the night's counts. `error` and `raw` stay in
- * the log, where they are scrubbed and cut: a provider's message can quote what it was sent.
+ * The fields a mail repeats from its line: ids, codes, a model's name, the provider's own words and the night's counts.
+ * `error` stays in the log, where it is scrubbed and cut.
+ *
+ * `raw` IS MAILED, because the phrase alone told nobody what to fix: from 20 November the mail said "model glm-5.3-flash,
+ * the provider did not answer" for four days while the provider was saying, every call, that it had retired the model.
+ * It is the provider's sentence as `scrubRaw` (`inference.ts`) kept it, keys and quoted prompts cut and 300 characters at
+ * most, and floored again below like every field.
  */
-const OPS_FIELDS = ['ref', 'where', 'rec', 'code', 'model', 'why', 'records', 'backups', 'backups_failed', 'directory'] as const;
+const OPS_FIELDS = ['ref', 'where', 'rec', 'code', 'model', 'why', 'raw', 'records', 'backups', 'backups_failed', 'directory'] as const;
 
 /** One mail per kind in this long, however many lines a burst writes. */
 export const OPS_QUIET_MS = 15 * 60 * 1000;
@@ -1008,7 +1013,9 @@ export async function opsAlert(
       return false;
     }
     /* THROUGH THE FLOOR, BECAUSE A MAIL IS A LOG THAT LEAVES (`log-floor.ts`): `why` can be a thrown sentence. */
-    const said = OPS_FIELDS.flatMap((key) => (fields[key] == null ? [] : [`${key}: ${floored(String(fields[key])).slice(0, 200)}`]));
+    const said = OPS_FIELDS.flatMap((key) =>
+      fields[key] == null || fields[key] === '' ? [] : [`${key}: ${floored(String(fields[key])).slice(0, key === 'raw' ? 300 : 200)}`],
+    );
     const text = [
       `The app Worker wrote an op: ${kind} line.`,
       '',

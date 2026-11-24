@@ -95,6 +95,7 @@ import { directoryCopies } from './directory-copy.ts';
 import { CUT_HOLD_MS, CUTS_TO_HOLD, cutAgain, cutsOf, heldUntil, resetSaid, type Cuts } from './alarm-cuts.ts';
 import { isHeld, redeliver, serveHeld, sweepHeld, type HeldDeps, type HeldMessage } from './held.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars } from './mail.ts';
+import { probeModels } from './model-probe.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail, type PushAddress } from './deliver.ts';
 import { apnsKeyed, apnsKeys, fetchApns } from './apns.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
@@ -1876,7 +1877,7 @@ export class Record$ extends DurableObject<Env> {
       'error',
     );
     if (fail.whose === 'owner' || (fail.why === 'schema' && fail.streak < SCHEMA_STREAK)) return;
-    this.ctx.waitUntil(opsAlert(this.env, { op: 'model', rec, model: fail.model, why: fail.why }, alertClaim(this.env)));
+    this.ctx.waitUntil(opsAlert(this.env, { op: 'model', rec, model: fail.model, why: fail.why, raw: fail.raw }, alertClaim(this.env)));
   }
 
   /**
@@ -4176,6 +4177,9 @@ export default {
     } catch (e) {
       op({ op: 'door', swept: false, error: e instanceof Error ? e.message : String(e) }, 'error');
     }
+    /* AND EACH MODEL SLASH'S ROUTE WALKS, ONE TINY CALL EACH (`model-probe.ts`), so a model the provider retires is
+       mailed the night it goes. Before the walk and never in its way: the probe does not throw. */
+    await probeModels(env, (fields) => opsAlert(env, fields, alertClaim(env)));
     /* A NIGHT THAT THROWS IS STILL RED, with its words floored: the platform logs what a cron throws. */
     await nightly(env).catch((e: unknown) => {
       throw flooredError(e);
