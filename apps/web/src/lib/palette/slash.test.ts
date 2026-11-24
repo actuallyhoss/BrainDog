@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import type { Reading, SlashProposal, SlashStatus } from '@braindog/client';
 
 import { copy } from '../copy.ts';
+import { modeSent } from './slash-chat.ts';
 import { asksFirst, capLine, drawProposal, drawReading, FIGURES_TRACE, inOrder, offersSlash, pass2Refused, secondPass, slashWords, whereWords } from './slash.ts';
 
 const ASK = { slash: true, prefix: null, text: 'late invoices', pending: false, places: 0 };
@@ -254,4 +255,12 @@ test('A SPENT BUDGET ON PASS 2 IS ITS OWN FIX, VERBATIM, THEN THE SENTENCE THAT 
     without: null,
     spent: false,
   });
+});
+
+test('THE BAR SENDS AUTO WHERE A DEEP KEY IS SET, so a failed Quick turn can hand off to Deep; Quick and Deep go as picked', () => {
+  assert.equal(modeSent('auto', true), 'auto');
+  assert.equal(modeSent('auto', false), 'quick', 'no Deep key: Quick, as before');
+  assert.equal(modeSent('quick', true), 'quick');
+  assert.equal(modeSent('deep', true), 'deep');
+  assert.equal(modeSent('deep', false), 'deep');
 });

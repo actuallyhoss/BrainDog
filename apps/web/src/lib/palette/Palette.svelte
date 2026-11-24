@@ -111,7 +111,7 @@
   import ThreadList from '../../routes/slash/ThreadList.svelte';
   import { ask as askThread, askingAs, clear as clearThread, convo, draftKey, open as threadOn, sentWith, wake } from './thread.svelte.ts';
   import { draftOf, keepDraft, kept as talks, matching } from './conversations.svelte.ts';
-  import { threadsKey } from './slash-chat.ts';
+  import { modeSent as sentMode, threadsKey } from './slash-chat.ts';
   import MentionField from '../mention/MentionField.svelte';
   import AgentsNow from './AgentsNow.svelte';
   import { factsOf } from '../record/told-apart.ts';
@@ -323,13 +323,12 @@
    * comes back on that row's strip and under Sent in the bell. The targets are read once Ask first opens; a host without
    * the door offers Slash alone.
    */
-  let askTo = $state<{ to: 'slash'; mode: 'quick' | 'deep' } | { to: 'target'; t: Target }>({ to: 'slash', mode: 'quick' });
+  let askTo = $state<{ to: 'slash'; mode: 'auto' | 'quick' | 'deep' } | { to: 'target'; t: Target }>({ to: 'slash', mode: 'auto' });
   let sendTargets = $state<Target[] | null>(null);
   let targetsAsked = false;
   let mentionField = $state<ReturnType<typeof MentionField> | null>(null);
   const switchable = $derived(sendTargets?.filter((t) => t.kind === 'mac' || t.kind === 'session') ?? []);
   const firstMac = $derived(sendTargets?.find((t) => t.kind === 'mac') ?? null);
-  const askLabel = $derived(askTo.to === 'slash' ? `${sendWords.slash} · ${askTo.mode === 'deep' ? sendWords.deep : sendWords.quick}` : askTo.t.label);
   /** What an ask is about besides its own mentions: the row behind the palette. The thread adds what was mentioned before. */
   const behindNow = (): string[] => (behind.row ? [behind.row] : []);
   const lastTurn = $derived(convo.turns.at(-1));
@@ -350,7 +349,7 @@
 
   function asked(question: string, mentions: readonly SentMention[] = []) {
     if (askTo.to === 'target') return void toTarget(askTo.t, question, mentions);
-    void askThread(question, behind, apiBase(), { mode: askTo.mode, attach: behindNow(), mentions });
+    void askThread(question, behind, apiBase(), { mode: modeSent, attach: behindNow(), mentions });
   }
 
   /** A message to a machine or a session: sent, and said in the thread as one line with the way to its row. */
@@ -535,6 +534,16 @@
    * else is the wrong place for it.
    */
   let slashStatus = $state<SlashStatus | null>(null);
+  /**
+   * AUTO WHILE NOTHING ELSE IS PICKED, WHERE A DEEP KEY IS SET (audit of 24 Nov, 3): a Quick turn that fails or runs out
+   * of steps goes to Deep, and a plan or a why goes Deep at once (`packages/slash/src/chat.ts`). With no Deep key, or
+   * before the status has answered, it is Quick, as it was. Quick and Deep picked in the menu are sent as picked.
+   */
+  const deepKey = $derived(slashStatus?.deep?.key === true);
+  const modeSent = $derived(askTo.to === 'slash' ? sentMode(askTo.mode, deepKey) : 'quick');
+  const askLabel = $derived(
+    askTo.to === 'slash' ? `${sendWords.slash} · ${modeSent === 'deep' ? sendWords.deep : modeSent === 'auto' ? sendWords.auto : sendWords.quick}` : askTo.t.label,
+  );
   const CAP_LINE_KEY = 'braindog.palette.slashCapLine';
   /* PER BROWSER, AND ALLOWED TO BE LOST. A private window forgets it and shows the line once more that month, which is the
      cheap way to be wrong; storage that throws is treated the same as storage that is empty. */
@@ -2145,7 +2154,8 @@
     <footer class="p-foot p-ask-foot" id="palette-ask-foot">
       <Menu label={sendWords.sheet}>
         {#snippet trigger()}<span class="p-to">{#if askTo.to === 'target' && askTo.t.live}<span class="p-live" aria-hidden="true"></span>{/if}{askLabel}<Icon name="chevronDown" size="s" /></span>{/snippet}
-        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'quick'} onclick={() => (askTo = { to: 'slash', mode: 'quick' })}><Icon name="slash" size="s" />{sendWords.slash} · {sendWords.quick}</button>
+        {#if deepKey}<button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'auto'} onclick={() => (askTo = { to: 'slash', mode: 'auto' })}><Icon name="slash" size="s" />{sendWords.slash} · {sendWords.auto}</button>{/if}
+        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && modeSent === 'quick'} onclick={() => (askTo = { to: 'slash', mode: 'quick' })}><Icon name="slash" size="s" />{sendWords.slash} · {sendWords.quick}</button>
         <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'deep'} onclick={() => (askTo = { to: 'slash', mode: 'deep' })}><Icon name="slash" size="s" />{sendWords.slash} · {sendWords.deep}</button>
         {#each switchable as t (t.id)}
           <button type="button" role="menuitemradio" aria-checked={askTo.to === 'target' && askTo.t.id === t.id} onclick={() => (askTo = { to: 'target', t })}><Icon name="session" size="s" /><span class="mi-name">{t.label}</span></button>

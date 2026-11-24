@@ -54,6 +54,12 @@ export type ChatEvent =
 /** How deep a message goes: the included model, Deep on the owner's key, or the first and then the second. */
 export type ChatMode = 'quick' | 'deep' | 'auto';
 
+/**
+ * THE MODE THE BAR SENDS (audit of 24 Nov, 3): Auto while nothing else is picked and a Deep key is set, so a Quick turn
+ * that fails hands off to Deep; with no Deep key, Quick. Quick or Deep picked in the menu goes as picked.
+ */
+export const modeSent = (picked: ChatMode, deepKey: boolean): ChatMode => (picked === 'auto' ? (deepKey ? 'auto' : 'quick') : picked);
+
 export type Turn = { role: 'you' | 'slash'; text: string; actions: ChatAction[] };
 export type Thread = { id: string; turns: Turn[] };
 export type NowLine = { text: string; href?: string };
