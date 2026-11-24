@@ -1501,6 +1501,20 @@ export const TEMPLATES = [
 ] as const;
 
 /**
+ * THE RECORD'S SLUG, AS EACH CALLER'S OWN `boot` ANSWERED IT, held for `SLUG_FOR` (`decideAt`).
+ *
+ * A FILED QUESTION'S LINK NEEDS THE SLUG ALONE, and every filing asked a whole `boot` for it: the first screen, with its
+ * bell, its news and its names, built to read one word of it (measured on a self-host under five agents: a fifth of all
+ * its time). A slug moves only when a record is put back under another name, so it is held a while, under the record's
+ * own `boot` (one function per record, however a host wraps its surface for each message) and under the caller's whole
+ * context, as `schema` is kept (`rpc.ts`, `namingKept`): nobody is handed a slug their own `boot` did not answer them. A
+ * context that cannot be written out is not held, and a refused `boot` holds nothing.
+ */
+const slugsHeld = new WeakMap<object, Map<string, { slug: string | null; at: number }>>();
+const SLUG_FOR = 5 * 60_000;
+const SLUG_CALLERS = 200;
+
+/**
  * What one answer has read so far, kept for that answer alone: whether it is said in words at all, the words of every
  * row it read by handle, and the one `boot` it asked for, so the tool and the words share a single read.
  *
@@ -2207,8 +2221,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    *
    * THE ORIGIN IS THE HOST'S AND THE SLUG IS THE RECORD'S. The host hands the address it is served at to `handle`, and
    * this package never guesses one, so a transport that hands none answers as before, with no `decide`. The slug is
-   * `boot`'s `record`, asked only after a filing succeeded; a record that names none answers without it too. An answer
-   * that already carries `decide` keeps its own.
+   * `boot`'s `record`, asked only after a filing succeeded and held a while after (`slugsHeld`); a record that names none
+   * answers without it too. An answer that already carries `decide` keeps its own.
    */
   const decideAt = async (answer: Result<unknown>, ctx: C, turn: Turn): Promise<Result<unknown>> => {
     /* AN EMPTY ID IS NO QUESTION TO LINK TO. The record answers `''` for the handle it could not find (`filedAs`), and
@@ -2223,12 +2237,37 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     )
       return answer;
     const id = answer.value.id;
-    const boot = await bootOf(ctx, turn);
-    const record = boot.ok && isObject(boot.value) ? boot.value.record : undefined;
-    const slug = isObject(record) && typeof record.slug === 'string' && record.slug !== '' ? record.slug : null;
+    const slug = await slugOf(ctx, turn);
     if (slug === null) return answer;
     const at = `${origin.replace(/\/+$/, '')}/${encodeURIComponent(slug)}/decide/${encodeURIComponent(id)}`;
     return { ok: true, value: { ...answer.value, decide: at } };
+  };
+
+  /** The record's slug for a decide link: from the answer's own `boot` where it has one, held (`slugsHeld`), or one `boot`. */
+  const slugOf = async (ctx: C, turn: Turn): Promise<string | null> => {
+    const record = surface.boot as unknown;
+    let byCaller = typeof record === 'function' ? slugsHeld.get(record) : undefined;
+    if (byCaller === undefined && typeof record === 'function') slugsHeld.set(record, (byCaller = new Map()));
+    let who: string | null = null;
+    try {
+      const said: unknown = JSON.stringify(ctx ?? null);
+      if (typeof said === 'string' && byCaller !== undefined) who = said;
+    } catch {
+      who = null;
+    }
+    const now = Date.now();
+    const had = who === null || turn.boot !== undefined ? undefined : byCaller?.get(who);
+    if (had !== undefined && now - had.at >= 0 && now - had.at < SLUG_FOR) return had.slug;
+    const boot = await bootOf(ctx, turn);
+    if (!boot.ok) return null;
+    const named = isObject(boot.value) ? boot.value.record : undefined;
+    const slug = isObject(named) && typeof named.slug === 'string' && named.slug !== '' ? named.slug : null;
+    if (who !== null && byCaller !== undefined) {
+      byCaller.delete(who);
+      if (byCaller.size >= SLUG_CALLERS) byCaller.delete(byCaller.keys().next().value as string);
+      byCaller.set(who, { slug, at: now });
+    }
+    return slug;
   };
 
   /* ── who, when and where, for the answers that say it ────────────────── */
