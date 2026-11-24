@@ -154,6 +154,26 @@ export function openSqlite(path: string): Sql & { close(): void } {
   };
 }
 
+/**
+ * EACH STATEMENT PREPARED ONCE AND KEPT, by its text, the newest `most`, as the Durable Object's own SQL API keeps them.
+ * `node:sqlite` prepared every statement on every call: a quarter to a half of the record's SQL time.
+ */
+function statements(db: DatabaseSync, most = 512): (text: string) => ReturnType<DatabaseSync['prepare']> {
+  const kept = new Map<string, ReturnType<DatabaseSync['prepare']>>();
+  return (text) => {
+    let st = kept.get(text);
+    if (st !== undefined) {
+      kept.delete(text);
+      kept.set(text, st);
+      return st;
+    }
+    st = db.prepare(text);
+    kept.set(text, st);
+    if (kept.size > most) kept.delete(kept.keys().next().value!);
+    return st;
+  };
+}
+
 /** The `Sql` port over `node:sqlite`, as the driver answers it. `openSqlite` puts the guard in front. */
 function openDriver(path: string): Sql & { close(): void } {
   /* FOREIGN KEYS OFF, and it is not a preference. `node:sqlite` defaults this ON and a Durable
@@ -167,14 +187,15 @@ function openDriver(path: string): Sql & { close(): void } {
   db.exec('PRAGMA synchronous = NORMAL');
   db.exec('PRAGMA busy_timeout = 5000');
   let depth = 0;
+  const prepared = statements(db);
   return {
     close: () => db.close(),
     exec: (text, ...params) => {
       if (params.length === 0) db.exec(text);
-      else db.prepare(text).run(...(params as never[]));
+      else prepared(text).run(...(params as never[]));
     },
-    all: <T = Row>(text: string, ...params: Param[]) => db.prepare(text).all(...(params as never[])) as T[],
-    one: <T = Row>(text: string, ...params: Param[]) => db.prepare(text).get(...(params as never[])) as T | undefined,
+    all: <T = Row>(text: string, ...params: Param[]) => prepared(text).all(...(params as never[])) as T[],
+    one: <T = Row>(text: string, ...params: Param[]) => prepared(text).get(...(params as never[])) as T | undefined,
     transactionSync<T>(fn: () => T): T {
       /* A NESTED CALL IS A SAVEPOINT, as on the Durable Object, where a nested `storage.transactionSync` is one
          (measured on workerd 1.20260903.1): an inner throw undoes the inner writes and nothing else, and the outer

@@ -61,6 +61,26 @@ export function sqlGuard(text: string, params: readonly Param[]): void {
 }
 
 /**
+ * EACH STATEMENT PREPARED ONCE AND KEPT, by its text, the newest `most`, as the Durable Object's own SQL API keeps them.
+ * `node:sqlite` prepared every statement on every call: a quarter to a half of the record's SQL time.
+ */
+function statements(db: DatabaseSync, most = 512): (text: string) => ReturnType<DatabaseSync['prepare']> {
+  const kept = new Map<string, ReturnType<DatabaseSync['prepare']>>();
+  return (text) => {
+    let st = kept.get(text);
+    if (st !== undefined) {
+      kept.delete(text);
+      kept.set(text, st);
+      return st;
+    }
+    st = db.prepare(text);
+    kept.set(text, st);
+    if (kept.size > most) kept.delete(kept.keys().next().value!);
+    return st;
+  };
+}
+
+/**
  * Guarded unless the caller says why not. `exec` with no parameters is a script and goes to `db.exec` unchecked, as it
  * does under `guarded`, because a migration's statements summed would read as one long compound.
  */
@@ -79,6 +99,7 @@ export function openSqlite(path = ':memory:', options?: OpenOptions): NodeSql {
   db.exec('PRAGMA journal_mode = WAL');
 
   let depth = 0;
+  const prepared = statements(db);
 
   const sql: NodeSql = {
     db,
@@ -88,18 +109,18 @@ export function openSqlite(path = ':memory:', options?: OpenOptions): NodeSql {
       if (params.length === 0) db.exec(text);
       else {
         check(text, params);
-        db.prepare(text).run(...(params as never[]));
+        prepared(text).run(...(params as never[]));
       }
     },
 
     all<T = Row>(text: string, ...params: Param[]): T[] {
       check(text, params);
-      return db.prepare(text).all(...(params as never[])) as T[];
+      return prepared(text).all(...(params as never[])) as T[];
     },
 
     one<T = Row>(text: string, ...params: Param[]): T | undefined {
       check(text, params);
-      return db.prepare(text).get(...(params as never[])) as T | undefined;
+      return prepared(text).get(...(params as never[])) as T | undefined;
     },
 
     /**
