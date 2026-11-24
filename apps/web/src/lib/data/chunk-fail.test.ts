@@ -7,13 +7,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AGAIN_AFTER_MS, RELOADED, handled, isChunkFailure, recovery } from './chunk-fail.ts';
+import { AGAIN_AFTER_MS, RELOADED, START_AGAIN, START_AGAIN_MS, START_TRIES, handled, isChunkFailure, recovery } from './chunk-fail.ts';
 
 /** A tab: its storage, where it is, the clock, and what it did. */
 function tab(at = 'https://brain.dog/acme/', store: Map<string, string> | null = new Map()) {
   const did: string[] = [];
   const marks: string[] = [];
+  const waits: number[] = [];
   let now = 1_000_000;
+  /* `error.html`'s box when it is drawn: its state, and the press its button hands on. */
+  const box = { drawn: false, state: null as string | null, press: null as ((e: { preventDefault(): void }) => void) | null };
   const env = {
     store: () =>
       store === null
@@ -22,8 +25,20 @@ function tab(at = 'https://brain.dog/acme/', store: Map<string, string> | null =
     here: () => ({ href: at, reload: () => void did.push(`reload ${at}`), assign: (u: string) => void did.push(`assign ${u}`) }),
     now: () => now,
     body: () => ({ setAttribute: (name: string) => void marks.push(name) }),
+    start: () =>
+      box.drawn
+        ? {
+            getAttribute: () => box.state,
+            setAttribute: (_: string, v: string) => void (box.state = v),
+            querySelector: () => ({ addEventListener: (_: 'click', fn: (e: { preventDefault(): void }) => void) => void (box.press = fn) }),
+          }
+        : null,
+    later: (fn: () => void, ms: number) => {
+      waits.push(ms);
+      fn();
+    },
   };
-  return { env, did, marks, store, later: (ms: number) => void (now += ms) };
+  return { env, did, marks, waits, box, store, later: (ms: number) => void (now += ms) };
 }
 
 test('EVERY ENGINE SAYS A FAILED IMPORT ITS OWN WAY, and each is a file that did not arrive', () => {
@@ -97,4 +112,40 @@ test("THE ROUTER'S ERROR IS MARKED chunk ONLY FOR A FILE THAT DID NOT ARRIVE, an
   t.mock.method(console, 'error', () => undefined);
   assert.deepEqual(handled(new TypeError('Failed to fetch dynamically imported module: x'), 'Internal Error'), { message: 'Internal Error', chunk: true });
   assert.deepEqual(handled(new Error('boom'), 'Internal Error'), { message: 'Internal Error' });
+});
+
+test('A FAILED START TRIES AGAIN THREE TIMES, 1.5 SECONDS APART, THEN SAYS SO; a start that works clears the count', () => {
+  const a = tab();
+  assert.equal(recovery(a.env).startFailed(), 'none', 'no error.html on screen, nothing to do');
+  const states: string[] = [];
+  for (let i = 0; i < START_AGAIN + 1; i += 1) {
+    a.box.drawn = true;
+    a.box.state = null;
+    states.push(recovery(a.env).startFailed());
+  }
+  assert.deepEqual(states, ['again', 'again', 'again', 'failed']);
+  assert.deepEqual(a.waits, [START_AGAIN_MS, START_AGAIN_MS, START_AGAIN_MS]);
+  assert.equal(a.did.length, START_AGAIN);
+  assert.equal(a.box.state, 'failed');
+
+  /* Its Try again reloads the address, once pressed, and the form under it is not sent. */
+  let prevented = false;
+  a.box.press?.({ preventDefault: () => void (prevented = true) });
+  assert.ok(prevented);
+  assert.equal(a.did.length, START_AGAIN + 1);
+
+  /* The same page asked twice is decided once. */
+  assert.equal(recovery(a.env).startFailed(), 'none');
+
+  recovery(a.env).started();
+  assert.equal(a.store?.has(START_TRIES), false);
+  a.box.state = null;
+  assert.equal(recovery(a.env).startFailed(), 'again');
+});
+
+test('A TAB THAT CANNOT COUNT ITS TRIES SAYS THE START FAILED AT ONCE, rather than reload for ever', () => {
+  const a = tab('https://brain.dog/', null);
+  a.box.drawn = true;
+  assert.equal(recovery(a.env).startFailed(), 'failed');
+  assert.deepEqual(a.did, []);
 });

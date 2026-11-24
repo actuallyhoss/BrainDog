@@ -56,6 +56,14 @@ test('THE POLICY FRAMES ONLY THE HOSTS OWN FRAMES AND TURNSTILE, AND ITS ONE INL
     assert.ok(!(d[name] ?? []).some((s) => s === 'unsafe-inline' || s === 'unsafe-eval'), `${name} allows inline or eval`);
 });
 
+test("THE FAILED START'S STYLESHEET IS HASHED, so the page SvelteKit draws when the app cannot start is drawn as designed", async () => {
+  const { default: config } = (await import(CONFIG)) as { default: { kit?: { csp?: Csp } } };
+  const page = readFileSync(new URL('../src/error.html', import.meta.url), 'utf8').replace(/<!--[\s\S]*?-->/gu, '');
+  const styles = [...page.matchAll(/<style>([\s\S]*?)<\/style>/gu)];
+  assert.equal(styles.length, 1, 'error.html is drawn by one stylesheet');
+  assert.ok(config.kit?.csp?.directives?.['style-src-elem']?.includes(hash(styles[0]![1]!).slice(1, -1)), "error.html's stylesheet is not hashed in style-src-elem, so the policy refuses it");
+});
+
 test('A BLOB IN THE HOLDING FRAME IS ONLY EVER A PDF: the one file that hands it a blob types it as one, and no other file that makes a blob draws a frame', () => {
   const src = fileURLToPath(new URL('../src/', import.meta.url));
   const viewer = 'lib/attach/AttachmentViewer.svelte';

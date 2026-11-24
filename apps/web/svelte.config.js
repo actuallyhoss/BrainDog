@@ -9,11 +9,16 @@ const OUT = process.env.BRAINDOG_ENV ? `build-${process.env.BRAINDOG_ENV}` : 'bu
    itself: the boot script is added for us, and the preference reader and the first-paint style in `src/app.html` are
    not. They are read from the file and not copied as literals, so an edit to either one moves its hash with it
    instead of blanking the app. Comments go first, because a comment that spelled a tag would be hashed as one.
-   `apps/web/test/csp.test.ts` reads the built shell and fails on any inline script or style this list missed. */
-const TEMPLATE = readFileSync(new URL('./src/app.html', import.meta.url), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
-/** @param {'script' | 'style'} tag */
-const inlineHashes = (tag) =>
-  [...TEMPLATE.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'g'))].map(
+   `apps/web/test/csp.test.ts` reads the built shell and fails on any inline script or style this list missed.
+   AND THE STYLESHEET OF `src/error.html`, the page a failed start draws: SvelteKit moves it into the document under
+   this same policy, which refused it unhashed. */
+/** @param {string} file */
+const markup = (file) => readFileSync(new URL(file, import.meta.url), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+const TEMPLATE = markup('./src/app.html');
+const FAILED_START = markup('./src/error.html');
+/** @param {'script' | 'style'} tag @param {string} [text] */
+const inlineHashes = (tag, text = TEMPLATE) =>
+  [...text.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'g'))].map(
     (m) => /** @type {`sha256-${string}`} */ (`sha256-${createHash('sha256').update(m[1] ?? '').digest('base64')}`),
   );
 
@@ -103,13 +108,14 @@ export default {
        `<meta>`, and both hosts copy it into the header with `frame-ancestors 'none'`, which a meta tag cannot carry.
        The one named exception is `style-src-attr 'unsafe-inline'`: the renderer's `--cells` and `--magnitude` ride
        a `style` attribute, which no content reaches unescaped (36 §13-10). Themes and the accent are constructed
-       sheets and never a `<style>`, so `style-src-elem` needs only the shell's own. */
+       sheets and never a `<style>`, so `style-src-elem` needs only the shell's own and the failed start's
+       (`error.html`). */
     csp: {
       mode: 'hash',
       directives: {
         'default-src': ['self'],
         'script-src': ['self', ...inlineHashes('script'), TURNSTILE],
-        'style-src-elem': ['self', ...inlineHashes('style')],
+        'style-src-elem': ['self', ...inlineHashes('style'), ...inlineHashes('style', FAILED_START)],
         'style-src-attr': ['unsafe-inline'],
         'frame-src': ['self', TURNSTILE],
         'object-src': ['none'],

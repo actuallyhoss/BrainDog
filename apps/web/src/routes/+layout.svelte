@@ -38,7 +38,7 @@
   import '$lib/ui/style.css';
   import { onMount } from 'svelte';
   import { navigating } from '$app/state';
-  import { preloadFailed } from '$lib/data/chunk-fail.ts';
+  import { preloadFailed, started } from '$lib/data/chunk-fail.ts';
 
   let { data, children } = $props();
 
@@ -47,6 +47,8 @@
      than once it has drawn, so a page's first lazy block is heard. */
   if (typeof window !== 'undefined')
     window.addEventListener('vite:preloadError', (e) => preloadFailed(e.payload, navigating.to?.url ?? null));
+  /* AND THIS IS A START THAT WORKED: a start that fails after it tries again three times before it says so (`error.html`). */
+  started();
 
   /* EVERY VIEW TRANSITION'S RULES ARRIVE ONCE THE FIRST SCREEN HAS DRAWN (speed4, 2 Nov): nothing in them draws a still
      screen, so they are not in the sheet every screen waits on. Asked when the browser is next idle, within a second. */
