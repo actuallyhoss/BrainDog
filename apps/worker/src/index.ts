@@ -3690,19 +3690,21 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
  * WHERE A CALL CAME FROM IS THE BRANCH THE ROUTER TOOK, never the path read again. A path is the caller's
  * to write, and `includes('/mcp')` once made `POST /api/list/mcp` record `mcp` on a token: a forgeable line
  * in the one place a person decides what to revoke.
+ *
+ * `clock`, WHEN GIVEN, IS ADDED THE TIME OF EACH TRIP `bearerOf` MAKES: `knows`, the lapse (`billing`) and `admit`.
  */
-function bearerDeps(env: Env): BearerDeps {
+function bearerDeps(env: Env, clock?: BearerClock): BearerDeps {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   return {
-    knows: (id) => directory.knows(id),
+    knows: (id) => clocked(clock, 'knows', () => directory.knows(id)),
     /* THE DIRECTORY'S ROW AND NOT THE OBJECT'S FLAG, as the session's `lapsed` is, so both doors cap on one fact. A record
        with no billing row answers `false` and is never capped. */
-    lapsed: async (id) => ((await directory.billing({ op: 'lapsed', record: id })) as unknown) === true,
+    lapsed: (id) => clocked(clock, 'billing', async () => ((await directory.billing({ op: 'lapsed', record: id })) as unknown) === true),
     verify: (id, bearer, surface, build) => held(env, id, (record) => record.verify(bearer, surface, build)),
     access: (id, person, token) => held(env, id, (record) => (token === undefined ? record.access(person) : record.access(person, token))),
     /* THE TWO ABOVE IN ONE TRIP TO THE RECORD, which is what the bearer path asks (`Record$.admit`). */
     admit: (id, bearer, surface, build) =>
-      held(env, id, (record) => record.admit(bearer, surface, build)) as ReturnType<NonNullable<BearerDeps['admit']>>,
+      clocked(clock, 'admit', () => held(env, id, (record) => record.admit(bearer, surface, build))) as ReturnType<NonNullable<BearerDeps['admit']>>,
     /* ASKED ONLY UNDER `/<slug>`, to hold the path to the record the bearer names. */
     named: async (slug) => (await directory.resolve(slug))?.record ?? null,
     /* ASKED ONLY AT THE FOUR PATHS AN OPERATION OPENS, because asking spends it (`session.ts`). An armed record rejects
@@ -3713,6 +3715,43 @@ function bearerDeps(env: Env): BearerDeps {
       return { method: out.value.method, person: out.value.person, binds: out.value.binds ?? null };
     },
   };
+}
+
+/**
+ * WHERE A BEARER'S CALL ON `/api` OR `/mcp` SPENT ITS TIME, for its `bearer-time` line (`bearerTimeSaid`): the
+ * Directory's `knows`, its `billing` (the lapse) and the record's `admit`, the token's minute (`limit`, `overLimit`), the
+ * forward to the record, and the whole of it from when this Worker took the request (`began`). `billing` and `admit` go
+ * out side by side, so they overlap and do not add; what the parts leave of the total is time none of them owns. Each is
+ * wall time across a trip: the clock stands still while this Worker's own code runs.
+ */
+type BearerClock = { began: number; knows: number; billing: number; admit: number; limit: number; forward: number };
+
+const bearerClock = (began: number): BearerClock => ({ began, knows: 0, billing: 0, admit: 0, limit: 0, forward: 0 });
+
+/** `run`, with the time it took added to `clock`'s `leg` whether it answered or threw, and as it was with no clock. */
+async function clocked<T>(clock: BearerClock | undefined, leg: Exclude<keyof BearerClock, 'began'>, run: () => Promise<T>): Promise<T> {
+  if (clock === undefined) return run();
+  const t0 = Date.now();
+  try {
+    return await run();
+  } finally {
+    clock[leg] += Date.now() - t0;
+  }
+}
+
+/** A bearer's call slower than this, whole, always writes its `bearer-time` line, and one in `BEARER_TIME_EVERY` of the rest. */
+const BEARER_TIME_SLOW_MS = 500;
+const BEARER_TIME_EVERY = 50;
+
+/**
+ * The `bearer-time` line of a call the record answered, written for every slow one and sampled below that (`sampled`), so
+ * it is not one more line a request. A call refused at the door writes none.
+ */
+function bearerTimeSaid(clock: BearerClock, path: string, rec: string, status: number): void {
+  const total = Date.now() - clock.began;
+  const slow = total > BEARER_TIME_SLOW_MS;
+  if (!slow && Math.random() >= 1 / BEARER_TIME_EVERY) return;
+  op({ op: 'bearer-time', path, rec, status, knows: clock.knows, billing: clock.billing, admit: clock.admit, limit: clock.limit, forward: clock.forward, total, ...(slow ? {} : { sampled: true }) });
 }
 
 /** The methods a runner calls, and the only paths `runnerOf` reads a bearer at. */
@@ -4023,7 +4062,7 @@ export default {
     request = old.request;
     let answer: Response;
     try {
-      answer = await route(request, env, ctx);
+      answer = await route(request, env, ctx, began);
     } catch (e) {
       /* AN ARMED RECORD IS NOT A FAULT, AND 500 TOLD THE CLIENT IT WAS. Every door that checks a credential by RPC reaches
          `#record()` first, which rejects while a restore is armed, and this answered that 500 `INTERNAL` with the refusal's
@@ -4289,7 +4328,7 @@ async function keepNight(directory: { nightDone(night: Night): Promise<void> }, 
   }
 }
 
-async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+async function route(request: Request, env: Env, ctx: ExecutionContext, began = Date.now()): Promise<Response> {
     const url = new URL(request.url);
     /* LIVENESS BEFORE EVERYTHING, THE OLD HOST'S REDIRECT INCLUDED. Measured at afb3b1b2 `/healthz` was the router's 404
        on `PUBLIC_HOST` and a 308 into the app on a legacy host for a caller sending `accept: text/html`, so a monitor
@@ -4328,7 +4367,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
       if (answered !== null) return answered;
     }
     /* AN AGENT'S MCP CLIENT, BEFORE ANY DOOR IS ASKED, so the cookie is never read for it. */
-    if (servesMcp(url.pathname)) return agent(request, env);
+    if (servesMcp(url.pathname)) return agent(request, env, began);
     /* `/in/*`: SOMETHING ARRIVES FROM OUTSIDE AND NOBODY IS ASKED WHO IT IS (`33 §4`, `51 §5.4`, `12 §3`).
        BEFORE EVERY DOOR, so the cookie is never read for it: an arrival is above the
        auth gate by design, and what stands in for a principal is whether the payload was verified, which
@@ -4403,10 +4442,10 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     const app = appPath(url.pathname);
     /* A RECORD'S PUBLIC KEY, UNDER ITS NAME, before the page and the API are told apart: it is neither. */
     if (app !== null && app.slug !== null && servesKey(app.rest)) return recordKey(request, env, app.slug);
-    if (app !== null) return servesApi(app.rest) ? timedApi(atRoot(request, app.rest), env, app.slug) : appPage(request, env, app);
+    if (app !== null) return servesApi(app.rest) ? timedApi(atRoot(request, app.rest), env, app.slug, began) : appPage(request, env, app);
     if (!servesApi(url.pathname))
       return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }, 404);
-    return timedApi(request, env, null);
+    return timedApi(request, env, null, began);
 }
 
 /**
@@ -4418,9 +4457,9 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
  * THE RECORD'S OWN CLOCK IS NOT ASKED: inside an object time moves only across I/O, so the work it does in its own thread
  * reads as nothing. What the record costs is read from `rec` against a call that does no work (`version`).
  */
-async function timedApi(request: Request, env: Env, slug: string | null): Promise<Response> {
+async function timedApi(request: Request, env: Env, slug: string | null, began = Date.now()): Promise<Response> {
   const t0 = Date.now();
-  const out = await recordApi(request, env, slug);
+  const out = await recordApi(request, env, slug, began);
   if (out.status === 101 || out.webSocket) return out;
   const said = /(?:^|,)\s*rec;dur=(\d+)/.exec(out.headers.get('server-timing') ?? '');
   const rec = said === null ? undefined : Number(said[1]);
@@ -4443,7 +4482,7 @@ export function withServerTiming(out: Response, value: string): Response {
  * could drift from the first. Under a slug a cookie means that record once the Directory says it is theirs, a bearer
  * must name the same record, and nothing presented is 401 at either.
  */
-async function recordApi(request: Request, env: Env, slug: string | null): Promise<Response> {
+async function recordApi(request: Request, env: Env, slug: string | null, began = Date.now()): Promise<Response> {
     const url = new URL(request.url);
     /* THE KEY A BROWSER SUBSCRIBES WITH IS THE DEPLOYMENT'S, NOT A RECORD'S, so it is answered before any door is asked
        and at either address: the app calls it under its slug and an agent at the root, and neither needs a session to
@@ -4578,7 +4617,9 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
 
     /* A BEARER. This Worker serves MANY records, and a request that says who it is by nothing but the
        header it carries says so here, or not at all. `session.ts` holds the path, and `/mcp` takes the same one. */
-    const found = await bearerOf(request, 'api', bearerDeps(env), slug);
+    /* EACH TRIP TIMED FOR THE `bearer-time` LINE (`BearerClock`), from when this Worker took the request. */
+    const clock = bearerClock(began);
+    const found = await bearerOf(request, 'api', bearerDeps(env, clock), slug);
     /* AND A BEARER NO TOKEN ROW KNOWS MAY BE A RUNNER'S, AT THE THREE PATHS A RUNNER CALLS AND NOWHERE ELSE.
        It is the same door, a bearer on `/api`, so it reaches the record through the same
        line below; the record builds the runner's context from its own device grants, and every method but the JOBS
@@ -4587,7 +4628,7 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
     if ('status' in caller) return caller.status === 403 ? json({ ok: false, refusal: caller.refusal }, 403) : unauthorized(env);
 
     /* AND A BEARER'S MINUTE, THE TOKEN'S OWN AND NOT ITS RECORD'S, before the record is asked (`overLimit`). */
-    const over = await overLimit(env, { door: 'bearer', ctx: caller.ctx }, request, classAt(url.pathname));
+    const over = await clocked(clock, 'limit', () => overLimit(env, { door: 'bearer', ctx: caller.ctx }, request, classAt(url.pathname)));
     if (over !== null) return over;
 
     /* THE WORKER AUTHENTICATES AND THE RECORD AUTHORISES, and neither does the other's half. Every check about
@@ -4596,10 +4637,11 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
     const inner = inward(request, caller.ctx);
     /* A RUNNER'S CLAIM IS HELD HERE UNTIL A JOB IS QUEUED OR ITS WAIT RUNS OUT (`holdClaim`), and every other call is
        forwarded once. Only the runner's own principal is held, so a person or a token asking `claimJob` is answered
-       at once with the record's refusal. */
-    return caller.ctx.principal.kind === 'runner' && claimAsked(inner.method, url.pathname)
-      ? heldClaim(inner, env, caller.record, caller.ctx)
-      : forward(inner, env, caller.record, caller.ctx);
+       at once with the record's refusal. A HELD CLAIM WRITES NO `bearer-time` LINE: it is slow by design. */
+    if (caller.ctx.principal.kind === 'runner' && claimAsked(inner.method, url.pathname)) return heldClaim(inner, env, caller.record, caller.ctx);
+    const out = await clocked(clock, 'forward', () => forward(inner, env, caller.record, caller.ctx));
+    bearerTimeSaid(clock, doorPath(url.pathname), caller.record, out.status);
+    return out;
 }
 
 /** Whether a request is the record's `claimJob`, under either base, as `removalAsked` reads its own method. */
@@ -5097,10 +5139,12 @@ function mailAddress(request: Request, env: Env, id: string, ctx: CallContext): 
  * every five minutes, a 401), the site logged "Can't read from request stream after response has been sent". The body
  * is at most `/mcp`'s ceiling by now (`guardBody`).
  */
-async function agent(request: Request, env: Env): Promise<Response> {
+async function agent(request: Request, env: Env, began = Date.now()): Promise<Response> {
   const early = gate(request);
   if (early) return drained(request, early);
-  const found = await bearerOf(request, 'mcp', bearerDeps(env));
+  /* EACH TRIP TIMED FOR THE `bearer-time` LINE (`BearerClock`), as on `/api`. */
+  const clock = bearerClock(began);
+  const found = await bearerOf(request, 'mcp', bearerDeps(env, clock));
   /* THE 401 NAMES WHERE TO SIGN IN, so an MCP client that holds no token starts OAuth from it (RFC 9728).
      On the name it reached, so a client set up with `brain.dog/mcp` reads `brain.dog/mcp` as the resource
      (`mcpMetadataAt`). Without a public host there is no address to name, and the 401 is as it was. */
@@ -5108,9 +5152,11 @@ async function agent(request: Request, env: Env): Promise<Response> {
   if ('status' in found) return drained(request, found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unknownAgent(metadata));
   /* THE TOKEN'S MINUTE BEFORE THE RECORD READS THE BODY, and always the MCP budget (`RL_MCP`, else the read one): which tool is called is inside a
      body nobody has parsed yet (`classOf`), and the record still decides whether a write is allowed. */
-  const over = await overLimit(env, { door: 'bearer', ctx: found.ctx }, request, 'mcp');
+  const over = await clocked(clock, 'limit', () => overLimit(env, { door: 'bearer', ctx: found.ctx }, request, 'mcp'));
   if (over !== null) return drained(request, over);
-  return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
+  const out = await clocked(clock, 'forward', () => env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx)));
+  bearerTimeSaid(clock, '/mcp', found.record, out.status);
+  return out;
 }
 
 /**
