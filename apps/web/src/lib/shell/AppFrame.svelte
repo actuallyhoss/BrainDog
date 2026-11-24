@@ -791,6 +791,9 @@
       /* MONEY KEEPS ITS PAGES OPEN AND ITS LISTS FOLDED (Q35 of the 29 Oct audit): the places he goes stand under it,
          and Snapshots, Books, Exchange rates, Categories and the rest wait under its More. */
       leads: placed.at.money ? { [placed.at.money]: moneyLead(rail.views[placed.at.money], [...rail.places, ...rail.rest].find((i) => i.key === placed.at.money)?.href) } : {},
+      /* AGENTS IS ONE DOOR (24 Nov): its runs, instructions, learnings, profiles, keys and automations are all on Runs and
+         setup, so the sidebar draws that one row under it and stays lit on each of them. */
+      door: placed.at.agents ? { [placed.at.agents]: { label: 'Runs and setup', icon: 'history', query: 'more' } } : {},
       waiting,
     }),
   });

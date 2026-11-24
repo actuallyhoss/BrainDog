@@ -20,6 +20,7 @@
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { setContext, tick, untrack } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import PageView from '$lib/page/PageView.svelte';
   import { preloadKinds } from 'braindog-render/svelte';
   import PageTabs from '$lib/page/PageTabs.svelte';
@@ -58,6 +59,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import ProjectWaiting from '$lib/page/ProjectWaiting.svelte';
   import { knownProject, projectsList, projectsPlace } from '$lib/page/known-project.ts';
+  import { MORE, MORE_TITLE, consoleOf, isConsole } from '$lib/agents/console.ts';
 
   const slug = $derived(route.params.slug ?? '');
   const showSource = $derived(route.url.searchParams.get('src') === '1');
@@ -431,6 +433,27 @@
   /* THE AGENTS PAGE, KNOWN THE SAME WAY, by the list of every run it draws (`panel: run-list`), opens on the plain head the
      hand-written screens beside it have (Needs you, Automations), not the lead tile (`PageView`'s `plain`). */
   const plainHead = $derived(got?.from === 'live' && got.page.blocks.some((b) => (b as { panel?: unknown }).panel === 'run-list'));
+  /* THE AGENTS PAGE IN TWO PARTS, FROM ONE READ (`console.ts`, 24 Nov): the conversations, who is working and what is up
+     next here, and everything else under Runs and setup (`?more`), with the way back. */
+  const morePart = $derived(route.url.searchParams.has(MORE));
+  /* ONE COLUMN UNDER A LAPTOP'S WIDTH, IN THE PAGE'S OWN ORDER: a phone draws a rail first (Money's, Home's), and here
+     the conversations are what he comes for, so they lead and who is working follows. */
+  const besides = new MediaQuery('(width >= 900px)', true);
+  const drawnGot = $derived.by((): Opened | null => {
+    const g = view.got;
+    if (g?.from !== 'live' || !isConsole(g.page.blocks)) return g;
+    const home = `/p/${view.slug}`;
+    const { blocks, layout } = consoleOf(g.page.blocks, morePart ? 'more' : 'lead', home);
+    const decl = g.page.page as typeof g.page.page & { head?: Record<string, unknown>; layout?: unknown };
+    const { layout: _flat, ...rest } = decl;
+    const page =
+      morePart || layout === null
+        ? { ...rest, title: MORE_TITLE, head: { ...(decl.head ?? {}), back: { href: home, label: decl.title } } }
+        : besides.current
+          ? { ...decl, layout }
+          : rest;
+    return { ...g, page: { ...g.page, page, blocks } };
+  });
   let told = $state<{ base: string; tile: LessonsTile | null } | null>(null);
   $effect(() => {
     if (!ofRuns) return;
@@ -467,7 +490,7 @@
     <div class="shaped-body">{@render shaped()}</div>
   </div>
 {:else}
-  <div class="read" aria-busy={reading ? 'true' : undefined}><PageView slug={view.slug} {showSource} got={view.got} {reread} offer={offer || lessons ? offerCard : undefined} waiting={known ? shaped : undefined} plain={plainHead} /></div>
+  <div class="read" aria-busy={reading ? 'true' : undefined}><PageView slug={view.slug} {showSource} got={drawnGot} {reread} offer={offer || lessons ? offerCard : undefined} waiting={known ? shaped : undefined} plain={plainHead} /></div>
 {/if}
 
 <style>

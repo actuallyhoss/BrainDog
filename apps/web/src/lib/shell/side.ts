@@ -364,6 +364,12 @@ export function sideModel(o: {
    * `section` is the section the page files itself under, which names its row under More lists (`Life`, polish-i PI2).
    */
   waiting?: readonly (SideLink & { home: string; section?: string | undefined })[];
+  /**
+   * A PLACE THAT DRAWS ONE DOOR IN PLACE OF ITS OWN ROWS, by the place's key: Agents, whose lists, pages and tools were
+   * five rows and a More (the Agents page of 24 Nov), draws one row to the page that holds them all. Each row it no
+   * longer draws is an address the place answers for, so it is still lit on every one of them.
+   */
+  door?: Readonly<Record<string, { label: string; icon: string; query: string }>>;
 }): SideModel {
   const named = new Map([...o.places, ...o.others].map((p) => [word(p.label), p.key] as const));
   const folded = new Map<string, SideList>();
@@ -418,6 +424,14 @@ export function sideModel(o: {
   const places = o.places.map((p): SidePlace => {
     const l = folded.get(p.key);
     const kids = once([...(o.views[p.key] ?? []), ...viewsOf(l), ...rows(p.key), ...own(p.key)]).filter((k) => !TUCKED.has(k.href));
+    const door = o.door?.[p.key];
+    if (door)
+      return {
+        ...p,
+        ...(l ? { list: l.id } : {}),
+        near: [...new Set([...(p.near ?? []), ...kids.flatMap((k) => [k.href, ...(k.near ?? [])])])],
+        kids: [{ href: `${p.href}?${door.query}`, label: door.label, icon: door.icon }],
+      };
     const lead = o.leads?.[p.key];
     const split = lead ? leadFirst(kids, lead) : null;
     return {

@@ -377,3 +377,24 @@ test('A PAGE HELD OFF THE RAIL GOES UNDER ITS PLACE, OR UNDER MORE LISTS WHERE I
   assert.deepEqual(crumbOf('/p/weather', m, litOf('/p/weather', m), 'Weather').map((c) => c.label), ['Life', 'Weather']);
   assert.deepEqual(crumbOf('/p/calendar', m, litOf('/p/calendar', m), 'Calendar').map((c) => c.label), ['Life', 'Calendar']);
 });
+
+test('AGENTS DRAWS ONE DOOR IN PLACE OF ITS ROWS, and every row it folds is still where Agents is lit', () => {
+  const lists = [list('runs', { name: 'Agent runs', count: 930, kernel: true, facts: null })];
+  const places = [TODAY, { ...CREW, count: 3, live: true }];
+  const m = sideModel({
+    places,
+    others: [],
+    projects: null,
+    lists,
+    homes: homesOf(lists, places, AT),
+    views: {},
+    tools: [{ href: '/automations', label: 'Automations', icon: 'refresh', home: CREW.key }],
+    foot: [],
+    counted: {},
+    door: { [CREW.key]: { label: 'Runs and setup', icon: 'history', query: 'more' } },
+  });
+  const crew = m.places.find((p) => p.key === CREW.key)!;
+  assert.deepEqual(crew.kids.map((k) => `${k.label} ${k.href}`), [`Runs and setup ${CREW.href}?more`]);
+  assert.equal(crew.count, 3, 'the place keeps its count of who is working');
+  assert.ok(crew.near?.includes('/automations'), 'a row it folds is an address it answers for');
+});
