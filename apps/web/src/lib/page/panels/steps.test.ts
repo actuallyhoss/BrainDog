@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { stepSaid, stepsOf } from './steps.ts';
+import { freshSteps, stepSaid, stepsOf } from './steps.ts';
 
 test('A STEP IS SAID IN PLAIN WORDS: no name it was addressed to, and a key by what it opens', () => {
   assert.equal(
@@ -46,4 +46,11 @@ test('A STEP SAYS THE PROJECT IT WAS LEFT IN, by the name the block gives its ro
       ['Write the note', null],
     ],
   );
+});
+
+test('ONLY WHAT IS STILL NEWS IS UP NEXT: a step left over a week ago folds under Older', () => {
+  const now = Date.parse('2026-09-20T12:00:00Z');
+  const steps = stepsOf({ rows: [row('S4', 'Send the invoice', 'next', '2026-09-18T11:00:00Z'), row('S2', 'Read the sales numbers', 'earlier', '2026-09-08T11:00:00Z')] });
+  const { fresh, older } = freshSteps(steps, now);
+  assert.deepEqual([fresh.map((s) => s.next), older.map((s) => s.next)], [['Send the invoice'], ['Read the sales numbers']]);
 });

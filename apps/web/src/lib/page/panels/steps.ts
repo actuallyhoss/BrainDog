@@ -63,3 +63,22 @@ export function stepSaid(next: string): string {
   said = said.replace(/\bthe sealed\s+(\S+)\s+key\b/giu, 'the $1 key');
   return said.charAt(0).toUpperCase() + said.slice(1);
 }
+
+/** How old a step may be and still be up next: older than a week, it is folded under Older (the Agents page of 24 Nov). */
+export const FRESH_DAYS = 7;
+
+/**
+ * THE STEPS THAT ARE STILL NEWS, AND THE ONES THAT ARE NOT: a step left in the last `FRESH_DAYS` days is up next; one
+ * older is under Older, a press away, since a read due 19 Nov drawn on 24 Nov beside today's work was stale junk. A
+ * step whose day is unknown is kept fresh, as it was.
+ */
+export function freshSteps(steps: readonly Step[], now: number, days = FRESH_DAYS): { fresh: Step[]; older: Step[] } {
+  const cut = now - days * 86_400_000;
+  const fresh: Step[] = [];
+  const older: Step[] = [];
+  for (const s of steps) {
+    const at = Date.parse(s.at);
+    (Number.isFinite(at) && at < cut ? older : fresh).push(s);
+  }
+  return { fresh, older };
+}

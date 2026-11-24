@@ -3,6 +3,9 @@
   `handoffs.open`, the read a new run is handed its step from, so the page never lists a step the briefing would not
   offer.
 
+  ONLY WHAT IS STILL NEWS (the Agents page of 24 Nov): a step left in the last week is up next, and older ones fold under
+  one Older line (`freshSteps`), so a Bake read due five days ago is not drawn beside tonight's work.
+
   ONE ROW A STEP, THE WHOLE WIDTH, AND A STEP LEFT THREE TIMES IS ONE ROW (the audit's "the same step 3 times"): the step in
   its own words first, then under it the project it was left in as a chip, who left it, when, and how many times. The
   newest three are drawn and the rest are folded under a count, so the tile never grows past what a glance takes in. It
@@ -24,7 +27,7 @@
   import { fill, told } from '$lib/record/instruct.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { listen } from '../listen.svelte.ts';
-  import { stepSaid, stepsOf, type Step } from './steps.ts';
+  import { freshSteps, stepSaid, stepsOf, type Step } from './steps.ts';
   import { readQuestionWords, refsParts } from './run-talk.ts';
 
   let { owner = false }: { owner?: boolean } = $props();
@@ -42,6 +45,8 @@
     left: (who: string, when: string, times: number) => `${who}, ${when}${times > 1 ? `, left ${times} times` : ''}`,
     more: (n: number) => `Show ${n.toLocaleString('en')} more`,
     fewer: 'Show fewer',
+    older: (n: number) => `Older, ${n.toLocaleString('en')}`,
+    none: 'Nothing new is waiting for the next run.',
     someone: 'An agent',
   } as const;
 
@@ -82,7 +87,8 @@
   });
   listen(load, () => busy !== null);
 
-  const shown = $derived(all ? steps : steps.slice(0, FIRST));
+  const split = $derived(freshSteps(steps, recordNow()));
+  const shown = $derived(all ? split.fresh : split.fresh.slice(0, FIRST));
 
   async function drop(s: Step): Promise<void> {
     if (busy !== null) return;
@@ -107,41 +113,52 @@
   }
 </script>
 
+{#snippet step(s: Step)}
+  <li class="step" data-earlier={s.earlier ? '' : undefined}>
+    <p class="step-next">{#each refsParts(stepSaid(s.next), questions) as part}{#if part.href}<a class="step-ref" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}</p>
+    <p class="step-meta">
+      {#if s.project}<span class="step-proj">{s.project}</span>{/if}<span>{words.left(s.agent || words.someone, since(s.at, recordNow()), s.runs.length)}</span>
+    </p>
+    {#if owner}
+      {#if asking === s.key}
+        <form class="step-ask" aria-label={words.drop} onsubmit={(e) => (e.preventDefault(), void drop(s))}>
+          <label class="step-why" for="{uid}-{s.key}">{words.why}</label>
+          <input id="{uid}-{s.key}" class="step-input" type="text" bind:value={why} maxlength="400" autocomplete="off" enterkeyhint="done" />
+          <div class="step-do">
+            <button type="button" class="step-btn" onclick={() => ((asking = null), (why = ''))}>{words.keep}</button>
+            <button type="submit" class="step-btn" data-weight="primary" disabled={busy === s.key}>{words.dropIt}</button>
+          </div>
+        </form>
+      {:else}
+        <div class="step-do step-acts">
+          <button type="button" class="step-btn" aria-label={words.takeLabel(s.next)} onclick={() => fill.say(words.takeSaid(s.next))}>{words.take}</button>
+          <button type="button" class="step-btn" aria-label={words.dropLabel(s.next)} onclick={() => ((asking = s.key), (why = ''))}>{words.drop}</button>
+        </div>
+      {/if}
+    {/if}
+  </li>
+{/snippet}
+
 {#if drew !== true}
   <!-- NOTHING LEFT, OR NOT READ YET: the tile is left out whole (`BlockSlot.svelte`'s rule for a panel that drew nothing),
        and says it is still reading while it is. -->
   <span data-seen-none hidden aria-busy={drew === null ? 'true' : undefined}></span>
 {:else}
   <div class="steps">
-    <ol class="steps-list">
-      {#each shown as s (s.key)}
-        <li class="step" data-earlier={s.earlier ? '' : undefined}>
-          <p class="step-next">{#each refsParts(stepSaid(s.next), questions) as part}{#if part.href}<a class="step-ref" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}</p>
-          <p class="step-meta">
-            {#if s.project}<span class="step-proj">{s.project}</span>{/if}<span>{words.left(s.agent || words.someone, since(s.at, recordNow()), s.runs.length)}</span>
-          </p>
-          {#if owner}
-            {#if asking === s.key}
-              <form class="step-ask" aria-label={words.drop} onsubmit={(e) => (e.preventDefault(), void drop(s))}>
-                <label class="step-why" for="{uid}-{s.key}">{words.why}</label>
-                <input id="{uid}-{s.key}" class="step-input" type="text" bind:value={why} maxlength="400" autocomplete="off" enterkeyhint="done" />
-                <div class="step-do">
-                  <button type="button" class="step-btn" onclick={() => ((asking = null), (why = ''))}>{words.keep}</button>
-                  <button type="submit" class="step-btn" data-weight="primary" disabled={busy === s.key}>{words.dropIt}</button>
-                </div>
-              </form>
-            {:else}
-              <div class="step-do step-acts">
-                <button type="button" class="step-btn" aria-label={words.takeLabel(s.next)} onclick={() => fill.say(words.takeSaid(s.next))}>{words.take}</button>
-                <button type="button" class="step-btn" aria-label={words.dropLabel(s.next)} onclick={() => ((asking = s.key), (why = ''))}>{words.drop}</button>
-              </div>
-            {/if}
-          {/if}
-        </li>
-      {/each}
-    </ol>
-    {#if steps.length > FIRST}
-      <button type="button" class="steps-more" onclick={() => (all = !all)}>{all ? words.fewer : words.more(steps.length - FIRST)}</button>
+    {#if split.fresh.length > 0}
+      <ol class="steps-list">{#each shown as s (s.key)}{@render step(s)}{/each}</ol>
+    {:else}
+      <p class="steps-none">{words.none}</p>
+    {/if}
+    {#if split.fresh.length > FIRST}
+      <button type="button" class="steps-more" onclick={() => (all = !all)}>{all ? words.fewer : words.more(split.fresh.length - FIRST)}</button>
+    {/if}
+    {#if split.older.length > 0}
+      <!-- OLDER THAN A WEEK, ONE LINE: still there to take or drop, never drawn as news. -->
+      <details class="steps-older">
+        <summary class="steps-more">{words.older(split.older.length)}</summary>
+        <ol class="steps-list">{#each split.older as s (s.key)}{@render step(s)}{/each}</ol>
+      </details>
     {/if}
   </div>
 {/if}
@@ -297,6 +314,26 @@
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
+  }
+
+  .steps-none {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: calc(18px * var(--type, 1));
+  }
+
+  .steps-older {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .steps-older > summary {
+    list-style: none;
+  }
+
+  .steps-older > summary::-webkit-details-marker {
+    display: none;
   }
 
   .steps-more {
