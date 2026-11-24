@@ -37,8 +37,16 @@
   /* THE STYLE LAYER (3 Nov): the ops dashboard's style in BrainDog's colours. Last, so its values win a tie. */
   import '$lib/ui/style.css';
   import { onMount } from 'svelte';
+  import { navigating } from '$app/state';
+  import { preloadFailed } from '$lib/data/chunk-fail.ts';
 
   let { data, children } = $props();
+
+  /* A LAZY FILE OF THE APP'S OWN CODE THAT DID NOT ARRIVE RELOADS THE PAGE ONCE, onto the address a navigation was going
+     to when one was (`chunk-fail.ts`). Here and not in a frame, so sign-in hears it too, and as the layout is made rather
+     than once it has drawn, so a page's first lazy block is heard. */
+  if (typeof window !== 'undefined')
+    window.addEventListener('vite:preloadError', (e) => preloadFailed(e.payload, navigating.to?.url ?? null));
 
   /* EVERY VIEW TRANSITION'S RULES ARRIVE ONCE THE FIRST SCREEN HAS DRAWN (speed4, 2 Nov): nothing in them draws a still
      screen, so they are not in the sheet every screen waits on. Asked when the browser is next idle, within a second. */

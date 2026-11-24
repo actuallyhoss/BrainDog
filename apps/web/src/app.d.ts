@@ -16,6 +16,17 @@ declare const __BRAINDOG_FLAGS__: string;
 declare const __SVELTEKIT_APP_VERSION__: string;
 
 /**
+ * What the router's error carries (`hooks.client.ts`): SvelteKit's message, and `chunk` when a file of the app's own
+ * code did not arrive (`lib/data/chunk-fail.ts`), which `+error.svelte` reloads onto rather than draws.
+ */
+declare namespace App {
+  interface Error {
+    message: string;
+    chunk?: boolean;
+  }
+}
+
+/**
  * The product's own words, made at build time out of the copy files by the `braindog:own-words` plugin of
  * `vite.config.ts` (`src/lib/shot/own-words.ts`). Screenshot mode hands the set to `src/lib/shot/plate.ts`, which
  * plates every text not in it. About 39 KB of source, so whoever mounts the mode imports it only when the mode goes
