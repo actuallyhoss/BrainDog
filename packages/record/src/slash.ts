@@ -2077,7 +2077,9 @@ function modelDraft(
     const built = changeBody(body, n, drawn, described);
     if (!built.ok) return { why: built.why };
     body = built.body;
-    if (built.says.length > 0) question = `${question} ${built.says.join(' ')}`;
+    /* A LINE THE MODEL ALREADY WROTE BACK (a Try again hands it the question it turned down) is not said twice. */
+    const fresh = built.says.filter((line) => !question.includes(line));
+    if (fresh.length > 0) question = `${question} ${fresh.join(' ')}`;
   }
   /* A LOOK IS PICKED FROM WHAT IS INSTALLED, and its question is the record's, in the look's name (`lookDraft`). */
   if (d.body_kind === 'settings' && Object.hasOwn(body, 'look')) return lookDraft(body, n, name, reading);
@@ -2649,6 +2651,28 @@ export function pinMoved(about: { id: string; body: unknown }, to: unknown, held
 }
 
 /**
+ * A DECLARATION THE MODEL NAMED BY ITS KIND, read as the change it means: `body_kind: "page"` with the page's blocks as
+ * its body is a change to the page being described, and a kind with its own `id` is a change to that declaration.
+ * MEASURED 24 NOVEMBER through the production gateway: asked from the bar for "a page that shows my late invoices and
+ * what I'm owed", `gemma-4-26b-a4b` answered `body_kind: "page"` with the blocks as the body, the record dropped it as "a
+ * page proposal", and Make from the bar drafted nothing. Anything else is passed as it came, for `modelDraft` to read.
+ */
+export function asChange(x: unknown, page: { id: string; body: unknown } | undefined): unknown {
+  const d = x as { body_kind?: unknown; body?: unknown } | null;
+  if (d === null || typeof d !== 'object' || typeof d.body_kind !== 'string' || !DESCRIBED_BUILDS.has(d.body_kind)) return x;
+  const body = d.body;
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return x;
+  const { id, kind: _kind, body: inner, ...rest } = body as Record<string, unknown>;
+  const own = inner !== null && typeof inner === 'object' && !Array.isArray(inner) ? (inner as Record<string, unknown>) : rest;
+  if (d.body_kind === 'page' && page !== undefined && page.id.startsWith('page.')) {
+    const was = page.body !== null && typeof page.body === 'object' && !Array.isArray(page.body) ? (page.body as Record<string, unknown>) : {};
+    return { ...d, body_kind: 'change', body: { to: { id: page.id, kind: 'page', body: { ...was, ...own, page: was['page'] ?? page.id.slice('page.'.length) } } } };
+  }
+  if (typeof id !== 'string' || id === '') return x;
+  return { ...d, body_kind: 'change', body: { to: { id, kind: d.body_kind, body: own } } };
+}
+
+/**
  * A description drafted by the model, each draft tried with `previewChange` (and its rules with `tryAutomation`, through
  * `previewerOf`), and what it refused handed back to be mended.
  *
@@ -2716,7 +2740,7 @@ export async function describe(deps: {
     const next: typeof refused = [];
     const cleanBefore = clean.length;
     for (const [i, x] of (list ?? []).entries()) {
-      const one = modelDraft(x, i + 1, deps.name, deps.drawn, true);
+      const one = modelDraft(asChange(x, deps.input.page), i + 1, deps.name, deps.drawn, true);
       if ('why' in one) {
         dropped.push(one.why);
         continue;

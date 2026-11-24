@@ -86,6 +86,9 @@ export function resolveDay(word: string, nowMs: number): string | null {
 
   const d = new Date(nowMs);
   switch (word) {
+    /* "NOW" IS TODAY, to a day: a model drafting a page wrote "due is before now" for what is late, the record refused it,
+       and two repairs wrote it again (24 November), so the page was never drafted. */
+    case 'now':
     case 'today':
       return iso(nowMs);
     case 'tomorrow':
@@ -903,8 +906,13 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
        and `n IS 3`, `state IS open` and `due BEFORE today` were refused "IS is not something a filter
        can say", naming the word the refusal then tells them to write. The browser drew rows for every
        one of them (`apps/web/src/lib/record/where.test.ts`, the shouted verb). */
-    const verb = (words[after] ?? '').toLowerCase();
-    const rest = words.slice(after + 1).join(' ');
+    /* "DUE IS BEFORE TODAY" IS "DUE BEFORE TODAY", on a day or an instant: both included models wrote it for what is late
+       when drafting a page (24 November), "before today" was refused as a value `due` cannot hold, two repairs wrote it
+       again, and the page was never drafted. On any other type `is on` stays the value it says. */
+    const dated = decl.type === 'day' || decl.type === 'instant';
+    const shifted = dated && (words[after] ?? '').toLowerCase() === 'is' && Object.hasOwn(ORDERED, (words[after + 1] ?? '').toLowerCase()) ? 1 : 0;
+    const verb = (words[after + shifted] ?? '').toLowerCase();
+    const rest = words.slice(after + shifted + 1).join(' ');
 
     /* ── more than · at least · less than · at most · between ─────────────── */
     const ranked = rankedOf(words.slice(after));

@@ -35,3 +35,14 @@ test('a held line is given once', () => {
   assert.equal(takeLine(), 'newest first');
   assert.equal(takeLine(), '');
 });
+
+test('A LINE THAT ASKS FOR A NEW PAGE IS READ FOR ITS NAME, and keeps the whole line for its describe sheet', async () => {
+  const { pageLine } = await import('./slash-entry.ts');
+  assert.deepEqual(pageLine("make a page that shows my late invoices and what I'm owed"), { title: "Late invoices and what I'm owed", line: "make a page that shows my late invoices and what I'm owed" });
+  assert.deepEqual(pageLine('build me a dashboard of the Northern Rail payments'), { title: 'Northern Rail payments', line: 'build me a dashboard of the Northern Rail payments' });
+  assert.equal(pageLine('make a page called Wedding with the guest list')?.title, 'Wedding with the guest list');
+  assert.equal(pageLine('create a new page for team holidays')?.title, 'Team holidays');
+  assert.equal(pageLine('make a page'), null, 'a page with no words to name it is the New page row');
+  assert.equal(pageLine('make payroll as a calendar'), null, 'a make about the page you are on stays the composer');
+  assert.equal(pageLine('what pages do I have'), null);
+});

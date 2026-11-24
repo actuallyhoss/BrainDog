@@ -90,7 +90,8 @@ export const pageHref = (slug: string): string => `/p/${slug}`;
  * Slash has no model there it opens the page as it is. SPELLED HERE, since the palette is in the layout every screen
  * waits for; `change-open.test.ts` holds it to that file's reading.
  */
-export const describedHref = (slug: string): string => `${pageHref(slug)}?describe=1`;
+export const describedHref = (slug: string, said?: string): string =>
+  `${pageHref(slug)}?describe=1${said === undefined || said.trim() === '' ? '' : `&said=${encodeURIComponent(said.trim())}`}`;
 
 /** What a press answered: the page and the sentence that says so, with its way back when there is one; or a sentence. */
 export type Made =
@@ -121,7 +122,7 @@ export type Desk = {
  * A SUGGESTION OPENS NOTHING AND OFFERS NO UNDO. There is no page until the owner accepts it on Decide, which the
  * receipt says, and a question once asked is the owner's to answer.
  */
-export async function pressed(p: Paging, desk: Desk): Promise<void> {
+export async function pressed(p: Paging, desk: Desk, said?: string): Promise<void> {
   let out: Made;
   try {
     out = await desk.make(p.title);
@@ -134,7 +135,8 @@ export async function pressed(p: Paging, desk: Desk): Promise<void> {
   if (out.as === 'suggested') return void desk.toast(out.said, { intent: 'good' });
   const href = pageHref(out.slug);
   const back = out.back;
-  await desk.go(describedHref(out.slug));
+  /* WITH WHAT THEY SAID, where the page came from a line ("make a page that shows my late invoices"): the sheet drafts it at once. */
+  await desk.go(describedHref(out.slug, said));
   desk.toast(out.said, {
     intent: 'good',
     ...(back

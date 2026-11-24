@@ -36,7 +36,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { apiBase } from '$lib/at.ts';
   import type { LiveLook } from '$lib/record/page-live.ts';
-  import { describeAsked, opensDescribe, withoutDescribe } from './change-open.ts';
+  import { describeAsked, describedLine, opensDescribe, withoutDescribe } from './change-open.ts';
   import {
     bodyOf,
     hiddenOf,
@@ -160,7 +160,15 @@
   $effect(() => {
     if (!describeAsked(page.url) || answered === page.url.href) return;
     answered = page.url.href;
-    if (opensDescribe({ asked: true, mayChange, model })) open = true;
+    if (opensDescribe({ asked: true, mayChange, model })) {
+      /* AND THE WORDS IT CAME WITH, from the bar's "make a page that shows ...": drafted at once, with Keep, Try again and Throw away. */
+      const said = describedLine(page.url);
+      if (said !== undefined) {
+        line = said;
+        lines += 1;
+      }
+      open = true;
+    }
     /* THROUGH `at()`, which hands back an address already under the app as it is (`at-sites.test.ts`). */
     void goto(at(withoutDescribe(page.url)), { replaceState: true, noScroll: true, keepFocus: true });
   });

@@ -55,3 +55,14 @@ test('the address the palette opens a made page at is one this file reads as ask
   assert.equal(describeAsked(there), true);
   assert.equal(withoutDescribe(there), pageHref('wedding'));
 });
+
+test('A PAGE MADE FROM A LINE OPENS ON ITS SHEET WITH THE LINE, and both leave the address once read', async () => {
+  const { describedLine, SAID } = await import('./change-open.ts');
+  const href = describedHref('late-invoices', 'make a page that shows my late invoices');
+  assert.equal(href, `/p/late-invoices?${DESCRIBE}=1&${SAID}=make%20a%20page%20that%20shows%20my%20late%20invoices`);
+  const there = url(href);
+  assert.equal(describedLine(there), 'make a page that shows my late invoices');
+  assert.equal(withoutDescribe(there), '/p/late-invoices');
+  assert.equal(describedLine(url('/p/x?said=hello')), undefined, 'words with no mark open nothing');
+  assert.equal(describedHref('wedding', '  '), '/p/wedding?describe=1');
+});

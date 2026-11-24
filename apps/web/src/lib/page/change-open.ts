@@ -13,6 +13,8 @@
 
 /** The mark's name in the address. `palette/new-page.ts` spells it too, and `change-open.test.ts` holds the two together. */
 export const DESCRIBE = 'describe';
+/** The words the sheet opens on and sends at once, beside the mark: "a page that shows my late invoices" from the bar. */
+export const SAID = 'said';
 
 /** An address, as far as this file reads it: a `URL`, or the router's. */
 type Address = { pathname: string; search: string; hash: string };
@@ -20,11 +22,18 @@ type Address = { pathname: string; search: string; hash: string };
 /** The parts of a query, as they were typed, with no leading `?`. */
 const parts = (search: string): string[] => search.replace(/^\?/u, '').split('&').filter((part) => part !== '');
 
-/** Whether one part of a query is the mark, whatever it is set to. */
-const isMark = (part: string): boolean => part === DESCRIBE || part.startsWith(`${DESCRIBE}=`);
+/** Whether one part of a query is the mark or its words, whatever it is set to. */
+const isMark = (part: string): boolean => part === DESCRIBE || part.startsWith(`${DESCRIBE}=`) || part === SAID || part.startsWith(`${SAID}=`);
 
 /** Whether the address asks for the page to open on its describe field. Only `describe=1` asks. */
 export const describeAsked = (url: Pick<Address, 'search'>): boolean => parts(url.search).includes(`${DESCRIBE}=1`);
+
+/** The words the address hands the sheet with the mark, or `undefined` for none. */
+export function describedLine(url: Pick<Address, 'search'>): string | undefined {
+  if (!describeAsked(url)) return undefined;
+  const said = new URLSearchParams(url.search).get(SAID)?.trim();
+  return said === undefined || said === '' ? undefined : said.slice(0, 1_000);
+}
 
 /**
  * The same address with the mark gone. EVERY OTHER PART IS KEPT AS IT WAS TYPED, in its order and its own encoding:

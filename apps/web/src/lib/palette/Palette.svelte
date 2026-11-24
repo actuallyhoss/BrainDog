@@ -86,7 +86,7 @@
   import { homeSlugOf, labels as heardLabels, relabel, singularOf } from '../voice.ts';
   import type { Shell } from '../record/boot-live.ts';
   import type { Fields } from '../record/schema.ts';
-  import { entryHref, sayLine, slashEntryWords, slashLine } from '../page/slash-entry.ts';
+  import { entryHref, pageLine, sayLine, slashEntryWords, slashLine } from '../page/slash-entry.ts';
   import { customise, type Change, type Look, type Place } from './customise.ts';
   import { widgetRows } from '../board/palette-rows.ts';
   import { todayOffer } from '../board/offer.svelte.ts';
@@ -169,6 +169,8 @@
     change?: Change | undefined;
     /** The page the new page row makes or suggests (`new-page.ts`). Only that row carries it. */
     paging?: Paging | undefined;
+    /** What its describe sheet drafts at once, on the row a "make a page that shows ..." line makes (`pageLine`). */
+    pageSaid?: string | undefined;
     /** Set on the row a plain line makes, which is ranked after every match. */
     plain?: true | undefined;
     /** What Tell's rules read the line as (`tell-row.ts`): only that row carries it, and it is drawn first. */
@@ -386,6 +388,7 @@
 
   /** A question from Find: a new conversation, asked at once, with the field cleared for the next one. */
   function askSlash(question: string) {
+    if (madeInstead(question)) return;
     backTo = q;
     modeWas = 'ask';
     opener.mode = 'ask';
@@ -403,6 +406,7 @@
     if (text === '' || convo.busy || convo.loading) return;
     d.text = '';
     d.mentions = [];
+    if (madeInstead(text)) return;
     asked(text, mentions);
   }
 
@@ -1447,8 +1451,13 @@
     /* "MAKE ..." AND "CHANGE ..." GO TO THE PAGE: the first row, since a person who typed the verb means it. */
     /* AND THE PAGE'S OWN CHANGES SAID WITHOUT "CHANGE" ("move Bills up", "show only open ones"), where no other row took
        the line: "hide Inbox" is the nav's, and stays its. */
-    const entry = parsed.prefix === null ? (slashLine(parsed.text) ?? (pageHere && (live.customise ?? []).length === 0 ? sayLine(parsed.text) : null)) : null;
+    /* "MAKE A PAGE THAT SHOWS ..." IS A NEW PAGE, opened on its describe sheet with the line drafted there (`pageLine`),
+       and not a block composed on the page you are on. The owner's alone, as New page is. */
+    const madePage = parsed.prefix === null && pageWho === 'owner' ? pageLine(parsed.text) : null;
+    const entry = parsed.prefix === null && madePage === null ? (slashLine(parsed.text) ?? (pageHere && (live.customise ?? []).length === 0 ? sayLine(parsed.text) : null)) : null;
     const toPage = entry ? entryHref(entry, pageHere ? page.url.pathname : null) : null;
+    if (madePage)
+      kept.unshift({ id: 'c-make-page', title: slashEntryWords.page(madePage.title), href: null, group: '', icon: 'plus', act: 'page', paging: { title: madePage.title, suggest: false }, pageSaid: madePage.line });
     if (entry && toPage)
       kept.unshift({ id: `c-${entry.verb}`, title: slashEntryWords[entry.verb](entry.line), href: toPage, group: '', icon: entry.verb === 'make' ? 'plus' : 'edit' });
     const question = offersSlash({ slash: slashHere, prefix, text, pending, places: kept.filter((r) => r.group !== copy.commands && r.plain !== true).length });
@@ -1829,7 +1838,7 @@
       return;
     }
     if (row.act === 'page') {
-      if (row.paging) void newPage(row.paging);
+      if (row.paging) void newPage(row.paging, row.pageSaid);
       return;
     }
     if (row.act === 'customise' && row.change) return customiseRun(row.change);
@@ -1893,9 +1902,11 @@
    * shows the one receipt. This hands it the screen: the record, the pages `boot` lists, the address bar and the toasts.
    * Undo leaves the page only when the reader is still on it.
    */
-  function newPage(p: Paging) {
+  function newPage(p: Paging, said?: string) {
     if (!isLive) return;
-    return pagePressed(p, {
+    return pagePressed(
+      p,
+      {
       make: pageMaker(apiBase(page.url), shell.pages ?? [], !p.suggest),
       go: (href) => goto(at(href)),
       toast: (text, opts) => toasts.push(text, opts),
@@ -1907,7 +1918,22 @@
       },
       leave: (href) => (page.url.pathname === new URL(at(href), page.url).pathname ? goto(at('/')) : undefined),
       notReached: copy.writeNotReached,
-    });
+      },
+      said,
+    );
+  }
+
+  /**
+   * A QUESTION THAT ASKS FOR A NEW PAGE GOES TO ONE, from the Ask row and from a conversation's own field alike: the page
+   * is made and opens on its describe sheet with the words drafted there (`pageLine`). Asked of the conversation, it read
+   * the figures and drafted nothing (the Slash audit of 24 November). `true` when it went.
+   */
+  function madeInstead(text: string): boolean {
+    const made = isLive && pageWho === 'owner' ? pageLine(text) : null;
+    if (made === null) return false;
+    open = false;
+    void newPage({ title: made.title, suggest: false }, made.line);
+    return true;
   }
 
   /**

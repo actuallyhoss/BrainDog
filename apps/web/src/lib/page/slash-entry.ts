@@ -11,11 +11,39 @@ export type SlashLine = { verb: 'make' | 'change'; line: string };
 export const slashEntryWords = {
   make: (line: string) => `Make: ${line}`,
   change: (line: string) => `Change: ${line}`,
+  page: (title: string) => `Make a page: ${title}`,
   which: 'Which block? Open its menu and pick Change this. Your words are kept for it.',
 };
 
 /** The window event a block's menu listens for, carrying the block's key and the line. */
 export const CHANGE_EVENT = 'braindog:change-block';
+
+/**
+ * A LINE THAT ASKS FOR A NEW PAGE, "make a page that shows my late invoices", with the page's name read out of it and the
+ * whole line kept for its describe sheet. MEASURED 24 NOVEMBER (the Slash audit, finding 9): from the bar it went to the
+ * conversation, which read the figures and drafted nothing, or to "Make:", which composes a block on the page you are on.
+ * A new page is made under the name and opens on its describe sheet with the line in it, drafted at once, with Keep, Try
+ * again and Throw away as any page's own Make (`palette/new-page.ts`, `page/change-open.ts`).
+ */
+export type PageLine = { title: string; line: string };
+
+const PAGE_LINE = /^\s*(?:please\s+)?(?:make|build|create|draft|design|set\s+up|start)\s+(?:me\s+)?(?:a|an|one)?\s*(?:new\s+)?(?:page|dashboard|screen)\b\s*(.*?)\s*[.!?]*$/iu;
+/** The words between "a page" and what it shows, which are no part of its name. */
+const PAGE_LEAD = /^(?:(?:that|which|to|for|of|showing|shows|show|with|about|listing|lists|list|tracking|tracks|track|where|so|i can see)\s+)+/iu;
+const NAMED = /\b(?:called|named|titled)\s+["“']?([^"”']+?)["”']?\s*$/iu;
+/** The longest a page's name is made from a line, cut at a word. */
+const TITLE_MOST = 40;
+
+export function pageLine(text: string): PageLine | null {
+  const m = PAGE_LINE.exec(text);
+  if (!m) return null;
+  const rest = (m[1] ?? '').trim();
+  const named = NAMED.exec(rest)?.[1]?.trim();
+  let title = named ?? rest.replace(PAGE_LEAD, '').replace(/^(?:all\s+)?(?:my|our|the)\s+/iu, '').replace(/\s+/gu, ' ').trim();
+  if (title.length > TITLE_MOST) title = title.slice(0, TITLE_MOST).replace(/\s+\S*$/u, '');
+  if (title === '') return null;
+  return { title: `${title.charAt(0).toUpperCase()}${title.slice(1)}`, line: text.trim() };
+}
 
 /** A line that opens with Make or Change and says something after it; anything else is an ordinary query. */
 export function slashLine(text: string): SlashLine | null {
