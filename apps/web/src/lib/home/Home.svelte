@@ -1313,9 +1313,15 @@
       if (deskLines(b)) tall.add(k);
     }
     /* NEEDS YOU WITH NOTHING ASKED IS ITS FOOT ALONE, the calm line, and a red sign's line under it when there is one. A
-       question is a tall line with its answers, so with any asked it keeps its frame. */
+       question is a tall line with its answers, so with two or more asked it keeps its frame.
+       AND ONE QUESTION IS ONE ROW (24 Nov): his Needs you held one, drawn about a row tall in a frame of two, and the
+       packer filled the row beside its empty half with Gold and Property, so What you own fell below Late. Laid one row
+       tall, the frame grows to the question as drawn (`fit.ts`), and the board keeps its order. */
     const asked = counted.get('needs-you');
-    if (kinds.has('needs-you') && !(deskedRaw ?? []).some((b) => b.key === 'needs-you' && isPending(b))) counted.set('needs-you', asked === 0 || asked === null || asked === undefined ? (signsSaid ? 1 : 0) : null);
+    if (kinds.has('needs-you') && !(deskedRaw ?? []).some((b) => b.key === 'needs-you' && isPending(b))) {
+      counted.set('needs-you', asked === 0 || asked === null || asked === undefined ? (signsSaid ? 1 : 0) : asked === 1 ? 1 : null);
+      if (asked === 1) tall.add('needs-you');
+    }
     /* WHAT LANDED BY THE LINES IT IS DRAWN AS: two writes an hour are one line each (`arrivalsOf`). */
     if (kinds.has('arrivals')) counted.set('arrivals', landedKit ? landedKit.arrivalsOf(landed).length : landed.length);
     for (const [k, rows] of counted) {
