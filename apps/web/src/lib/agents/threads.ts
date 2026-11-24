@@ -76,6 +76,9 @@ export type ThreadCard = {
   title: string;
   /** Who has it and where: "Claude · BrainDog". */
   who: string;
+  /** Who has it alone, "Claude", and the project it is on with its picture, which the row draws before its name. */
+  by: string;
+  project: { key: string; name: string; picture: string | null } | null;
   /** The agent kind, for its mark. */
   agent: string | null;
   /** One plain line of where it stands: "Claude took it 23:03", "Claude asks you", "Done 23:14". */
@@ -138,8 +141,9 @@ export function threadCardOf(g: ThreadGroup, ctx: CardContext): ThreadCard {
   const kind = agentOf(g, runs);
   const name = agentNamed(kind) ?? (g.latest.to === 'anyone' ? 'the next agent' : 'the agent');
   const Name = name.charAt(0).toUpperCase() + name.slice(1);
-  const project = projectName(g.first.project, projects) ?? projectName(g.latest.project, projects);
-  const who = [agentNamed(kind) ?? (g.latest.to === 'anyone' ? 'Any agent' : 'An agent'), project].filter((x): x is string => !!x).join(' · ');
+  const on = [g.first.project, g.latest.project].map((k) => (k === null ? undefined : projects.get(k))).find((p) => p !== undefined) ?? null;
+  const by = agentNamed(kind) ?? (g.latest.to === 'anyone' ? 'Any agent' : 'An agent');
+  const who = [by, on?.name].filter((x): x is string => !!x).join(' · ');
 
   const messages: ThreadMessage[] = [];
   for (const w of g.words) {
@@ -179,6 +183,8 @@ export function threadCardOf(g: ThreadGroup, ctx: CardContext): ThreadCard {
     key: g.key,
     title: oneLine(g.first.said),
     who,
+    by,
+    project: on ? { key: on.key, name: on.name, picture: on.picture ?? null } : null,
     agent: kind,
     status,
     tone,

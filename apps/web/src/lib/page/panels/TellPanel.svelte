@@ -252,7 +252,7 @@
   /* THE ONE ON ITS WAY, drawn as a thread of his words alone until the record answers. */
   const pending = $derived(
     sending
-      ? [{ key: sending.key, title: sending.said.replace(/\s+/gu, ' ').trim(), who: sending.to, agent: sending.agent, status: 'On its way', tone: 'open' as const, messages: [], changes: null, folded: false, reply: false, name: 'the agent', quick: [], takeBack: null, close: false }]
+      ? [{ key: sending.key, title: sending.said.replace(/\s+/gu, ' ').trim(), who: sending.to, by: sending.to, project: null, agent: sending.agent, status: 'On its way', tone: 'open' as const, messages: [], changes: null, folded: false, reply: false, name: 'the agent', quick: [], takeBack: null, close: false }]
       : [],
   );
 </script>

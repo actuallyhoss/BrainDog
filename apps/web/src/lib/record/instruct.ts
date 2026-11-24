@@ -31,6 +31,7 @@ import { undoChange } from './undo-write.ts';
 import { machineSaid } from './machine-name.ts';
 import type { Fetch } from './boot-live.ts';
 import { rowsOf as tabRows } from '../data/ref-rows.ts';
+import { pictureOfRow } from '../picture/picture.ts';
 
 /* ── what the record answers ────────────────────────────────────────────── */
 
@@ -126,8 +127,12 @@ export type Thread = {
 /** A run the page knows by handle: its agent kind, project and branch, read from presence or its own row. */
 export type RunKnown = { agent: string | null; project: string | null; branch: string | null };
 
-/** A project as the composer offers it: its handle as runs hold it (`things#1`), its name and its stored hue. */
-export type Project = { key: string; name: string; hue: number | null };
+/**
+ * A project as the composer offers it: its handle as runs hold it (`things#1`), its name and its stored hue, and its
+ * picture, its logo, by hash where it holds one (`pictureOfRow`), which the sidebar draws it by and so does every row
+ * of the Agents page that names it.
+ */
+export type Project = { key: string; name: string; hue: number | null; picture?: string | null };
 
 /** The machines and Claude Code profiles the composer may offer, by name (`Places` in `methods/instructions.ts`). */
 export type Places = {
@@ -925,7 +930,7 @@ export function control(base: string, io?: Fetch) {
     /**
      * The projects "On" offers, by the handle runs hold them by (`<list>#1`): the list the runs name and every list the
      * tab has learnt declares `scopes`, never one named here, read whole, its title field said and its hue kept for the
-     * dot. FROM THE TAB'S WALK (`ref-rows.ts`), which the page beside the panel walked already to name its refs (scope
+     * dot, and its picture where its list names one (the logo the sidebar draws). FROM THE TAB'S WALK (`ref-rows.ts`), which the page beside the panel walked already to name its refs (scope
      * 2026-10-24 A21), and not a read of its own; a caller handed a fetch of its own reads for itself.
      */
     async projects(rows: readonly LiveRun[]): Promise<Map<string, Project>> {
@@ -944,7 +949,7 @@ export function control(base: string, io?: Fetch) {
           const titled = REGISTERS[register]?.title;
           const name = [titled ? row.fields[titled] : undefined, row.fields.name, row.fields.title].find((v): v is string => typeof v === 'string' && v.trim() !== '');
           if (!name) continue;
-          out.set(`${register}#${String(row.seq)}`, { key: `${register}#${String(row.seq)}`, name, hue: typeof row.fields.hue === 'number' ? row.fields.hue : null });
+          out.set(`${register}#${String(row.seq)}`, { key: `${register}#${String(row.seq)}`, name, hue: typeof row.fields.hue === 'number' ? row.fields.hue : null, picture: pictureOfRow(register, row.fields) });
         }
       }
       return new Map([...out.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name)));

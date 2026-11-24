@@ -13,6 +13,7 @@
   import type { ToldNeed } from '$lib/record/told-live.ts';
   import { heardTold, toldNow } from '$lib/home/told-now.svelte.ts';
   import AgentMark from '$lib/ui/AgentMark.svelte';
+  import ProjectPic from '$lib/ui/ProjectPic.svelte';
   import { agentKindOf } from '$lib/ui/face.ts';
 
   let { need, thread = null, compact = false }: { need: ToldNeed; thread?: string | null; compact?: boolean } = $props();
@@ -30,15 +31,15 @@
   let writing = $state(false);
   let busy = $state(false);
   let fault = $state<string | null>(null);
-  let project = $state<string | null>(null);
+  let project = $state.raw<Project | null>(null);
 
-  /* THE PROJECT BY NAME, from the tab's own walk of the projects (`control().projects`), once a card is drawn. */
+  /* THE PROJECT BY NAME AND PICTURE, from the tab's own walk of the projects (`control().projects`), once a card is drawn. */
   $effect(() => {
     const key = need.project;
     if (key === null) return;
     void control(apiBase())
       .projects([{ project: key } as never])
-      .then((m: Map<string, Project>) => (project = m.get(key)?.name ?? null))
+      .then((m: Map<string, Project>) => (project = m.get(key) ?? null))
       .catch(() => undefined);
   });
 
@@ -66,7 +67,7 @@
   <span class="ask-face" aria-hidden="true"><AgentMark kind={agentKindOf(need.agent)} size="s" /></span>
   <div class="ask-body">
     <p class="ask-q" dir="auto">{need.line}</p>
-    <p class="ask-who">{need.who}{#if project}{' · '}{project}{/if}{#if thread}{' · '}<a class="ask-link" href={at(thread)}>{words.open}</a>{/if}</p>
+    <p class="ask-who">{need.who}{#if project}{' · '}<ProjectPic {project} />{project.name}{/if}{#if thread}{' · '}<a class="ask-link" href={at(thread)}>{words.open}</a>{/if}</p>
     <form class="ask-do" aria-label={words.box(need.who)} onsubmit={(e) => (e.preventDefault(), void answer(said))}>
       {#each need.quick as q (q)}<button type="button" class="ask-btn" disabled={busy} onclick={() => void answer(q)}>{q}</button>{/each}
       {#if need.quick.length === 0 || writing}

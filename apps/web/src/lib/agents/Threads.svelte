@@ -14,6 +14,7 @@
   import { agentMarkFill } from 'braindog-render';
   import { at } from '$lib/at.ts';
   import Icon from '$lib/ui/Icon.svelte';
+  import ProjectPic from '$lib/ui/ProjectPic.svelte';
   import type { ThreadCard } from './threads.ts';
 
   let {
@@ -107,6 +108,9 @@
   >
 {/snippet}
 
+<!-- WHO HAS IT AND WHERE, the project with its picture before its name where it holds one (`ProjectPic`). -->
+{#snippet meta(c: ThreadCard)}{#if c.project}{c.by}{' · '}<ProjectPic project={c.project} />{c.project.name}{:else}{c.who}{/if}{/snippet}
+
 {#if cards.length > 0}
   <ol class="threads" aria-label="What you told agents">
     {#each cards as c (c.key)}
@@ -116,14 +120,14 @@
         {#if c.folded}
           <button type="button" class="tt-head tt-press" aria-expanded={open} aria-label={words.open(c.title)} onclick={() => toggle(c.key)}>
             {@render face(c)}
-            <span class="tt-words"><span class="tt-title">{c.title}</span><span class="tt-meta">{c.who}</span></span>
+            <span class="tt-words"><span class="tt-title">{c.title}</span><span class="tt-meta">{@render meta(c)}</span></span>
             <span class="tt-status" data-tone={c.tone}>{#if c.tone === 'done'}<Icon name="check" size="s" />{/if}{c.status}</span>
             <span class="tt-chev" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
           </button>
         {:else}
           <div class="tt-head">
             {@render face(c)}
-            <span class="tt-words"><span class="tt-title">{c.title}</span><span class="tt-meta">{c.who}</span></span>
+            <span class="tt-words"><span class="tt-title">{c.title}</span><span class="tt-meta">{@render meta(c)}</span></span>
             <span class="tt-status" data-tone={c.tone}>{c.status}</span>
           </div>
         {/if}

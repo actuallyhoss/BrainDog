@@ -6,8 +6,8 @@
   aims the composer above (`aim`); a stop, a pause or a resume is an instruction the record applies at once, and the
   other panel is told to read again (`told`).
 
-  ON THE AGENTS PAGE, ONE ROW A LIVE SESSION, LED BY ITS PROJECT (the Agents page of 24 Nov): the project's mark and
-  name, what the session is doing now in its own words (the newer of its last `doing` and its newest note, never the
+  ON THE AGENTS PAGE, ONE ROW A LIVE SESSION, LED BY ITS PROJECT (the Agents page of 24 Nov): the project's picture (its
+  logo, as the sidebar draws it, else its letter) and name, what the session is doing now in its own words (the newer of its last `doing` and its newest note, never the
   first thing it said, `nowOf`), and when it was last heard. The sessions silent over an hour or open with nothing
   written fold into one "3 quiet" line. No machine, no profile, no folder: where a session runs is on its own page.
   Tell, Pause and Stop are behind one More press; a pause or a stop asks once, in place, with what it will do.
@@ -49,6 +49,7 @@
   import NamedAgents from '$lib/agents/NamedAgents.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { initialOf, slotOf } from '$lib/ui/face.ts';
+  import { pictureNow } from '$lib/picture/pictures.svelte.ts';
   import { nowOf } from '$lib/agents/threads.ts';
   import RunSkeleton from '$lib/agents/RunSkeleton.svelte';
   import { keepCount, lastCount } from '$lib/agents/last-size.ts';
@@ -132,7 +133,7 @@
   const kinds = $derived(new Set([...open.shown, ...quietRuns].map((r) => r.agent ?? 'other')).size);
 
   /** One live session, worded: its project and mark, what it is doing now, and when it was last heard. */
-  type LiveRow = { key: string; title: string; letter: string; slot: string | null; now: string; when: string; working: boolean; held: string | null; href: string | null; busy: boolean };
+  type LiveRow = { key: string; title: string; letter: string; slot: string | null; picture: string | null; now: string; when: string; working: boolean; held: string | null; href: string | null; busy: boolean };
   const liveOf = (r: LiveRun): LiveRow => {
     const p = r.project === null ? null : (projects.get(r.project) ?? null);
     const folder = folderSaid(r.cwd);
@@ -145,6 +146,9 @@
       title: kinds > 1 && who ? `${where} · ${who}` : where,
       letter: initialOf(where),
       slot: p ? slotOf(p.hue) : null,
+      /* ITS PICTURE, ITS LOGO, AS THE SIDEBAR DRAWS IT (`pictureNow`: what this tab just wrote first), and its letter only
+         where it holds none. */
+      picture: p ? pictureNow(p.key, p.picture ?? null) : null,
       now: nowOf(r, own) ?? lastSaid({ ...r, doing: null }),
       /* WHEN IT WAS LAST HEARD, every row: "Working now" under a tile called Working now said nothing; the dot says it. */
       when: `Heard ${agoSaid(r.heard_s)}`,
@@ -226,7 +230,7 @@
     {#each rows as r (r.key)}
       {@const run = rowsByKey.get(r.key)}
       <li class="live-row" data-working={r.working ? '' : undefined} aria-busy={r.busy ? 'true' : undefined}>
-        <span class="live-mark"><IconWell letter={r.letter} slot={(r.slot ?? undefined) as never} size="l" />{#if r.working}<span class="live-dot" aria-hidden="true"></span>{/if}</span>
+        <span class="live-mark"><IconWell letter={r.letter} picture={r.picture} slot={(r.slot ?? undefined) as never} size="l" />{#if r.working}<span class="live-dot" aria-hidden="true"></span>{/if}</span>
         <span class="live-words">
           {#if r.href}<a class="live-title" href={at(r.href)}>{r.title}</a>{:else}<span class="live-title">{r.title}</span>{/if}
           <span class="live-now" title={r.now}>{r.now}</span>

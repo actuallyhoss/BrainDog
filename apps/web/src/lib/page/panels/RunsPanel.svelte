@@ -26,6 +26,7 @@
   import { control, type LiveRun, type Project } from '$lib/record/instruct.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import AgentMark from '$lib/ui/AgentMark.svelte';
+  import ProjectPic from '$lib/ui/ProjectPic.svelte';
   import ItemMenu from '$lib/ui/ItemMenu.svelte';
   import { ownMenu } from '$lib/ui/context-menu.ts';
   import { agentKindOf } from '$lib/ui/face.ts';
@@ -127,14 +128,14 @@
     {#if short}<p class="runs-note">{runsWords.short}</p>{/if}
     {#if shown.length > 0}<ul class="runs-list">
       {#each shown as { line, n } (line.key)}
-        {@const project = line.project ? (projects.get(line.project)?.name ?? null) : null}
+        {@const project = line.project ? (projects.get(line.project) ?? null) : null}
         <li class="runs-line" data-bad={line.bad ? '' : undefined} {@attach line.path && ownMenu((p) => ((menuLine = line), (point = p)), line.path)}>
           <span class="runs-mark">{#if line.agent}<AgentMark kind={agentKindOf(line.agent)} size="s" />{:else}<Icon name={kindIcon(line.kind)} size="s" />{/if}</span>
           {#if line.path}<a class="runs-name" href={at(line.path)} title={line.name}>{line.name}</a>{:else}<span class="runs-name" title={line.name}>{line.name}</span>{/if}
           <span class="runs-end">
             <!-- ONE FORMAT FOR EVERY ROW, plain text and no chips: its project, how many times where it ran more
                  than once, then how it ended and when. -->
-            {#if project}<span class="runs-proj">{project}</span>{/if}
+            {#if project}<span class="runs-proj"><ProjectPic {project} />{project.name}</span>{/if}
             {#if (line.times ?? 1) + n - 1 > 1}<span class="runs-times num">{words.times((line.times ?? 1) + n - 1)}</span>{/if}
             <span class="runs-said" title={line.said}>{line.outcome ?? firstWord(line.said)}</span>
             <span class="runs-when num">{since(line.at, recordNow())}</span>
