@@ -17,6 +17,7 @@
  */
 
 import { codeOf, fixOf, type Result, type Sql } from '@braindog/ports';
+import { money, moneyIn } from './words.ts';
 import { kindsOfWrite, madeByIn, shapeIn, type Floor, type ListShape } from '@braindog/kernel';
 
 import { tools as agentTools, type McpSurface } from './index.ts';
@@ -105,6 +106,8 @@ export type SlashSurface<C> = McpSurface<C> & {
   slashPropose?(args: { asked: string; page?: string }, ctx: C): Answer;
   /** The record's vital signs now, for a sign a person sends Slash (`signs` in `packages/record/src/methods/signs.ts`). */
   signs?(args: unknown, ctx: C): Answer;
+  /** Every late row the asker may read, the worst first, with how many in all (`lateRows` in `packages/record/src/methods/briefing.ts`). */
+  lateRows?(args: { limit?: number }, ctx: C): Answer;
 };
 
 export type SlashToolDeps = {
@@ -167,6 +170,8 @@ const FLOOR_SAID: Readonly<Record<Floor, string>> = {
 
 const QUALIFIED = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u;
 const NOTE_MOST = 200;
+/** How many late rows `today` names, the worst first; how many there are in all is said beside them. */
+const LATE_LISTED = 12;
 
 /** The words a question asks a figure with that no figure's name carries, taken out before the names are matched. */
 const ASKING = new Set(['how', 'much', 'many', 'what', 'whats', 'did', 'do', 'does', 'i', 'my', 'me', 'the', 'a', 'an', 'is', 'are', 'have', 'has', 'of', 'on', 'for', 'and', 'we', 'our', 'total', 'it']);
@@ -709,10 +714,32 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         return { text: lines.join('\n'), step: 'Working out the figures' };
       }
       case 'today': {
-        const out = await agent.read('braindog:briefing', ctx);
+        /* WHAT IS LATE IS READ WHOLE, THE WORST FIRST (`lateRows`), and the briefing says the rest: due, asked, stopped. The
+           briefing's cards stop at five and put the least late first, so "what's late" named five things two to nine days
+           late and left out the two that were 38 and 64 days late. */
+        const [out, late] = await Promise.all([agent.read('braindog:briefing', ctx), surface.lateRows ? surface.lateRows({ limit: LATE_LISTED }, ctx) : Promise.resolve(null)]);
+        const lateNow = late !== null && late.ok && isObject(late.value) && Array.isArray(late.value['rows']) ? late.value : null;
         const cards = out.ok && isObject(out.value) && Array.isArray(out.value.cards) ? out.value.cards.filter(isObject) : [];
-        const lines = cards.map((c) => `- ${text(c['line'])}${typeof c['row'] === 'string' && c['row'] !== '' ? ` (${c['row']})` : ''}`);
-        if (!out.ok) return { text: fixOf(out), step: 'Looking at today' };
+        const rest = cards
+          .filter((c) => lateNow === null || !/^late-/u.test(text(c['h'])))
+          .map((c) => `- ${text(c['line'])}${typeof c['row'] === 'string' && c['row'] !== '' ? ` (${c['row']})` : ''}`);
+        const lines: string[] = [];
+        if (lateNow !== null) {
+          const rows = (lateNow['rows'] as unknown[]).filter(isObject);
+          const total = typeof lateNow['total'] === 'number' ? lateNow['total'] : rows.length;
+          if (rows.length > 0) {
+            lines.push(total === 1 ? 'Late:' : `Late, the worst first, ${String(total)} in all:`);
+            for (const r of rows) {
+              const amount = moneyIn(r['amount']);
+              const days = typeof r['days'] === 'number' ? r['days'] : 0;
+              lines.push(`- ${text(r['title'])} (${text(r['row'])}), ${text(r['list'])}: ${days === 1 ? '1 day' : `${String(days)} days`} late${amount === null ? '' : `, ${money(amount.amount, amount.currency)}`}`);
+            }
+            if (total > rows.length) lines.push(`${String(total - rows.length)} more late, not listed here.`);
+            if (total > 5) lines.push(`When you name fewer than all ${String(total)}, name the worst first and say how many are late in all.`);
+          }
+          if (rest.length > 0) lines.push(rows.length > 0 ? 'Also today:' : 'Nothing is late. Today:', ...rest);
+        } else lines.push(...rest);
+        if (!out.ok && lateNow === null) return { text: fixOf(out), step: 'Looking at today' };
         return { ...(lines.length === 0 ? { text: 'Nothing is late, due or waiting today.' } : heldLines(lines.join('\n'))), step: 'Looking at today' };
       }
       case 'waiting':

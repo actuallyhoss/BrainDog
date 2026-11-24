@@ -293,10 +293,90 @@ async function pausedLine(deps: RecordDeps, failed: boolean): Promise<string | n
   return failed ? 'The written brief is paused: the model did not answer the last time it was asked.' : null;
 }
 
+/** The most late rows one list's deadline is read for, the worst first, and the most one answer names. */
+const LATE_READ_MOST = 500;
+export const LATE_MOST = 50;
+
+/** One late row, as `lateRows` answers it: its handle, its name, its list, how many days late, and its amount where it has one. */
+export type LateRow = { row: string; title: string; list: string; days: number; amount?: { amount: number; currency: string } };
+
+/**
+ * Every row this caller may read that is late, THE WORST FIRST: the most days late, then by name. A row is late where a
+ * day its list declares `deadline: true` is before the record's today and its state is not one of the list's `done`
+ * states, as the briefing reads it. A row is said once, by its oldest such day.
+ *
+ * WHY IT IS NOT THE BRIEFING. Slash read "what's late" off the briefing's cards, which stop at five and put the least
+ * late first, so on the seed it named five things two to nine days late and left out an invoice 38 days late and a
+ * review 64 days late. This reads them all and says how many there are (`total`), so an answer that names a few can say
+ * how many it left out.
+ */
+export function lateRowsFor(deps: RecordDeps, ctx: CallContext, nowMs: number): LateRow[] {
+  const { kernel, readable } = deps;
+  const today = localDays(readableZone(kernel.identity()?.tz))(nowMs);
+  const at = dayNumber(today);
+  const found = new Map<string, LateRow & { day: string }>();
+  for (const list of kernel.registers().values()) {
+    if (readable(ctx, list.id) !== null) continue;
+    const schema = kernel.schemaOf(list.id);
+    if (!schema) continue;
+    const hidden = hiddenOf(ctx, list.id);
+    const days = Object.keys(schema.fields).filter((f) => schema.fields[f]!.deadline === true && schema.fields[f]!.type === 'day' && !hidden.has(f));
+    if (days.length === 0) continue;
+    const money = Object.keys(schema.fields).find((f) => schema.fields[f]!.type === 'money' && !hidden.has(f));
+    const done = list.done ?? [];
+    const open = schema.state !== undefined && done.length > 0 && !hidden.has(schema.state) ? [{ field: schema.state, not_in: [...done] }] : [];
+    for (const field of days) {
+      const got = kernel.list(
+        { register: list.id, where: { all: [{ field, lt: today }, ...open] }, limit: LATE_READ_MOST, order: [{ field, dir: 'asc' }] },
+        kernel.scope(ctx, list.id),
+        [...hidden],
+      );
+      if (!got.ok) continue;
+      for (const row of got.value.rows) {
+        const day = row.fields[field];
+        const title = said(row.fields[list.title]);
+        if (typeof day !== 'string' || row.seq === null || title === null) continue;
+        const held = found.get(row.id);
+        if (held !== undefined && held.day <= day.slice(0, 10)) continue;
+        const value = money === undefined ? undefined : row.fields[money];
+        const amount =
+          value !== null && typeof value === 'object' && !Array.isArray(value) && typeof value['amount'] === 'number' && typeof value['currency'] === 'string'
+            ? { amount: value['amount'], currency: value['currency'] }
+            : undefined;
+        found.set(row.id, {
+          row: spoken(row.register, row.seq),
+          title,
+          list: list.name,
+          days: at - dayNumber(day.slice(0, 10)),
+          day: day.slice(0, 10),
+          ...(amount === undefined ? {} : { amount }),
+        });
+      }
+    }
+  }
+  return [...found.values()]
+    .sort((a, b) => b.days - a.days || (a.title < b.title ? -1 : a.title > b.title ? 1 : 0) || (a.row < b.row ? -1 : 1))
+    .map(({ day: _day, ...rest }) => rest);
+}
+
 export function methods(deps: RecordDeps) {
   const { kernel, scoped, clock } = deps;
 
   return {
+    /**
+     * `{ limit? }`: what is late on this record that the caller may read, the worst first (`lateRowsFor`), as
+     * `{ rows, total }`. `rows` holds at most `limit` (12 unless said, at most `LATE_MOST`); `total` is how many are late
+     * in all. READ+, held to what the caller may read, and it changes nothing.
+     */
+    async lateRows(args: { limit?: unknown }, ctx: CallContext): Promise<Result<{ rows: LateRow[]; total: number }>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      const asked = typeof args?.limit === 'number' && Number.isFinite(args.limit) ? Math.floor(args.limit) : 12;
+      const most = Math.min(Math.max(1, asked), LATE_MOST);
+      const all = kernel.transaction(() => lateRowsFor(deps, ctx, clock.now()));
+      return { ok: true, value: { rows: all.slice(0, most), total: all.length } };
+    },
+
     /**
      * `{}`: what matters on this record now, as `{ cards, at, basis, said }`. Each card is one line a person reads, the
      * row it opens and who wrote the line: `slash` when a model's kept answer still stands for this caller's own facts,
