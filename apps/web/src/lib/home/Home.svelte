@@ -2713,6 +2713,44 @@
     display: none;
   }
 
+  /* A FIGURE'S LINE IS UNDER IT, THE CELL'S WIDTH, as Cash ahead draws its own (24 Nov): on the label's line at the cell's
+     end, his Net worth's line stood in the middle of What you own, between it and the next figure. And the words that say
+     when the line starts take the same place, so a figure is never squeezed beside them. */
+  @container stat (inline-size >= 480px) {
+    .body[data-board] :global(.block-slot:not([data-key='cash']) .block[data-kind='stat']:not([data-form='lead']) .cell:has(> :is(.cell-trend, .cell-trend-wait))) {
+      grid-template-areas:
+        'label glyph'
+        'figure figure'
+        'trend trend'
+        'note note';
+      grid-template-columns: fit-content(100%) minmax(0, 1fr);
+    }
+
+    .body[data-board] :global(.block-slot:not([data-key='cash']) .block[data-kind='stat']:not([data-form='lead']) .grid > .cell) {
+      grid-template-rows: none;
+    }
+
+    .body[data-board] :global(.block-slot:not([data-key='cash']) .block[data-kind='stat']:not([data-form='lead']) .cell > .cell-trend) {
+      inline-size: 100%;
+      block-size: 32px;
+      margin-block-start: var(--sp-1);
+    }
+  }
+
+  @container stat (inline-size < 480px) {
+    .body[data-board] :global(.block-slot:not([data-key='cash']) .block[data-kind='stat']:not([data-form='lead']) .cell:has(> .cell-trend-wait)) {
+      grid-template-areas:
+        'label glyph figure'
+        'trend trend trend'
+        'note note note';
+      grid-template-columns: minmax(0, auto) auto minmax(auto, 1fr);
+    }
+  }
+
+  .body[data-board] :global(.block-slot:not([data-key='cash']) .block[data-kind='stat']:not([data-form='lead']) .cell > .cell-trend-wait) {
+    justify-self: start;
+  }
+
   /* ── the tiles, as Today draws them (the Today polish of 20 October) ── */
 
   /* NEEDS YOU'S COUNT IS THE ONLY RED IN A TILE'S HEAD (polish 5): red words, not a filled badge, which the top bar has. */

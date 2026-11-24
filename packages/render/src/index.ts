@@ -36,6 +36,7 @@ export {
   trendOf,
   trendSaid,
   trendTrimmed,
+  trendKept,
   trendAhead,
   TREND_TODAY,
   type AgentMark,

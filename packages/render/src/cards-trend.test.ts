@@ -16,7 +16,7 @@ import type { Component } from 'svelte';
 
 import { parse, type Block as BlockSegment } from './parse.ts';
 import { toHTML } from './html.ts';
-import { cardTrend } from './cards.ts';
+import { cardTrend, trendKept } from './cards.ts';
 
 registerHooks({
   load(url, context, next) {
@@ -79,5 +79,24 @@ test('A CARD WITH TWO POINTS SHOWS ITS FIGURE ALONE, and the card beside it with
     const nook = html.slice(html.indexOf('Nook'), html.indexOf('Oxbow'));
     assert.match(nook, /<span class="cards-value num">2<\/span><span class="cards-label">Done<\/span>/u, `${who} keeps the figure and its name`);
     assert.doesNotMatch(nook, /<svg/u, `${who} draws nothing beside it`);
+  }
+});
+
+test('A STAT LINE LEAVES OUT A FIRST STRETCH CUT OFF BY A LONGER GAP, and starts at the readings that lead to now (24 Nov)', () => {
+  /* HIS NET WORTH: three early nights, nine with none, then ten. */
+  const run = ['5', '5', '5', ...Array<string>(9).fill('-'), '6', '7', '8', '8', '9', '9', '9', '9', '9', '10'].join(' ');
+  const kept = trendKept(run);
+  assert.equal(kept.lead, 12);
+  assert.equal(kept.value, '6 7 8 8 9 9 9 9 9 10');
+  /* A SHORT GAP IS A GAP IN ONE LINE, and a run that starts empty starts at its first reading. */
+  assert.deepEqual(trendKept('5 5 5 - 6 7 8 9 9 9'), { value: '5 5 5 - 6 7 8 9 9 9', lead: 0 });
+  assert.equal(trendKept('- - - - 6 7 8 9 9 9 9 9').value, '6 7 8 9 9 9 9 9');
+  /* A RUN LONGER THAN A WEEK STAYS A LINE: its last eight are kept, gaps and all. */
+  assert.equal(trendKept('4 4 - - - - - - - - - 6 7 8').value, '- - - - - 6 7 8');
+  const src = `\`\`\`stat\nNet worth | EGP 3,008,499 | | ${run}\nGold | EGP 709,316\n\`\`\``;
+  for (const [who, html] of [['the mirror', mirror(src)], ['the app', drawer(src)]] as const) {
+    const label = /aria-label="Net worth: ([^"]*)"/u.exec(html)?.[1] ?? '';
+    assert.equal(label, '6 to 10, lowest 6, highest 10, 10 readings', `${who} draws the line from its first kept reading`);
+    assert.match(html, /class="trend-line" d="M0 /u, `${who} starts the line at the left`);
   }
 });

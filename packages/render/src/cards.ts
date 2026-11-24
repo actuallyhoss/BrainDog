@@ -171,6 +171,35 @@ export function trendTrimmed(value: string): { value: string; lead: number; tail
   return { value: tokens.slice(first, last + 1).join(', '), lead: first, tail: tokens.length - 1 - last, length: tokens.length };
 }
 
+/**
+ * A STAT'S LINE FROM THE READINGS THAT LEAD TO NOW (24 Nov): his Net worth over 12 weeks held five early nights, then
+ * forty with none, then the last five weeks, and its cell drew the five as a dash floating apart from the line. A first
+ * stretch of readings cut off from the rest by a longer gap is left out, then the empty start, so the line starts at the
+ * stretch that runs on to now. `lead` is how many readings the start lost, for the day under it.
+ */
+export function trendKept(value: string): { value: string; lead: number } {
+  const tokens = runTokens(value);
+  const known = tokens.map((t) => t !== '' && Number.isFinite(Number(t.replace(/−/gu, '-').replace(/,(?=\d{3}(?!\d))/gu, ''))));
+  const stretches: [number, number][] = [];
+  known.forEach((k, i) => {
+    if (!k) return;
+    const last = stretches.at(-1);
+    if (last && last[1] === i - 1) last[1] = i;
+    else stretches.push([i, i]);
+  });
+  while (stretches.length > 1) {
+    const [from, to] = stretches[0]!;
+    const gap = stretches[1]![0] - to - 1;
+    if (gap <= to - from + 1) break;
+    stretches.shift();
+  }
+  const first = stretches[0]?.[0] ?? 0;
+  if (first === 0) return { value, lead: 0 };
+  /* A RUN LONGER THAN A WEEK STAYS A LINE (`trendOf` draws a week or less as bars), so its last eight are always kept. */
+  const from = tokens.length > 7 ? Math.min(first, tokens.length - 8) : first;
+  return { value: tokens.map((t, i) => (i < first ? '-' : t)).slice(from).join(' '), lead: from };
+}
+
 /** What a gap in a run is called in the line's accessible name. */
 const NO_VALUE = 'no value';
 

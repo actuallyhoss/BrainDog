@@ -26,7 +26,7 @@ import { kindSpec } from './kind-spec.ts';
 import { cellNamesNothing, inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, barFigures, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, cardsCount, helpersOf, type Helpers, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, trendAhead, TREND_TODAY, TREND_WAIT, type RunCell, type RunFace } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, cardsCount, helpersOf, type Helpers, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, trendAhead, trendKept, TREND_TODAY, TREND_WAIT, type RunCell, type RunFace } from './cards.ts';
 import { FEED_DAY, FEED_EARLIER, feedBurst, feedCasedNodes, feedFold, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_REASONS, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueReasoned, queueSuggested, queueWays, type QueueShows } from './queue.ts';
@@ -495,7 +495,8 @@ function trendSvg(cls: string, label: string, value: string, o: RenderOptions): 
     const named = `${plain(inline(label, o)) || TREND}, ${TREND_TODAY.toLowerCase()} to ${ahead.to}: ${trendSaid(run.said)}`;
     return `<span class="${cls}-ahead"><svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(named)}"><path class="trend-area" d="${run.area}"></path>${run.zero ? `<path class="trend-zero" d="${run.zero}" vector-effect="non-scaling-stroke"></path>` : ''}<path class="trend-line" d="${run.d}" vector-effect="non-scaling-stroke"></path><path class="trend-today" d="${ahead.today}" vector-effect="non-scaling-stroke"></path><path class="trend-low" d="${ahead.low}" vector-effect="non-scaling-stroke"${run.below ? ' data-below=""' : ''}></path></svg><span class="trend-days" aria-hidden="true"><span>${escape(TREND_TODAY)}</span><span>${escape(ahead.to)}</span></span></span>`;
   }
-  const t = trendOf(plain(inline(value, o)));
+  /* A STAT'S LINE STARTS AT THE READINGS THAT LEAD TO NOW (`trendKept`), as `Trend.svelte` draws it. */
+  const t = trendOf(cls === 'cell-trend' ? trendKept(plain(inline(value, o))).value : plain(inline(value, o)));
   if (!t) return '';
   const name = `${plain(inline(label, o)) || TREND}: ${trendSaid(t.said)}`;
   /* A STAT'S SHORT RUN IS BARS; a `sparkline` keeps its line. */
