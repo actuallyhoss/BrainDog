@@ -3,7 +3,11 @@
  * declared page and Today wait on, so a page of cards and a note downloaded the forecast, the calendar, the form and
  * nine more (about three quarters of that chunk went unused on Today, measured with Lighthouse on 24 Nov). In the app
  * each kind named here is its own chunk: `Lazy.svelte` draws it once it has landed, and `preloadKinds` lets a host ask
- * for a page's drawers the moment it knows the page's kinds, so the block does not wait a round trip of its own.
+ * for a page's drawers the moment it knows the page's kinds, so the block does not wait a round trip of its own; the
+ * host holds its body until they have (`drawers-wait.svelte.ts`).
+ *
+ * NOT THE FEED: every Today draws one (Arrivals, `default-home.ts`), so it stays in the shared chunk and Today waits on
+ * nothing it did not wait on before. Fetched, Today drew its board, then the feed, and "Edit Today" moved down.
  *
  * HELD FROM THE START EVERYWHERE ELSE. `#drawers` is `drawers-held.ts`, every drawer imported as before, and the app's
  * build resolves it to `drawers-fetched.ts` (`apps/web/vite.config.ts`). The site's pages are finished HTML on disk and
@@ -16,7 +20,7 @@ import { fetched, held } from '#drawers';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Drawer = Component<any>;
 
-export const LAZY_KINDS = ['forecast', 'series', 'lines', 'split', 'bridge', 'calendar', 'form', 'lanes', 'gallery', 'embed', 'inputs', 'feed', 'agents'] as const;
+export const LAZY_KINDS = ['forecast', 'series', 'lines', 'split', 'bridge', 'calendar', 'form', 'lanes', 'gallery', 'embed', 'inputs', 'agents'] as const;
 export type LazyKind = (typeof LAZY_KINDS)[number];
 const LAZY: ReadonlySet<string> = new Set(LAZY_KINDS);
 

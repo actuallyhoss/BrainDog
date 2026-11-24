@@ -19,7 +19,7 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Block, Degraded } from 'braindog-render/svelte';
+  import { Block, Degraded, drawersHeld } from 'braindog-render/svelte';
   import { AGENT_MARKS, type MarkedAgent } from '@braindog/skin/agent-marks.ts';
 
   import { apiBase } from '$lib/at.ts';
@@ -31,6 +31,7 @@
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import Mark from '$lib/ui/Mark.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import Fold from './Fold.svelte';
   import {
     FAILED_RUN,
@@ -148,6 +149,9 @@
   const parts = partSpecimens();
   /* ON THE SPECIMENS' OWN DAY, so "today", "late" and a chart's last day are the same in every photograph. */
   const opts = { now: SHEET_NOW };
+  /* THE DRAWERS EVERY CHART HERE IS DRAWN WITH, the record's own kinds and the specimens', waited for before the sheet
+     draws (`drawersHeld`, as a page waits): a chart whose drawer landed after the sheet drew moved every tile under it. */
+  const drawers = drawersHeld(() => [...KINDS, ...[...charts, ...plans, ...parts, ...FAILED.map((f) => FAILED_RUN[f])].flatMap((s) => specimenSegments(s).flatMap((seg) => (seg.type === 'block' ? [seg.kind] : [])))]);
 
   /* ── faces ──────────────────────────────────────────────────────────────── */
   const me = $derived((shell.names[shell.me.person] ?? '').trim());
@@ -164,6 +168,9 @@
   </figure>
 {/snippet}
 
+{#if !drawers.ready}
+<Waiting />
+{:else}
 <div class="sheet" data-sheet-name="charts">
 
   <Fold id="sheet-yours" name={words.yours}>
@@ -269,6 +276,7 @@
     </div>
   </Fold>
 </div>
+{/if}
 
 <style>
   /* BANDS OF TILES, the whole width: a band's name on the board, and under it as many tiles as fit, one on a phone. */

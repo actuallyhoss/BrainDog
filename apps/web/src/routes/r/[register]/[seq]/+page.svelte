@@ -34,8 +34,8 @@
   import { listLine } from '$lib/record/tags.ts';
   import { amountOf, currencyOf, moneyInText, symbolText } from '$lib/record/money.ts';
   import { wayField, wayOfValue } from '$lib/record/money-way.ts';
-  import { money, TONES } from 'braindog-render';
-  import { Document } from 'braindog-render/svelte';
+  import { money, parse, TONES } from 'braindog-render';
+  import { Document, drawersHeld } from 'braindog-render/svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { copy } from '$lib/copy.ts';
@@ -195,8 +195,12 @@
      not name is drawn as `<list>#<number>` and never as a sample row. Undefined for a row the record
      does not hold. */
   const names = $derived(got?.from === 'live' ? got.names : undefined);
-  /* NOTHING IS DRAWN UNTIL THE ROW HAS BEEN READ. */
-  const waiting = $derived(Number.isInteger(seq) && seq >= 1 && got === null);
+  /* THE DRAWERS ITS DOCUMENTS' BLOCKS ARE DRAWN WITH, waited for with the row (`drawersHeld`, as a page waits): a chart
+     or a calendar in a document that landed after the row drew moved every tile under it. Its first drawing only
+     (`once`): a saved edit that writes a chart in does not put the page back to its bars. */
+  const drawers = drawersHeld(() => (row ? writtenDocuments.flatMap((f) => parse(String(row.fields[f.id] ?? '')).flatMap((seg) => (seg.type === 'block' ? [seg.kind] : []))) : null), { once: true });
+  /* NOTHING IS DRAWN UNTIL THE ROW HAS BEEN READ, and its documents' drawers are in. */
+  const waiting = $derived(Number.isInteger(seq) && seq >= 1 && (got === null || !drawers.ready));
   const written = $derived(got?.from === 'live' ? (got.entry ?? undefined) : undefined);
   const row = $derived(written);
 

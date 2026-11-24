@@ -139,6 +139,8 @@
   import { keptWordsNow } from '$lib/home/kept-words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
   import Board from '$lib/board/Board.svelte';
+  /* THE ONE HOLD EVERY SURFACE THAT DRAWS BLOCKS WAITS BY, from its own entry so Today's first chunk does not take the kit. */
+  import { drawersHeld, preloadKinds } from 'braindog-render/drawers-wait';
   import type EditCoverOf from '$lib/board/EditCover.svelte';
   import type DraftMarkOf from '$lib/board/DraftMark.svelte';
   import { BoardModel, boardWords } from '$lib/board/board.svelte.ts';
@@ -436,6 +438,13 @@
   let got = $state<Opened | null>(null);
   /** Whether `got` is Today with cards still arriving (`today-partial.ts`), not yet the record's whole answer. */
   let partial = $state(false);
+  /* THE DRAWERS TODAY'S KINDS NEED (a calendar on a student's Today, lines on a team's), held for as `PageView` holds a
+     page (`drawersHeld`): the board stands as its skeleton until they have landed, and "Edit Today" under it with it.
+     Drawn as they came, the board drew, then the block's body, and everything under it moved down. */
+  const drawers = drawersHeld(() => (got?.from === 'live' ? got.page.blocks.map((b) => b.kind) : []));
+  /** Ask for the drawers of the kinds an answer holds, beside its tiles' code, so the board's hold is as short as can be. */
+  const askDrawers = (blocks: unknown): void =>
+    void preloadKinds((Array.isArray(blocks) ? blocks : []).flatMap((b) => (b !== null && typeof b === 'object' && typeof (b as { kind?: unknown }).kind === 'string' ? [(b as { kind: string }).kind] : [])));
   /** Whether the first read has come back, so a host that cannot draw Today's body is told from one still reading. */
   let settled = $state(false);
   /** A read of Home's own is out: `listen` waits for it rather than asking again on top of it. STATE, because the board
@@ -738,6 +747,7 @@
       if (out.ok) {
         tiles.askTiles((out.value as { blocks?: unknown }).blocks);
         answered = (out.value as { blocks?: unknown }).blocks;
+        askDrawers(answered);
         const said = out.value as { declared?: unknown; declared_version?: unknown };
         if (said.declared !== null && typeof said.declared === 'object' && !Array.isArray(said.declared)) declared = said.declared as Record<string, unknown>;
         if (typeof said.declared_version === 'number') version = said.declared_version;
@@ -828,6 +838,7 @@
       if (out.ok) {
         tiles.askTiles((out.value as { blocks?: unknown }).blocks);
         answered = (out.value as { blocks?: unknown }).blocks;
+        askDrawers(answered);
       }
       return out;
     });
@@ -1440,7 +1451,7 @@
      shape is kept per record and per board width once the board has drawn from the record and rested. */
   const skelCols = $derived(narrow.current ? 2 : 4);
   const skelShape = $derived(readShape(apiBase(), skelCols) ?? firstShape(skelCols));
-  const boardWaits = $derived(board && !data.refused && (got === null ? !settled : PageView === null));
+  const boardWaits = $derived(board && !data.refused && ((got === null ? !settled : PageView === null) || !drawers.ready));
   /** The cards this device last drew on Today's board, which a card still arriving keeps a cell for. */
   const skelKeys = $derived(new Set(skelShape.cards.map((c) => c.key)));
   /** The skeleton a card still arriving draws in its cell: as this device last drew it, else a few rows. */
@@ -2065,7 +2076,7 @@
             onremove={inspectedWidget.key === 'needs-you' || inspectedWidget.key === 'late' ? undefined : (key) => boardModel.hide(key)}
           />{/await}
         {/if}
-        {#if mayArrange && !boardModel.editing && settled && shaped && drawsAny(shaped.blocks)}
+        {#if mayArrange && !boardModel.editing && settled && shaped && drawsAny(shaped.blocks) && drawers.ready}
           <div class="board-foot"><Button weight="quiet" size="sm" onclick={() => boardModel.enter()}>{boardWords.editToday}</Button></div>
         {/if}
       {:else}

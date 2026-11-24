@@ -21,7 +21,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { dateSaid, parse } from 'braindog-render';
-  import { Block, Markdown, Table } from 'braindog-render/svelte';
+  import { Block, Markdown, Table, drawersHeld } from 'braindog-render/svelte';
   /* THE KINDS' AND THE CHARTS' SHEETS, as a declared page loads them (`PageView`), so a note's bar is bars here too. */
   import '@braindog/skin/blocks-kinds.css';
   import '@braindog/skin/blocks-charts.css';
@@ -79,7 +79,7 @@
   });
 
   $effect(() => {
-    if (got?.from === 'live') drew('ready');
+    if (got?.from === 'live' && drawers.ready) drew('ready');
   });
 
   /* THE RECORD'S CLOCK, LANGUAGE AND ZONE: "3d ago" is counted from when the owner's record was read, in its zone. */
@@ -131,6 +131,25 @@
       return isMarked(k) ? AGENT_MARKS[k] : null;
     },
   });
+
+  /* THE DRAWERS ITS BLOCKS NEED, WAITED FOR as the owner's page waits for them (`drawersHeld`): a shared Forecast or
+     Calendar drew its head, then its body a moment later, and moved everything under it. Each block's kind, the kinds it
+     is drawn as here (`drawingOf`), and the blocks of its note and of the project's notes. */
+  const kinds = $derived.by((): string[] => {
+    if (got?.from !== 'live') return [];
+    const out: string[] = [];
+    const fences = (body: string | null) => {
+      if (body) for (const seg of segmentsOf(body)) if (seg.type === 'block') out.push(seg.kind);
+    };
+    for (const sh of shown.blocks) {
+      out.push(sh.block.kind);
+      fences(sh.block.body);
+      for (const seg of drawingOf(sh, where).segments) if (seg.type === 'block') out.push(seg.kind);
+    }
+    fences(got.page.project?.notes ?? null);
+    return out;
+  });
+  const drawers = drawersHeld(() => kinds);
 </script>
 
 <svelte:head>
@@ -201,7 +220,7 @@
     {#if got?.from === 'live'}<span class="what"><Icon name="eye" size="s" /><span class="what-word">{words.sharedChip}</span></span>{/if}
   </header>
 
-  {#if got === null || head === null}
+  {#if got === null || head === null || !drawers.ready}
     <Waiting head />
   {:else if got.from === 'shut'}
     <!-- NO REASON, AND ONE ACTION: the person holding a dead link cannot mend it from here, so the one thing offered is
@@ -349,7 +368,7 @@
 
   <!-- THE CREDIT UNDER A PAGE THAT OPENED. Under "This page is not shared" it was a second way to brain.dog beside the
        card's own "See what BrainDog is", under the mark that already says BrainDog. -->
-  {#if got?.from === 'live'}
+  {#if got?.from === 'live' && drawers.ready}
     <footer class="made">
       <a class="made-link" href="https://brain.dog" rel="noreferrer" onclick={outside}><Mark height={14} />{words.sharedMade}</a>
     </footer>

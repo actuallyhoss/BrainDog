@@ -48,8 +48,9 @@ const PALETTE = fileURLToPath(new URL(`../../packages/skin/${ENV === '' ? 'house
  * AND THE RARER BLOCK DRAWERS ARE FETCHED AS A PAGE NEEDS THEM, by the same means: the renderer's `#drawers` is every
  * drawer in hand wherever nothing says otherwise (the site's finished HTML, the tests' strings), and here it is the
  * file that fetches each as a chunk of its own (`packages/render/svelte/lazy.ts`). The shared drawers chunk every
- * declared page and Today wait on went from 58.3 to 33.4 KB brotli; a page holding one of them waits for it
- * (`PageView.svelte`), so nothing under its block moves when it lands.
+ * declared page and Today wait on went from 58.3 to 26.5 KB brotli (24 Nov, with the feed back in it, which every
+ * Today draws); a surface holding one of the rest waits for it (`drawers-wait.svelte.ts`), so nothing under its
+ * block moves when it lands.
  */
 const DRAWERS = fileURLToPath(new URL('../../packages/render/svelte/drawers-fetched.ts', import.meta.url));
 

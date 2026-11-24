@@ -30,7 +30,7 @@
 -->
 <script lang="ts">
   import { KINDS, isKind, kindSpec } from 'braindog-render';
-  import { Block, Degraded } from 'braindog-render/svelte';
+  import { Block, Degraded, drawersHeld } from 'braindog-render/svelte';
 
   import { at } from '../at.ts';
   import { copy } from '../copy.ts';
@@ -51,6 +51,7 @@
   import Button from './Button.svelte';
   import Define from './Define.svelte';
   import Sheet from './Sheet.svelte';
+  import Waiting from './Waiting.svelte';
 
   let {
     open = $bindable(false),
@@ -248,6 +249,11 @@
     }),
   );
   const allTiles = $derived([...tiles, ...packTiles]);
+
+  /* THE TILES' DRAWERS, WAITED FOR ONCE THE SHEET OPENS (`drawersHeld`, as a page waits for its own): a tile whose kind's
+     drawer landed a moment after the sheet drew grew to its picture and moved every tile under it. Nothing is asked
+     while the sheet is shut. */
+  const drawers = drawersHeld(() => (open ? allTiles.flatMap((t) => t.segments.flatMap((s) => (s.type === 'block' ? [s.kind] : []))) : []));
 </script>
 
 <Sheet bind:open title={copy.addBlock} >
@@ -283,6 +289,9 @@
       </ul>
     </section>
   {/if}
+  {#if !drawers.ready}
+    <Waiting />
+  {:else}
   {#each PURPOSES as purpose}
     {@const group = allTiles.filter((t) => t.spec?.purpose === purpose)}
     {#if group.length}
@@ -331,6 +340,7 @@
     {/if}
   {/each}
   {#if notOffered}<p class="not-offered">{notOffered}</p>{/if}
+  {/if}
   {/if}
 </Sheet>
 

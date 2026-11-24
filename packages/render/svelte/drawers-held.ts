@@ -14,7 +14,6 @@ import Lanes from './Lanes.svelte';
 import Gallery from './Gallery.svelte';
 import Embed from './Embed.svelte';
 import Inputs from './Inputs.svelte';
-import Feed from './Feed.svelte';
 import Agents from './Agents.svelte';
 import type { Drawer, Drawers, LazyKind } from './lazy.ts';
 
@@ -30,7 +29,6 @@ export const held: Drawers['held'] = {
   gallery: Gallery,
   embed: Embed,
   inputs: Inputs,
-  feed: Feed,
   agents: Agents,
 } satisfies Record<LazyKind, Drawer>;
 

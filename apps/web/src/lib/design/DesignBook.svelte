@@ -8,12 +8,13 @@
   reader's theme, and the light and dark values are printed beside it.
 -->
 <script lang="ts">
-  import { Block, Degraded } from 'braindog-render/svelte';
+  import { Block, Degraded, drawersHeld } from 'braindog-render/svelte';
   import { SHEET_NOW, designBook, parse } from 'braindog-render';
   import { HOUSE_FRAME } from '@braindog/theme';
   import { SCALE_CSS } from '@braindog/theme/scale.ts';
 
   import Tile from '$lib/ui/Tile.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import Fold from './Fold.svelte';
 
   /* THE APP'S OWN FRAME (SPEC 1.1), light and dark, written as the declarations the book reads: the board, the tiles,
@@ -21,6 +22,10 @@
   const frameCss = (scheme: 'light' | 'dark') => Object.entries(HOUSE_FRAME[scheme]).map(([k, v]) => `--${k}: ${v};`).join(' ');
   const APP_LOOK = `:root { ${frameCss('light')} } :root[data-theme="dark"] { ${frameCss('dark')} }`;
   const book = designBook({ look: APP_LOOK, scale: SCALE_CSS });
+  /* EACH KIND'S EXAMPLE, READ ONCE, and the drawers they are drawn with waited for (`drawersHeld`, as a page waits): an
+     example whose drawer landed after the book drew grew into its tile and moved every tile under it. */
+  const examples = new Map(book.kinds.map((k) => [k.kind, k.example ? parse(k.example, { page: true }) : []] as const));
+  const drawers = drawersHeld(() => [...examples.values()].flatMap((segments) => segments.flatMap((s) => (s.type === 'block' ? [s.kind] : []))));
   const opts = { now: SHEET_NOW };
   const GROUPS = ['say', 'figure', 'list', 'plan', 'media'] as const;
   const words = {
@@ -132,6 +137,9 @@
   </Fold>
 
   <Fold id="book-kinds" name={words.kinds} count={book.kinds.length}>
+  {#if !drawers.ready}
+    <Waiting />
+  {:else}
   {#each GROUPS as g (g)}
     {#if book.kinds.some((k) => k.group === g)}
       <h3 class="book-g">{words.group[g]}</h3>
@@ -144,7 +152,7 @@
             </p>
             {#if k.example}
               <div class="example">
-                {#each parse(k.example, { page: true }) as segment, i (i)}
+                {#each examples.get(k.kind) ?? [] as segment, i (i)}
                   {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
                 {/each}
               </div>
@@ -156,6 +164,7 @@
       </div>
     {/if}
   {/each}
+  {/if}
   </Fold>
 </div>
 

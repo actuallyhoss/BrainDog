@@ -18,6 +18,5 @@ export const fetched: Drawers['fetched'] = {
   gallery: () => import('./Gallery.svelte'),
   embed: () => import('./Embed.svelte'),
   inputs: () => import('./Inputs.svelte'),
-  feed: () => import('./Feed.svelte'),
   agents: () => import('./Agents.svelte'),
 } satisfies Record<LazyKind, () => Promise<{ default: Drawer }>>;

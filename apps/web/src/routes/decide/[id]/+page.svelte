@@ -32,7 +32,8 @@
   };
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
-  import { day, since, symbolText } from 'braindog-render';
+  import { day, parse, since, symbolText } from 'braindog-render';
+  import { drawersHeld } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { stillTyping } from '$lib/a11y/typed.ts';
@@ -1010,6 +1011,14 @@
   const picking = $derived(pickable.length > 0 && costed);
   /* A NEW ROW, OR ROWS THE TICKS DO NOT DRAW, field by field: what accepting adds is read before the press (`createsOf`). */
   const creates = $derived(question && live && !merge && pickable.length === 0 && costed ? createsOf(live.rowset, live.registers, plainOf(live.registers, live.names)) : []);
+  /* THE DRAWERS A CHANGED NOTE'S BLOCKS ARE DRAWN WITH (`Changes.svelte` draws each part as a page does), waited for
+     with the read (`drawersHeld`, as a page waits): a chart in a note that landed after the card drew moved the press
+     under it. */
+  const drawers = drawersHeld(() =>
+    [...updates, ...creates]
+      .flatMap((u) => u.changes.flatMap((c) => (c.long && c.note ? c.note.parts.flatMap((p) => [...p.before, ...p.after]) : [])))
+      .flatMap((source) => parse(source, { page: true }).flatMap((seg) => (seg.type === 'block' ? [seg.kind] : []))),
+  );
   /* WHAT IT CHANGES LEADS when it is entries changed and the answers are the record's two (`doesPart`). */
   const changesFirst = $derived(two && !story && !preview && (updates.length > 0 || creates.length > 0 || picking));
   /** What accepting would call out, while it can still be approved. */
@@ -1136,8 +1145,8 @@
   </div>
 {/snippet}
 
-{#if from === 'reading'}
-  <!-- Bars, and after 300ms, until the read answers. -->
+{#if from === 'reading' || !drawers.ready}
+  <!-- Bars, and after 300ms, until the read answers and its notes' drawers are in. -->
   <Waiting head />
 {:else if from === 'refused'}
   <div class="page">
