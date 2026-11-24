@@ -44,7 +44,7 @@ function write(kernel, register, fields, opts, at) {
     const out = kernel.backdate(at, () => kernel.create(register, fields, opts));
     if (out.ok) return;
     const field = out.refusal?.at;
-    if (out.refusal?.code !== 'FIELD_UNKNOWN' || typeof field !== 'string' || !(field in fields)) throw new Error(`grow ${register}: ${out.refusal?.code} ${out.refusal?.fix}`);
+    if (!['FIELD_UNKNOWN', 'IMMUTABLE_FIELD'].includes(out.refusal?.code) || typeof field !== 'string' || !(field in fields)) throw new Error(`grow ${register}: ${out.refusal?.code} ${out.refusal?.fix}`);
     delete fields[field];
   }
   throw new Error(`grow ${register}: too many fields refused`);
