@@ -1644,6 +1644,8 @@
     /* `⌘J` OPENS STRAIGHT INTO ASK, where the conversation with Slash was left; with the palette open it moves there. ON
        SLASH'S OWN PAGE IT IS THAT PAGE'S FIELD (3 Nov): the palette opened over the composer it stood for. */
     if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'j') {
+      /* IN ASK THE BAR TOOK IT ALREADY, to put itself away (⌘J toggles). */
+      if (e.defaultPrevented) return;
       e.preventDefault();
       askSlash();
       return;

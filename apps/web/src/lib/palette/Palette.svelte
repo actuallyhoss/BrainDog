@@ -1983,18 +1983,16 @@
   }
 
   /**
-   * ESC, ONE LAYER A PRESS. In Ask: the waiting card first, then the search over the list, then back to Find when a question
-   * came from there, then out of a conversation to the list, and only then closed. In Find it closes, as it always has.
+   * ESC CLOSES THE INNERMOST THING, ONE A PRESS. In Ask: the waiting card first, then the search over the list, then back
+   * to Find when a question came from there, and then the bar closes, focus going back where it was. It no longer steps
+   * out of a conversation to its list first (audit of 24 Nov, 15): a fresh ⌘J took two presses to put away. The list is
+   * one press of Back away on a phone and beside the conversation on a wider screen. In Find it closes, as it always has.
    * Words half typed are never what it takes: they stay in the field, the conversation's own.
    */
   function stepBack() {
     if (!inAsk) return dismiss();
     if (askStep === 'thread' && typed.text === '' && threadView?.escape()) return;
-    if (askStep === 'list') {
-      if (listQuery !== '') return void (listQuery = '');
-    } else if (backTo === null && convo.turns.length > 0 && talks.items.length > 0) {
-      return toList();
-    }
+    if (askStep === 'list' && listQuery !== '') return void (listQuery = '');
     if (backTo !== null) return toFind();
     dismiss();
   }
@@ -2008,6 +2006,13 @@
      the next press unless something was pressed between, so a level or two of steps would have been cut short. What sits
      inside (the @ list, a row being renamed, a menu) has its own Esc and stops it first. */
   function onEscape(e: KeyboardEvent) {
+    /* ⌘J TOGGLES: pressed in Ask it puts the bar away, as Esc does, and focus goes back where it was. Taken here so the
+       shell's own ⌘J, which opens Ask, does not open it again. */
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'j' && inAsk && !e.defaultPrevented) {
+      e.preventDefault();
+      e.stopPropagation();
+      return dismiss();
+    }
     if (e.key !== 'Escape' || !inAsk || e.defaultPrevented) return;
     if (e.target instanceof Element && e.target.closest('dialog') !== el) return;
     e.preventDefault();
