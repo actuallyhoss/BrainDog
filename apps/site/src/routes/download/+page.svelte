@@ -47,17 +47,6 @@
 
 <PageHead title={site.downloadHead.title} lead={site.downloadHead.lead}>
   <div class="here">
-    <p class="said">
-      {#if device && mine?.href}
-        You're on {device.said}.
-      {:else if device && mine}
-        You're on {device.said}. The app is coming soon, and BrainDog works in your browser until then.
-      {:else if device}
-        You're on {device.said}. BrainDog works in your browser.
-      {:else}
-        BrainDog works in any browser, with nothing to install.
-      {/if}
-    </p>
     <div class="acts">
       {#if mine?.href}
         <a class="btn red" href={mine.href} rel="external noopener">{mine.action}</a>
@@ -99,13 +88,7 @@
 <style>
   .here {
     margin-block-start: 28px;
-    min-block-size: 116px;
-  }
-  .said {
-    margin: 0 0 18px;
-    max-inline-size: 36em;
-    color: var(--on-night-2);
-    font-size: var(--t-say);
+    min-block-size: 48px;
   }
   .acts {
     display: flex;
