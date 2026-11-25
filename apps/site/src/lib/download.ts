@@ -2,8 +2,8 @@
  * What /download offers, and which of it the visitor's own device wants.
  *
  * ONE LINE PER PLATFORM, SO AN APP GOING LIVE IS ONE CHANGE: give its row an `href` and its button goes from "Coming soon"
- * on a press to a link. Nothing here says a store has an app until that store shows it: Mac is still in review, and the
- * page must not send anybody to a store that answers with nothing.
+ * on a press to a link. Nothing here says a store has an app until that store shows it: the page must not send anybody
+ * to a store that answers with nothing.
  */
 import { APP, DOCS } from './links.ts';
 
@@ -26,6 +26,8 @@ export type Platform = {
 /** Listed under Quartz Apps since 5 November (1.0.1). */
 export const WINDOWS_STORE = 'https://apps.microsoft.com/detail/9nw4cq8dfbz4';
 const IPHONE_STORE = 'https://apps.apple.com/app/id6830139915';
+/** Live on the Mac App Store since 25 November, as BrainDog Desktop (1.0). */
+const MAC_STORE = 'https://apps.apple.com/app/id6831136539';
 /** Live on Google Play since 12 November (1.0.1). */
 const GOOGLE_PLAY = 'https://play.google.com/store/apps/details?id=dog.brain.app';
 export const INSTALL = 'curl -fsSL https://brain.dog/cli/install.sh | sh';
@@ -37,7 +39,7 @@ const WINDOWS = 'M0 3.449 9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h
 export const PLATFORMS: readonly Platform[] = [
   { id: 'windows', name: 'Windows', say: 'The desktop app, from the Microsoft Store.', action: 'Get it from Microsoft', href: WINDOWS_STORE, mark: WINDOWS },
   { id: 'iphone', name: 'iPhone', say: 'A notification the moment something needs you.', action: 'App Store', href: IPHONE_STORE, mark: APPLE },
-  { id: 'mac', name: 'Mac', say: 'The desktop app, from the Mac App Store.', action: 'Mac App Store', mark: APPLE },
+  { id: 'mac', name: 'Mac', say: 'The desktop app, from the Mac App Store.', action: 'Mac App Store', href: MAC_STORE, mark: APPLE },
   { id: 'android', name: 'Android', say: 'BrainDog in your pocket, from Google Play.', action: 'Google Play', href: GOOGLE_PLAY, mark: ANDROID },
   { id: 'web', name: 'Web', say: 'Any browser on any device, with nothing to install.', action: 'Open BrainDog', href: APP, glyph: 'globe' },
   { id: 'terminal', name: 'Terminal', say: 'The command line, for you and your agents, on Mac and Linux.', action: 'Read the docs', href: DOCS, glyph: 'terminal' },
